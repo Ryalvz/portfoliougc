@@ -291,6 +291,20 @@
   .work-meta .tag { border: 1px solid rgba(240, 238, 234, .7); padding: 1px 6px; border-radius: 3px; text-transform: uppercase; letter-spacing: 1px; font-size: 11px; color: var(--parchment); }
   .work-meta .new { background: var(--parchment); color: var(--cobalt); font-weight: 700; padding: 1px 6px; border-radius: 3px; }
 
+  /* Card com vídeo: prévia ao passar o mouse e player ao clicar */
+  .work-video { display: block; width: 100%; padding: 0; border: 0; background: none; cursor: pointer; text-align: left; font: inherit; color: inherit; }
+  .work-video video { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .play-sm { width: 52px; height: 52px; }
+  .play-sm svg { width: 22px; height: 22px; }
+  .work-video:hover .play-sm, .work-video.playing .play-sm { opacity: 0; transform: scale(.8); }
+  .work-video .play-sm { transition: opacity .25s, transform .25s; }
+
+  /* Player do vídeo em tela cheia */
+  .player-card { position: relative; width: 100%; max-width: 420px; animation: pop .35s ease; }
+  .player-card video { width: 100%; max-height: calc(100vh - 90px); border-radius: 8px; background: var(--cobalt); display: block; box-shadow: 14px 14px 0 var(--olive); }
+  .player-card p { color: var(--parchment); font-weight: 700; margin: 14px 0 0; text-align: center; }
+  .player-card .modal-close { top: 10px; right: 10px; z-index: 1; background: var(--parchment); }
+
   /* =========================================================
      5. SERVIÇOS
      ========================================================= */
@@ -633,6 +647,18 @@
 </footer>
 
 <!-- ================= CARD DE CAPTURA (mídia kit) ================= -->
+<!-- ================= PLAYER DE VÍDEO (abre ao clicar num card com vídeo) ================= -->
+<div class="modal" id="video-modal" hidden>
+  <div class="modal-bg" data-close-video></div>
+  <div class="player-card" role="dialog" aria-modal="true" aria-labelledby="video-title">
+    <button class="modal-close" type="button" aria-label="Fechar vídeo" data-close-video>
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+    </button>
+    <video id="video-player" controls playsinline preload="none"></video>
+    <p id="video-title"></p>
+  </div>
+</div>
+
 <div class="modal" id="kit-modal" hidden>
   <div class="modal-bg" data-close></div>
   <div class="modal-card light" role="dialog" aria-modal="true" aria-labelledby="kit-title" aria-describedby="kit-desc">
@@ -694,6 +720,8 @@ const NICHES = [
 ];
 
 // Galeria de trabalhos. capa: caminho da imagem 2:3 (deixe "" para o degradê). link: opcional.
+// video: caminho do vídeo .mp4 (ex: "videos/meu-video.mp4"). Com vídeo, o card toca uma prévia ao passar o mouse
+// e abre o player com som ao clicar. Coloque o arquivo na pasta "videos" do repositório.
 const WORKS = [
   { nicho: "beleza",  titulo: "Rotina de skincare",        marca: "Marca 01", formato: "Reels",   capa: "", link: "" },
   { nicho: "beleza",  titulo: "Teste de perfume",          marca: "Marca 02", formato: "TikTok",  capa: "", link: "" },
@@ -706,6 +734,7 @@ const WORKS = [
   { nicho: "fitness", titulo: "Treino com o produto",      marca: "Marca 09", formato: "Reels",   capa: "", link: "" },
   { nicho: "fitness", titulo: "Rotina pré treino",         marca: "Marca 10", formato: "Anúncio", capa: "", link: "" },
   { nicho: "fitness", titulo: "Meu dia em movimento",      marca: "Marca 11", formato: "TikTok",  capa: "", link: "" },
+  { nicho: "tech",    titulo: "Campanha Zapay",            marca: "Zapay",    formato: "Vídeo UGC", capa: "videos/zapay-tech.jpg", video: "videos/zapay-tech.mp4", link: "" },
   { nicho: "tech",    titulo: "Primeiras impressões",      marca: "Marca 12", formato: "Resenha",  capa: "", link: "" },
   { nicho: "tech",    titulo: "Mesa montada em 30 segundos",      marca: "Marca 01", formato: "Reels",   capa: "", link: "" },
   { nicho: "tech",    titulo: "Unboxing do gadget",        marca: "Marca 02", formato: "Unboxing", capa: "", link: "" }
@@ -793,12 +822,21 @@ $("#rows").innerHTML = NICHES.map((n) => {
   const items = WORKS.filter((w) => w.nicho === n.chave);
   if (!items.length) return "";
   const cards = items.map((w, i) => {
+    const media = w.video
+      ? `<div class="media ratio-23">
+          <video src="${esc(w.video)}" poster="${esc(w.capa)}" muted loop playsinline preload="none" aria-hidden="true"></video>
+          <span class="play play-sm" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span>
+        </div>`
+      : mediaBlock(w.capa, "ratio-23", "capa 2:3", "Capa do trabalho " + w.titulo);
     const inner = `
-      ${mediaBlock(w.capa, "ratio-23", "capa 2:3", "Capa do trabalho " + w.titulo)}
+      ${media}
       <div class="work-info">
         <h4>${esc(w.titulo)}</h4>
         <div class="work-meta">${i === 0 ? '<span class="new">Novo</span>' : ""}<span class="tag">${esc(w.formato)}</span><span>${esc(w.marca)}</span></div>
       </div>`;
+    if (w.video) {
+      return `<button class="work work-video" type="button" data-video="${esc(w.video)}" data-title="${esc(w.titulo + " · " + w.marca)}" aria-label="Assistir: ${esc(w.titulo)}, ${esc(w.marca)}">${inner}</button>`;
+    }
     return w.link
       ? `<a class="work" href="${esc(w.link)}" target="_blank" rel="noopener">${inner}</a>`
       : `<article class="work" tabindex="0">${inner}</article>`;
@@ -945,6 +983,40 @@ $("#contact-form").addEventListener("submit", (e) => {
   box.querySelector(".success").focus();
 });
 
+/* ---------- Cards com vídeo: prévia e player ---------- */
+const videoModal = $("#video-modal");
+const player = $("#video-player");
+let videoReturnFocus = null;
+
+document.querySelectorAll(".work-video").forEach((card) => {
+  const preview = card.querySelector("video");
+  if (!reduceMotion) {
+    card.addEventListener("mouseenter", () => { preview.play().then(() => card.classList.add("playing")).catch(() => {}); });
+    card.addEventListener("mouseleave", () => { preview.pause(); card.classList.remove("playing"); });
+  }
+  card.addEventListener("click", () => {
+    preview.pause();
+    videoReturnFocus = card;
+    player.src = card.dataset.video;
+    $("#video-title").textContent = card.dataset.title;
+    videoModal.hidden = false;
+    document.body.style.overflow = "hidden";
+    videoModal.querySelector(".modal-close").focus();
+    player.play().catch(() => {});
+  });
+});
+
+function closeVideo() {
+  if (videoModal.hidden) return;
+  player.pause();
+  player.removeAttribute("src");
+  player.load();
+  videoModal.hidden = true;
+  document.body.style.overflow = "";
+  if (videoReturnFocus) videoReturnFocus.focus();
+}
+videoModal.addEventListener("click", (e) => { if (e.target.closest("[data-close-video]")) closeVideo(); });
+
 /* ---------- Card de captura do mídia kit ---------- */
 const modal = $("#kit-modal");
 const KIT_KEY = "midiaKitVisto";
@@ -955,6 +1027,8 @@ function storageSet(k, v) { try { sessionStorage.setItem(k, v); } catch (_) {} }
 
 function openModal() {
   if (storageGet(KIT_KEY)) return;
+  // Não interrompe quem está assistindo um vídeo: tenta de novo depois
+  if (!videoModal.hidden) { setTimeout(openModal, 5000); return; }
   storageSet(KIT_KEY, "1");
   lastFocus = document.activeElement;
   modal.hidden = false;
@@ -971,7 +1045,7 @@ setTimeout(openModal, 7000);
 
 modal.addEventListener("click", (e) => { if (e.target.closest("[data-close]")) closeModal(); });
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") { closeModal(); closeMenu(); }
+  if (e.key === "Escape") { closeVideo(); closeModal(); closeMenu(); }
   // Mantém o foco do teclado dentro do card enquanto ele está aberto
   if (e.key === "Tab" && !modal.hidden) {
     const els = [...modal.querySelectorAll("button, input, [tabindex]")].filter((el) => !el.disabled && el.offsetParent !== null);
