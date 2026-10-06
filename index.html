@@ -359,6 +359,10 @@
   .field input::placeholder, .field textarea::placeholder { color: rgba(31, 63, 195, .6); }
   .field input:focus, .field textarea:focus { outline: none; border-color: var(--olive); box-shadow: 0 0 0 3px var(--parchment), 0 0 0 5px var(--olive); }
   .field textarea { min-height: 130px; resize: vertical; }
+  .form-erro { margin: 0 0 14px; padding: 10px 12px; border-radius: 4px; background: var(--parchment); color: var(--cobalt); font-weight: 600; font-size: 15px; border-left: 4px solid var(--olive); }
+  .form-erro:empty { display: none; }
+  .form-erro a { color: var(--cobalt); }
+  .row-vazia { color: var(--muted); padding: 18px 0 4px; }
   .form .btn { width: 100%; }
   .success { text-align: center; padding: 24px 8px; }
   .success svg { width: 64px; height: 64px; color: var(--olive); margin: 0 auto 12px; }
@@ -585,25 +589,30 @@
         <p class="sec-lead">Me conta sobre a sua marca e o que você precisa. Eu respondo rapidinho.</p>
       </div>
       <div class="contact-grid">
-        <!-- FORMULÁRIO: hoje ele só mostra a confirmação na tela.
-             Para receber as mensagens no seu e-mail, crie um formulário grátis no Formspree
-             e coloque action="https://formspree.io/f/SEU_CODIGO" method="POST" na tag form
-             (e remova o e.preventDefault() do script). -->
+        <!-- FORMULÁRIO: cada envio entra na sua base de marcas do admin (tabela marcas), como "Lead". -->
         <div class="form dark reveal" id="form-box">
           <form id="contact-form" novalidate>
             <div class="field">
               <label for="c-nome">Nome</label>
-              <input id="c-nome" name="nome" type="text" autocomplete="name" required>
+              <input id="c-nome" name="nome" type="text" autocomplete="name" maxlength="120" required>
+            </div>
+            <div class="field">
+              <label for="c-marca">Marca ou empresa (opcional)</label>
+              <input id="c-marca" name="marca" type="text" autocomplete="organization" maxlength="120">
             </div>
             <div class="field">
               <label for="c-email">E-mail</label>
-              <input id="c-email" name="email" type="email" autocomplete="email" required>
+              <input id="c-email" name="email" type="email" autocomplete="email" maxlength="200" required>
+            </div>
+            <div class="field">
+              <label for="c-whats">WhatsApp (opcional)</label>
+              <input id="c-whats" name="whats" type="tel" autocomplete="tel" maxlength="30" placeholder="(11) 90000-0000">
             </div>
             <div class="field">
               <label for="c-msg">Mensagem</label>
-              <textarea id="c-msg" name="mensagem" required placeholder="Conte sobre a marca, o produto e o prazo"></textarea>
+              <textarea id="c-msg" name="mensagem" required maxlength="2500" placeholder="Conte sobre a marca, o produto e o prazo"></textarea>
             </div>
-            <p class="sr-only" id="form-error" aria-live="assertive"></p>
+            <p class="form-erro" id="form-error" aria-live="assertive"></p>
             <button class="btn btn-primary" type="submit">Enviar mensagem</button>
           </form>
         </div>
@@ -684,6 +693,8 @@
   </div>
 </div>
 
+<!-- Conexão com o banco (Supabase): endereço e chave pública ficam em js/banco.js -->
+<script src="js/banco.js"></script>
 <script>
 /* =============================================================
    DADOS DO PORTFÓLIO: edite aqui, sem mexer no HTML.
@@ -719,25 +730,11 @@ const NICHES = [
   { chave: "tech",    nome: "Tech" }
 ];
 
-// Galeria de trabalhos. capa: caminho da imagem 2:3 (deixe "" para o degradê). link: opcional.
-// video: caminho do vídeo .mp4 (ex: "videos/meu-video.mp4"). Com vídeo, o card toca uma prévia ao passar o mouse
-// e abre o player com som ao clicar. Coloque o arquivo na pasta "videos" do repositório.
+// Galeria de trabalhos: AGORA VEM DO PAINEL ADMIN (aba Portfólio, tabela "videos").
+// Edite lá e o site muda sozinho, sem publicar de novo.
+// Esta lista abaixo só aparece se o banco não responder (sem internet, por exemplo).
 const WORKS = [
-  { nicho: "beleza",  titulo: "Rotina de skincare",        marca: "Marca 01", formato: "Reels",   capa: "", link: "" },
-  { nicho: "beleza",  titulo: "Teste de perfume",          marca: "Marca 02", formato: "TikTok",  capa: "", link: "" },
-  { nicho: "beleza",  titulo: "Cuidado com o cabelo",      marca: "Marca 03", formato: "Anúncio", capa: "", link: "" },
-  { nicho: "beleza",  titulo: "Antes e depois",            marca: "Marca 04", formato: "Reels",   capa: "", link: "" },
-  { nicho: "moda",    titulo: "Provador em casa",          marca: "Marca 05", formato: "Reels",   capa: "", link: "" },
-  { nicho: "moda",    titulo: "Três looks, uma peça",      marca: "Marca 06", formato: "TikTok",  capa: "", link: "" },
-  { nicho: "moda",    titulo: "Unboxing da coleção",       marca: "Marca 07", formato: "Unboxing", capa: "", link: "" },
-  { nicho: "moda",    titulo: "Look do dia",               marca: "Marca 08", formato: "Stories", capa: "", link: "" },
-  { nicho: "fitness", titulo: "Treino com o produto",      marca: "Marca 09", formato: "Reels",   capa: "", link: "" },
-  { nicho: "fitness", titulo: "Rotina pré treino",         marca: "Marca 10", formato: "Anúncio", capa: "", link: "" },
-  { nicho: "fitness", titulo: "Meu dia em movimento",      marca: "Marca 11", formato: "TikTok",  capa: "", link: "" },
-  { nicho: "tech",    titulo: "Campanha Zapay",            marca: "Zapay",    formato: "Vídeo UGC", capa: "videos/zapay-tech.jpg", video: "videos/zapay-tech.mp4", link: "" },
-  { nicho: "tech",    titulo: "Primeiras impressões",      marca: "Marca 12", formato: "Resenha",  capa: "", link: "" },
-  { nicho: "tech",    titulo: "Mesa montada em 30 segundos",      marca: "Marca 01", formato: "Reels",   capa: "", link: "" },
-  { nicho: "tech",    titulo: "Unboxing do gadget",        marca: "Marca 02", formato: "Unboxing", capa: "", link: "" }
+  { nicho: "tech", titulo: "Campanha Zapay", marca: "Zapay", formato: "Vídeo UGC", capa: "videos/zapay-tech.jpg", link: "videos/zapay-tech.mp4" }
 ];
 
 // Seis serviços
@@ -818,46 +815,101 @@ $("#filters").innerHTML =
   `<button class="filter" type="button" data-filter="todos" aria-pressed="true">Todos</button>` +
   NICHES.map((n) => `<button class="filter" type="button" data-filter="${esc(n.chave)}" aria-pressed="false">${esc(n.nome)}</button>`).join("");
 
-$("#rows").innerHTML = NICHES.map((n) => {
-  const items = WORKS.filter((w) => w.nicho === n.chave);
-  if (!items.length) return "";
-  const cards = items.map((w, i) => {
-    const media = w.video
-      ? `<div class="media ratio-23">
-          <video src="${esc(w.video)}" poster="${esc(w.capa)}" muted loop playsinline preload="none" aria-hidden="true"></video>
-          <span class="play play-sm" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span>
-        </div>`
-      : mediaBlock(w.capa, "ratio-23", "capa 2:3", "Capa do trabalho " + w.titulo);
-    const inner = `
-      ${media}
-      <div class="work-info">
-        <h4>${esc(w.titulo)}</h4>
-        <div class="work-meta">${i === 0 ? '<span class="new">Novo</span>' : ""}<span class="tag">${esc(w.formato)}</span><span>${esc(w.marca)}</span></div>
-      </div>`;
-    if (w.video) {
-      return `<button class="work work-video" type="button" data-video="${esc(w.video)}" data-title="${esc(w.titulo + " · " + w.marca)}" aria-label="Assistir: ${esc(w.titulo)}, ${esc(w.marca)}">${inner}</button>`;
-    }
-    return w.link
-      ? `<a class="work" href="${esc(w.link)}" target="_blank" rel="noopener">${inner}</a>`
-      : `<article class="work" tabindex="0">${inner}</article>`;
+// Link de arquivo de vídeo (.mp4 etc.) abre no player do site; outro link (Reels, TikTok) abre em nova aba
+const ehArquivoVideo = (l) => /\.(mp4|webm|m4v|mov)(\?.*)?$/i.test(l || "");
+let filtroAtual = "todos";
+
+function desenharTrabalhos(lista) {
+  if (lista === null) { $("#rows").innerHTML = '<p class="row-vazia">Carregando trabalhos...</p>'; return; }
+  $("#rows").innerHTML = NICHES.map((n) => {
+    const items = lista.filter((w) => w.nicho === n.chave);
+    const cards = items.map((w, i) => {
+      const video = ehArquivoVideo(w.link);
+      const media = video
+        ? `<div class="media ratio-23">
+            <video src="${esc(w.link)}" ${w.capa ? `poster="${esc(w.capa)}"` : ""} muted loop playsinline preload="${w.capa ? "none" : "metadata"}" aria-hidden="true"></video>
+            <span class="play play-sm" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span>
+          </div>`
+        : mediaBlock(w.capa, "ratio-23", "capa 2:3", "Capa do trabalho " + w.titulo);
+      const inner = `
+        ${media}
+        <div class="work-info">
+          <h4>${esc(w.titulo)}</h4>
+          <div class="work-meta">${i === 0 ? '<span class="new">Novo</span>' : ""}${w.formato ? `<span class="tag">${esc(w.formato)}</span>` : ""}<span>${esc(w.marca || "")}</span></div>
+        </div>`;
+      const titulo = w.titulo + (w.marca ? " · " + w.marca : "");
+      if (video) return `<button class="work work-video" type="button" data-video="${esc(w.link)}" data-title="${esc(titulo)}" aria-label="Assistir: ${esc(titulo)}">${inner}</button>`;
+      return w.link
+        ? `<a class="work" href="${esc(w.link)}" target="_blank" rel="noopener">${inner}</a>`
+        : `<article class="work" tabindex="0">${inner}</article>`;
+    }).join("");
+    const vazio = items.length === 0;
+    const escondido = filtroAtual === "todos" ? vazio : filtroAtual !== n.chave;
+    return `<div class="row in" data-niche="${esc(n.chave)}" data-vazio="${vazio ? 1 : 0}" ${escondido ? "hidden" : ""}>
+      <h3 class="row-title">${esc(n.nome)} <small>${items.length === 1 ? "1 trabalho" : items.length + " trabalhos"}</small></h3>
+      ${vazio ? `<p class="row-vazia">Em breve, trabalhos de ${esc(n.nome.toLowerCase())} por aqui.</p>` : `<div class="row-scroller">${cards}</div>`}
+    </div>`;
   }).join("");
-  return `<div class="row reveal" data-niche="${esc(n.chave)}">
-    <h3 class="row-title">${esc(n.nome)} <small>${items.length} trabalhos</small></h3>
-    <div class="row-scroller">${cards}</div>
-  </div>`;
-}).join("");
+  ligarCardsVideo();
+}
 
 $("#filters").addEventListener("click", (e) => {
   const btn = e.target.closest(".filter");
   if (!btn) return;
   const f = btn.dataset.filter;
+  filtroAtual = f;
   document.querySelectorAll(".filter").forEach((b) => b.setAttribute("aria-pressed", b === btn ? "true" : "false"));
   document.querySelectorAll(".row").forEach((r) => {
-    r.hidden = !(f === "todos" || r.dataset.niche === f);
+    r.hidden = f === "todos" ? r.dataset.vazio === "1" : r.dataset.niche !== f;
     r.classList.add("in");
   });
   $("#filter-status").textContent = f === "todos" ? "Mostrando todos os trabalhos" : "Mostrando trabalhos de " + btn.textContent;
 });
+
+// Destaques: se algum vídeo do painel tiver o campo "destaque" preenchido (ex: "2,4M views"),
+// os 3 primeiros entram no lugar dos cards de exemplo.
+function desenharDestaquesDoBanco(lista) {
+  const com = lista.filter((v) => v.destaque).slice(0, 3);
+  if (!com.length) return;
+  $("#highlights").innerHTML = com.map((v, i) => {
+    const m = String(v.destaque).trim().match(/^(\S+)\s*(.*)$/) || [];
+    const numero = m[1] || v.destaque, rotulo = m[2] || "";
+    const titulo = v.titulo + (v.marca ? " · " + v.marca : "");
+    const corpo = `
+      <div style="position:relative">
+        <span class="hl-rank" aria-hidden="true">${i + 1}</span>
+        ${mediaBlock(v.capa, "ratio-916", "capa do vídeo 9:16", "Capa do vídeo " + v.titulo)}
+        ${playIcon}
+      </div>
+      <div class="hl-body">
+        <div class="hl-num">${esc(numero)}</div>
+        <div class="hl-label">${esc(rotulo)}</div>
+        <h3>${esc(v.titulo)}</h3>
+        <p>${esc([v.marca, v.formato].filter(Boolean).join(" · "))}</p>
+      </div>`;
+    return ehArquivoVideo(v.link)
+      ? `<button class="hl-card dark in work-video" type="button" style="border:0;padding:0;text-align:left;font:inherit;color:inherit;cursor:pointer" data-video="${esc(v.link)}" data-title="${esc(titulo)}" aria-label="Assistir: ${esc(titulo)}">${corpo}</button>`
+      : `<a class="hl-card dark in" href="${esc(v.link || "#")}" target="_blank" rel="noopener" aria-label="Assistir: ${esc(titulo)}">${corpo}</a>`;
+  }).join("");
+  ligarCardsVideo();
+}
+
+// Busca os vídeos no banco. Se não responder em 6 segundos, usa a lista WORKS acima.
+async function carregarTrabalhos() {
+  desenharTrabalhos(null);
+  try {
+    if (!window.bancoLer) throw new Error("sem banco");
+    const espera = new Promise((_, falha) => setTimeout(() => falha(new Error("demorou")), 6000));
+    const lista = await Promise.race([
+      window.bancoLer("videos", "select=titulo,link,capa,nicho,formato,marca,destaque,ordem&visivel=eq.true&order=ordem.asc,id.asc"),
+      espera
+    ]);
+    desenharTrabalhos(lista);
+    desenharDestaquesDoBanco(lista);
+  } catch (_) {
+    desenharTrabalhos(WORKS);
+  }
+}
 
 // Serviços
 $("#services").innerHTML = SERVICES.map((s, i) => `
@@ -964,18 +1016,42 @@ if ("IntersectionObserver" in window) {
 const isEmail = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 const checkIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m8 12 3 3 5-6"/></svg>';
 
-$("#contact-form").addEventListener("submit", (e) => {
+// Cada envio vira uma marca na tabela "marcas" do admin, com a situação "lead"
+$("#contact-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const f = e.target;
   const nome = f.nome.value.trim();
+  const marca = f.marca.value.trim();
   const email = f.email.value.trim();
+  const whats = f.whats.value.trim();
   const msg = f.mensagem.value.trim();
   let bad = null;
   if (!nome) bad = f.nome; else if (!isEmail(email)) bad = f.email; else if (!msg) bad = f.mensagem;
   [f.nome, f.email, f.mensagem].forEach((i) => i.setAttribute("aria-invalid", i === bad ? "true" : "false"));
   if (bad) {
-    $("#form-error").textContent = bad === f.email ? "Digite um e-mail válido." : "Preencha todos os campos.";
+    $("#form-error").textContent = bad === f.email ? "Digite um e-mail válido." : "Preencha nome, e-mail e mensagem.";
     bad.focus();
+    return;
+  }
+  $("#form-error").textContent = "";
+  const btn = f.querySelector('button[type="submit"]');
+  btn.disabled = true;
+  btn.textContent = "Enviando...";
+  const d = new Date();
+  const hoje = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  try {
+    await window.bancoInserir("marcas", {
+      nome: (marca || nome).slice(0, 150),
+      email: email.slice(0, 200),
+      telefone: whats ? whats.slice(0, 40) : null,
+      situacao: "lead",
+      ultimo_contato: hoje,
+      obs: `Veio pelo formulário do site. Contato: ${nome}.${marca ? "" : " (não informou a marca)"}\n\n${msg}`.slice(0, 3000)
+    });
+  } catch (_) {
+    btn.disabled = false;
+    btn.textContent = "Enviar mensagem";
+    $("#form-error").innerHTML = 'Não consegui enviar agora. Tente de novo ou me chame no <a href="https://wa.me/5511913012249" target="_blank" rel="noopener">WhatsApp</a>.';
     return;
   }
   const box = $("#form-box");
@@ -988,23 +1064,26 @@ const videoModal = $("#video-modal");
 const player = $("#video-player");
 let videoReturnFocus = null;
 
-document.querySelectorAll(".work-video").forEach((card) => {
-  const preview = card.querySelector("video");
-  if (!reduceMotion) {
-    card.addEventListener("mouseenter", () => { preview.play().then(() => card.classList.add("playing")).catch(() => {}); });
-    card.addEventListener("mouseleave", () => { preview.pause(); card.classList.remove("playing"); });
-  }
-  card.addEventListener("click", () => {
-    preview.pause();
-    videoReturnFocus = card;
-    player.src = card.dataset.video;
-    $("#video-title").textContent = card.dataset.title;
-    videoModal.hidden = false;
-    document.body.style.overflow = "hidden";
-    videoModal.querySelector(".modal-close").focus();
-    player.play().catch(() => {});
+function ligarCardsVideo() {
+  document.querySelectorAll(".work-video:not([data-ligado])").forEach((card) => {
+    card.dataset.ligado = "1";
+    const preview = card.querySelector("video");
+    if (preview && !reduceMotion) {
+      card.addEventListener("mouseenter", () => { preview.play().then(() => card.classList.add("playing")).catch(() => {}); });
+      card.addEventListener("mouseleave", () => { preview.pause(); card.classList.remove("playing"); });
+    }
+    card.addEventListener("click", () => {
+      if (preview) preview.pause();
+      videoReturnFocus = card;
+      player.src = card.dataset.video;
+      $("#video-title").textContent = card.dataset.title;
+      videoModal.hidden = false;
+      document.body.style.overflow = "hidden";
+      videoModal.querySelector(".modal-close").focus();
+      player.play().catch(() => {});
+    });
   });
-});
+}
 
 function closeVideo() {
   if (videoModal.hidden) return;
@@ -1061,9 +1140,49 @@ $("#kit-form").addEventListener("submit", (e) => {
   const nome = f.nome.value.trim();
   if (!nome) { f.nome.setAttribute("aria-invalid", "true"); f.nome.focus(); return; }
   if (!isEmail(f.email.value.trim())) { f.email.setAttribute("aria-invalid", "true"); f.email.focus(); return; }
+  // Quem pede o mídia kit também entra na base de marcas como lead
+  if (window.bancoInserir) {
+    window.bancoInserir("marcas", {
+      nome: nome.slice(0, 150), email: f.email.value.trim().slice(0, 200), situacao: "lead",
+      ultimo_contato: new Date().toLocaleDateString("sv-SE"),
+      obs: "Pediu o mídia kit pelo card do site."
+    }).catch(() => {});
+  }
   $("#kit-content").innerHTML = `<div class="success" tabindex="-1">${checkIcon}<h2 id="kit-title">Prontinho!</h2><p>Valeu, ${esc(nome.split(" ")[0])}! O mídia kit vai chegar no seu e-mail.</p></div>`;
   $("#kit-content .success").focus();
 });
+
+/* ---------- Trabalhos vindos do painel ---------- */
+carregarTrabalhos();
+
+/* ---------- Registro de visita (sem cookie, sem dado pessoal) ----------
+   Grava só: a página e de onde a pessoa veio. Uma vez por visita (aba aberta).
+   Não conta quando o site é aberto no próprio computador para testes. */
+(function registrarVisita() {
+  if (!window.bancoInserir || location.protocol === "file:" || /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) return;
+  try {
+    const chave = "visita-registrada:" + location.pathname;
+    if (sessionStorage.getItem(chave)) return;
+    sessionStorage.setItem(chave, "1");
+  } catch (_) {}
+  const nomes = [
+    [/instagram/i, "Instagram"], [/tiktok|musical_ly|bytedance/i, "TikTok"], [/facebook|fban|fbav|fb\.me|^m\.facebook/i, "Facebook"],
+    [/whatsapp|wa\.me/i, "WhatsApp"], [/linkedin|lnkd\.in/i, "LinkedIn"], [/youtube|youtu\.be/i, "YouTube"],
+    [/google\./i, "Google"], [/bing\./i, "Bing"], [/^t\.co$|twitter|^x\.com$/i, "X (Twitter)"], [/pinterest/i, "Pinterest"]
+  ];
+  const nomear = (t) => { const a = nomes.find(([re]) => re.test(t)); return a ? a[1] : null; };
+  let origem = null;
+  try {
+    const utm = new URLSearchParams(location.search).get("utm_source");
+    if (utm) origem = nomear(utm) || utm.slice(0, 60);
+    if (!origem && document.referrer) {
+      const host = new URL(document.referrer).hostname.replace(/^www\./, "");
+      if (host && host !== location.hostname) origem = nomear(host) || host;
+    }
+    if (!origem) origem = nomear(navigator.userAgent); // navegador interno do Instagram, TikTok...
+  } catch (_) {}
+  window.bancoInserir("visitas", { pagina: location.pathname.slice(0, 200), origem: (origem || "Direto").slice(0, 200) }).catch(() => {});
+})();
 </script>
 </body>
 </html>
