@@ -830,7 +830,9 @@ function desenharTrabalhos(lista) {
             <video src="${esc(w.link)}" ${w.capa ? `poster="${esc(w.capa)}"` : ""} muted loop playsinline preload="${w.capa ? "none" : "metadata"}" aria-hidden="true"></video>
             <span class="play play-sm" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span>
           </div>`
-        : mediaBlock(w.capa, "ratio-23", "capa 2:3", "Capa do trabalho " + w.titulo);
+        : w.capa
+          ? mediaBlock(w.capa, "ratio-23", "", "Capa do trabalho " + w.titulo)
+          : `<div class="media ratio-23" role="img" aria-label="Trabalho ${esc(w.titulo)}">${w.link ? '<span class="play play-sm" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span>' : ""}</div>`;
       const inner = `
         ${media}
         <div class="work-info">
@@ -878,7 +880,7 @@ function desenharDestaquesDoBanco(lista) {
     const corpo = `
       <div style="position:relative">
         <span class="hl-rank" aria-hidden="true">${i + 1}</span>
-        ${mediaBlock(v.capa, "ratio-916", "capa do vídeo 9:16", "Capa do vídeo " + v.titulo)}
+        ${mediaBlock(v.capa, "ratio-916", "", "Capa do vídeo " + v.titulo)}
         ${playIcon}
       </div>
       <div class="hl-body">
