@@ -1302,9 +1302,8 @@ function pintarDetalheTrans() {
       </div>
       <div class="cartao trans-textos">
         <div class="barra" style="margin-bottom:6px"><h2 style="margin:0">Roteiro (transcrição)</h2><span class="espaco"></span><span class="sub" id="t-status"></span></div>
-        <textarea class="campo" id="t-transcricao" rows="12" placeholder="Cole aqui o texto do TokScript. Se vier em outro idioma, eu traduzo para português sozinho.">${esc(t.transcricao || "")}</textarea>
+        <textarea class="campo" id="t-transcricao" rows="12" placeholder="Cole aqui o texto do TokScript. Vídeo em português fica como está. Se o vídeo for em outro idioma, eu traduzo para português sozinho.">${esc(t.transcricao || "")}</textarea>
         <div class="barra" style="margin:6px 0 0">
-          <button class="btn" type="button" id="t-traduzir">${ic("traduzir")}Traduzir para português</button>
           ${traduzido ? `<button class="btn" type="button" id="t-original">Ver o original (${esc(NOME_IDIOMA[t.idioma_original] || t.idioma_original)})</button>` : ""}
         </div>
         <div id="t-original-caixa" hidden><p class="sub" style="margin:10px 0 4px">Texto original, como veio do TokScript:</p><div class="original">${esc(t.transcricao_original || "")}</div></div>
@@ -1346,7 +1345,7 @@ function pintarDetalheTrans() {
     if (!texto) { if (manual) avisar("Cole o texto primeiro.", true); return; }
     status("Conferindo o idioma...");
     const idioma = (await detectarIdioma(texto) || "").slice(0, 2);
-    if (idioma === "pt") { status(manual ? "Esse texto já está em português." : ""); return; }
+    if (idioma === "pt") { status(""); return; }
     status(`Traduzindo do ${NOME_IDIOMA[idioma] || idioma} para português...`);
     try {
       const pt = await traduzirParaPortugues(texto, idioma, status);
@@ -1365,8 +1364,9 @@ function pintarDetalheTrans() {
     $("a", d).addEventListener("click", () => d.close());
   }
 
+  // Traduz sozinho ao colar (ou ao sair do campo), e só se o texto não estiver em português
   ta.addEventListener("paste", () => setTimeout(() => garantirPortugues(false), 50));
-  $("#t-traduzir").onclick = () => garantirPortugues(true);
+  ta.addEventListener("change", () => garantirPortugues(false));
   if ($("#t-original")) $("#t-original").onclick = () => { const c = $("#t-original-caixa"); c.hidden = !c.hidden; };
 
   const salvar = async () => {
