@@ -265,3 +265,34 @@ drop policy if exists "dono apaga arquivos" on storage.objects;
 create policy "dono apaga arquivos" on storage.objects
   for delete to authenticated
   using (bucket_id = 'portfolio' and public.eh_admin());
+
+
+-- -------------------------------------------------------------
+-- 11. TABELA TRANSCRICOES
+-- Vídeos de referência (YouTube, Instagram, TikTok) com o roteiro
+-- transcrito, sempre em português, e as suas observações.
+-- transcricao: o texto em português (o que você lê e edita)
+-- categoria: tiktok_shop (TikTok Shop), organico (ideias para vídeos
+-- orgânicos) ou publi (publi e UGC)
+-- transcricao_original / idioma_original: o texto como veio, quando
+-- precisou ser traduzido
+-- Só você (logado) lê e mexe aqui. Ninguém de fora vê nada.
+-- -------------------------------------------------------------
+create table if not exists public.transcricoes (
+  id                    bigint generated always as identity primary key,
+  criado_em             timestamptz not null default now(),
+  link                  text not null,
+  plataforma            text check (plataforma in ('youtube', 'instagram', 'tiktok', 'outro')),
+  categoria             text not null default 'organico'
+                        check (categoria in ('tiktok_shop', 'organico', 'publi')),
+  titulo                text,
+  transcricao           text,
+  transcricao_original  text,
+  idioma_original       text,
+  observacoes           text
+);
+alter table public.transcricoes enable row level security;
+
+drop policy if exists "dono faz tudo" on public.transcricoes;
+create policy "dono faz tudo" on public.transcricoes
+  for all to authenticated using (public.eh_admin()) with check (public.eh_admin());
