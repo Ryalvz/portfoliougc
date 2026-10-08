@@ -232,11 +232,11 @@ function abrirForm({ titulo, tabela, campos, valores = {}, aoSalvar, aoApagar })
   if (primeiro) primeiro.focus();
 }
 
-function confirmar(texto) {
+function confirmar(texto, rotulo = "Sim, apagar") {
   return new Promise((resolve) => {
     const c = document.createElement("dialog");
     c.innerHTML = `<div class="janela-corpo">${esc(texto)}</div>
-      <div class="janela-pe"><button type="button" class="btn" data-n>Cancelar</button><button type="button" class="btn primario" data-s>Sim, apagar</button></div>`;
+      <div class="janela-pe"><button type="button" class="btn" data-n>Cancelar</button><button type="button" class="btn primario" data-s>${esc(rotulo)}</button></div>`;
     document.body.appendChild(c);
     const fim = (r) => { c.close(); c.remove(); resolve(r); };
     $("[data-n]", c).onclick = () => fim(false);
@@ -1106,15 +1106,15 @@ function subRevisar(corpo, B) {
 /* =============================================================
    ABA 6: TRANSCRIÇÕES
    Vídeos de referência do YouTube, Instagram e TikTok, separados em
-   TikTok Shop, Ideias orgânicas e Publi / UGC. A transcrição é feita
-   pelo TokScript aberto dentro do próprio painel, e o texto colado é
-   traduzido para português pelo tradutor que vem dentro do Chrome.
+   TikTok Shop, Ideias orgânicas e Publi / UGC. A transcrição é automática:
+   o ajudante "transcrever" (supabase/functions/transcrever) pede o texto ao
+   Supadata, e o que não vier em português é traduzido pelo tradutor do Chrome.
    ============================================================= */
 const CATEGORIAS = [["tiktok_shop", "TikTok Shop"], ["organico", "Ideias orgânicas"], ["publi", "Publi / UGC"]];
 const nomeCategoria = (c) => (CATEGORIAS.find((x) => x[0] === c) || [c, "Sem divisão"])[1];
 const NOME_PLATAFORMA = { youtube: "YouTube", instagram: "Instagram", tiktok: "TikTok", outro: "Link" };
 const NOME_IDIOMA = { en: "inglês", es: "espanhol", fr: "francês", it: "italiano", de: "alemão", ja: "japonês", ko: "coreano", zh: "chinês", ru: "russo", hi: "hindi", ar: "árabe", tr: "turco", nl: "holandês", pl: "polonês" };
-const trans = { categoria: "todas", busca: "", sel: null, tokscriptAberto: false };
+const trans = { categoria: "todas", busca: "", sel: null };
 
 // Descobre a plataforma e o endereço para mostrar o vídeo dentro do painel
 function videoDoLink(link) {
@@ -1230,7 +1230,7 @@ function desenharTranscricoes(el) {
   $("#lista-trans").addEventListener("click", (e) => {
     const b = e.target.closest("[data-trans]");
     if (!b) return;
-    trans.sel = b.dataset.trans; trans.tokscriptAberto = false;
+    trans.sel = b.dataset.trans;
     pintarListaTrans(); pintarDetalheTrans();
     if (window.innerWidth < 960) $("#detalhe-trans").scrollIntoView({ behavior: "smooth" });
   });
@@ -1253,7 +1253,7 @@ function pintarListaTrans() {
     : lista.map((t) => `<button type="button" class="item-trans ${String(t.id) === String(trans.sel) ? "ativo" : ""}" data-trans="${esc(t.id)}">
         <span class="item-trans-topo"><span class="pilula p-plat-${esc(t.plataforma || "outro")}">${esc(NOME_PLATAFORMA[t.plataforma] || "Link")}</span><span class="pilula p-cat">${esc(nomeCategoria(t.categoria))}</span></span>
         <b>${esc(t.titulo || "Sem título")}</b>
-        <small>${t.transcricao ? esc(t.transcricao.slice(0, 90)) + (t.transcricao.length > 90 ? "..." : "") : "Ainda sem transcrição"}</small>
+        <small>${transcrevendo.has(String(t.id)) ? "Transcrevendo..." : t.transcricao ? esc(t.transcricao.slice(0, 90)) + (t.transcricao.length > 90 ? "..." : "") : "Ainda sem transcrição"}</small>
         <small class="data">${t.criado_em ? dataBR(isoLocal(new Date(t.criado_em))) : ""}</small>
       </button>`).join("");
 }
@@ -1272,10 +1272,77 @@ async function adicionarTranscricao(e) {
   Object.keys(dados).forEach((k) => { if (temCampo("transcricoes", k)) limpo[k] = dados[k]; });
   const { data, error } = await db.from("transcricoes").insert(limpo).select("id").single();
   if (error) { avisar(traduzErro(error), true); return; }
-  trans.sel = String(data.id); trans.tokscriptAberto = true;
+  trans.sel = String(data.id);
   if (trans.categoria !== "todas" && trans.categoria !== dados.categoria) trans.categoria = dados.categoria;
-  avisar("Vídeo salvo. Agora gere a transcrição no quadro do TokScript.");
   await recarregar("transcricoes");
+  const novo = S.transcricoes.find((x) => String(x.id) === String(data.id));
+  if (novo) transcreverVideo(novo);
+}
+
+/* ---------- Transcrição automática (ajudante "transcrever" no Supabase + Supadata) ---------- */
+const transcrevendo = new Set();
+
+async function mensagemDoErroDaFuncao(error) {
+  const st = error && error.context && error.context.status;
+  if (st === 404) return "O ajudante de transcrição ainda não foi instalado no Supabase.";
+  try { const j = await error.context.json(); if (j && j.erro) return j.erro; } catch (_) {}
+  if (/fetch|network/i.test((error && error.message) || "")) return "Sem conexão. Confira a internet e tente de novo.";
+  return "Não deu para transcrever agora. Tente de novo em instantes.";
+}
+
+// Atualiza a tela do vídeo aberto sem apagar o que você estiver digitando nas observações
+function mostrarTranscricaoNaTela(item, aviso) {
+  if (String(trans.sel) !== String(item.id) || !$("#t-transcricao")) return;
+  const rodando = transcrevendo.has(String(item.id));
+  $("#t-transcricao").value = item.transcricao || "";
+  $("#t-transcricao").disabled = rodando;
+  $("#t-status").textContent = aviso || "";
+  $("#t-transcrever").disabled = rodando;
+  $("#t-transcrever").innerHTML = `${ic("transcricao")}${rodando ? "Transcrevendo..." : item.transcricao ? "Transcrever de novo" : "Transcrever automaticamente"}`;
+  const area = $("#t-original-area");
+  if (area) area.innerHTML = botaoOriginal(item);
+}
+
+function botaoOriginal(t) {
+  if (!(t.transcricao_original && t.idioma_original && t.idioma_original !== "pt")) return "";
+  return `<button class="btn" type="button" id="t-original">Ver o original (${esc(NOME_IDIOMA[t.idioma_original] || t.idioma_original)})</button>
+    <div id="t-original-caixa" hidden><p class="sub" style="margin:10px 0 4px">Texto original, antes da tradução:</p><div class="original">${esc(t.transcricao_original)}</div></div>`;
+}
+
+async function transcreverVideo(item) {
+  const id = String(item.id);
+  if (transcrevendo.has(id)) return;
+  transcrevendo.add(id);
+  pintarListaTrans();
+  mostrarTranscricaoNaTela(item, "Transcrevendo o vídeo... pode levar até 1 minuto.");
+  let aviso = "";
+  try {
+    const { data, error } = await db.functions.invoke("transcrever", { body: { link: item.link } });
+    if (error || !data || data.erro) {
+      aviso = error ? await mensagemDoErroDaFuncao(error) : (data && data.erro) || "Não deu para transcrever agora.";
+      avisar(aviso, true);
+      return;
+    }
+    let texto = String(data.texto || "").trim();
+    // Confere o idioma pelo próprio texto (mais seguro que confiar só no que o serviço diz)
+    let idioma = (await detectarIdioma(texto) || data.idioma || "").slice(0, 2);
+    const dados = { transcricao: texto, transcricao_original: null, idioma_original: null };
+    if (idioma && idioma !== "pt") {
+      let pt = null;
+      try { pt = await traduzirParaPortugues(texto, idioma, (t) => mostrarTranscricaoNaTela(item, t)); } catch (_) {}
+      if (pt) { dados.transcricao = pt.trim(); dados.transcricao_original = texto; dados.idioma_original = idioma; }
+      else aviso = `Veio em ${NOME_IDIOMA[idioma] || idioma} e o tradutor do Chrome não respondeu. Apague o texto e cole de novo para traduzir.`;
+    }
+    if (await gravar("transcricoes", dados, item.id)) {
+      Object.assign(item, dados);
+      if (!aviso) aviso = dados.idioma_original ? `Transcrito e traduzido do ${NOME_IDIOMA[dados.idioma_original] || dados.idioma_original}.` : "Transcrito.";
+      avisar(dados.idioma_original ? "Transcrição pronta e traduzida para português." : "Transcrição pronta.");
+    }
+  } finally {
+    transcrevendo.delete(id);
+    pintarListaTrans();
+    mostrarTranscricaoNaTela(item, aviso);
+  }
 }
 
 function pintarDetalheTrans() {
@@ -1302,11 +1369,11 @@ function pintarDetalheTrans() {
       </div>
       <div class="cartao trans-textos">
         <div class="barra" style="margin-bottom:6px"><h2 style="margin:0">Roteiro (transcrição)</h2><span class="espaco"></span><span class="sub" id="t-status"></span></div>
-        <textarea class="campo" id="t-transcricao" rows="12" placeholder="Cole aqui o texto do TokScript. Vídeo em português fica como está. Se o vídeo for em outro idioma, eu traduzo para português sozinho.">${esc(t.transcricao || "")}</textarea>
+        <textarea class="campo" id="t-transcricao" rows="12" placeholder="A transcrição aparece aqui sozinha, sempre em português. Você também pode editar ou colar um texto.">${esc(t.transcricao || "")}</textarea>
         <div class="barra" style="margin:6px 0 0">
-          ${traduzido ? `<button class="btn" type="button" id="t-original">Ver o original (${esc(NOME_IDIOMA[t.idioma_original] || t.idioma_original)})</button>` : ""}
+          <button class="btn" type="button" id="t-transcrever">${ic("transcricao")}${t.transcricao ? "Transcrever de novo" : "Transcrever automaticamente"}</button>
+          <span id="t-original-area">${botaoOriginal(t)}</span>
         </div>
-        <div id="t-original-caixa" hidden><p class="sub" style="margin:10px 0 4px">Texto original, como veio do TokScript:</p><div class="original">${esc(t.transcricao_original || "")}</div></div>
         <h2 style="margin-top:16px">Minhas observações</h2>
         <textarea class="campo" id="t-obs" rows="6" placeholder="O que chamou sua atenção? Gancho, ritmo, enquadramento, o que você quer copiar ou adaptar...">${esc(t.observacoes || "")}</textarea>
         <div class="barra" style="margin:10px 0 0">
@@ -1316,29 +1383,17 @@ function pintarDetalheTrans() {
           <button class="btn primario" type="button" id="t-salvar">Salvar</button>
         </div>
       </div>
-    </div>
-    <details class="secao tokscript" id="t-tokscript" ${trans.tokscriptAberto ? "open" : ""}>
-      <summary><span class="emo" aria-hidden="true">${ic("transcricao")}</span><span class="nome">Gerar a transcrição aqui (TokScript)</span><span class="conta">grátis, até 5 por dia</span></summary>
-      <div class="corpo">
-        <ol class="passos">
-          <li>A transcrição começa sozinha no quadro abaixo. Espere uns segundos e role o quadro até aparecer o texto. Se não começar, clique em <b>Scan Video</b>.</li>
-          <li>Selecione o texto, copie (<b>Cmd + C</b>) e cole (<b>Cmd + V</b>) no campo <b>Roteiro</b> aqui em cima.</li>
-          <li>Se vier em inglês, espanhol ou outro idioma, eu traduzo para português sozinho. Depois clique em <b>Salvar</b>.</li>
-        </ol>
-        <div class="moldura-tokscript" id="t-tokscript-moldura"></div>
-      </div>
-    </details>`;
+    </div>`;
 
   const ta = $("#t-transcricao"), status = (txt) => { $("#t-status").textContent = txt; };
   let originalPendente = null;
+  mostrarTranscricaoNaTela(t, transcrevendo.has(String(t.id)) ? "Transcrevendo o vídeo... pode levar até 1 minuto." : "");
 
-  // Abre o TokScript só quando a pessoa pede, para não pesar
-  const carregarTokscript = () => {
-    const m = $("#t-tokscript-moldura");
-    if (!m.firstChild) m.innerHTML = `<iframe src="https://tokscript.com/${esc(t.link)}" title="TokScript" allow="clipboard-read; clipboard-write"></iframe>`;
+  $("#t-transcrever").onclick = async () => {
+    if (t.transcricao && !(await confirmar("Transcrever de novo? O texto atual do roteiro vai ser trocado pelo novo.", "Sim, transcrever"))) return;
+    transcreverVideo(t);
   };
-  if (trans.tokscriptAberto) carregarTokscript();
-  $("#t-tokscript").addEventListener("toggle", (e) => { trans.tokscriptAberto = e.target.open; if (e.target.open) carregarTokscript(); });
+  $("#t-original-area").addEventListener("click", (e) => { if (e.target.closest("#t-original")) { const c = $("#t-original-caixa"); c.hidden = !c.hidden; } });
 
   async function garantirPortugues(manual) {
     const texto = ta.value.trim();
@@ -1367,7 +1422,6 @@ function pintarDetalheTrans() {
   // Traduz sozinho ao colar (ou ao sair do campo), e só se o texto não estiver em português
   ta.addEventListener("paste", () => setTimeout(() => garantirPortugues(false), 50));
   ta.addEventListener("change", () => garantirPortugues(false));
-  if ($("#t-original")) $("#t-original").onclick = () => { const c = $("#t-original-caixa"); c.hidden = !c.hidden; };
 
   const salvar = async () => {
     const dados = { titulo: $("#t-titulo").value.trim() || null, categoria: $("#t-cat").value, transcricao: ta.value.trim() || null, observacoes: $("#t-obs").value.trim() || null };
