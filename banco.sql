@@ -296,3 +296,22 @@ alter table public.transcricoes enable row level security;
 drop policy if exists "dono faz tudo" on public.transcricoes;
 create policy "dono faz tudo" on public.transcricoes
   for all to authenticated using (public.eh_admin()) with check (public.eh_admin());
+
+
+-- -------------------------------------------------------------
+-- 12. BANCO DE IDEIAS (etapas e a sua versão do roteiro)
+-- status: em que etapa a ideia está
+--   ideia   = Banco de ideias (não quero fazer agora)
+--   agora   = Fazer agora
+--   fazendo = Fazendo
+--   feito   = Feito
+-- minha_versao: o seu roteiro, adaptado da referência
+-- O link deixa de ser obrigatório, para você anotar ideias sem vídeo.
+-- -------------------------------------------------------------
+alter table public.transcricoes add column if not exists status text not null default 'ideia';
+alter table public.transcricoes add column if not exists minha_versao text;
+alter table public.transcricoes alter column link drop not null;
+
+alter table public.transcricoes drop constraint if exists transcricoes_status_check;
+alter table public.transcricoes add constraint transcricoes_status_check
+  check (status in ('ideia', 'agora', 'fazendo', 'feito'));
