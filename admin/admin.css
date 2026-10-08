@@ -309,3 +309,8 @@ dialog::backdrop { background: rgba(26, 42, 108, .35); }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } }
 
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* Campo de enviar arquivo (vídeo e capa) */
+.campo.arquivo { padding: 6px; background: var(--parchment); cursor: pointer; }
+.campo.arquivo::file-selector-button { border: 0; border-radius: 4px; background: var(--cobalt); color: var(--parchment); font-weight: 600; padding: 6px 10px; margin-right: 10px; cursor: pointer; }
+.ajuda { display: block; color: var(--muted); font-size: 11.5px; margin-top: 3px; }

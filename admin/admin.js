@@ -165,6 +165,9 @@ function campoHTML(c, v) {
   const req = c.req ? "required" : "";
   const ph = c.ph ? `placeholder="${esc(c.ph)}"` : "";
   if (c.t === "check") return `<div class="${cls}"><label class="check"><input type="checkbox" name="${c.n}" ${val ? "checked" : ""}> ${esc(c.r)}</label></div>`;
+  if (c.t === "file") return `<div class="${cls}"><label for="${id}">${esc(c.r)}</label>
+    <input class="campo arquivo" id="${id}" name="${c.n}" type="file" accept="${esc(c.accept || "")}">
+    ${c.ajuda ? `<small class="ajuda" data-ajuda="${c.n}">${esc(c.ajuda)}</small>` : ""}</div>`;
   let input;
   if (c.t === "select") input = `<select class="campo" style="width:100%" id="${id}" name="${c.n}">${c.op.map(([ov, ot]) => `<option value="${esc(ov)}" ${String(ov) === String(val) ? "selected" : ""}>${esc(ot)}</option>`).join("")}</select>`;
   else if (c.t === "textarea") input = `<textarea class="campo" id="${id}" name="${c.n}" rows="4" ${ph}>${esc(val)}</textarea>`;
@@ -173,7 +176,7 @@ function campoHTML(c, v) {
 }
 
 function abrirForm({ titulo, tabela, campos, valores = {}, aoSalvar, aoApagar }) {
-  const usados = campos.filter((c) => !tabela || temCampo(tabela, c.n));
+  const usados = campos.filter((c) => !tabela || c.t === "file" || temCampo(tabela, c.n));
   const d = janela();
   d.innerHTML = `<form class="form-janela" novalidate>
     <div class="janela-topo"><h3>${esc(titulo)}</h3><button type="button" class="icone-btn" data-fechar aria-label="Fechar">${ic("fechar")}</button></div>
@@ -189,12 +192,19 @@ function abrirForm({ titulo, tabela, campos, valores = {}, aoSalvar, aoApagar })
     if (!(await confirmar("Apagar de vez? Isso não tem como desfazer."))) return;
     if (await aoApagar()) d.close();
   });
+  // Mostra o nome e o tamanho do arquivo escolhido
+  $$('input[type="file"]', d).forEach((inp) => inp.addEventListener("change", () => {
+    const aj = $(`[data-ajuda="${inp.name}"]`, d);
+    const arq = inp.files[0];
+    if (aj && arq) aj.textContent = `Escolhido: ${arq.name} (${(arq.size / 1048576).toFixed(1).replace(".", ",")} MB)`;
+  }));
   f.addEventListener("submit", async (e) => {
     e.preventDefault();
     const dados = {};
     for (const c of usados) {
       const el = f.elements[c.n];
       if (c.t === "check") { dados[c.n] = el.checked; continue; }
+      if (c.t === "file") { dados[c.n] = el.files[0] || null; continue; }
       let v = el.value.trim();
       if (c.req && !v) { el.focus(); avisar(`Preencha o campo ${c.r}.`, true); return; }
       if (c.t === "number") v = v === "" ? 0 : Number(v.replace(",", "."));
@@ -202,9 +212,16 @@ function abrirForm({ titulo, tabela, campos, valores = {}, aoSalvar, aoApagar })
       dados[c.n] = v;
     }
     const btn = $('button[type="submit"]', f);
+    const fechar = $$("[data-fechar], [data-apagar]", d);
     btn.disabled = true;
-    const ok = await aoSalvar(dados);
+    fechar.forEach((b) => { b.disabled = true; });
+    const status = (t) => { btn.textContent = t; };
+    status("Salvando...");
+    let ok = false;
+    try { ok = await aoSalvar(dados, status); } catch (erro) { avisar(traduzErro(erro), true); }
     btn.disabled = false;
+    fechar.forEach((b) => { b.disabled = false; });
+    status("Salvar");
     if (ok) { d.close(); avisar("Salvo."); }
   });
   d.showModal();
@@ -377,7 +394,7 @@ function desenharPortfolio(el) {
       if (await gravar("videos", { visivel: v.visivel === false }, v.id)) { avisar(v.visivel === false ? "Vídeo aparecendo no site." : "Vídeo escondido do site."); recarregar("videos"); }
     } else if (e.target.closest("[data-editar]")) formVideo(v);
     else if (e.target.closest("[data-apagar]")) {
-      if (await confirmar(`Apagar o vídeo "${v.titulo}"? Ele sai do site na hora.`) && (await apagarLinha("videos", v.id))) { avisar("Vídeo apagado."); recarregar("videos"); }
+      if (await confirmar(`Apagar o vídeo "${v.titulo}"? Ele sai do site na hora.`) && (await apagarVideo(v))) avisar("Vídeo apagado.");
     }
   });
   ligarArraste(corpo);
@@ -394,12 +411,74 @@ function linhaVideo(v) {
     <td>${esc(v.formato || "")}</td>
     <td>${esc(v.marca || "")}</td>
     <td>${esc(v.destaque || "")}</td>
-    <td class="corta">${v.link ? `<a href="${esc(linkAbrivel(v.link))}" target="_blank" rel="noopener">${esc(v.link)}</a>` : ""}</td>
+    <td class="corta">${v.link ? `<a href="${esc(linkAbrivel(v.link))}" target="_blank" rel="noopener">${ehDoStorage(v.link) ? "Vídeo enviado (abrir)" : esc(v.link)}</a>` : ""}</td>
     <td class="acoes">
       <button class="icone-btn" type="button" data-olho title="${escondido ? "Escondido do site. Clique para mostrar" : "Aparecendo no site. Clique para esconder"}" aria-label="${escondido ? "Mostrar no site" : "Esconder do site"}">${ic(escondido ? "olho-fechado" : "olho")}</button>
       <button class="icone-btn" type="button" data-editar aria-label="Editar">${ic("editar")}</button>
       <button class="icone-btn perigo" type="button" data-apagar aria-label="Apagar">${ic("apagar")}</button>
     </td></tr>`;
+}
+
+/* ---------- Envio de arquivos para o Storage do Supabase (espaço "portfolio") ---------- */
+const BUCKET = "portfolio";
+const LIMITE_MB = 50;
+const TIPOS_ARQUIVO = { mp4: "video/mp4", m4v: "video/mp4", mov: "video/quicktime", webm: "video/webm", jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp" };
+const MARCA_STORAGE = `/storage/v1/object/public/${BUCKET}/`;
+const ehDoStorage = (url) => typeof url === "string" && url.includes(MARCA_STORAGE);
+
+function traduzErroArquivo(e) {
+  const m = ((e && e.message) || "").toLowerCase();
+  if (m.includes("bucket not found")) return "O espaço de vídeos ainda não foi criado no Supabase. Rode a parte 10 do banco.sql.";
+  if (m.includes("maximum allowed size") || m.includes("too large") || m.includes("payload")) return `O arquivo passa de ${LIMITE_MB} MB. Exporte em MP4 1080p (no CapCut ou no app Fotos) e tente de novo.`;
+  if (m.includes("mime") || m.includes("not supported")) return "Formato não aceito. Use vídeo MP4, MOV ou WEBM, e capa JPG, PNG ou WEBP.";
+  if (m.includes("row-level security") || m.includes("unauthorized")) return "Sem permissão para enviar arquivos. Saia e entre de novo.";
+  if (m.includes("fetch") || m.includes("network")) return "A internet caiu no meio do envio. Tente de novo.";
+  return "Não deu para enviar o arquivo: " + ((e && e.message) || "erro desconhecido");
+}
+
+async function enviarArquivo(arquivo, pasta, nomeBase) {
+  const nome = (nomeBase || arquivo.name || "arquivo").toLowerCase()
+    .normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9.]+/g, "-").replace(/^-+|-+$/g, "") || "arquivo";
+  const ext = (nome.split(".").pop() || "").toLowerCase();
+  const tipo = TIPOS_ARQUIVO[ext] || arquivo.type || "application/octet-stream";
+  const caminho = `${pasta}/${Date.now()}-${nome}`;
+  const { error } = await db.storage.from(BUCKET).upload(caminho, arquivo, { contentType: tipo, cacheControl: "31536000", upsert: false });
+  if (error) { avisar(traduzErroArquivo(error), true); return null; }
+  return db.storage.from(BUCKET).getPublicUrl(caminho).data.publicUrl;
+}
+
+async function removerArquivos(urls) {
+  const caminhos = urls.filter(ehDoStorage).map((u) => decodeURIComponent(u.split(MARCA_STORAGE)[1].split("?")[0]));
+  if (caminhos.length) { try { await db.storage.from(BUCKET).remove(caminhos); } catch (_) {} }
+}
+
+// Tira uma "foto" do vídeo (por volta de 1 segundo) para usar como capa
+function capturarCapa(arquivo) {
+  return new Promise((resolve) => {
+    const v = document.createElement("video");
+    const url = URL.createObjectURL(arquivo);
+    let terminou = false;
+    const fim = (blob) => { if (terminou) return; terminou = true; clearTimeout(t); URL.revokeObjectURL(url); resolve(blob || null); };
+    const t = setTimeout(() => fim(null), 12000);
+    v.muted = true; v.playsInline = true; v.preload = "auto"; v.src = url;
+    v.addEventListener("loadeddata", () => { v.currentTime = Math.min(1, (v.duration || 2) / 2); }, { once: true });
+    v.addEventListener("seeked", () => {
+      try {
+        if (!v.videoWidth || !v.videoHeight) return fim(null);
+        const h = Math.min(960, v.videoHeight), w = Math.round((v.videoWidth / v.videoHeight) * h);
+        const c = document.createElement("canvas"); c.width = w; c.height = h;
+        c.getContext("2d").drawImage(v, 0, 0, w, h);
+        c.toBlob((b) => fim(b), "image/jpeg", 0.8);
+      } catch (_) { fim(null); }
+    }, { once: true });
+    v.addEventListener("error", () => fim(null), { once: true });
+  });
+}
+
+async function apagarVideo(v) {
+  const ok = await apagarLinha("videos", v.id);
+  if (ok) { await removerArquivos([v.link, v.capa]); recarregar("videos"); }
+  return ok;
 }
 
 function formVideo(v) {
@@ -409,21 +488,58 @@ function formVideo(v) {
     valores: v || { visivel: true, nicho: "beleza" },
     campos: [
       { n: "titulo", r: "Título", req: true, inteiro: true },
-      { n: "link", r: "Link do vídeo", inteiro: true, ph: "videos/arquivo.mp4 ou link do Reels, TikTok, YouTube" },
-      { n: "capa", r: "Capa (opcional)", inteiro: true, ph: "videos/capa.jpg ou link de uma imagem" },
+      { n: "arquivo", r: v && ehDoStorage(v.link) ? "Trocar o vídeo (opcional)" : "Vídeo do seu computador ou celular", t: "file", accept: "video/mp4,video/quicktime,video/webm,.mp4,.mov,.m4v,.webm", inteiro: true,
+        ajuda: `MP4 ou MOV, até ${LIMITE_MB} MB. Dica: exporte em 1080p no CapCut. A capa é criada sozinha.` },
+      { n: "link", r: "Ou cole um link (Reels, TikTok, YouTube)", inteiro: true, ph: "https://..." },
+      { n: "capaArquivo", r: "Capa (opcional, se quiser escolher outra)", t: "file", accept: "image/jpeg,image/png,image/webp", inteiro: true, ajuda: "JPG, PNG ou WEBP, de preferência vertical." },
       { n: "nicho", r: "Nicho", t: "select", op: NICHOS },
       { n: "formato", r: "Formato", ph: "Reels, TikTok, Vídeo UGC..." },
       { n: "marca", r: "Marca" },
       { n: "destaque", r: "Destaque", ph: "ex: 2,4M views" },
       { n: "visivel", r: "Aparecer no site", t: "check", inteiro: true }
     ],
-    aoSalvar: async (d) => {
+    aoSalvar: async (d, status) => {
+      const arq = d.arquivo, capaArq = d.capaArquivo;
+      delete d.arquivo; delete d.capaArquivo;
+      for (const a of [arq, capaArq]) {
+        if (a && a.size > LIMITE_MB * 1048576) { avisar(`O arquivo "${a.name}" tem ${(a.size / 1048576).toFixed(0)} MB e o limite é ${LIMITE_MB} MB. Exporte em MP4 1080p e tente de novo.`, true); return false; }
+      }
+      const enviados = [], antigos = [];
+      if (arq) {
+        status("Enviando vídeo...");
+        const url = await enviarArquivo(arq, "videos");
+        if (!url) return false;
+        enviados.push(url);
+        if (v && v.link !== url) antigos.push(v.link);
+        d.link = url;
+        if (!capaArq) {
+          status("Criando a capa...");
+          const foto = await capturarCapa(arq);
+          if (foto) {
+            const u = await enviarArquivo(foto, "capas", "capa.jpg");
+            if (u) { enviados.push(u); if (v) antigos.push(v.capa); d.capa = u; }
+          } else if (v && ehDoStorage(v.capa)) { antigos.push(v.capa); d.capa = null; }
+        }
+      }
+      if (capaArq) {
+        status("Enviando a capa...");
+        const u = await enviarArquivo(capaArq, "capas");
+        if (!u) { await removerArquivos(enviados); return false; }
+        enviados.push(u);
+        if (v) antigos.push(v.capa);
+        d.capa = u;
+      }
+      // Trocou o vídeo enviado por um link? O arquivo antigo sai do Storage.
+      if (!arq && v && ehDoStorage(v.link) && d.link !== v.link) antigos.push(v.link);
       if (!v) d.ordem = S.videos.reduce((m, x) => Math.max(m, Number(x.ordem) || 0), 0) + 1;
+      status("Salvando...");
       const ok = await gravar("videos", d, v ? v.id : null);
-      if (ok) recarregar("videos");
-      return ok;
+      if (!ok) { await removerArquivos(enviados); return false; }
+      await removerArquivos(antigos.filter((u) => !enviados.includes(u)));
+      recarregar("videos");
+      return true;
     },
-    aoApagar: v ? async () => { const ok = await apagarLinha("videos", v.id); if (ok) recarregar("videos"); return ok; } : null
+    aoApagar: v ? () => apagarVideo(v) : null
   });
 }
 
