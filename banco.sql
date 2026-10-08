@@ -225,3 +225,43 @@ where not exists (select 1 from public.calendario);
 insert into public.campanhas (campanha, cliente, tipo, status, qtd, valor, prazo, pagamento, ativa, favorita, exemplo)
 select 'EXEMPLO Campanha de teste', 'Marca de teste', 'Conteúdo', 'Briefing', 1, 0, current_date + 7, 'pendente', true, false, true
 where not exists (select 1 from public.campanhas);
+
+
+-- -------------------------------------------------------------
+-- 10. ESPAÇO DE ARQUIVOS (Storage) PARA OS VÍDEOS
+-- Os vídeos e capas que você envia pelo admin ficam guardados aqui,
+-- num espaço chamado "portfolio".
+-- public = true: o site consegue EXIBIR os arquivos (só exibir).
+-- Limite de 50 MB por arquivo (o máximo do plano grátis) e só
+-- formatos de vídeo e imagem.
+-- -------------------------------------------------------------
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('portfolio', 'portfolio', true, 52428800,
+        array['video/mp4', 'video/quicktime', 'video/webm', 'image/jpeg', 'image/png', 'image/webp'])
+on conflict (id) do update
+  set public = excluded.public,
+      file_size_limit = excluded.file_size_limit,
+      allowed_mime_types = excluded.allowed_mime_types;
+
+-- Só você (logado) pode enviar, trocar, ver a lista e apagar arquivos.
+-- Ninguém de fora consegue enviar nem apagar nada.
+drop policy if exists "dono envia arquivos" on storage.objects;
+create policy "dono envia arquivos" on storage.objects
+  for insert to authenticated
+  with check (bucket_id = 'portfolio' and public.eh_admin());
+
+drop policy if exists "dono troca arquivos" on storage.objects;
+create policy "dono troca arquivos" on storage.objects
+  for update to authenticated
+  using (bucket_id = 'portfolio' and public.eh_admin())
+  with check (bucket_id = 'portfolio' and public.eh_admin());
+
+drop policy if exists "dono ve arquivos" on storage.objects;
+create policy "dono ve arquivos" on storage.objects
+  for select to authenticated
+  using (bucket_id = 'portfolio' and public.eh_admin());
+
+drop policy if exists "dono apaga arquivos" on storage.objects;
+create policy "dono apaga arquivos" on storage.objects
+  for delete to authenticated
+  using (bucket_id = 'portfolio' and public.eh_admin());
