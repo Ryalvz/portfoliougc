@@ -390,3 +390,29 @@ details.tokscript > summary .emo { font-size: 16px; color: var(--cobalt); }
 .destaque-versao { border-left: 4px solid var(--green); }
 @media (max-width: 1100px) { .quadro { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 620px) { .quadro { grid-template-columns: 1fr; } .divisao { grid-template-columns: 1fr; gap: 4px; } }
+
+/* ---------- Mural de post-its (aba Transcrições, "Todas") ---------- */
+.mural { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 20px 18px; padding: 6px 4px 20px; }
+.postit {
+  position: relative; display: flex; flex-direction: column; gap: 6px; min-height: 190px; padding: 22px 16px 12px;
+  border-radius: 2px 2px 14px 2px; cursor: pointer; color: #2b2a22;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, .06), 0 8px 18px rgba(0, 0, 0, .08);
+  transform: rotate(-1.2deg); transition: transform .2s ease, box-shadow .2s ease;
+}
+.postit:nth-child(3n + 2) { transform: rotate(1deg); }
+.postit:nth-child(3n) { transform: rotate(-.4deg); }
+.postit:hover, .postit:focus-visible { transform: rotate(0) translateY(-4px); box-shadow: 0 2px 2px rgba(0, 0, 0, .06), 0 14px 26px rgba(0, 0, 0, .14); outline-offset: 4px; }
+.postit::before { /* fita adesiva */
+  content: ""; position: absolute; top: -9px; left: 50%; width: 70px; height: 18px; transform: translateX(-50%) rotate(-2deg);
+  background: rgba(255, 255, 255, .55); box-shadow: 0 1px 2px rgba(0, 0, 0, .08);
+}
+.postit-tiktok_shop { background: #fde9a8; }
+.postit-organico { background: #d9ecd2; }
+.postit-publi { background: #f7d6e0; }
+.postit-div { font-size: 10.5px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; opacity: .65; }
+.postit b { font-size: 15px; line-height: 1.25; color: #1f1e17; }
+.postit p { margin: 0; font-size: 12.5px; line-height: 1.45; opacity: .8; flex: 1; }
+.postit footer { display: flex; justify-content: space-between; gap: 6px; align-items: center; font-size: 11px; font-weight: 600; opacity: .85; margin-top: 4px; }
+.postit-etapa { padding: 2px 7px; border-radius: 999px; background: rgba(255, 255, 255, .6); }
+.trilho-etapas.grande { height: 12px; margin: 0 0 6px; }
+@media (prefers-reduced-motion: reduce) { .postit, .postit:nth-child(3n + 2), .postit:nth-child(3n) { transform: none; } }

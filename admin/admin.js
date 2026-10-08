@@ -1236,17 +1236,22 @@ function desenharTranscricoes(el) {
         <button class="btn" type="button" id="ideia-sem-link">Nova ideia sem link</button>
       </div>
     </form>
-    <div id="painel-ideias"></div>
+    ${trans.categoria === "todas" ? "" : `<div id="painel-ideias"></div>`}
     <div class="barra" style="margin:4px 0 10px">
       <div class="busca" style="max-width:360px">${ic("busca")}<input type="search" id="busca-trans" placeholder="Buscar no título, roteiro ou observação" value="${esc(trans.busca)}" aria-label="Buscar ideias"></div>
-      <span class="sub">arraste os cartões entre as colunas, ou troque a etapa no próprio cartão</span>
+      <span class="sub">${trans.categoria === "todas" ? "todas as suas ideias. Clique numa para abrir, ou entre numa divisão para ver as etapas" : "arraste os cartões entre as colunas, ou troque a etapa no próprio cartão"}</span>
     </div>
-    <div class="quadro" id="quadro"></div>`;
+    ${trans.categoria === "todas" ? `<div class="mural" id="mural"></div>` : `<div class="quadro" id="quadro"></div>`}`;
 
   $("#form-add-trans").addEventListener("submit", adicionarTranscricao);
   $("#ideia-sem-link").onclick = () => adicionarIdeia(null);
   $("#busca-trans").addEventListener("input", (e) => { trans.busca = e.target.value; pintarListaTrans(); });
-  ligarQuadro($("#quadro"));
+  if ($("#quadro")) ligarQuadro($("#quadro"));
+  if ($("#mural")) {
+    const mural = $("#mural");
+    mural.addEventListener("click", (e) => { const p = e.target.closest(".postit"); if (p) abrirIdeia(p.dataset.trans); });
+    mural.addEventListener("keydown", (e) => { const p = e.target.closest(".postit"); if (p && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); abrirIdeia(p.dataset.trans); } });
+  }
   pintarListaTrans();
 }
 
@@ -1261,6 +1266,13 @@ function filtrarTrans() {
 // Painel de números + quadro (também é chamado quando uma transcrição termina)
 function pintarListaTrans() {
   pintarPainelIdeias();
+  const mural = $("#mural");
+  if (mural) {
+    const ideias = filtrarTrans();
+    mural.innerHTML = ideias.length ? ideias.map(postit).join("")
+      : `<p class="vazio" style="grid-column:1/-1">${S.transcricoes.length ? "Nenhuma ideia com essa busca." : "Seu mural está vazio. Cole o link de uma referência aqui em cima ou crie uma ideia sem link."}</p>`;
+    return;
+  }
   const quadro = $("#quadro");
   if (!quadro) return;
   const lista = filtrarTrans();
@@ -1271,6 +1283,21 @@ function pintarListaTrans() {
       <div class="coluna-corpo">${itens.length ? itens.map(cartaoIdeia).join("") : `<p class="coluna-vazia">${S.transcricoes.length ? "Arraste uma ideia para cá" : v === "ideia" ? "Suas ideias aparecem aqui" : ""}</p>`}</div>
     </section>`;
   }).join("");
+}
+
+// Post-it do mural "Todas": cor pela divisão
+function postit(t) {
+  const rodando = transcrevendo.has(String(t.id));
+  const resumo = rodando ? "Transcrevendo..." : (t.minha_versao || t.transcricao || t.observacoes || "");
+  return `<article class="postit postit-${esc(t.categoria || "organico")}" data-trans="${esc(t.id)}" tabindex="0" aria-label="Abrir ${esc(t.titulo || "ideia")}, ${esc(nomeCategoria(t.categoria))}, ${esc(nomeEtapa(etapaDe(t)))}">
+    <span class="postit-div">${esc(nomeCategoria(t.categoria))}</span>
+    <b>${esc(t.titulo || "Sem título")}</b>
+    <p>${resumo ? esc(resumo.slice(0, 160)) + (resumo.length > 160 ? "..." : "") : "Sem roteiro ainda"}</p>
+    <footer>
+      <span class="postit-etapa seg-txt-${etapaDe(t)}">${esc(nomeEtapa(etapaDe(t)))}</span>
+      <span>${t.link ? esc(NOME_PLATAFORMA[t.plataforma] || "Link") : "Ideia própria"}</span>
+    </footer>
+  </article>`;
 }
 
 function cartaoIdeia(t) {
@@ -1293,26 +1320,10 @@ function cartaoIdeia(t) {
 function pintarPainelIdeias() {
   const caixa = $("#painel-ideias");
   if (!caixa) return;
-  const lista = S.transcricoes.filter((t) => trans.categoria === "todas" || t.categoria === trans.categoria);
-  const n = (s, l = lista) => l.filter((t) => etapaDe(t) === s).length;
+  const lista = S.transcricoes.filter((t) => t.categoria === trans.categoria);
+  const n = (s) => lista.filter((t) => etapaDe(t) === s).length;
   const total = lista.length;
   const pct = total ? Math.round((n("feito") / total) * 100) : 0;
-  const porDivisao = trans.categoria !== "todas" ? "" : `
-    <div class="cartao divisoes">
-      <h2>Por divisão</h2>
-      ${CATEGORIAS.map(([v, nome]) => {
-        const l = S.transcricoes.filter((t) => t.categoria === v);
-        const tot = l.length;
-        return `<div class="divisao">
-          <span class="divisao-nome">${nome}</span>
-          <span class="trilho-etapas" role="img" aria-label="${nome}: ${ETAPAS.map(([s, en]) => `${n(s, l)} ${en.toLowerCase()}`).join(", ")}">
-            ${tot ? ETAPAS.map(([s]) => n(s, l) ? `<i class="seg-${s}" style="width:${(n(s, l) / tot) * 100}%"></i>` : "").join("") : ""}
-          </span>
-          <span class="sub">${tot ? `${n("feito", l)} de ${tot} feitas` : "nenhuma ainda"}</span>
-        </div>`;
-      }).join("")}
-      <p class="legenda">${ETAPAS.map(([s, nome]) => `<span><i class="seg-${s}"></i>${nome}</span>`).join("")}</p>
-    </div>`;
   caixa.innerHTML = `
     <div class="faixa-kpi">
       <div class="kpi"><span>Banco de ideias</span><strong>${n("ideia")}</strong></div>
@@ -1320,7 +1331,9 @@ function pintarPainelIdeias() {
       <div class="kpi"><span>Fazendo</span><strong>${n("fazendo")}</strong></div>
       <div class="kpi"><span>Feito</span><strong>${n("feito")}</strong></div>
       <div class="kpi"><span>Executado</span><strong>${pct}%</strong><small>${total ? `${n("feito")} de ${total} ideias` : "adicione a primeira ideia"}</small></div>
-    </div>${porDivisao}`;
+    </div>
+    ${total ? `<div class="trilho-etapas grande" role="img" aria-label="${ETAPAS.map(([s, en]) => `${n(s)} ${en.toLowerCase()}`).join(", ")}">${ETAPAS.map(([s]) => n(s) ? `<i class="seg-${s}" style="width:${(n(s) / total) * 100}%"></i>` : "").join("")}</div>
+    <p class="legenda" style="margin-bottom:16px">${ETAPAS.map(([s, nome]) => `<span><i class="seg-${s}"></i>${nome}</span>`).join("")}</p>` : ""}`;
 }
 
 async function moverIdeia(id, etapa) {
