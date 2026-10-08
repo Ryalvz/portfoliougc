@@ -73,7 +73,7 @@ const ESQUEMA = {
   marcas: ["id", "nome", "instagram", "email", "telefone", "situacao", "obs", "ultimo_contato", "exemplo", "criado_em"],
   calendario: ["id", "titulo", "marca", "tipo", "data", "status", "exemplo"],
   campanhas: ["id", "campanha", "cliente", "tipo", "status", "qtd", "valor", "prazo", "pagamento", "ativa", "favorita", "exemplo"],
-  transcricoes: ["id", "criado_em", "link", "plataforma", "categoria", "titulo", "transcricao", "transcricao_original", "idioma_original", "observacoes"],
+  transcricoes: ["id", "criado_em", "link", "plataforma", "categoria", "status", "titulo", "transcricao", "transcricao_original", "idioma_original", "minha_versao", "observacoes"],
   marcados: ["chave", "marcado"],
   visitas: ["id", "data", "pagina", "origem"]
 };
@@ -1195,6 +1195,16 @@ function linkGoogleTradutor(texto) {
   return "https://translate.google.com/?sl=auto&tl=pt&op=translate&text=" + encodeURIComponent(texto.slice(0, 4500));
 }
 
+/* ---------- Banco de ideias: etapas ---------- */
+const ETAPAS = [
+  ["ideia", "Banco de ideias", "não quero fazer agora"],
+  ["agora", "Fazer agora", "próximas da fila"],
+  ["fazendo", "Fazendo", "em produção"],
+  ["feito", "Feito", "já foi pro ar"]
+];
+const nomeEtapa = (s) => (ETAPAS.find((x) => x[0] === s) || ETAPAS[0])[1];
+const etapaDe = (t) => (ETAPAS.some((x) => x[0] === t.status) ? t.status : "ideia");
+
 /* ---------- Desenho da aba ---------- */
 function desenharTranscricoes(el) {
   const todas = S.transcricoes;
@@ -1208,75 +1218,199 @@ function desenharTranscricoes(el) {
         ${[["todas", "Todas"], ...CATEGORIAS].map(([v, t]) => `<button class="chip" type="button" data-cat="${v}" aria-pressed="${trans.categoria === v}">${t} <span class="sub">${v === "todas" ? todas.length : conta(v)}</span></button>`).join("")}
       </div>
     </div>
+    <div id="trans-conteudo"></div>`;
+
+  $$("[data-cat]", el).forEach((b) => b.onclick = () => { trans.categoria = b.dataset.cat; trans.sel = null; desenhar(); });
+
+  const caixa = $("#trans-conteudo");
+  if (trans.sel) { caixa.innerHTML = `<div id="detalhe-trans"></div>`; pintarDetalheTrans(); return; }
+
+  caixa.innerHTML = `
     <form class="cartao add-trans" id="form-add-trans" novalidate>
-      <label for="novo-link"><b>Novo vídeo de referência</b> <span class="sub">cole o link do YouTube, Instagram ou TikTok</span></label>
+      <label for="novo-link"><b>Nova ideia</b> <span class="sub">cole o link de uma referência (YouTube, Instagram ou TikTok) e a transcrição vem sozinha</span></label>
       <div class="barra" style="margin:6px 0 0">
-        <input class="campo" id="novo-link" type="url" placeholder="https://www.instagram.com/reel/..." style="flex:1 1 280px">
+        <input class="campo" id="novo-link" type="url" placeholder="https://www.instagram.com/reel/..." style="flex:1 1 260px">
         <select class="campo" id="novo-cat" aria-label="Divisão">${CATEGORIAS.map(([v, t]) => `<option value="${v}" ${v === catPadrao ? "selected" : ""}>${t}</option>`).join("")}</select>
+        <select class="campo" id="novo-etapa" aria-label="Etapa">${ETAPAS.map(([v, t]) => `<option value="${v}">${t}</option>`).join("")}</select>
         <button class="btn primario" type="submit">${ic("mais")}Adicionar</button>
+        <button class="btn" type="button" id="ideia-sem-link">Nova ideia sem link</button>
       </div>
     </form>
-    <div class="trans-grade">
-      <div class="trans-lista">
-        <div class="busca" style="max-width:none;margin-bottom:8px">${ic("busca")}<input type="search" id="busca-trans" placeholder="Buscar no título, roteiro ou observação" value="${esc(trans.busca)}" aria-label="Buscar transcrições"></div>
-        <div id="lista-trans"></div>
-      </div>
-      <div class="trans-detalhe" id="detalhe-trans"></div>
-    </div>`;
+    <div id="painel-ideias"></div>
+    <div class="barra" style="margin:4px 0 10px">
+      <div class="busca" style="max-width:360px">${ic("busca")}<input type="search" id="busca-trans" placeholder="Buscar no título, roteiro ou observação" value="${esc(trans.busca)}" aria-label="Buscar ideias"></div>
+      <span class="sub">arraste os cartões entre as colunas, ou troque a etapa no próprio cartão</span>
+    </div>
+    <div class="quadro" id="quadro"></div>`;
 
-  $$("[data-cat]", el).forEach((b) => b.onclick = () => { trans.categoria = b.dataset.cat; desenhar(); });
   $("#form-add-trans").addEventListener("submit", adicionarTranscricao);
+  $("#ideia-sem-link").onclick = () => adicionarIdeia(null);
   $("#busca-trans").addEventListener("input", (e) => { trans.busca = e.target.value; pintarListaTrans(); });
-  $("#lista-trans").addEventListener("click", (e) => {
-    const b = e.target.closest("[data-trans]");
-    if (!b) return;
-    trans.sel = b.dataset.trans;
-    pintarListaTrans(); pintarDetalheTrans();
-    if (window.innerWidth < 960) $("#detalhe-trans").scrollIntoView({ behavior: "smooth" });
-  });
+  ligarQuadro($("#quadro"));
   pintarListaTrans();
-  pintarDetalheTrans();
 }
 
 function filtrarTrans() {
   const q = trans.busca.toLowerCase();
   return S.transcricoes.filter((t) => {
     if (trans.categoria !== "todas" && t.categoria !== trans.categoria) return false;
-    return !q || [t.titulo, t.transcricao, t.observacoes, t.link].some((x) => String(x || "").toLowerCase().includes(q));
+    return !q || [t.titulo, t.transcricao, t.minha_versao, t.observacoes, t.link].some((x) => String(x || "").toLowerCase().includes(q));
   });
 }
 
+// Painel de números + quadro (também é chamado quando uma transcrição termina)
 function pintarListaTrans() {
+  pintarPainelIdeias();
+  const quadro = $("#quadro");
+  if (!quadro) return;
   const lista = filtrarTrans();
-  $("#lista-trans").innerHTML = lista.length === 0
-    ? `<p class="vazio">${S.transcricoes.length ? "Nada com esse filtro." : "Sua biblioteca está vazia. Cole o link de um vídeo que você gosta aqui em cima."}</p>`
-    : lista.map((t) => `<button type="button" class="item-trans ${String(t.id) === String(trans.sel) ? "ativo" : ""}" data-trans="${esc(t.id)}">
-        <span class="item-trans-topo"><span class="pilula p-plat-${esc(t.plataforma || "outro")}">${esc(NOME_PLATAFORMA[t.plataforma] || "Link")}</span><span class="pilula p-cat">${esc(nomeCategoria(t.categoria))}</span></span>
-        <b>${esc(t.titulo || "Sem título")}</b>
-        <small>${transcrevendo.has(String(t.id)) ? "Transcrevendo..." : t.transcricao ? esc(t.transcricao.slice(0, 90)) + (t.transcricao.length > 90 ? "..." : "") : "Ainda sem transcrição"}</small>
-        <small class="data">${t.criado_em ? dataBR(isoLocal(new Date(t.criado_em))) : ""}</small>
-      </button>`).join("");
+  quadro.innerHTML = ETAPAS.map(([v, nome, sub]) => {
+    const itens = lista.filter((t) => etapaDe(t) === v);
+    return `<section class="coluna col-${v}" data-etapa="${v}" aria-label="${nome}">
+      <header><b>${nome}</b><span class="pilula">${itens.length}</span><small>${sub}</small></header>
+      <div class="coluna-corpo">${itens.length ? itens.map(cartaoIdeia).join("") : `<p class="coluna-vazia">${S.transcricoes.length ? "Arraste uma ideia para cá" : v === "ideia" ? "Suas ideias aparecem aqui" : ""}</p>`}</div>
+    </section>`;
+  }).join("");
 }
 
-async function adicionarTranscricao(e) {
-  e.preventDefault();
-  const link = $("#novo-link").value.trim();
-  if (!/^https?:\/\//i.test(link)) { avisar("Cole um link completo, começando com https://", true); $("#novo-link").focus(); return; }
-  if (!temCampo("transcricoes", "link")) { avisar("A tabela transcricoes ainda não existe. Rode a parte 11 do banco.sql.", true); return; }
-  const info = videoDoLink(link);
+function cartaoIdeia(t) {
+  const rodando = transcrevendo.has(String(t.id));
+  const resumo = rodando ? "Transcrevendo..." : (t.minha_versao || t.transcricao || t.observacoes || "");
+  return `<article class="cartao-ideia" draggable="true" data-trans="${esc(t.id)}" tabindex="0" aria-label="Abrir ${esc(t.titulo || "ideia")}">
+    <div class="item-trans-topo">
+      ${t.link ? `<span class="pilula p-plat-${esc(t.plataforma || "outro")}">${esc(NOME_PLATAFORMA[t.plataforma] || "Link")}</span>` : `<span class="pilula p-propria">Ideia própria</span>`}
+      ${trans.categoria === "todas" ? `<span class="pilula p-cat">${esc(nomeCategoria(t.categoria))}</span>` : ""}
+      ${t.minha_versao ? `<span class="pilula p-versao" title="Já tem a sua versão do roteiro">minha versão</span>` : ""}
+    </div>
+    <b>${esc(t.titulo || "Sem título")}</b>
+    ${resumo ? `<small>${esc(resumo.slice(0, 110))}${resumo.length > 110 ? "..." : ""}</small>` : `<small>Sem roteiro ainda</small>`}
+    <select class="campo etapa-cartao" data-mover="${esc(t.id)}" aria-label="Mudar a etapa de ${esc(t.titulo || "ideia")}">
+      ${ETAPAS.map(([v, n]) => `<option value="${v}" ${v === etapaDe(t) ? "selected" : ""}>${n}</option>`).join("")}
+    </select>
+  </article>`;
+}
+
+function pintarPainelIdeias() {
+  const caixa = $("#painel-ideias");
+  if (!caixa) return;
+  const lista = S.transcricoes.filter((t) => trans.categoria === "todas" || t.categoria === trans.categoria);
+  const n = (s, l = lista) => l.filter((t) => etapaDe(t) === s).length;
+  const total = lista.length;
+  const pct = total ? Math.round((n("feito") / total) * 100) : 0;
+  const porDivisao = trans.categoria !== "todas" ? "" : `
+    <div class="cartao divisoes">
+      <h2>Por divisão</h2>
+      ${CATEGORIAS.map(([v, nome]) => {
+        const l = S.transcricoes.filter((t) => t.categoria === v);
+        const tot = l.length;
+        return `<div class="divisao">
+          <span class="divisao-nome">${nome}</span>
+          <span class="trilho-etapas" role="img" aria-label="${nome}: ${ETAPAS.map(([s, en]) => `${n(s, l)} ${en.toLowerCase()}`).join(", ")}">
+            ${tot ? ETAPAS.map(([s]) => n(s, l) ? `<i class="seg-${s}" style="width:${(n(s, l) / tot) * 100}%"></i>` : "").join("") : ""}
+          </span>
+          <span class="sub">${tot ? `${n("feito", l)} de ${tot} feitas` : "nenhuma ainda"}</span>
+        </div>`;
+      }).join("")}
+      <p class="legenda">${ETAPAS.map(([s, nome]) => `<span><i class="seg-${s}"></i>${nome}</span>`).join("")}</p>
+    </div>`;
+  caixa.innerHTML = `
+    <div class="faixa-kpi">
+      <div class="kpi"><span>Banco de ideias</span><strong>${n("ideia")}</strong></div>
+      <div class="kpi"><span>Fazer agora</span><strong>${n("agora")}</strong></div>
+      <div class="kpi"><span>Fazendo</span><strong>${n("fazendo")}</strong></div>
+      <div class="kpi"><span>Feito</span><strong>${n("feito")}</strong></div>
+      <div class="kpi"><span>Executado</span><strong>${pct}%</strong><small>${total ? `${n("feito")} de ${total} ideias` : "adicione a primeira ideia"}</small></div>
+    </div>${porDivisao}`;
+}
+
+async function moverIdeia(id, etapa) {
+  const t = S.transcricoes.find((x) => String(x.id) === String(id));
+  if (!t || etapaDe(t) === etapa) return;
+  const antes = t.status;
+  t.status = etapa;
+  pintarListaTrans();
+  if (await gravar("transcricoes", { status: etapa }, t.id)) avisar(`Movida para ${nomeEtapa(etapa)}.`);
+  else { t.status = antes; pintarListaTrans(); }
+}
+
+function abrirIdeia(id) {
+  trans.sel = String(id);
+  desenhar();
+  window.scrollTo({ top: 0 });
+}
+
+// Arrastar entre colunas (computador) + abrir ao clicar + trocar etapa pelo seletor (celular)
+function ligarQuadro(quadro) {
+  let arrastando = null;
+  quadro.addEventListener("dragstart", (e) => {
+    const c = e.target.closest(".cartao-ideia");
+    if (!c) return;
+    arrastando = c.dataset.trans;
+    c.classList.add("arrastando");
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", arrastando);
+  });
+  quadro.addEventListener("dragend", (e) => {
+    const c = e.target.closest(".cartao-ideia");
+    if (c) c.classList.remove("arrastando");
+    $$(".coluna.sobre", quadro).forEach((col) => col.classList.remove("sobre"));
+  });
+  quadro.addEventListener("dragover", (e) => {
+    const col = e.target.closest(".coluna");
+    if (!col || !arrastando) return;
+    e.preventDefault();
+    $$(".coluna.sobre", quadro).forEach((x) => { if (x !== col) x.classList.remove("sobre"); });
+    col.classList.add("sobre");
+  });
+  quadro.addEventListener("drop", (e) => {
+    const col = e.target.closest(".coluna");
+    if (!col || !arrastando) return;
+    e.preventDefault();
+    const id = arrastando; arrastando = null;
+    moverIdeia(id, col.dataset.etapa);
+  });
+  quadro.addEventListener("change", (e) => {
+    const s = e.target.closest("[data-mover]");
+    if (s) moverIdeia(s.dataset.mover, s.value);
+  });
+  quadro.addEventListener("click", (e) => {
+    if (e.target.closest("select")) return;
+    const c = e.target.closest(".cartao-ideia");
+    if (c) abrirIdeia(c.dataset.trans);
+  });
+  quadro.addEventListener("keydown", (e) => {
+    const c = e.target.closest(".cartao-ideia");
+    if (c && e.target === c && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); abrirIdeia(c.dataset.trans); }
+  });
+}
+
+async function adicionarIdeia(link) {
+  if (!temCampo("transcricoes", "id")) { avisar("A tabela transcricoes ainda não existe. Rode o banco.sql.", true); return; }
+  const info = link ? videoDoLink(link) : { plataforma: "outro" };
   const dados = {
-    link, plataforma: info.plataforma, categoria: $("#novo-cat").value,
-    titulo: `Vídeo do ${NOME_PLATAFORMA[info.plataforma] || "link"} de ${dataBR(hojeISO()).slice(0, 5)}`
+    link: link || null,
+    plataforma: link ? info.plataforma : null,
+    categoria: $("#novo-cat").value,
+    status: $("#novo-etapa").value,
+    titulo: link ? `Vídeo do ${NOME_PLATAFORMA[info.plataforma] || "link"} de ${dataBR(hojeISO()).slice(0, 5)}` : "Nova ideia"
   };
   const limpo = {};
   Object.keys(dados).forEach((k) => { if (temCampo("transcricoes", k)) limpo[k] = dados[k]; });
   const { data, error } = await db.from("transcricoes").insert(limpo).select("id").single();
   if (error) { avisar(traduzErro(error), true); return; }
-  trans.sel = String(data.id);
   if (trans.categoria !== "todas" && trans.categoria !== dados.categoria) trans.categoria = dados.categoria;
+  trans.sel = String(data.id);
   await recarregar("transcricoes");
   const novo = S.transcricoes.find((x) => String(x.id) === String(data.id));
-  if (novo) transcreverVideo(novo);
+  if (novo && link) transcreverVideo(novo);
+  if (!link) { const tt = $("#t-titulo"); if (tt) { tt.focus(); tt.select(); } }
+}
+
+async function adicionarTranscricao(e) {
+  e.preventDefault();
+  const link = $("#novo-link").value.trim();
+  if (!/^https?:\/\//i.test(link)) { avisar("Cole um link completo, começando com https://. Para anotar sem link, use Nova ideia sem link.", true); $("#novo-link").focus(); return; }
+  adicionarIdeia(link);
 }
 
 /* ---------- Transcrição automática (ajudante "transcrever" no Supabase + Supadata) ---------- */
@@ -1348,98 +1482,121 @@ async function transcreverVideo(item) {
 function pintarDetalheTrans() {
   const caixa = $("#detalhe-trans");
   const t = S.transcricoes.find((x) => String(x.id) === String(trans.sel));
-  if (!t) { caixa.innerHTML = `<div class="cartao"><p class="vazio">Escolha um vídeo na lista ou adicione um novo link para ver o vídeo, gerar o roteiro e anotar as suas observações.</p></div>`; return; }
+  if (!caixa || !t) return;
   const info = videoDoLink(t.link);
-  const traduzido = t.transcricao_original && t.idioma_original && t.idioma_original !== "pt";
 
   caixa.innerHTML = `
+    <div class="barra">
+      <button class="btn" type="button" id="t-voltar">${ic("esq")}Voltar ao quadro</button>
+      <span class="espaco"></span>
+      <span class="sub" id="t-salvo"></span>
+    </div>
     <div class="cartao">
       <div class="trans-cabeca">
-        <input class="campo titulo-trans" id="t-titulo" value="${esc(t.titulo || "")}" placeholder="Dê um nome para este vídeo" aria-label="Título">
+        <input class="campo titulo-trans" id="t-titulo" value="${esc(t.titulo || "")}" placeholder="O tema desta ideia" aria-label="Título da ideia">
         <select class="campo" id="t-cat" aria-label="Divisão">${CATEGORIAS.map(([v, n]) => `<option value="${v}" ${v === t.categoria ? "selected" : ""}>${n}</option>`).join("")}</select>
+        <select class="campo" id="t-etapa" aria-label="Etapa">${ETAPAS.map(([v, n]) => `<option value="${v}" ${v === etapaDe(t) ? "selected" : ""}>${n}</option>`).join("")}</select>
       </div>
-      <p class="sub" style="margin:6px 0 0"><a href="${esc(t.link)}" target="_blank" rel="noopener">Abrir o vídeo original no ${esc(NOME_PLATAFORMA[info.plataforma] || "site")}</a></p>
+      ${t.link ? `<p class="sub" style="margin:6px 0 0"><a href="${esc(t.link)}" target="_blank" rel="noopener">Abrir a referência original no ${esc(NOME_PLATAFORMA[info.plataforma] || "site")}</a></p>` : ""}
     </div>
-    <div class="trans-trabalho">
-      <div class="cartao trans-video">
-        <h2>Conteúdo</h2>
+    <div class="trans-trabalho ${t.link ? "" : "sem-video"}">
+      ${t.link ? `<div class="cartao trans-video">
+        <h2>Referência</h2>
         ${info.src
           ? `<div class="moldura ${info.vertical ? "vertical" : ""}"><iframe src="${esc(info.src)}" title="Vídeo de referência" loading="lazy" allow="autoplay; encrypted-media; picture-in-picture; clipboard-write" allowfullscreen></iframe></div>`
-          : `<p class="vazio">Esse link não dá para mostrar aqui dentro. Use o link "Abrir o vídeo original" acima.${info.plataforma === "tiktok" ? " No TikTok, use o link completo do vídeo (com /video/ no endereço), não o link curto." : ""}</p>`}
-      </div>
-      <div class="cartao trans-textos">
-        <div class="barra" style="margin-bottom:6px"><h2 style="margin:0">Roteiro (transcrição)</h2><span class="espaco"></span><span class="sub" id="t-status"></span></div>
-        <textarea class="campo" id="t-transcricao" rows="12" placeholder="A transcrição aparece aqui sozinha, sempre em português. Você também pode editar ou colar um texto.">${esc(t.transcricao || "")}</textarea>
-        <div class="barra" style="margin:6px 0 0">
-          <button class="btn" type="button" id="t-transcrever">${ic("transcricao")}${t.transcricao ? "Transcrever de novo" : "Transcrever automaticamente"}</button>
-          <span id="t-original-area">${botaoOriginal(t)}</span>
+          : `<p class="vazio">Esse link não dá para mostrar aqui dentro. Use o link "Abrir a referência original" acima.</p>`}
+      </div>` : ""}
+      <div class="trans-textos">
+        ${t.link ? `<div class="cartao">
+          <div class="barra" style="margin-bottom:6px"><h2 style="margin:0">Roteiro da referência</h2><span class="espaco"></span><span class="sub" id="t-status"></span></div>
+          <textarea class="campo" id="t-transcricao" rows="9" placeholder="A transcrição aparece aqui sozinha, sempre em português.">${esc(t.transcricao || "")}</textarea>
+          <div class="barra" style="margin:6px 0 0">
+            <button class="btn" type="button" id="t-transcrever">${ic("transcricao")}${t.transcricao ? "Transcrever de novo" : "Transcrever automaticamente"}</button>
+            <span id="t-original-area">${botaoOriginal(t)}</span>
+          </div>
+        </div>` : ""}
+        <div class="cartao destaque-versao">
+          <h2>Minha versão (meu roteiro)</h2>
+          <textarea class="campo" id="t-versao" rows="9" placeholder="${t.link ? "Escreva aqui a sua versão: o seu gancho, a sua fala, como você vai adaptar essa referência." : "Escreva aqui a sua ideia e o roteiro: gancho, desenvolvimento e chamada final."}">${esc(t.minha_versao || "")}</textarea>
         </div>
-        <h2 style="margin-top:16px">Minhas observações</h2>
-        <textarea class="campo" id="t-obs" rows="6" placeholder="O que chamou sua atenção? Gancho, ritmo, enquadramento, o que você quer copiar ou adaptar...">${esc(t.observacoes || "")}</textarea>
-        <div class="barra" style="margin:10px 0 0">
+        <div class="cartao">
+          <h2>Observações</h2>
+          <textarea class="campo" id="t-obs" rows="4" placeholder="O que funcionou na referência? Gancho, corte, fala, o que dá para adaptar para a marca...">${esc(t.observacoes || "")}</textarea>
+        </div>
+        <div class="barra">
           <button class="btn perigo" type="button" id="t-apagar">${ic("apagar")}Apagar</button>
           <span class="espaco"></span>
-          <span class="sub" id="t-salvo"></span>
           <button class="btn primario" type="button" id="t-salvar">Salvar</button>
         </div>
       </div>
     </div>`;
 
-  const ta = $("#t-transcricao"), status = (txt) => { $("#t-status").textContent = txt; };
+  const ta = $("#t-transcricao");
+  const status = (txt) => { const s = $("#t-status"); if (s) s.textContent = txt; };
   let originalPendente = null;
-  mostrarTranscricaoNaTela(t, transcrevendo.has(String(t.id)) ? "Transcrevendo o vídeo... pode levar até 1 minuto." : "");
+  let mudou = false;
+  $$("#t-titulo, #t-versao, #t-obs, #t-transcricao", caixa).forEach((el) => el.addEventListener("input", () => { mudou = true; }));
 
-  $("#t-transcrever").onclick = async () => {
-    if (t.transcricao && !(await confirmar("Transcrever de novo? O texto atual do roteiro vai ser trocado pelo novo.", "Sim, transcrever"))) return;
-    transcreverVideo(t);
-  };
-  $("#t-original-area").addEventListener("click", (e) => { if (e.target.closest("#t-original")) { const c = $("#t-original-caixa"); c.hidden = !c.hidden; } });
+  if (ta) {
+    mostrarTranscricaoNaTela(t, transcrevendo.has(String(t.id)) ? "Transcrevendo o vídeo... pode levar até 1 minuto." : "");
+    $("#t-transcrever").onclick = async () => {
+      if (t.transcricao && !(await confirmar("Transcrever de novo? O roteiro da referência vai ser trocado pelo novo.", "Sim, transcrever"))) return;
+      transcreverVideo(t);
+    };
+    $("#t-original-area").addEventListener("click", (e) => { if (e.target.closest("#t-original")) { const c = $("#t-original-caixa"); c.hidden = !c.hidden; } });
 
-  async function garantirPortugues(manual) {
-    const texto = ta.value.trim();
-    if (!texto) { if (manual) avisar("Cole o texto primeiro.", true); return; }
-    status("Conferindo o idioma...");
-    const idioma = (await detectarIdioma(texto) || "").slice(0, 2);
-    if (idioma === "pt") { status(""); return; }
-    status(`Traduzindo do ${NOME_IDIOMA[idioma] || idioma} para português...`);
-    try {
-      const pt = await traduzirParaPortugues(texto, idioma, status);
-      if (pt) {
-        originalPendente = { texto, idioma };
-        ta.value = pt.trim();
-        status(`Traduzido do ${NOME_IDIOMA[idioma] || idioma}. Confira e clique em Salvar.`);
-        return;
-      }
-    } catch (_) {}
-    status("");
-    const d = abrirJanelaSimples("Traduzir para português",
-      `<p>O tradutor que vem no Chrome não está disponível neste navegador. Dá para traduzir pelo Google Tradutor:</p>
-       <ol class="passos"><li>Clique em <b>Abrir o Google Tradutor</b>.</li><li>Copie o texto em português que aparecer.</li><li>Volte aqui, apague o texto do campo Roteiro e cole o traduzido.</li></ol>`,
-      `<a class="btn primario" href="${linkGoogleTradutor(texto)}" target="_blank" rel="noopener">Abrir o Google Tradutor</a>`);
-    $("a", d).addEventListener("click", () => d.close());
+    const garantirPortugues = async () => {
+      const texto = ta.value.trim();
+      if (!texto) return;
+      status("Conferindo o idioma...");
+      const idioma = (await detectarIdioma(texto) || "").slice(0, 2);
+      if (idioma === "pt") { status(""); return; }
+      status(`Traduzindo do ${NOME_IDIOMA[idioma] || idioma} para português...`);
+      try {
+        const pt = await traduzirParaPortugues(texto, idioma, status);
+        if (pt) { originalPendente = { texto, idioma }; ta.value = pt.trim(); mudou = true; status(`Traduzido do ${NOME_IDIOMA[idioma] || idioma}. Clique em Salvar.`); return; }
+      } catch (_) {}
+      status("");
+      const d = abrirJanelaSimples("Traduzir para português",
+        `<p>O tradutor que vem no Chrome não respondeu. Dá para traduzir pelo Google Tradutor:</p>
+         <ol class="passos"><li>Clique em <b>Abrir o Google Tradutor</b>.</li><li>Copie o texto em português que aparecer.</li><li>Volte aqui, apague o texto do roteiro e cole o traduzido.</li></ol>`,
+        `<a class="btn primario" href="${linkGoogleTradutor(texto)}" target="_blank" rel="noopener">Abrir o Google Tradutor</a>`);
+      $("a", d).addEventListener("click", () => d.close());
+    };
+    ta.addEventListener("paste", () => setTimeout(garantirPortugues, 50));
+    ta.addEventListener("change", garantirPortugues);
   }
 
-  // Traduz sozinho ao colar (ou ao sair do campo), e só se o texto não estiver em português
-  ta.addEventListener("paste", () => setTimeout(() => garantirPortugues(false), 50));
-  ta.addEventListener("change", () => garantirPortugues(false));
-
-  const salvar = async () => {
-    const dados = { titulo: $("#t-titulo").value.trim() || null, categoria: $("#t-cat").value, transcricao: ta.value.trim() || null, observacoes: $("#t-obs").value.trim() || null };
+  const salvar = async (mostrarAviso = true) => {
+    const dados = {
+      titulo: $("#t-titulo").value.trim() || null,
+      categoria: $("#t-cat").value,
+      status: $("#t-etapa").value,
+      minha_versao: $("#t-versao").value.trim() || null,
+      observacoes: $("#t-obs").value.trim() || null
+    };
+    if (ta && !transcrevendo.has(String(t.id))) dados.transcricao = ta.value.trim() || null;
     if (originalPendente) { dados.transcricao_original = originalPendente.texto; dados.idioma_original = originalPendente.idioma; }
     const btn = $("#t-salvar"); btn.disabled = true; btn.textContent = "Salvando...";
     const ok = await gravar("transcricoes", dados, t.id);
     btn.disabled = false; btn.textContent = "Salvar";
     if (ok) {
-      originalPendente = null;
+      originalPendente = null; mudou = false;
       Object.assign(t, dados);
-      $("#t-salvo").textContent = "Salvo " + new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-      pintarListaTrans();
+      $("#t-salvo").textContent = "Salvo às " + new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+      if (mostrarAviso) avisar("Salvo.");
     }
+    return ok;
   };
-  $("#t-salvar").onclick = salvar;
-  $("#t-cat").addEventListener("change", salvar);
+  $("#t-salvar").onclick = () => salvar();
+  $("#t-cat").addEventListener("change", () => salvar(false));
+  $("#t-etapa").addEventListener("change", async () => { if (await salvar(false)) avisar(`Movida para ${nomeEtapa($("#t-etapa").value)}.`); });
+  $("#t-voltar").onclick = async () => {
+    if (mudou && !(await salvar(false))) return;
+    trans.sel = null; desenhar();
+  };
   $("#t-apagar").onclick = async () => {
-    if (!(await confirmar(`Apagar "${t.titulo || "este vídeo"}" da sua biblioteca?`))) return;
-    if (await apagarLinha("transcricoes", t.id)) { trans.sel = null; avisar("Apagado."); recarregar("transcricoes"); }
+    if (!(await confirmar(`Apagar "${t.titulo || "esta ideia"}" do seu banco de ideias?`))) return;
+    if (await apagarLinha("transcricoes", t.id)) { trans.sel = null; avisar("Apagada."); recarregar("transcricoes"); }
   };
 }
