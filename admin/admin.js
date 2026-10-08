@@ -73,10 +73,11 @@ const ESQUEMA = {
   marcas: ["id", "nome", "instagram", "email", "telefone", "situacao", "obs", "ultimo_contato", "exemplo", "criado_em"],
   calendario: ["id", "titulo", "marca", "tipo", "data", "status", "exemplo"],
   campanhas: ["id", "campanha", "cliente", "tipo", "status", "qtd", "valor", "prazo", "pagamento", "ativa", "favorita", "exemplo"],
+  transcricoes: ["id", "criado_em", "link", "plataforma", "categoria", "titulo", "transcricao", "transcricao_original", "idioma_original", "observacoes"],
   marcados: ["chave", "marcado"],
   visitas: ["id", "data", "pagina", "origem"]
 };
-const S = { videos: [], marcas: [], calendario: [], campanhas: [], marcados: {}, visitas: [] };
+const S = { videos: [], marcas: [], calendario: [], campanhas: [], marcados: {}, visitas: [], transcricoes: [] };
 const CAMPOS = {};          // campos que existem de verdade em cada tabela
 const FALTAS = new Map();   // tabela -> o que faltou
 
@@ -116,15 +117,16 @@ async function ler(tabela, ajuste) {
 
 async function carregarTudo() {
   const desde = new Date(); desde.setHours(0, 0, 0, 0); desde.setDate(desde.getDate() - 13);
-  const [videos, marcas, calendario, campanhas, marcados, visitas] = await Promise.all([
+  const [videos, marcas, calendario, campanhas, marcados, visitas, transcricoes] = await Promise.all([
     ler("videos", (q, c) => (c.includes("ordem") ? q.order("ordem", { ascending: true }) : q)),
     ler("marcas", (q, c) => (c.includes("criado_em") ? q.order("criado_em", { ascending: false }) : q)),
     ler("calendario"),
     ler("campanhas"),
     ler("marcados"),
-    ler("visitas", (q, c) => (c.includes("data") ? q.gte("data", desde.toISOString()).order("data").limit(10000) : q))
+    ler("visitas", (q, c) => (c.includes("data") ? q.gte("data", desde.toISOString()).order("data").limit(10000) : q)),
+    ler("transcricoes", (q, c) => (c.includes("criado_em") ? q.order("criado_em", { ascending: false }) : q))
   ]);
-  Object.assign(S, { videos, marcas, calendario, campanhas, visitas });
+  Object.assign(S, { videos, marcas, calendario, campanhas, visitas, transcricoes });
   S.marcados = {};
   marcados.forEach((m) => { if (m.chave) S.marcados[m.chave] = m.marcado !== false; });
 }
@@ -149,7 +151,8 @@ async function apagarLinha(tabela, id) {
 async function recarregar(tabela) {
   const ajustes = {
     videos: (q, c) => (c.includes("ordem") ? q.order("ordem", { ascending: true }) : q),
-    marcas: (q, c) => (c.includes("criado_em") ? q.order("criado_em", { ascending: false }) : q)
+    marcas: (q, c) => (c.includes("criado_em") ? q.order("criado_em", { ascending: false }) : q),
+    transcricoes: (q, c) => (c.includes("criado_em") ? q.order("criado_em", { ascending: false }) : q)
   };
   S[tabela] = await ler(tabela, ajustes[tabela]);
   desenhar();
@@ -270,6 +273,7 @@ const DESENHOS = {
   marcas: desenharMarcas,
   calendario: desenharCalendario,
   campanhas: desenharCampanhas,
+  transcricoes: desenharTranscricoes,
   checklist: desenharChecklist
 };
 let abaAtual = "portfolio";
@@ -1096,5 +1100,291 @@ function subRevisar(corpo, B) {
       if (error) avisar(traduzErro(error), true);
     }
     desenhar();
+  };
+}
+
+/* =============================================================
+   ABA 6: TRANSCRIÇÕES
+   Vídeos de referência do YouTube, Instagram e TikTok, separados em
+   TikTok Shop, Ideias orgânicas e Publi / UGC. A transcrição é feita
+   pelo TokScript aberto dentro do próprio painel, e o texto colado é
+   traduzido para português pelo tradutor que vem dentro do Chrome.
+   ============================================================= */
+const CATEGORIAS = [["tiktok_shop", "TikTok Shop"], ["organico", "Ideias orgânicas"], ["publi", "Publi / UGC"]];
+const nomeCategoria = (c) => (CATEGORIAS.find((x) => x[0] === c) || [c, "Sem divisão"])[1];
+const NOME_PLATAFORMA = { youtube: "YouTube", instagram: "Instagram", tiktok: "TikTok", outro: "Link" };
+const NOME_IDIOMA = { en: "inglês", es: "espanhol", fr: "francês", it: "italiano", de: "alemão", ja: "japonês", ko: "coreano", zh: "chinês", ru: "russo", hi: "hindi", ar: "árabe", tr: "turco", nl: "holandês", pl: "polonês" };
+const trans = { categoria: "todas", busca: "", sel: null, tokscriptAberto: false };
+
+// Descobre a plataforma e o endereço para mostrar o vídeo dentro do painel
+function videoDoLink(link) {
+  try {
+    const u = new URL(link);
+    const h = u.hostname.replace(/^(www|m|vm|vt)\./, "");
+    if (/(^|\.)youtube\.com$|^youtu\.be$/.test(h)) {
+      const id = h === "youtu.be" ? u.pathname.slice(1) : (u.searchParams.get("v") || (u.pathname.match(/\/(shorts|embed|live)\/([^/?#]+)/) || [])[2]);
+      return { plataforma: "youtube", src: id ? `https://www.youtube.com/embed/${encodeURIComponent(id)}` : null, vertical: /\/shorts\//.test(u.pathname) };
+    }
+    if (/(^|\.)instagram\.com$/.test(h)) {
+      const m = u.pathname.match(/\/(p|reel|reels|tv)\/([^/?#]+)/);
+      return { plataforma: "instagram", src: m ? `https://www.instagram.com/${m[1] === "reels" ? "reel" : m[1]}/${encodeURIComponent(m[2])}/embed` : null, vertical: true };
+    }
+    if (/(^|\.)tiktok\.com$/.test(h)) {
+      const m = u.pathname.match(/\/video\/(\d+)/);
+      return { plataforma: "tiktok", src: m ? `https://www.tiktok.com/embed/v2/${m[1]}` : null, vertical: true };
+    }
+  } catch (_) {}
+  return { plataforma: "outro", src: null, vertical: false };
+}
+
+/* ---------- Tradução para português ---------- */
+// Palpite simples de idioma, para quando o Chrome não tiver o detector
+function palpiteIdioma(t) {
+  const p = (" " + t.toLowerCase().replace(/[^a-zà-ú\s]/g, " ") + " ");
+  const conta = (lista) => lista.reduce((s, w) => s + (p.split(" " + w + " ").length - 1), 0);
+  const pt = conta(["você", "não", "que", "uma", "pra", "para", "com", "isso", "muito", "tem", "é", "eu", "meu", "minha"]);
+  const en = conta(["the", "you", "and", "this", "that", "is", "it", "my", "your", "with", "what", "i", "so"]);
+  const es = conta(["el", "los", "las", "pero", "muy", "esto", "usted", "tú", "mi", "con", "qué", "es"]);
+  if (pt >= en && pt >= es) return "pt";
+  return en >= es ? "en" : "es";
+}
+
+async function detectarIdioma(texto) {
+  try {
+    if ("LanguageDetector" in self) {
+      const det = await comLimite(self.LanguageDetector.create(), 6000);
+      const r = await comLimite(det.detect(texto.slice(0, 3000)), 6000);
+      if (r && r[0] && r[0].confidence > 0.5) return r[0].detectedLanguage;
+    }
+  } catch (_) {}
+  return palpiteIdioma(texto);
+}
+
+// Espera uma promessa por no máximo "ms"; se passar disso, desiste
+const comLimite = (promessa, ms) => Promise.race([promessa, new Promise((_, falha) => setTimeout(() => falha(new Error("demorou")), ms))]);
+
+// Traduz em pedaços, para textos longos
+async function traduzirParaPortugues(texto, idioma, aviso) {
+  if (!("Translator" in self)) return null;
+  const disp = await comLimite(self.Translator.availability({ sourceLanguage: idioma, targetLanguage: "pt" }), 6000);
+  if (disp === "unavailable") return null;
+  let baixando = false;
+  const criar = self.Translator.create({
+    sourceLanguage: idioma, targetLanguage: "pt",
+    monitor(m) { m.addEventListener("downloadprogress", (e) => { baixando = true; aviso(`Preparando o tradutor do Chrome (só na primeira vez)... ${Math.round((e.loaded || 0) * 100)}%`); }); }
+  });
+  // Se estiver baixando o tradutor, espera mais; se não, desiste rápido
+  const tradutor = await comLimite(criar, 15000).catch(async (erro) => { if (baixando) return comLimite(criar, 180000); throw erro; });
+  const partes = texto.split(/(\n+)/);
+  let saida = "";
+  for (const parte of partes) {
+    if (!parte.trim()) { saida += parte; continue; }
+    const frases = parte.match(/[^.!?]+[.!?]*\s*/g) || [parte];
+    let bloco = "";
+    for (const f of frases) {
+      if ((bloco + f).length > 900) { saida += await comLimite(tradutor.translate(bloco), 30000); bloco = ""; }
+      bloco += f;
+    }
+    if (bloco) saida += await comLimite(tradutor.translate(bloco), 30000);
+  }
+  return saida;
+}
+
+function linkGoogleTradutor(texto) {
+  return "https://translate.google.com/?sl=auto&tl=pt&op=translate&text=" + encodeURIComponent(texto.slice(0, 4500));
+}
+
+/* ---------- Desenho da aba ---------- */
+function desenharTranscricoes(el) {
+  const todas = S.transcricoes;
+  const conta = (c) => todas.filter((t) => t.categoria === c).length;
+  if (trans.sel && !todas.some((t) => String(t.id) === String(trans.sel))) trans.sel = null;
+  const catPadrao = trans.categoria === "todas" ? "organico" : trans.categoria;
+
+  el.innerHTML = `
+    <div class="barra">
+      <div class="chips" role="group" aria-label="Divisões">
+        ${[["todas", "Todas"], ...CATEGORIAS].map(([v, t]) => `<button class="chip" type="button" data-cat="${v}" aria-pressed="${trans.categoria === v}">${t} <span class="sub">${v === "todas" ? todas.length : conta(v)}</span></button>`).join("")}
+      </div>
+    </div>
+    <form class="cartao add-trans" id="form-add-trans" novalidate>
+      <label for="novo-link"><b>Novo vídeo de referência</b> <span class="sub">cole o link do YouTube, Instagram ou TikTok</span></label>
+      <div class="barra" style="margin:6px 0 0">
+        <input class="campo" id="novo-link" type="url" placeholder="https://www.instagram.com/reel/..." style="flex:1 1 280px">
+        <select class="campo" id="novo-cat" aria-label="Divisão">${CATEGORIAS.map(([v, t]) => `<option value="${v}" ${v === catPadrao ? "selected" : ""}>${t}</option>`).join("")}</select>
+        <button class="btn primario" type="submit">${ic("mais")}Adicionar</button>
+      </div>
+    </form>
+    <div class="trans-grade">
+      <div class="trans-lista">
+        <div class="busca" style="max-width:none;margin-bottom:8px">${ic("busca")}<input type="search" id="busca-trans" placeholder="Buscar no título, roteiro ou observação" value="${esc(trans.busca)}" aria-label="Buscar transcrições"></div>
+        <div id="lista-trans"></div>
+      </div>
+      <div class="trans-detalhe" id="detalhe-trans"></div>
+    </div>`;
+
+  $$("[data-cat]", el).forEach((b) => b.onclick = () => { trans.categoria = b.dataset.cat; desenhar(); });
+  $("#form-add-trans").addEventListener("submit", adicionarTranscricao);
+  $("#busca-trans").addEventListener("input", (e) => { trans.busca = e.target.value; pintarListaTrans(); });
+  $("#lista-trans").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-trans]");
+    if (!b) return;
+    trans.sel = b.dataset.trans; trans.tokscriptAberto = false;
+    pintarListaTrans(); pintarDetalheTrans();
+    if (window.innerWidth < 960) $("#detalhe-trans").scrollIntoView({ behavior: "smooth" });
+  });
+  pintarListaTrans();
+  pintarDetalheTrans();
+}
+
+function filtrarTrans() {
+  const q = trans.busca.toLowerCase();
+  return S.transcricoes.filter((t) => {
+    if (trans.categoria !== "todas" && t.categoria !== trans.categoria) return false;
+    return !q || [t.titulo, t.transcricao, t.observacoes, t.link].some((x) => String(x || "").toLowerCase().includes(q));
+  });
+}
+
+function pintarListaTrans() {
+  const lista = filtrarTrans();
+  $("#lista-trans").innerHTML = lista.length === 0
+    ? `<p class="vazio">${S.transcricoes.length ? "Nada com esse filtro." : "Sua biblioteca está vazia. Cole o link de um vídeo que você gosta aqui em cima."}</p>`
+    : lista.map((t) => `<button type="button" class="item-trans ${String(t.id) === String(trans.sel) ? "ativo" : ""}" data-trans="${esc(t.id)}">
+        <span class="item-trans-topo"><span class="pilula p-plat-${esc(t.plataforma || "outro")}">${esc(NOME_PLATAFORMA[t.plataforma] || "Link")}</span><span class="pilula p-cat">${esc(nomeCategoria(t.categoria))}</span></span>
+        <b>${esc(t.titulo || "Sem título")}</b>
+        <small>${t.transcricao ? esc(t.transcricao.slice(0, 90)) + (t.transcricao.length > 90 ? "..." : "") : "Ainda sem transcrição"}</small>
+        <small class="data">${t.criado_em ? dataBR(isoLocal(new Date(t.criado_em))) : ""}</small>
+      </button>`).join("");
+}
+
+async function adicionarTranscricao(e) {
+  e.preventDefault();
+  const link = $("#novo-link").value.trim();
+  if (!/^https?:\/\//i.test(link)) { avisar("Cole um link completo, começando com https://", true); $("#novo-link").focus(); return; }
+  if (!temCampo("transcricoes", "link")) { avisar("A tabela transcricoes ainda não existe. Rode a parte 11 do banco.sql.", true); return; }
+  const info = videoDoLink(link);
+  const dados = {
+    link, plataforma: info.plataforma, categoria: $("#novo-cat").value,
+    titulo: `Vídeo do ${NOME_PLATAFORMA[info.plataforma] || "link"} de ${dataBR(hojeISO()).slice(0, 5)}`
+  };
+  const limpo = {};
+  Object.keys(dados).forEach((k) => { if (temCampo("transcricoes", k)) limpo[k] = dados[k]; });
+  const { data, error } = await db.from("transcricoes").insert(limpo).select("id").single();
+  if (error) { avisar(traduzErro(error), true); return; }
+  trans.sel = String(data.id); trans.tokscriptAberto = true;
+  if (trans.categoria !== "todas" && trans.categoria !== dados.categoria) trans.categoria = dados.categoria;
+  avisar("Vídeo salvo. Agora gere a transcrição no quadro do TokScript.");
+  await recarregar("transcricoes");
+}
+
+function pintarDetalheTrans() {
+  const caixa = $("#detalhe-trans");
+  const t = S.transcricoes.find((x) => String(x.id) === String(trans.sel));
+  if (!t) { caixa.innerHTML = `<div class="cartao"><p class="vazio">Escolha um vídeo na lista ou adicione um novo link para ver o vídeo, gerar o roteiro e anotar as suas observações.</p></div>`; return; }
+  const info = videoDoLink(t.link);
+  const traduzido = t.transcricao_original && t.idioma_original && t.idioma_original !== "pt";
+
+  caixa.innerHTML = `
+    <div class="cartao">
+      <div class="trans-cabeca">
+        <input class="campo titulo-trans" id="t-titulo" value="${esc(t.titulo || "")}" placeholder="Dê um nome para este vídeo" aria-label="Título">
+        <select class="campo" id="t-cat" aria-label="Divisão">${CATEGORIAS.map(([v, n]) => `<option value="${v}" ${v === t.categoria ? "selected" : ""}>${n}</option>`).join("")}</select>
+      </div>
+      <p class="sub" style="margin:6px 0 0"><a href="${esc(t.link)}" target="_blank" rel="noopener">Abrir o vídeo original no ${esc(NOME_PLATAFORMA[info.plataforma] || "site")}</a></p>
+    </div>
+    <div class="trans-trabalho">
+      <div class="cartao trans-video">
+        <h2>Conteúdo</h2>
+        ${info.src
+          ? `<div class="moldura ${info.vertical ? "vertical" : ""}"><iframe src="${esc(info.src)}" title="Vídeo de referência" loading="lazy" allow="autoplay; encrypted-media; picture-in-picture; clipboard-write" allowfullscreen></iframe></div>`
+          : `<p class="vazio">Esse link não dá para mostrar aqui dentro. Use o link "Abrir o vídeo original" acima.${info.plataforma === "tiktok" ? " No TikTok, use o link completo do vídeo (com /video/ no endereço), não o link curto." : ""}</p>`}
+      </div>
+      <div class="cartao trans-textos">
+        <div class="barra" style="margin-bottom:6px"><h2 style="margin:0">Roteiro (transcrição)</h2><span class="espaco"></span><span class="sub" id="t-status"></span></div>
+        <textarea class="campo" id="t-transcricao" rows="12" placeholder="Cole aqui o texto do TokScript. Se vier em outro idioma, eu traduzo para português sozinho.">${esc(t.transcricao || "")}</textarea>
+        <div class="barra" style="margin:6px 0 0">
+          <button class="btn" type="button" id="t-traduzir">${ic("traduzir")}Traduzir para português</button>
+          ${traduzido ? `<button class="btn" type="button" id="t-original">Ver o original (${esc(NOME_IDIOMA[t.idioma_original] || t.idioma_original)})</button>` : ""}
+        </div>
+        <div id="t-original-caixa" hidden><p class="sub" style="margin:10px 0 4px">Texto original, como veio do TokScript:</p><div class="original">${esc(t.transcricao_original || "")}</div></div>
+        <h2 style="margin-top:16px">Minhas observações</h2>
+        <textarea class="campo" id="t-obs" rows="6" placeholder="O que chamou sua atenção? Gancho, ritmo, enquadramento, o que você quer copiar ou adaptar...">${esc(t.observacoes || "")}</textarea>
+        <div class="barra" style="margin:10px 0 0">
+          <button class="btn perigo" type="button" id="t-apagar">${ic("apagar")}Apagar</button>
+          <span class="espaco"></span>
+          <span class="sub" id="t-salvo"></span>
+          <button class="btn primario" type="button" id="t-salvar">Salvar</button>
+        </div>
+      </div>
+    </div>
+    <details class="secao tokscript" id="t-tokscript" ${trans.tokscriptAberto ? "open" : ""}>
+      <summary><span class="emo" aria-hidden="true">${ic("transcricao")}</span><span class="nome">Gerar a transcrição aqui (TokScript)</span><span class="conta">grátis, até 5 por dia</span></summary>
+      <div class="corpo">
+        <ol class="passos">
+          <li>No quadro abaixo, o link já está preenchido. Se quiser, clique em <b>Translate</b> e escolha <b>Portuguese</b>.</li>
+          <li>Clique em <b>Scan Video</b> e espere o texto aparecer.</li>
+          <li>Copie o texto e cole no campo <b>Roteiro</b> aqui em cima. Se vier em inglês ou espanhol, eu traduzo sozinho.</li>
+        </ol>
+        <div class="moldura-tokscript" id="t-tokscript-moldura"></div>
+      </div>
+    </details>`;
+
+  const ta = $("#t-transcricao"), status = (txt) => { $("#t-status").textContent = txt; };
+  let originalPendente = null;
+
+  // Abre o TokScript só quando a pessoa pede, para não pesar
+  const carregarTokscript = () => {
+    const m = $("#t-tokscript-moldura");
+    if (!m.firstChild) m.innerHTML = `<iframe src="https://tokscript.com/${esc(t.link)}" title="TokScript" allow="clipboard-read; clipboard-write"></iframe>`;
+  };
+  if (trans.tokscriptAberto) carregarTokscript();
+  $("#t-tokscript").addEventListener("toggle", (e) => { trans.tokscriptAberto = e.target.open; if (e.target.open) carregarTokscript(); });
+
+  async function garantirPortugues(manual) {
+    const texto = ta.value.trim();
+    if (!texto) { if (manual) avisar("Cole o texto primeiro.", true); return; }
+    status("Conferindo o idioma...");
+    const idioma = (await detectarIdioma(texto) || "").slice(0, 2);
+    if (idioma === "pt") { status(manual ? "Esse texto já está em português." : ""); return; }
+    status(`Traduzindo do ${NOME_IDIOMA[idioma] || idioma} para português...`);
+    try {
+      const pt = await traduzirParaPortugues(texto, idioma, status);
+      if (pt) {
+        originalPendente = { texto, idioma };
+        ta.value = pt.trim();
+        status(`Traduzido do ${NOME_IDIOMA[idioma] || idioma}. Confira e clique em Salvar.`);
+        return;
+      }
+    } catch (_) {}
+    status("");
+    const d = abrirJanelaSimples("Traduzir para português",
+      `<p>O tradutor que vem no Chrome não está disponível neste navegador. Dá para traduzir pelo Google Tradutor:</p>
+       <ol class="passos"><li>Clique em <b>Abrir o Google Tradutor</b>.</li><li>Copie o texto em português que aparecer.</li><li>Volte aqui, apague o texto do campo Roteiro e cole o traduzido.</li></ol>`,
+      `<a class="btn primario" href="${linkGoogleTradutor(texto)}" target="_blank" rel="noopener">Abrir o Google Tradutor</a>`);
+    $("a", d).addEventListener("click", () => d.close());
+  }
+
+  ta.addEventListener("paste", () => setTimeout(() => garantirPortugues(false), 50));
+  $("#t-traduzir").onclick = () => garantirPortugues(true);
+  if ($("#t-original")) $("#t-original").onclick = () => { const c = $("#t-original-caixa"); c.hidden = !c.hidden; };
+
+  const salvar = async () => {
+    const dados = { titulo: $("#t-titulo").value.trim() || null, categoria: $("#t-cat").value, transcricao: ta.value.trim() || null, observacoes: $("#t-obs").value.trim() || null };
+    if (originalPendente) { dados.transcricao_original = originalPendente.texto; dados.idioma_original = originalPendente.idioma; }
+    const btn = $("#t-salvar"); btn.disabled = true; btn.textContent = "Salvando...";
+    const ok = await gravar("transcricoes", dados, t.id);
+    btn.disabled = false; btn.textContent = "Salvar";
+    if (ok) {
+      originalPendente = null;
+      Object.assign(t, dados);
+      $("#t-salvo").textContent = "Salvo " + new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+      pintarListaTrans();
+    }
+  };
+  $("#t-salvar").onclick = salvar;
+  $("#t-cat").addEventListener("change", salvar);
+  $("#t-apagar").onclick = async () => {
+    if (!(await confirmar(`Apagar "${t.titulo || "este vídeo"}" da sua biblioteca?`))) return;
+    if (await apagarLinha("transcricoes", t.id)) { trans.sel = null; avisar("Apagado."); recarregar("transcricoes"); }
   };
 }
