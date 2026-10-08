@@ -1174,7 +1174,8 @@ async function traduzirParaPortugues(texto, idioma, aviso) {
     monitor(m) { m.addEventListener("downloadprogress", (e) => { baixando = true; aviso(`Preparando o tradutor do Chrome (só na primeira vez)... ${Math.round((e.loaded || 0) * 100)}%`); }); }
   });
   // Se estiver baixando o tradutor, espera mais; se não, desiste rápido
-  const tradutor = await comLimite(criar, 15000).catch(async (erro) => { if (baixando) return comLimite(criar, 180000); throw erro; });
+  aviso("Abrindo o tradutor do Chrome...");
+  const tradutor = await comLimite(criar, 60000).catch(async (erro) => { if (baixando) return comLimite(criar, 180000); throw erro; });
   const partes = texto.split(/(\n+)/);
   let saida = "";
   for (const parte of partes) {
@@ -1321,9 +1322,9 @@ function pintarDetalheTrans() {
       <summary><span class="emo" aria-hidden="true">${ic("transcricao")}</span><span class="nome">Gerar a transcrição aqui (TokScript)</span><span class="conta">grátis, até 5 por dia</span></summary>
       <div class="corpo">
         <ol class="passos">
-          <li>No quadro abaixo, o link já está preenchido. Se quiser, clique em <b>Translate</b> e escolha <b>Portuguese</b>.</li>
-          <li>Clique em <b>Scan Video</b> e espere o texto aparecer.</li>
-          <li>Copie o texto e cole no campo <b>Roteiro</b> aqui em cima. Se vier em inglês ou espanhol, eu traduzo sozinho.</li>
+          <li>A transcrição começa sozinha no quadro abaixo. Espere uns segundos e role o quadro até aparecer o texto. Se não começar, clique em <b>Scan Video</b>.</li>
+          <li>Selecione o texto, copie (<b>Cmd + C</b>) e cole (<b>Cmd + V</b>) no campo <b>Roteiro</b> aqui em cima.</li>
+          <li>Se vier em inglês, espanhol ou outro idioma, eu traduzo para português sozinho. Depois clique em <b>Salvar</b>.</li>
         </ol>
         <div class="moldura-tokscript" id="t-tokscript-moldura"></div>
       </div>
