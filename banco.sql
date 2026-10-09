@@ -352,3 +352,25 @@ alter table public.contratos enable row level security;
 drop policy if exists "dono faz tudo" on public.contratos;
 create policy "dono faz tudo" on public.contratos
   for all to authenticated using (public.eh_admin()) with check (public.eh_admin());
+
+
+-- -------------------------------------------------------------
+-- 14. CAMPANHAS E FINANCEIRO JUNTOS
+-- A aba Campanhas passa a usar a mesma tabela contratos: você
+-- cadastra uma vez e o trabalho aparece no Financeiro (dinheiro) e em
+-- Campanhas (etapas de produção). Campos novos:
+-- qtd: quantos vídeos | prazo_entrega: data de entrega para a marca
+-- favorita: a estrela de destaque
+-- A tabela antiga "campanhas" não é mais usada pelo painel.
+-- -------------------------------------------------------------
+alter table public.contratos add column if not exists qtd integer check (qtd >= 0);
+alter table public.contratos add column if not exists prazo_entrega date;
+alter table public.contratos add column if not exists favorita boolean not null default false;
+
+-- Preenche a quantidade de vídeos a partir da descrição (ex: "2 videos" vira 2)
+update public.contratos
+   set qtd = (regexp_match(descricao, '^\s*(\d+)'))[1]::integer
+ where qtd is null and descricao ~ '^\s*\d+';
+
+-- Apaga a linha de exemplo da tabela antiga de campanhas
+delete from public.campanhas where exemplo = true;
