@@ -579,6 +579,11 @@ details.tokscript > summary .emo { font-size: 16px; color: var(--cobalt); }
   #alternar-menu, #titulo { display: none; }
   .topo-mobile { transition: transform .2s ease; }
   .topo-escondido .topo-mobile { transform: translateY(-100%); }
+  /* No celular, o olho, o sino e o "ver meu site" sobem para a barra do topo */
+  .cabeca { position: fixed; top: 0; right: 12px; z-index: 31; height: 51px; margin: 0; transition: transform .2s ease; }
+  .topo-escondido .cabeca { transform: translateY(-100%); }
+  .cabeca-titulo { display: none; }
+  .principal { overflow-x: hidden; }
 }
 
 /* ---------- Início ---------- */
@@ -594,10 +599,10 @@ details.tokscript > summary .emo { font-size: 16px; color: var(--cobalt); }
 .kpi-inicio small { font-size: 12px; color: var(--muted); }
 .kpi-inicio.alerta small { color: var(--red); font-weight: 600; }
 .meta-trilho.mini { display: block; flex: none; height: 6px; margin: 4px 0 2px; }
-.grade-inicio { display: grid; grid-template-columns: 1.2fr 1fr; gap: 16px; align-items: start; }
+.grade-inicio { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 16px; align-items: start; }
 .coluna-inicio { display: grid; gap: 16px; }
 .sub-titulo { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin: 16px 0 6px; }
-.lista-dia { display: grid; gap: 2px; }
+.lista-dia { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; }
 .item-dia { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; font: inherit; color: inherit; background: none; border: 0; border-radius: var(--radius); padding: 7px 6px; cursor: pointer; }
 .item-dia:hover { background: var(--tint); }
 .item-dia .pilula { flex: none; }
@@ -605,7 +610,7 @@ details.tokscript > summary .emo { font-size: 16px; color: var(--cobalt); }
 .item-dia-texto b { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .item-dia-texto small { font-size: 11.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .item-dia > .sub, .item-dia > .etq { flex: none; }
-@media (max-width: 1000px) { .inicio-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .grade-inicio { grid-template-columns: 1fr; } }
+@media (max-width: 1000px) { .inicio-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .grade-inicio { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 420px) { .kpi-inicio strong { font-size: 18px; } }
 
 /* ---------- Cabeçalho: olho (esconder valores) e sino dos lembretes ---------- */
@@ -690,7 +695,7 @@ a.btn.pequeno { text-decoration: none; }
 @media (max-width: 620px) { .ig-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
 /* ---------- Início: propostas e Instagram; bolinhas do menu ---------- */
-.grade-entrada { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.grade-entrada { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 16px; }
 .grade-entrada h2 { display: inline-flex; align-items: center; gap: 6px; }
 .ig-mini { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .ig-mini span { display: block; font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
@@ -700,7 +705,9 @@ a.btn.pequeno { text-decoration: none; }
 .menu-bolinha { margin-left: auto; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: #e8848f; color: #fff; font-size: 11px; font-style: normal; font-weight: 700; line-height: 20px; text-align: center; animation: pulsar 2s ease-in-out 3; }
 @keyframes pulsar { 50% { transform: scale(1.18); } }
 @media (prefers-reduced-motion: reduce) { .menu-bolinha { animation: none; } }
-@media (max-width: 1000px) { .grade-entrada { grid-template-columns: 1fr; } }
+@media (max-width: 1000px) { .grade-entrada { grid-template-columns: minmax(0, 1fr); } }
+.grade-entrada .barra h2 { min-width: 0; }
+.grade-entrada .link-btn { white-space: nowrap; flex: none; }
 
 /* ---------- Menu em blocos por assunto ---------- */
 .menu { overflow-y: auto; }
