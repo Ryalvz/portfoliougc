@@ -1189,14 +1189,15 @@ async function detectarIdioma(texto) {
 // Espera uma promessa por no máximo "ms"; se passar disso, desiste
 const comLimite = (promessa, ms) => Promise.race([promessa, new Promise((_, falha) => setTimeout(() => falha(new Error("demorou")), ms))]);
 
-// Traduz em pedaços, para textos longos
-async function traduzirParaPortugues(texto, idioma, aviso) {
+// Traduz em pedaços, para textos longos (de um idioma para outro, com o tradutor do Chrome)
+async function traduzirParaPortugues(texto, idioma, aviso) { return traduzir(texto, idioma, "pt", aviso); }
+async function traduzir(texto, idioma, destino, aviso = () => {}) {
   if (!("Translator" in self)) return null;
-  const disp = await comLimite(self.Translator.availability({ sourceLanguage: idioma, targetLanguage: "pt" }), 6000);
+  const disp = await comLimite(self.Translator.availability({ sourceLanguage: idioma, targetLanguage: destino }), 6000);
   if (disp === "unavailable") return null;
   let baixando = false;
   const criar = self.Translator.create({
-    sourceLanguage: idioma, targetLanguage: "pt",
+    sourceLanguage: idioma, targetLanguage: destino,
     monitor(m) { m.addEventListener("downloadprogress", (e) => { baixando = true; aviso(`Preparando o tradutor do Chrome (só na primeira vez)... ${Math.round((e.loaded || 0) * 100)}%`); }); }
   });
   // Se estiver baixando o tradutor, espera mais; se não, desiste rápido
@@ -1217,8 +1218,8 @@ async function traduzirParaPortugues(texto, idioma, aviso) {
   return saida;
 }
 
-function linkGoogleTradutor(texto) {
-  return "https://translate.google.com/?sl=auto&tl=pt&op=translate&text=" + encodeURIComponent(texto.slice(0, 4500));
+function linkGoogleTradutor(texto, de = "auto", para = "pt") {
+  return `https://translate.google.com/?sl=${de}&tl=${para}&op=translate&text=` + encodeURIComponent(texto.slice(0, 4500));
 }
 
 /* ---------- Banco de ideias: etapas ---------- */
@@ -3009,7 +3010,7 @@ function semCitacao(t) {
 }
 
 async function abrirConversa(email) {
-  gm.aberto = email; gm.conversa = null; gm.carregandoConversa = true;
+  gm.aberto = email; gm.conversa = null; gm.carregandoConversa = true; gm.idioma = "pt"; gm.rascunho = ""; gm.rascunhoPt = "";
   desenhar();
   try {
     const th = await gmailApi(`threads/${email.thread}?format=full`);
@@ -3019,6 +3020,9 @@ async function abrirConversa(email) {
       messageId: cabecalho(m, "Message-ID") || cabecalho(m, "Message-Id"), referencias: cabecalho(m, "References"),
       texto: semCitacao(textoDaMensagem(m.payload) || m.snippet || "")
     }));
+    // Em que idioma a marca escreve? (para traduzir a conversa e a resposta)
+    const daMarca = [...gm.conversa].reverse().find((m) => m.de.email !== EMAIL_PROPOSTAS);
+    gm.idioma = daMarca ? String(await detectarIdioma(daMarca.texto) || "pt").slice(0, 2) : "pt";
   } catch (e) { gm.erro = e.message; gm.aberto = null; }
   gm.carregandoConversa = false;
   desenhar();
@@ -3066,14 +3070,22 @@ function desenharConversa(el) {
       <h2 class="conversa-assunto">${esc(x.assunto)}</h2>
       ${gm.carregandoConversa ? `<p class="vazio">Abrindo a conversa...</p>` : (gm.conversa || []).map((m) => `<div class="msg ${m.de.email === EMAIL_PROPOSTAS ? "minha" : ""}">
         <div class="email-topo"><b>${m.de.email === EMAIL_PROPOSTAS ? "Você" : esc(m.de.nome)}</b><span class="sub">${esc(m.de.email)}</span><span class="espaco"></span><span class="sub">${m.data.toLocaleString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span></div>
-        <div class="msg-texto">${esc(m.texto)}</div>
+        <div class="msg-texto">${esc(m.verTraducao && m.traducao ? m.traducao : m.texto)}</div>
+        ${m.de.email !== EMAIL_PROPOSTAS && gm.idioma && gm.idioma !== "pt" ? `<button type="button" class="link-btn pequeno-link" data-traduzir-msg="${esc(m.id)}">${m.verTraducao ? "ver o original" : "ver em português"}</button>` : ""}
       </div>`).join("")}
     </div>
     ${gm.carregandoConversa ? "" : `<div class="cartao responder">
       <div class="barra" style="margin-bottom:8px"><h2 style="margin:0">Responder ${esc(x.de.nome)}</h2><span class="espaco"></span>
         <span class="chips">${modelosResposta(x).map(([n], i) => `<button type="button" class="chip" data-modelo="${i}">${esc(n)}</button>`).join("")}</span></div>
       ${podeResponder() ? "" : `<div class="aviso-falta">Para responder daqui, o Google precisa da sua permissão de envio. Clique em <b>Liberar respostas</b> e aceite no Google.</div>`}
-      <textarea class="campo" id="texto-resposta" rows="9" placeholder="Escreva a sua resposta ou escolha um modelo acima."></textarea>
+      <textarea class="campo" id="texto-resposta" rows="9" placeholder="Escreva a sua resposta em português ou escolha um modelo acima.">${esc(gm.rascunho || "")}</textarea>
+      <div class="barra traduzir-barra">
+        <span class="sub">Traduzir a resposta para</span>
+        <select class="campo" id="idioma-resposta" aria-label="Idioma da resposta">${[["en", "inglês"], ["es", "espanhol"], ["fr", "francês"], ["it", "italiano"], ["de", "alemão"]].map(([v, n]) => `<option value="${v}" ${v === (gm.idioma && gm.idioma !== "pt" ? gm.idioma : "en") ? "selected" : ""}>${n}</option>`).join("")}</select>
+        <button class="btn" type="button" id="traduzir-resposta">${ic("traduzir")}Traduzir</button>
+        ${gm.rascunhoPt ? `<button type="button" class="link-btn pequeno-link" id="voltar-pt">voltar ao português</button>` : ""}
+        <span class="sub" id="status-traducao">${gm.idioma && gm.idioma !== "pt" ? `a marca escreve em ${esc(NOME_IDIOMA[gm.idioma] || gm.idioma)}` : ""}</span>
+      </div>
       <div class="barra" style="margin:8px 0 0">
         <span class="sub">vai de ${esc(EMAIL_PROPOSTAS)}, dentro da mesma conversa no Gmail</span>
         <span class="espaco"></span>
@@ -3082,11 +3094,45 @@ function desenharConversa(el) {
     </div>`}`;
 
   $("#voltar-propostas").onclick = () => { gm.aberto = null; gm.conversa = null; desenhar(); };
-  $$("[data-modelo]", el).forEach((b) => b.onclick = () => { $("#texto-resposta").value = modelosResposta(x)[Number(b.dataset.modelo)][1]; $("#texto-resposta").focus(); });
+  const caixa = $("#texto-resposta");
+  if (caixa) caixa.addEventListener("input", () => { gm.rascunho = caixa.value; });
+  $$("[data-modelo]", el).forEach((b) => b.onclick = () => { gm.rascunhoPt = ""; gm.rascunho = modelosResposta(x)[Number(b.dataset.modelo)][1]; desenhar(); $("#texto-resposta").focus(); });
+  $$("[data-traduzir-msg]", el).forEach((b) => b.onclick = async () => {
+    const m = gm.conversa.find((y) => y.id === b.dataset.traduzirMsg);
+    if (m.traducao) { m.verTraducao = !m.verTraducao; desenhar(); return; }
+    b.textContent = "traduzindo...";
+    try {
+      const pt = await traduzir(m.texto, gm.idioma, "pt", (t) => { b.textContent = t; });
+      if (!pt) { window.open(linkGoogleTradutor(m.texto, gm.idioma, "pt"), "_blank", "noopener"); b.textContent = "ver em português"; return; }
+      m.traducao = pt.trim(); m.verTraducao = true; desenhar();
+    } catch (_) { window.open(linkGoogleTradutor(m.texto, gm.idioma, "pt"), "_blank", "noopener"); b.textContent = "ver em português"; }
+  });
+  const btnTraduzir = $("#traduzir-resposta");
+  if (btnTraduzir) btnTraduzir.onclick = async () => {
+    const texto = caixa.value.trim();
+    if (!texto) { avisar("Escreva a resposta em português primeiro.", true); return; }
+    const destino = $("#idioma-resposta").value;
+    const status = (t) => { const st = $("#status-traducao"); if (st) st.textContent = t; };
+    btnTraduzir.disabled = true; status("Traduzindo...");
+    try {
+      const traduzido = await traduzir(texto, "pt", destino, status);
+      if (!traduzido) throw new Error("sem tradutor");
+      gm.rascunhoPt = texto; gm.rascunho = traduzido.trim();
+      desenhar(); avisar("Traduzido! Confira o texto antes de enviar.");
+    } catch (_) {
+      btnTraduzir.disabled = false; status("");
+      const d = abrirJanelaSimples("Traduzir a resposta",
+        `<p>O tradutor que vem no Chrome não respondeu. Dá para traduzir pelo Google Tradutor:</p>
+         <ol class="passos"><li>Clique em <b>Abrir o Google Tradutor</b>.</li><li>Copie o texto traduzido.</li><li>Volte aqui, apague a resposta e cole o texto traduzido.</li></ol>`,
+        `<a class="btn primario" href="${linkGoogleTradutor(texto, "pt", destino)}" target="_blank" rel="noopener">Abrir o Google Tradutor</a>`);
+      $("a", d).addEventListener("click", () => d.close());
+    }
+  };
+  const voltarPt = $("#voltar-pt");
+  if (voltarPt) voltarPt.onclick = () => { gm.rascunho = gm.rascunhoPt; gm.rascunhoPt = ""; desenhar(); };
   const liberar = $("#liberar-respostas");
   if (liberar) liberar.onclick = async () => {
-    const rascunho = $("#texto-resposta").value;
-    try { await conectarGmail(); desenhar(); $("#texto-resposta").value = rascunho; } catch (e) { avisar(e.message, true); }
+    try { await conectarGmail(); desenhar(); } catch (e) { avisar(e.message, true); }
   };
   const enviar = $("#enviar-resposta");
   if (enviar) enviar.onclick = async () => {
@@ -3095,7 +3141,7 @@ function desenharConversa(el) {
     if (texto.includes("R$ ___")) { avisar("Troque o R$ ___ pelo seu valor antes de enviar.", true); return; }
     if (!(await confirmar(`Enviar esta resposta para ${x.de.email}?`, "Sim, enviar"))) return;
     enviar.disabled = true; enviar.textContent = "Enviando...";
-    try { await enviarResposta(texto); avisar("Resposta enviada!"); await abrirConversa(x); }
+    try { await enviarResposta(texto); gm.rascunho = ""; gm.rascunhoPt = ""; avisar("Resposta enviada!"); await abrirConversa(x); }
     catch (e) { avisar("Não deu para enviar: " + e.message, true); enviar.disabled = false; enviar.textContent = "Enviar resposta"; }
   };
 }

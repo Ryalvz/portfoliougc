@@ -660,3 +660,5 @@ a.btn.pequeno { text-decoration: none; }
 .responder { margin-top: 16px; }
 .responder textarea { width: 100%; resize: vertical; line-height: 1.5; }
 @media (max-width: 620px) { .msg.minha { margin-left: 12px; } }
+.traduzir-barra { margin: 8px 0 0; }
+.traduzir-barra select.campo { padding: 5px 8px; }
