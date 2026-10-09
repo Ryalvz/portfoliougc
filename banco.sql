@@ -442,3 +442,66 @@ alter table public.metas enable row level security;
 drop policy if exists "dono faz tudo" on public.metas;
 create policy "dono faz tudo" on public.metas
   for all to authenticated using (public.eh_admin()) with check (public.eh_admin());
+
+
+-- -------------------------------------------------------------
+-- 17. LEMBRETES E NOTIFICAÇÕES NO CELULAR
+-- lembretes_adiados: quando você responde "ainda não" ou "lembrar
+--   depois", o lembrete some até a data "ate".
+-- push_inscricoes: os aparelhos (iPhone, computador) que aceitaram
+--   receber notificação do painel.
+-- config_privada e lembretes_enviados: só o ajudante "lembretes" do
+--   Supabase lê (nenhum login acessa). A chave de assinatura das
+--   notificações é criada lá dentro sozinha e nunca sai do banco.
+-- -------------------------------------------------------------
+create table if not exists public.lembretes_adiados (
+  chave  text primary key,
+  ate    date not null
+);
+alter table public.lembretes_adiados enable row level security;
+drop policy if exists "dono faz tudo" on public.lembretes_adiados;
+create policy "dono faz tudo" on public.lembretes_adiados
+  for all to authenticated using (public.eh_admin()) with check (public.eh_admin());
+
+create table if not exists public.push_inscricoes (
+  endpoint   text primary key,
+  inscricao  jsonb not null,
+  aparelho   text,
+  criado_em  timestamptz not null default now()
+);
+alter table public.push_inscricoes enable row level security;
+drop policy if exists "dono faz tudo" on public.push_inscricoes;
+create policy "dono faz tudo" on public.push_inscricoes
+  for all to authenticated using (public.eh_admin()) with check (public.eh_admin());
+
+create table if not exists public.config_privada (
+  chave  text primary key,
+  valor  text not null
+);
+alter table public.config_privada enable row level security;   -- sem regra: só o ajudante lê
+
+create table if not exists public.lembretes_enviados (
+  chave      text primary key,
+  enviado_em timestamptz not null default now()
+);
+alter table public.lembretes_enviados enable row level security;   -- sem regra: só o ajudante lê
+
+-- Relógio do Supabase: chama o ajudante "lembretes"
+--   todo dia às 9h (horário de Brasília): resumo do que está pendente
+--   toda quarta às 18h: lembra do repasse do TikTok Shop, se ainda não foi lançado
+-- A chave usada aqui é a pública (a mesma do js/banco.js), não é segredo.
+create extension if not exists pg_cron with schema pg_catalog;
+create extension if not exists pg_net with schema extensions;
+
+select cron.schedule('lembretes-diario', '0 12 * * *', $$
+  select net.http_post(
+    url := 'https://jlehawiwklvyvrzbfuiu.supabase.co/functions/v1/lembretes',
+    headers := '{"Content-Type": "application/json", "apikey": "sb_publishable_oZdhIWRB1gBabQH4xRJ2Xg__F8Lq0V0"}'::jsonb,
+    body := '{"tipo": "diario"}'::jsonb)
+$$);
+select cron.schedule('lembretes-quarta', '0 21 * * 3', $$
+  select net.http_post(
+    url := 'https://jlehawiwklvyvrzbfuiu.supabase.co/functions/v1/lembretes',
+    headers := '{"Content-Type": "application/json", "apikey": "sb_publishable_oZdhIWRB1gBabQH4xRJ2Xg__F8Lq0V0"}'::jsonb,
+    body := '{"tipo": "quarta"}'::jsonb)
+$$);
