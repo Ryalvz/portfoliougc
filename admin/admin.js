@@ -348,6 +348,8 @@ async function iniciar(sessao) {
   $("#aba-inicio").innerHTML = '<p class="vazio">Carregando seus dados...</p>';
   await carregarTudo();
   irPara((location.hash || "").slice(1) || "inicio");
+  // Tocar numa notificação com o painel já aberto troca de aba
+  window.addEventListener("hashchange", () => { const aba = (location.hash || "").slice(1); if (aba && aba !== abaAtual) irPara(aba); });
   sincronizarGmail();
 }
 
@@ -2522,6 +2524,33 @@ function calcularLembretes() {
         acoes: [["Fechou!", true, () => mudarEtapa(c, "Aguardando briefing")], ["Não fechou", false, () => mudarEtapa(c, "Perdida")], ["Lembrar em 3 dias", false, () => adiarLembrete(k, somaDiasISO(2))]] });
     }
   });
+  // Agenda do calendário: o que é pra hoje e o que ficou pra trás (até 7 dias)
+  S.calendario.filter((a) => !a.exemplo && a.status !== "feito" && a.data && String(a.data).slice(0, 10) <= hoje && String(a.data).slice(0, 10) >= somaDiasISO(-7))
+    .forEach((a) => {
+      const k = `cal-${a.id}`, data = String(a.data).slice(0, 10);
+      if (adiado(k)) return;
+      const oque = `<b>${esc((TIPOS_CAL.find((t) => t[0] === a.tipo) || [0, a.tipo])[1])}: ${esc(a.titulo)}</b>${a.marca ? ` (${esc(a.marca)})` : ""}`;
+      L.push({ aba: "calendario", ic: "calendario", nivel: data < hoje ? "alerta" : "",
+        texto: data === hoje ? `Na sua agenda de hoje: ${oque}.` : `Ficou pra trás no dia ${dataBR(data).slice(0, 5)}: ${oque}.`,
+        acoes: [["Já fiz", true, async () => { if (await gravar("calendario", { status: "feito" }, a.id)) { avisar("Marcado como feito."); recarregar("calendario"); } }],
+          ["Lembrar amanhã", false, () => adiarLembrete(k, hoje)]] });
+    });
+  // Meta do mês: a partir do dia 20, se ainda não bateu
+  const [ano, mes, dia] = hoje.split("-").map(Number);
+  const meta = metaDe(ano, mes), feito = faturadoEm(ano, mes);
+  if (meta > 0 && dia >= 20 && feito < meta && !adiado(`meta-${ano}-${mes}`)) {
+    const sobra = new Date(ano, mes, 0).getDate() - dia;
+    L.push({ aba: "financeiro", ic: "grafico", nivel: "",
+      texto: `Faltam <b>${real(meta - feito)}</b> pra bater a meta de ${MESES_LONGOS[mes - 1].toLowerCase()} (${sobra ? plural(sobra, "dia", "dias") + " até o fim do mês" : "hoje é o último dia"}). Tem proposta parada que dá pra puxar?`,
+      acoes: [["Ver propostas", true, () => irPara("propostas")], ["Lembrar semana que vem", false, () => adiarLembrete(`meta-${ano}-${mes}`, somaDiasISO(6))]] });
+  }
+  // Instagram parado: 7 dias ou mais sem post no feed
+  const ultimoPost = typeof ig !== "undefined" && ig.dados && (ig.dados.posts || []).map((x) => isoLocal(new Date(x.data))).sort().pop();
+  if (ultimoPost && diasEntre(ultimoPost, hoje) >= 7 && !adiado(`postar-${ultimoPost}`)) {
+    L.push({ aba: "instagram", ic: "insta", nivel: "",
+      texto: `Faz <b>${plural(diasEntre(ultimoPost, hoje), "dia", "dias")}</b> que você não posta no Instagram. Constância ajuda o alcance a voltar.`,
+      acoes: [["Ver o que funciona", true, () => irPara("instagram")], ["Lembrar em 3 dias", false, () => adiarLembrete(`postar-${ultimoPost}`, somaDiasISO(2))]] });
+  }
   return L;
 }
 
@@ -2686,12 +2715,12 @@ async function abrirNotificacoes() {
     corpo = `<p>As notificações deste app estão bloqueadas. No iPhone, vá em <b>Ajustes</b>, depois <b>Notificações</b>, toque em <b>Painel Ryan</b> e ligue <b>Permitir Notificações</b>. Depois volte aqui.</p>`;
   } else if (sub && Notification.permission === "granted") {
     corpo = `<p><b>Notificações ligadas neste aparelho.</b></p>
-      <ul class="passos"><li>Todo dia às 9h: um resumo do que está pendente (só quando tem algo).</li><li>Toda quarta às 18h: lembrete do repasse do TikTok Shop, se ainda não foi lançado.</li></ul>
+      <ul class="passos"><li>Todo dia às 9h: um resumo do que está pendente (só quando tem algo). Na segunda, com o balanço da semana.</li><li>Toda quarta às 8h: lembrete do repasse do TikTok Shop, que cai de madrugada.</li><li>De 2 em 2 horas (8h às 22h): proposta nova no Gmail.</li></ul>
       <p class="sub">O número no ícone do app mostra quantos lembretes estão abertos.</p>`;
     pe = `<button type="button" class="btn perigo esq" data-desligar>Desligar neste aparelho</button><button type="button" class="btn primario" data-teste>Mandar notificação de teste</button>`;
   } else {
     corpo = `<p>Ligue as notificações para receber:</p>
-      <ul class="passos"><li>Todo dia às 9h: um resumo do que está pendente (pagamento vencido, nota para enviar, entrega chegando, negociação parada).</li><li>Toda quarta às 18h: lembrete do repasse do TikTok Shop, se ainda não foi lançado.</li></ul>`;
+      <ul class="passos"><li>Todo dia às 9h: um resumo do que está pendente (pagamento, nota, entrega, negociação parada, agenda do dia, meta do mês, Instagram parado). Na segunda, com o balanço da semana.</li><li>Toda quarta às 8h: lembrete do repasse do TikTok Shop, que cai de madrugada.</li><li>De 2 em 2 horas (8h às 22h): proposta nova no Gmail.</li></ul>`;
     pe = `<button type="button" class="btn primario" data-ligar>Ligar notificações</button>`;
   }
   const d = abrirJanelaSimples("Notificações no celular", corpo, pe);

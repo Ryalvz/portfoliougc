@@ -14,7 +14,7 @@ self.addEventListener("push", (e) => {
     body: d.corpo || "",
     icon: "icone-192.png",
     badge: "icone-192.png",
-    tag: "lembretes",
+    tag: d.tag || "lembretes",
     data: { url: d.url || "./" }
   })];
   // Número no ícone do app (quantos lembretes)
@@ -27,7 +27,7 @@ self.addEventListener("notificationclick", (e) => {
   const url = new URL((e.notification.data && e.notification.data.url) || "./", self.registration.scope).href;
   e.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((janelas) => {
     const aberta = janelas.find((w) => w.url.startsWith(self.registration.scope));
-    if (aberta) return aberta.focus();
+    if (aberta) return (aberta.navigate ? aberta.navigate(url).catch(() => aberta) : Promise.resolve(aberta)).then((w) => (w || aberta).focus());
     return self.clients.openWindow(url);
   }));
 });
