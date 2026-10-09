@@ -505,3 +505,22 @@ select cron.schedule('lembretes-quarta', '0 21 * * 3', $$
     headers := '{"Content-Type": "application/json", "apikey": "sb_publishable_oZdhIWRB1gBabQH4xRJ2Xg__F8Lq0V0"}'::jsonb,
     body := '{"tipo": "quarta"}'::jsonb)
 $$);
+
+
+-- -------------------------------------------------------------
+-- 18. INSTAGRAM: HISTÓRICO DE SEGUIDORES
+-- O Instagram só mostra os últimos 30 dias. Toda vez que o painel
+-- busca as métricas, o ajudante "instagram" guarda os seguidores do
+-- dia aqui, e assim o gráfico de crescimento vai ficando completo.
+-- A chave de acesso do Instagram fica na tabela config_privada
+-- (seção 17), que nenhum login acessa: só o ajudante.
+-- -------------------------------------------------------------
+create table if not exists public.ig_historico (
+  data        date primary key,
+  seguidores  integer,
+  posts       integer
+);
+alter table public.ig_historico enable row level security;
+drop policy if exists "dono le" on public.ig_historico;
+create policy "dono le" on public.ig_historico
+  for select to authenticated using (public.eh_admin());
