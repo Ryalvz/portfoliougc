@@ -398,3 +398,47 @@ alter table public.comissoes_ttk enable row level security;
 drop policy if exists "dono faz tudo" on public.comissoes_ttk;
 create policy "dono faz tudo" on public.comissoes_ttk
   for all to authenticated using (public.eh_admin()) with check (public.eh_admin());
+
+
+-- -------------------------------------------------------------
+-- 16. ETAPAS COMPLETAS DO CONTRATO E META DO MÊS
+-- O contrato agora acompanha a marca do começo ao fim:
+--   negociação: Em negociação, Assinatura de contrato
+--   produção:   Aguardando briefing, Roteiro em andamento,
+--               Aguardando aprovação de roteiro, Gravando, Editando,
+--               Enviado p/ aprovação
+--   dinheiro:   Entregue, Nota fiscal enviada, Aguardando pagamento, Pago
+--   fora:       Perdida (a negociação não fechou), Cancelado
+-- "Vencido" continua automático: o painel mostra sozinho quando o
+-- prazo de pagamento passou e ainda falta receber.
+-- -------------------------------------------------------------
+alter table public.contratos drop constraint if exists contratos_status_check;
+
+-- Ajusta os contratos que já existem para as etapas novas
+update public.contratos set status = 'Aguardando aprovação de roteiro' where status = 'Aprovação de roteiro';
+update public.contratos set status = 'Aguardando pagamento' where status = 'Vencido';
+update public.contratos set status = 'Pago'
+ where status = 'Entregue' and valor > 0 and coalesce(parcela1, 0) + coalesce(parcela2, 0) >= valor;
+update public.contratos set status = 'Aguardando pagamento'
+ where status = 'Entregue' and data_nf is not null;
+
+alter table public.contratos add constraint contratos_status_check
+  check (status in ('Em negociação', 'Assinatura de contrato',
+                    'Aguardando briefing', 'Roteiro em andamento', 'Aguardando aprovação de roteiro',
+                    'Gravando', 'Editando', 'Enviado p/ aprovação',
+                    'Entregue', 'Nota fiscal enviada', 'Aguardando pagamento', 'Pago',
+                    'Perdida', 'Cancelado'));
+alter table public.contratos alter column status set default 'Em negociação';
+
+-- Meta de faturamento de cada mês
+create table if not exists public.metas (
+  ano    integer not null,
+  mes    integer not null check (mes between 1 and 12),
+  valor  numeric(12, 2) not null default 0 check (valor >= 0),
+  primary key (ano, mes)
+);
+alter table public.metas enable row level security;
+
+drop policy if exists "dono faz tudo" on public.metas;
+create policy "dono faz tudo" on public.metas
+  for all to authenticated using (public.eh_admin()) with check (public.eh_admin());
