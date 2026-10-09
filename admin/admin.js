@@ -2463,12 +2463,20 @@ async function adiarLembrete(chave, ate, aviso = "Certo, eu lembro de novo depoi
 function calcularLembretes() {
   const hoje = hojeISO();
   const L = [];
-  if (propostasNovas) L.push({ ic: "email", nivel: "",
-    texto: `${propostasNovas === 1 ? "Chegou <b>1 proposta nova</b>" : `Chegaram <b>${propostasNovas} propostas novas</b>`} no Gmail.`,
-    acoes: [["Ver propostas", true, () => irPara("propostas")]] });
+  const naoVistas = propostasNaoVistas();
+  if (naoVistas.length) {
+    const imp = naoVistas.filter((x) => x.importante).length;
+    L.push({ aba: "propostas", ic: "email", nivel: imp ? "alerta" : "",
+      texto: `${naoVistas.length === 1 ? "Chegou <b>1 proposta nova</b>" : `Chegaram <b>${naoVistas.length} propostas novas</b>`} no Gmail${imp ? ` (${imp === 1 ? "1 parece" : imp + " parecem"} importante)` : ""}: ${naoVistas.slice(0, 2).map((x) => esc(x.de.marca)).join(", ")}.`,
+      acoes: [["Ver propostas", true, () => irPara("propostas")]] });
+  }
+  const destaque = postEmDestaque();
+  if (destaque) L.push({ aba: "instagram", ic: "insta", nivel: "",
+    texto: `Seu post "<b>${esc((destaque.post.legenda || "sem legenda").slice(0, 50))}</b>" está alcançando <b>${destaque.vezes.toFixed(1).replace(".", ",")}x</b> mais que a sua média. Responda os comentários e repita o formato.`,
+    acoes: [["Ver no painel", true, () => irPara("instagram")], ["Ok, vi", false, () => { marcarVisto("ig-vistos", destaque.post.id); desenhar(); }]] });
   const quarta = ultimaQuarta();
   if (!S.comissoes.some((x) => String(x.data).slice(0, 10) === quarta) && !adiado("ttk-" + quarta)) {
-    L.push({ ic: "financeiro", nivel: quarta === hoje ? "" : "alerta",
+    L.push({ aba: "financeiro", ic: "financeiro", nivel: quarta === hoje ? "" : "alerta",
       texto: quarta === hoje ? "Hoje é quarta: <b>lance o repasse do TikTok Shop</b> que caiu." : `Falta lançar o <b>repasse do TikTok Shop</b> de quarta ${dataBR(quarta).slice(0, 5)}.`,
       acoes: [["Lançar agora", true, () => formComissao()], ["Não teve repasse", false, () => adiarLembrete("ttk-" + quarta, somaDiasISO(6, quarta), "Anotado: sem repasse nessa semana.")]] });
   }
@@ -2478,33 +2486,33 @@ function calcularLembretes() {
     const aberto = fechado(c) && c.status !== "Pago" && sal > 0;
     if (aberto && prev && prev < hoje) {
       const k = `vencido-${c.id}`;
-      if (!adiado(k)) L.push({ ic: "relogio", nivel: "alerta",
+      if (!adiado(k)) L.push({ aba: "financeiro", ic: "relogio", nivel: "alerta",
         texto: `${nome} venceu há ${plural(diasEntre(prev, hoje), "dia", "dias")} (${real(sal)}). A marca já pagou?`,
         acoes: [["Sim, recebi", true, () => formRecebi(c)], ["Ainda não, vou cobrar", false, () => adiarLembrete(k, somaDiasISO(2), "Combinado. Pergunto de novo em 3 dias.")]] });
       return;
     }
     if (aberto && prev && prev >= hoje && prev <= somaDiasISO(2)) {
       const k = `vence-${c.id}-${prev}`;
-      if (!adiado(k)) L.push({ ic: "calendario", nivel: "",
+      if (!adiado(k)) L.push({ aba: "financeiro", ic: "calendario", nivel: "",
         texto: `${nome} deve pagar ${prev === hoje ? "hoje" : "até " + dataBR(prev).slice(0, 5)} (${real(sal)}). O dinheiro já caiu?`,
         acoes: [["Sim, recebi", true, () => formRecebi(c)], ["Ainda não", false, () => adiarLembrete(k, prev, "Certo. Se não cair até o prazo, eu aviso que venceu.")]] });
     }
     if (c.status === "Entregue" && !c.data_nf && sal > 0) {
       const k = `nota-${c.id}`;
-      if (!adiado(k)) L.push({ ic: "transcricao", nivel: "",
+      if (!adiado(k)) L.push({ aba: "financeiro", ic: "transcricao", nivel: "",
         texto: `${nome} foi entregue e está <b>sem nota fiscal</b>. Sem nota, o prazo de pagamento não começa a contar.`,
         acoes: [["Enviei a nota hoje", true, () => mudarEtapa(c, "Nota fiscal enviada")], ["Lembrar amanhã", false, () => adiarLembrete(k, hoje)]] });
     }
     if (grupoDe(c.status) === "producao" && c.prazo_entrega && c.prazo_entrega <= somaDiasISO(1)) {
       const k = `entrega-${c.id}-${c.prazo_entrega}`;
       const d = diasEntre(hoje, c.prazo_entrega);
-      if (!adiado(k)) L.push({ ic: "campanhas", nivel: d < 0 ? "alerta" : "",
+      if (!adiado(k)) L.push({ aba: "campanhas", ic: "campanhas", nivel: d < 0 ? "alerta" : "",
         texto: `${nome}: ${d < 0 ? `a entrega está <b>atrasada há ${plural(-d, "dia", "dias")}</b>` : d === 0 ? "a entrega é <b>hoje</b>" : "a entrega é <b>amanhã</b>"} (${esc(c.status.toLowerCase())}).`,
         acoes: [["Já entreguei", true, () => mudarEtapa(c, "Entregue")], ["Lembrar amanhã", false, () => adiarLembrete(k, hoje)]] });
     }
     if (grupoDe(c.status) === "negociacao" && c.criado_em && diasEntre(String(c.criado_em).slice(0, 10), hoje) >= 5) {
       const k = `negocia-${c.id}`;
-      if (!adiado(k)) L.push({ ic: "marcas", nivel: "",
+      if (!adiado(k)) L.push({ aba: "campanhas", ic: "marcas", nivel: "",
         texto: `${nome} está em negociação há ${plural(diasEntre(String(c.criado_em).slice(0, 10), hoje), "dia", "dias")}${n2(c.valor) ? ` (${real(c.valor)})` : ""}. Já fez follow-up?`,
         acoes: [["Fechou!", true, () => mudarEtapa(c, "Aguardando briefing")], ["Não fechou", false, () => mudarEtapa(c, "Perdida")], ["Lembrar em 3 dias", false, () => adiarLembrete(k, somaDiasISO(2))]] });
     }
@@ -2538,11 +2546,55 @@ function formRecebi(c) {
 }
 
 let lembretesAtuais = [];
+
+/* ---------- "Já vi": o aviso some só depois que você olha ---------- */
+function lerVistos(chave) { try { return JSON.parse(localStorage.getItem(chave) || "[]"); } catch (_) { return []; } }
+function marcarVisto(chave, ...ids) {
+  const atuais = new Set(lerVistos(chave));
+  ids.forEach((id) => atuais.add(String(id)));
+  try { localStorage.setItem(chave, JSON.stringify([...atuais].slice(-500))); } catch (_) {}
+}
+// Propostas de pessoas, não lidas no Gmail, que você ainda não viu no painel
+function propostasNaoVistas() {
+  if (typeof propostasVisiveis !== "function" || !gm.emails) return [];
+  const vistos = new Set(lerVistos("propostas-vistas"));
+  return propostasVisiveis().filter((x) => x.novo && !vistos.has(x.id));
+}
+// Post recente (últimos 4 dias) rendendo bem acima da média
+function postEmDestaque() {
+  if (typeof ig === "undefined" || !ig.dados) return null;
+  const posts = (ig.dados.posts || []).filter((x) => n2(x.reach));
+  if (posts.length < 5) return null;
+  const vistos = new Set(lerVistos("ig-vistos"));
+  const mediaAlcance = posts.reduce((s, x) => s + n2(x.reach), 0) / posts.length;
+  const recente = posts.filter((x) => Date.now() - Date.parse(x.data) < 4 * 864e5 && !vistos.has(String(x.id)))
+    .sort((a, b) => n2(b.reach) - n2(a.reach))[0];
+  if (!recente || n2(recente.reach) < mediaAlcance * 1.8) return null;
+  return { post: recente, vezes: n2(recente.reach) / mediaAlcance };
+}
+
+// Bolinha com número no menu: fica até você resolver ou abrir a aba
+function pintarBolinhasMenu(L) {
+  const conta = {};
+  L.forEach((x) => { if (x.aba) conta[x.aba] = (conta[x.aba] || 0) + 1; });
+  $$(".menu-item[data-aba]").forEach((b) => {
+    let bola = $(".menu-bolinha", b);
+    const n = conta[b.dataset.aba] || 0;
+    if (!n) { if (bola) bola.remove(); return; }
+    if (!bola) { bola = document.createElement("i"); bola.className = "menu-bolinha"; b.appendChild(bola); }
+    bola.textContent = n > 9 ? "9+" : String(n);
+    bola.setAttribute("aria-label", plural(n, "aviso", "avisos"));
+  });
+}
 function pintarLembretes() {
   const caixa = $("#lembretes");
   if (!caixa) return;
+  // Abrir a aba conta como "vi": as propostas e o destaque do Instagram saem da bolinha
+  if (abaAtual === "propostas" && gm.emails && !gm.aberto) marcarVisto("propostas-vistas", ...propostasVisiveis().map((x) => x.id));
+  if (abaAtual === "instagram" && ig.dados) { const d = postEmDestaque(); if (d) marcarVisto("ig-vistos", d.post.id); }
   const L = calcularLembretes();
   lembretesAtuais = L;
+  pintarBolinhasMenu(L);
   // Número no ícone do app no iPhone
   try { if (navigator.setAppBadge) (L.length ? navigator.setAppBadge(L.length) : navigator.clearAppBadge()).catch(() => {}); } catch (_) {}
   const conta = $("#sino-conta");
@@ -2730,6 +2782,8 @@ function desenharInicio(el) {
       </button>
     </div>
 
+    ${quadrosEntrada()}
+
     <div class="grade-inicio">
       <div class="cartao">
         <div class="barra" style="margin-bottom:6px"><h2 style="margin:0">Hoje</h2><span class="espaco"></span><button type="button" class="link-btn" data-ir="calendario">abrir calendário</button></div>
@@ -2763,7 +2817,13 @@ function desenharInicio(el) {
       </div>
     </div>`;
 
+  // Busca o Instagram em segundo plano (uma vez) para o quadro do Início
+  if (ig.conectado === null && !ig.carregando) carregarInstagram();
+  const conectarGm = $("#inicio-conectar-gmail", el);
+  if (conectarGm) conectarGm.onclick = async () => { try { await conectarGmail(); lerPropostas(); } catch (erro) { avisar(erro.message, true); } };
   el.onclick = (e) => {
+    const abrirEmail = e.target.closest("[data-inicio-email]");
+    if (abrirEmail) { const x = (gm.emails || []).find((m) => m.id === abrirEmail.dataset.inicioEmail); irPara("propostas"); if (x) abrirConversa(x); return; }
     const ir = e.target.closest("[data-ir]");
     if (ir) { irPara(ir.dataset.ir); return; }
     const ev = e.target.closest("[data-evento]");
@@ -2970,7 +3030,8 @@ async function lerPropostas() {
       const de = lerRemetente(cabecalho(m, "From"));
       return { id: m.id, thread: m.threadId, de, assunto: cabecalho(m, "Subject") || "(sem assunto)", trecho: semEntidades(m.snippet || ""),
         data: new Date(Number(m.internalDate) || Date.parse(cabecalho(m, "Date")) || Date.now()),
-        novo: (m.labelIds || []).includes("UNREAD"), automatico: motivoAutomatico(m, de) };
+        novo: (m.labelIds || []).includes("UNREAD"), automatico: motivoAutomatico(m, de),
+        importante: /proposta|or[cç]amento|briefing|contrato|campanha|parceria|pagamento|valor|cach[eê]|budget|rate|paid|collab/i.test(cabecalho(m, "Subject") + " " + (m.snippet || "")) };
     }).filter((x) => x.de.email !== EMAIL_PROPOSTAS)
       // Uma conversa vira um cartão só (o e-mail mais recente dela)
       .filter((x, i, todos) => todos.findIndex((y) => y.thread === x.thread) === i);
@@ -3169,7 +3230,7 @@ function cartaoEmail(x) {
     <div class="email-corpo">
       <button type="button" class="email-abrir" data-acao-email="abrir">
         <span class="email-topo"><b>${esc(x.de.nome)}</b><span class="sub">${esc(x.de.email)}</span><span class="espaco"></span><span class="sub">${x.data.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}</span></span>
-        <span class="email-assunto">${x.novo ? `<i class="ponto-novo" aria-label="não lido"></i>` : ""}${esc(x.assunto)}</span>
+        <span class="email-assunto">${x.novo ? `<i class="ponto-novo" aria-label="não lido"></i>` : ""}${esc(x.assunto)}${x.importante && !x.automatico ? ` <span class="etq amarela">importante</span>` : ""}</span>
         <span class="email-trecho">${esc(x.trecho)}</span>
       </button>
       ${x.automatico ? `<p class="sub" style="margin:0">escondido: ${esc(x.automatico)}</p>` : `<div class="lembrete-acoes" style="justify-content:flex-start">
@@ -3271,7 +3332,7 @@ async function chamarInstagram(corpo) {
 async function carregarInstagram() {
   if (ig.carregando) return;
   ig.carregando = true; ig.erro = "";
-  if (abaAtual === "instagram") desenhar();
+  if (["instagram", "inicio"].includes(abaAtual)) desenhar();
   try {
     const r = await chamarInstagram({ acao: "dados", dias: ig.dias });
     ig.conectado = r.conectado !== false && !!r.perfil;
@@ -3280,7 +3341,7 @@ async function carregarInstagram() {
     if (ig.conectado) S.igHistorico = await ler("ig_historico", (q, c) => (c.includes("data") ? q.order("data") : q)).catch(() => []);
   } catch (e) { ig.erro = e.message; ig.conectado = ig.conectado ?? false; }
   ig.carregando = false;
-  if (abaAtual === "instagram") desenhar();
+  if (["instagram", "inicio"].includes(abaAtual)) desenhar();
 }
 
 function desenharInstagram(el) {
@@ -3483,4 +3544,54 @@ function desenharConectarInstagram(el) {
       ig.conectado = null; ig.dados = null; carregarInstagram();
     } catch (erro) { ig.erro = erro.message; desenhar(); }
   };
+}
+
+/* ---------- Início: quadros de propostas (Gmail) e Instagram ---------- */
+function quadrosEntrada() {
+  // E-mails
+  let emails;
+  if (!gmailConectado()) {
+    emails = `<p class="sub" style="margin:0 0 8px">Conecte o Gmail para ver aqui as propostas que chegaram.</p>
+      <button type="button" class="btn pequeno primario" id="inicio-conectar-gmail">${ic("email")}Conectar o Gmail</button>`;
+  } else if (!gm.emails) {
+    emails = `<p class="vazio">${gm.carregando ? "Lendo o seu Gmail..." : "Abrindo as propostas..."}</p>`;
+  } else {
+    const lista = propostasVisiveis().sort((a, b) => (b.importante === true) - (a.importante === true) || (b.novo === true) - (a.novo === true) || b.data - a.data).slice(0, 3);
+    const naoLidas = propostasVisiveis().filter((x) => x.novo).length;
+    emails = lista.length
+      ? `<p class="sub" style="margin:0 0 6px">${naoLidas ? `<b>${plural(naoLidas, "proposta não lida", "propostas não lidas")}</b> de pessoas` : "nenhuma proposta não lida"}</p>
+        <div class="lista-dia">${lista.map((x) => `<button type="button" class="item-dia" data-inicio-email="${esc(x.id)}">
+          <span class="pilula ${x.importante ? "p-pendente" : "p-conversando"}">${x.importante ? "Importante" : x.novo ? "Nova" : "Proposta"}</span>
+          <span class="item-dia-texto"><b>${x.novo ? "● " : ""}${esc(x.assunto)}</b><small>${esc(x.de.nome)} · ${x.data.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}</small></span>
+        </button>`).join("")}</div>`
+      : `<p class="vazio">Nenhuma proposta de pessoa nos últimos 90 dias.</p>`;
+  }
+  // Instagram
+  let insta;
+  if (ig.carregando && !ig.dados) insta = `<p class="vazio">Buscando o Instagram...</p>`;
+  else if (!ig.conectado || !ig.dados) insta = `<p class="sub" style="margin:0 0 8px">Conecte o @ryalvz para ver alcance, seguidores e os posts que estão rendendo.</p>
+      <button type="button" class="btn pequeno" data-ir="instagram">${ic("insta")}Conectar o Instagram</button>`;
+  else {
+    const d = ig.dados, a = d.atual || {}, b = d.anterior || {};
+    const novos = n2(a.seguiram) - n2(a.deixaram);
+    const top = [...(d.posts || [])].filter((x) => Date.now() - Date.parse(x.data) < 14 * 864e5).sort((x, y) => n2(y.reach) - n2(x.reach))[0];
+    const destaque = postEmDestaque();
+    insta = `<div class="ig-mini">
+        <div><span>Seguidores</span><b>${compacto(d.perfil.followers_count)}</b><small>${novos >= 0 ? "+" : ""}${num(novos)} em ${d.dias} dias</small></div>
+        <div><span>Alcance</span><b>${compacto(a.reach)}</b><small>${variacao(n2(a.reach), n2(b.reach))}</small></div>
+        <div><span>Interações</span><b>${compacto(a.total_interactions)}</b><small>${variacao(n2(a.total_interactions), n2(b.total_interactions))}</small></div>
+      </div>
+      ${destaque ? `<p class="dica-caixa" style="margin:8px 0 0">🔥 Post rendendo <b>${destaque.vezes.toFixed(1).replace(".", ",")}x</b> a sua média: "${esc((destaque.post.legenda || "").slice(0, 60))}"</p>`
+        : top ? `<p class="sub" style="margin:8px 0 0">Melhor post das últimas 2 semanas: "${esc((top.legenda || "sem legenda").slice(0, 60))}" (${compacto(top.reach)} de alcance)</p>` : ""}`;
+  }
+  return `<div class="grade-entrada">
+    <div class="cartao">
+      <div class="barra" style="margin-bottom:6px"><h2 style="margin:0">${ic("email")} E-mails de propostas</h2><span class="espaco"></span><button type="button" class="link-btn" data-ir="propostas">ver todas</button></div>
+      ${emails}
+    </div>
+    <div class="cartao">
+      <div class="barra" style="margin-bottom:6px"><h2 style="margin:0">${ic("insta")} Instagram</h2><span class="espaco"></span><button type="button" class="link-btn" data-ir="instagram">ver métricas</button></div>
+      ${insta}
+    </div>
+  </div>`;
 }
