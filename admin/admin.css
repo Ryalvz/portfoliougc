@@ -701,3 +701,9 @@ a.btn.pequeno { text-decoration: none; }
 @keyframes pulsar { 50% { transform: scale(1.18); } }
 @media (prefers-reduced-motion: reduce) { .menu-bolinha { animation: none; } }
 @media (max-width: 1000px) { .grade-entrada { grid-template-columns: 1fr; } }
+
+/* ---------- Menu em blocos por assunto ---------- */
+.menu { overflow-y: auto; }
+.menu-blocos { display: grid; gap: 10px; }
+.menu-bloco { border-top: 1px solid var(--line); padding-top: 4px; }
+.menu-bloco .menu-grupo { padding-top: 8px; }
