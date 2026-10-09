@@ -472,3 +472,68 @@ details.tokscript > summary .emo { font-size: 16px; color: var(--cobalt); }
 .link-ttk:hover { border-color: var(--cobalt); }
 .link-ttk small { grid-column: 1 / -1; color: var(--muted); font-size: 11.5px; }
 @media (max-width: 760px) { .grade-ttk { grid-template-columns: 1fr; } }
+
+/* ---------- Financeiro: relatório do mês, onde está o dinheiro, insights ---------- */
+.relatorio { border-top: 4px solid var(--cobalt); }
+.rel-rotulo { display: block; font-size: 11px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .6px; }
+.rel-numero { display: block; font-size: 34px; line-height: 1.1; color: var(--cobalt); font-variant-numeric: tabular-nums; margin: 2px 0 8px; }
+.meta-linha { display: flex; align-items: center; gap: 10px; max-width: 560px; }
+.meta-linha b { font-variant-numeric: tabular-nums; }
+.meta-trilho { flex: 1; height: 12px; background: var(--tint); border-radius: 6px; overflow: hidden; }
+.meta-trilho i { display: block; height: 100%; background: #1F3FC3; border-radius: 6px; }
+.meta-trilho.batida i { background: var(--green); }
+.meta-texto { margin: 6px 0 0; font-size: 13px; line-height: 1.6; color: var(--text); }
+.meta-texto .link-btn, .meta-texto .btn { margin-left: 6px; vertical-align: middle; }
+.link-btn { border: 0; background: none; padding: 0; color: var(--cobalt); font: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; text-align: left; }
+.btn.pequeno { padding: 4px 10px; font-size: 12px; }
+.rel-grade { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0; margin-top: 14px; border-top: 1px solid var(--line); }
+.rel-grade > div { padding: 10px 12px 2px 0; min-width: 0; }
+.rel-grade span { display: block; font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
+.rel-grade b { display: block; font-size: 17px; margin-top: 2px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rel-grade small { display: block; font-size: 11.5px; color: var(--muted); }
+.sobe { color: var(--green); }
+.desce { color: var(--red); }
+.funil { display: grid; gap: 6px; }
+.funil-linha { display: grid; grid-template-columns: minmax(150px, 1fr) 1.3fr auto; gap: 2px 10px; align-items: center; font: inherit; font-size: 13px; color: inherit; text-align: left; background: none; border: 1px solid transparent; border-radius: var(--radius); padding: 6px 8px; cursor: pointer; }
+.funil-linha:hover:not(:disabled) { border-color: var(--line); background: var(--tint); }
+.funil-linha:disabled { cursor: default; opacity: .6; }
+.funil-linha.gargalo { border-color: var(--amber); background: var(--amber-bg); }
+.funil-linha.f-vencido.gargalo { border-color: var(--red); background: var(--red-bg); }
+.fl-nome { font-weight: 600; }
+.f-negociacao .lb-trilho i { background: var(--olive); }
+.f-vencido .lb-trilho i { background: var(--red); }
+.dica-caixa { margin-top: 12px; padding: 10px 12px; border-radius: var(--radius); background: var(--tint); font-size: 13px; line-height: 1.5; }
+.dica-caixa.urgente { background: var(--red-bg); }
+.insights { display: grid; gap: 12px; }
+.insight { display: grid; grid-template-columns: 30px 1fr; gap: 10px; align-items: start; }
+.insight-ic { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; background: var(--tint-2); color: var(--cobalt); }
+.insight-ic svg { width: 16px; height: 16px; }
+.insight.alerta .insight-ic { background: var(--amber-bg); color: var(--amber); }
+.insight b { font-size: 13px; }
+.insight p { margin: 2px 0 0; font-size: 13px; line-height: 1.45; }
+.insight-dica { color: var(--muted); font-size: 12.5px !important; }
+.insight-dica::before { content: "Dica: "; font-weight: 700; color: var(--olive); }
+.leg-meta { display: inline-block; width: 12px; height: 0 !important; border-top: 2px dashed var(--text); border-radius: 0 !important; }
+.par-barras { position: relative; }
+.m-meta { position: absolute; left: 6%; right: 6%; height: 0; border-top: 2px dashed var(--text); opacity: .55; pointer-events: none; }
+.etq.verde { background: var(--green-bg); color: var(--green); }
+.como-usar summary { cursor: pointer; }
+.como-usar ol { margin: 10px 0 0; padding-left: 20px; display: grid; gap: 6px; font-size: 13px; line-height: 1.5; }
+.lista-balde { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.lista-balde li { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+.lista-balde .link-btn { text-decoration: none; color: var(--text); font-weight: 400; }
+.lista-balde .link-btn:hover { color: var(--cobalt); }
+@media (max-width: 620px) { .rel-numero { font-size: 28px; } .funil-linha { grid-template-columns: 1fr auto; } .funil-linha .lb-trilho { grid-column: 1 / -1; grid-row: 2; } }
+
+/* ---------- Campanhas: 7 colunas, da negociação ao pago ---------- */
+.quadro-7 { grid-template-columns: repeat(7, minmax(150px, 1fr)); gap: 8px; overflow-x: auto; padding-bottom: 8px; }
+.col-prod[data-coluna="Negociação"] > header { box-shadow: inset 0 3px 0 var(--olive); }
+.col-prod[data-coluna="Entregue"] > header { box-shadow: inset 0 3px 0 var(--amber); }
+.col-prod[data-coluna="Pago"] > header { box-shadow: inset 0 3px 0 var(--green); }
+@media (max-width: 1100px) { .quadro-7 { grid-template-columns: repeat(7, minmax(200px, 1fr)); } }
+@media (max-width: 620px) { .quadro-7 { grid-template-columns: 1fr; overflow-x: visible; } }
+.quadro-7 .coluna { min-width: 0; }
+.cartao-campanha { min-width: 0; grid-template-columns: minmax(0, 1fr); }
+.cartao-campanha .etapa-cartao { width: 100%; min-width: 0; }
+.cartao-campanha > .pilula { white-space: normal; }
+.col-prod > header small { white-space: nowrap; }

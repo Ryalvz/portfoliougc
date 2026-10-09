@@ -74,12 +74,13 @@ const ESQUEMA = {
   calendario: ["id", "titulo", "marca", "tipo", "data", "status", "exemplo"],
   campanhas: ["id", "campanha", "cliente", "tipo", "status", "qtd", "valor", "prazo", "pagamento", "ativa", "favorita", "exemplo"],
   comissoes_ttk: ["id", "data", "valor", "gmv", "itens", "obs"],
+  metas: ["ano", "mes", "valor"],
   contratos: ["id", "cliente", "tipo", "descricao", "valor", "mes", "ano", "data_nf", "prazo_dias", "status", "parcela1", "data_p1", "parcela2", "data_p2", "obs", "qtd", "prazo_entrega", "favorita"],
   transcricoes: ["id", "criado_em", "link", "plataforma", "categoria", "status", "titulo", "transcricao", "transcricao_original", "idioma_original", "minha_versao", "observacoes"],
   marcados: ["chave", "marcado"],
   visitas: ["id", "data", "pagina", "origem"]
 };
-const S = { videos: [], marcas: [], calendario: [], campanhas: [], marcados: {}, visitas: [], transcricoes: [], contratos: [], comissoes: [] };
+const S = { videos: [], marcas: [], calendario: [], campanhas: [], marcados: {}, visitas: [], transcricoes: [], contratos: [], comissoes: [], metas: [] };
 const CAMPOS = {};          // campos que existem de verdade em cada tabela
 const FALTAS = new Map();   // tabela -> o que faltou
 
@@ -119,7 +120,7 @@ async function ler(tabela, ajuste) {
 
 async function carregarTudo() {
   const desde = new Date(); desde.setHours(0, 0, 0, 0); desde.setDate(desde.getDate() - 13);
-  const [videos, marcas, calendario, campanhas, marcados, visitas, transcricoes, contratos, comissoes] = await Promise.all([
+  const [videos, marcas, calendario, campanhas, marcados, visitas, transcricoes, contratos, comissoes, metas] = await Promise.all([
     ler("videos", (q, c) => (c.includes("ordem") ? q.order("ordem", { ascending: true }) : q)),
     ler("marcas", (q, c) => (c.includes("criado_em") ? q.order("criado_em", { ascending: false }) : q)),
     ler("calendario"),
@@ -128,9 +129,10 @@ async function carregarTudo() {
     ler("visitas", (q, c) => (c.includes("data") ? q.gte("data", desde.toISOString()).order("data").limit(10000) : q)),
     ler("transcricoes", (q, c) => (c.includes("criado_em") ? q.order("criado_em", { ascending: false }) : q)),
     ler("contratos", (q, c) => (c.includes("id") ? q.order("id", { ascending: true }).limit(5000) : q)),
-    ler("comissoes_ttk", (q, c) => (c.includes("data") ? q.order("data", { ascending: false }).limit(5000) : q))
+    ler("comissoes_ttk", (q, c) => (c.includes("data") ? q.order("data", { ascending: false }).limit(5000) : q)),
+    ler("metas")
   ]);
-  Object.assign(S, { videos, marcas, calendario, campanhas, visitas, transcricoes, contratos, comissoes });
+  Object.assign(S, { videos, marcas, calendario, campanhas, visitas, transcricoes, contratos, comissoes, metas });
   S.marcados = {};
   marcados.forEach((m) => { if (m.chave) S.marcados[m.chave] = m.marcado !== false; });
 }
@@ -181,7 +183,7 @@ function campoHTML(c, v) {
   if (c.t === "select") input = `<select class="campo" style="width:100%" id="${id}" name="${c.n}">${c.op.map(([ov, ot]) => `<option value="${esc(ov)}" ${String(ov) === String(val) ? "selected" : ""}>${esc(ot)}</option>`).join("")}</select>`;
   else if (c.t === "textarea") input = `<textarea class="campo" id="${id}" name="${c.n}" rows="4" ${ph}>${esc(val)}</textarea>`;
   else input = `<input class="campo" id="${id}" name="${c.n}" type="${c.t || "text"}" value="${esc(String(val).slice(0, c.t === "date" ? 10 : undefined))}" ${c.t === "number" ? 'step="any" min="0"' : ""} ${req} ${ph}>`;
-  return `<div class="${cls}"><label for="${id}">${esc(c.r)}${c.req ? " *" : ""}</label>${input}</div>`;
+  return `<div class="${cls}"><label for="${id}">${esc(c.r)}${c.req ? " *" : ""}</label>${input}${c.ajuda ? `<small class="ajuda">${esc(c.ajuda)}</small>` : ""}</div>`;
 }
 
 function abrirForm({ titulo, tabela, campos, valores = {}, aoSalvar, aoApagar }) {
@@ -702,7 +704,7 @@ function eventosCalendario() {
     feito: c.status === "feito", origem: "calendario", ref: c
   }));
   // Prazos de entrega das campanhas (tabela contratos)
-  const prazos = S.contratos.filter((c) => c.prazo_entrega && c.status !== "Cancelado").map((c) => ({
+  const prazos = S.contratos.filter((c) => c.prazo_entrega && fechado(c)).map((c) => ({
     tipo: "prazo", titulo: "Entrega: " + c.cliente, marca: c.descricao, data: String(c.prazo_entrega).slice(0, 10),
     feito: c.status === "Entregue" || c.status === "Pago", origem: "campanha", ref: c
   }));
@@ -1624,33 +1626,108 @@ function pintarDetalheTrans() {
 
 /* =============================================================
    ABA 7: FINANCEIRO
-   Os contratos (tabela contratos), no lugar da planilha de
-   contabilidade. O painel calcula: data prevista (nota + prazo),
-   recebido (parcela 1 + 2), saldo e vencido (prazo passou e ainda
-   falta receber).
+   Os contratos (tabela contratos), do primeiro contato com a marca
+   até o dinheiro na conta. O painel calcula: data prevista (nota +
+   prazo), recebido (parcela 1 + 2), saldo, vencido (prazo passou e
+   ainda falta receber), a meta do mês (tabela metas) e onde o
+   dinheiro está parado.
    ============================================================= */
 const TIPOS_CONTRATO = ["UGC", "Influencer", "Freelance", "Videomaker", "Infoproduto/Comissão", "Outro"];
-const STATUS_CONTRATO = ["Aguardando briefing", "Aprovação de roteiro", "Gravando", "Editando", "Enviado p/ aprovação", "Entregue", "Pago", "Cancelado"];
+// O caminho de um contrato, em ordem
+const GRUPOS_STATUS = [
+  ["negociacao", ["Em negociação", "Assinatura de contrato"]],
+  ["producao", ["Aguardando briefing", "Roteiro em andamento", "Aguardando aprovação de roteiro", "Gravando", "Editando", "Enviado p/ aprovação"]],
+  ["dinheiro", ["Entregue", "Nota fiscal enviada", "Aguardando pagamento", "Pago"]],
+  ["fora", ["Perdida", "Cancelado"]]
+];
+const STATUS_CONTRATO = GRUPOS_STATUS.flatMap((g) => g[1]);
+const grupoDe = (s) => (GRUPOS_STATUS.find((g) => g[1].includes(s)) || GRUPOS_STATUS[1])[0];
+// Fechado = a marca contratou de verdade. Só isso conta no faturado.
+const fechado = (c) => ["producao", "dinheiro"].includes(grupoDe(c.status));
+// Lista do filtro: as etapas na ordem, com o Vencido automático antes do Pago
+const STATUS_FILTRO = [...STATUS_CONTRATO.filter((s) => s !== "Pago" && grupoDe(s) !== "fora"), "Vencido", "Pago", "Perdida", "Cancelado"];
 const MESES_CURTOS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 const MESES_LONGOS = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
-const fin = { ano: new Date().getFullYear(), mes: 0, busca: "", status: "", ordem: "recente" };
+const fin = { ano: new Date().getFullYear(), mes: new Date().getMonth() + 1, busca: "", status: "", ordem: "recente" };
 
 const n2 = (v) => Number(v) || 0;
 const recebidoDe = (c) => n2(c.parcela1) + n2(c.parcela2);
-const saldoDe = (c) => (c.status === "Cancelado" ? 0 : Math.max(0, Math.round((n2(c.valor) - recebidoDe(c)) * 100) / 100));
+const saldoDe = (c) => (!fechado(c) ? 0 : Math.max(0, Math.round((n2(c.valor) - recebidoDe(c)) * 100) / 100));
 function previstaDe(c) {
   if (!c.data_nf || c.prazo_dias == null) return null;
   const d = deISO(c.data_nf); d.setDate(d.getDate() + Number(c.prazo_dias));
   return isoLocal(d);
 }
-// Vencido é automático: o prazo passou, ainda falta receber e não está pago/cancelado
+// Vencido é automático: o prazo passou, ainda falta receber e não está pago
 function situacaoDe(c) {
-  if (c.status === "Pago" || c.status === "Cancelado") return c.status;
+  if (!fechado(c) || c.status === "Pago") return c.status;
   const prev = previstaDe(c);
   if (saldoDe(c) > 0 && prev && prev < hojeISO()) return "Vencido";
   return c.status;
 }
-const classeStatus = (s) => ({ "Pago": "p-pago", "Entregue": "p-cliente", "Vencido": "p-vencido", "Cancelado": "p-parada", "Enviado p/ aprovação": "p-conversando" }[s] || "p-pendente");
+function classeStatus(s) {
+  if (s === "Pago") return "p-pago";
+  if (s === "Vencido") return "p-vencido";
+  return { negociacao: "p-lead", producao: "p-conversando", dinheiro: "p-pendente", fora: "p-parada" }[grupoDe(s)];
+}
+const chaveCliente = (c) => String(c.cliente || "").trim().toLowerCase();
+const melhorNome = (atual, novo) => (!atual || (atual === atual.toLowerCase() && novo !== novo.toLowerCase()) ? String(novo).trim() : atual);
+const metaDe = (ano, mes) => n2((S.metas.find((m) => Number(m.ano) === ano && Number(m.mes) === mes) || {}).valor);
+const mesAntes = (ano, mes, k = 1) => { const d = new Date(ano, mes - 1 - k, 1); return [d.getFullYear(), d.getMonth() + 1]; };
+const noPeriodo = (data, ano, mes) => { if (!data) return false; const d = deISO(data); return d.getFullYear() === ano && (!mes || d.getMonth() + 1 === mes); };
+
+// Faturado = contratos fechados no mês + comissões do TikTok Shop que caíram no mês (mes 0 = ano todo)
+function faturadoEm(ano, mes) {
+  return S.contratos.filter((c) => fechado(c) && Number(c.ano) === ano && (!mes || Number(c.mes) === mes)).reduce((s, c) => s + n2(c.valor), 0)
+    + S.comissoes.filter((x) => noPeriodo(x.data, ano, mes)).reduce((s, x) => s + n2(x.valor), 0);
+}
+// Entrou na conta = parcelas pelo dia em que caíram + TikTok Shop
+function entrouEm(ano, mes) {
+  let t = 0;
+  S.contratos.forEach((c) => [[c.parcela1, c.data_p1], [c.parcela2, c.data_p2]].forEach(([v, d]) => { if (v && noPeriodo(d, ano, mes)) t += n2(v); }));
+  return t + S.comissoes.filter((x) => noPeriodo(x.data, ano, mes)).reduce((s, x) => s + n2(x.valor), 0);
+}
+// Sugestão de meta: média dos 3 últimos meses com faturamento, mais 15%, arredondada para cima de 100 em 100
+function sugestaoMeta(ano, mes) {
+  const vals = [];
+  for (let k = 1; k <= 12 && vals.length < 3; k++) { const [a, m] = mesAntes(ano, mes, k); const v = faturadoEm(a, m); if (v > 0) vals.push(v); }
+  return vals.length ? Math.ceil((vals.reduce((s, v) => s + v, 0) / vals.length) * 1.15 / 100) * 100 : 0;
+}
+
+// Onde cada contrato em aberto está parado agora
+const BALDES = [
+  { k: "negociacao", nome: "Em negociação", explica: "propostas que ainda não fecharam (não conta no faturado)",
+    acao: "Faça follow-up: marca que não respondeu em 3 dias recebe uma mensagem curta perguntando se ficou alguma dúvida." },
+  { k: "producao", nome: "Em produção", explica: "fechado, mas o trabalho ainda não foi entregue",
+    acao: "O dinheiro só começa a andar depois da entrega. Priorize o que está mais perto do fim e cobre o briefing de quem está parado." },
+  { k: "sem-nota", nome: "Entregue sem nota fiscal", explica: "entregou, mas a nota ainda não foi enviada",
+    acao: "Emita a nota hoje: o prazo de pagamento da marca só começa a contar quando a nota chega." },
+  { k: "esperando", nome: "Esperando pagamento", explica: "nota enviada, dentro do prazo",
+    acao: "Confira as datas previstas e mande um lembrete 2 dias antes do vencimento." },
+  { k: "vencido", nome: "Vencido", explica: "o prazo passou e o dinheiro não entrou",
+    acao: "Cobre hoje, com educação: mande a nota de novo, os dados de pagamento e pergunte a data certa." }
+];
+function baldeDe(c) {
+  const g = grupoDe(c.status);
+  if (g === "negociacao") return "negociacao";
+  if (g === "fora" || c.status === "Pago" || saldoDe(c) <= 0) return null;
+  if (situacaoDe(c) === "Vencido") return "vencido";
+  if (g === "producao") return "producao";
+  if (c.status === "Entregue" && !c.data_nf) return "sem-nota";
+  return "esperando";
+}
+function ondeEstaODinheiro() {
+  const r = BALDES.map((b) => ({ ...b, lista: [], v: 0 }));
+  S.contratos.forEach((c) => {
+    const k = baldeDe(c); if (!k) return;
+    const b = r.find((x) => x.k === k);
+    b.lista.push(c); b.v += k === "negociacao" ? n2(c.valor) : saldoDe(c);
+  });
+  // Gargalo: vencido primeiro (é o mais urgente); se não tiver, onde há mais dinheiro parado depois de fechado
+  const candidatos = r.filter((b) => b.k !== "negociacao" && b.v > 0);
+  const gargalo = r.find((b) => b.k === "vencido" && b.v > 0) || candidatos.sort((a, b) => b.v - a.v)[0] || null;
+  return { baldes: r, gargalo };
+}
 
 // Tooltip único para todos os gráficos do financeiro
 function ligarDicas(el) {
@@ -1668,49 +1745,227 @@ function ligarDicas(el) {
   el.addEventListener("pointerleave", () => { dica.hidden = true; });
 }
 
+const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0);
+function variacao(atual, antes) {
+  if (!antes) return atual ? `<span class="sobe">novo</span>` : `<span class="sub">sem dados</span>`;
+  const p = Math.round(((atual - antes) / antes) * 100);
+  return p >= 0 ? `<span class="sobe">▲ ${p}%</span>` : `<span class="desce">▼ ${-p}%</span>`;
+}
+
+/* ---------- Relatório do mês (o topo do Financeiro) ---------- */
+function relatorioPeriodo() {
+  const { ano, mes } = fin;
+  const hoje = new Date();
+  const fat = faturadoEm(ano, mes);
+  const entrou = entrouEm(ano, mes);
+  const ttk = S.comissoes.filter((x) => noPeriodo(x.data, ano, mes)).reduce((s, x) => s + n2(x.valor), 0);
+  const fechadosP = S.contratos.filter((c) => fechado(c) && Number(c.ano) === ano && (!mes || Number(c.mes) === mes));
+  const ticket = fechadosP.length ? (fat - ttk) / fechadosP.length : 0;
+  const meta = mes ? metaDe(ano, mes) : 0;
+  const negociando = S.contratos.filter((c) => grupoDe(c.status) === "negociacao");
+  const vNeg = negociando.reduce((s, c) => s + n2(c.valor), 0);
+
+  let comparar = "", media = "";
+  if (mes) {
+    const [pa, pm] = mesAntes(ano, mes);
+    const antes = faturadoEm(pa, pm);
+    const ult3 = [1, 2, 3].map((k) => faturadoEm(...mesAntes(ano, mes, k)));
+    const med = ult3.reduce((s, v) => s + v, 0) / 3;
+    comparar = `<div><span>vs ${MESES_LONGOS[pm - 1]}</span><b>${variacao(fat, antes)}</b><small>${real(antes)}</small></div>`;
+    media = `<div><span>Média dos 3 meses antes</span><b>${real(med)}</b><small>${fat >= med ? "este mês está acima" : "este mês está abaixo"}</small></div>`;
+  } else {
+    const antes = faturadoEm(ano - 1, 0);
+    const mesesCom = MESES_CURTOS.map((_, i) => faturadoEm(ano, i + 1)).filter((v) => v > 0);
+    comparar = `<div><span>vs ${ano - 1}</span><b>${variacao(fat, antes)}</b><small>${real(antes)}</small></div>`;
+    media = `<div><span>Média por mês</span><b>${real(mesesCom.length ? fat / mesesCom.length : 0)}</b><small>nos ${plural(mesesCom.length, "mês", "meses")} com faturamento</small></div>`;
+  }
+
+  // Barra da meta
+  let barraMeta;
+  if (meta) {
+    const p = pct(fat, meta);
+    const falta = Math.max(0, meta - fat);
+    const ehAgora = mes && ano === hoje.getFullYear() && mes === hoje.getMonth() + 1;
+    const diasFim = ehAgora ? new Date(ano, mes, 0).getDate() - hoje.getDate() : 0;
+    const trabalhos = ticket && falta ? Math.ceil(falta / ticket) : 0;
+    barraMeta = `<div class="meta-linha">
+        <div class="meta-trilho ${p >= 100 ? "batida" : ""}" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.min(100, p)}" aria-label="Meta"><i style="width:${Math.min(100, p)}%"></i></div>
+        <b>${p}%</b>
+      </div>
+      <p class="meta-texto">${p >= 100
+        ? `Meta de ${real(meta)} batida${fat > meta ? `, com ${real(fat - meta)} a mais` : ""}. Parabéns!`
+        : `Meta ${real(meta)}. Faltam <b>${real(falta)}</b>${ehAgora ? ` em ${plural(diasFim, "dia", "dias")}` : ""}${trabalhos ? `, mais ou menos ${plural(trabalhos, "trabalho", "trabalhos")} no seu ticket médio` : ""}.`}
+        ${mes ? `<button type="button" class="link-btn" data-meta>mudar a meta</button>` : ""}</p>`;
+  } else {
+    const sug = mes ? sugestaoMeta(ano, mes) : 0;
+    barraMeta = mes
+      ? `<p class="meta-texto">Você ainda não tem meta para ${MESES_LONGOS[mes - 1].toLowerCase()}. ${sug ? `Uma boa meta seria <b>${real(sug)}</b> (sua média recente mais 15%).` : ""} <button type="button" class="btn primario pequeno" data-meta>Definir meta</button></p>`
+      : (() => {
+        const comMeta = S.metas.filter((m) => Number(m.ano) === ano && n2(m.valor) > 0);
+        const batidas = comMeta.filter((m) => faturadoEm(ano, Number(m.mes)) >= n2(m.valor));
+        return comMeta.length
+          ? `<p class="meta-texto">Meta batida em <b>${batidas.length} de ${plural(comMeta.length, "mês", "meses")}</b> com meta definida.${batidas.length ? ` (${batidas.map((m) => MESES_CURTOS[m.mes - 1]).join(", ")})` : ""}</p>`
+          : `<p class="meta-texto">Escolha um mês no filtro para definir a meta dele.</p>`;
+      })();
+  }
+
+  return `<div class="cartao relatorio">
+    <div class="rel-topo">
+      <div>
+        <span class="rel-rotulo">Faturado em ${mes ? `${MESES_LONGOS[mes - 1].toLowerCase()} de ${ano}` : ano}</span>
+        <strong class="rel-numero">${real(fat)}</strong>
+        ${barraMeta}
+      </div>
+    </div>
+    <div class="rel-grade">
+      <div><span>Entrou na conta</span><b>${real(entrou)}</b><small>pelo dia em que o dinheiro caiu</small></div>
+      ${comparar}
+      ${media}
+      <div><span>Contratos fechados</span><b>${num(fechadosP.length)}</b><small>ticket médio ${real(ticket)}</small></div>
+      <div><span>TikTok Shop</span><b>${real(ttk)}</b><small>${fat ? pct(ttk, fat) + "% do faturado" : "nenhum repasse"}</small></div>
+      <div><span>Em negociação</span><b>${real(vNeg)}</b><small>${negociando.length ? `${plural(negociando.length, "proposta aberta", "propostas abertas")}` : "nenhuma proposta aberta"}</small></div>
+    </div>
+  </div>`;
+}
+
+/* ---------- "Onde está o seu dinheiro" ---------- */
+function cartaoFunil({ baldes, gargalo }) {
+  const max = Math.max(1, ...baldes.map((b) => b.v));
+  const aberto = baldes.filter((b) => b.k !== "negociacao").reduce((s, b) => s + b.v, 0);
+  return `<div class="cartao">
+    <h2>Onde está o seu dinheiro agora</h2>
+    <p class="sub" style="margin:-6px 0 10px">todos os meses juntos · ${real(aberto)} fechado e ainda não recebido</p>
+    <div class="funil">
+      ${baldes.map((b) => `<button type="button" class="funil-linha f-${b.k} ${gargalo && gargalo.k === b.k ? "gargalo" : ""}" data-balde="${b.k}" ${b.lista.length ? "" : "disabled"}
+        data-dica="<b>${esc(b.nome)}</b><br>${esc(b.explica)}${b.lista.length ? "<br>" + b.lista.slice(0, 5).map((c) => esc(c.cliente) + ": " + real(b.k === "negociacao" ? c.valor : saldoDe(c))).join("<br>") + (b.lista.length > 5 ? "<br>..." : "") : ""}">
+        <span class="fl-nome">${esc(b.nome)}${gargalo && gargalo.k === b.k ? ` <span class="etq ${b.k === "vencido" ? "vermelha" : "amarela"}">gargalo</span>` : ""}</span>
+        <span class="lb-trilho"><i style="width:${(b.v / max) * 100}%"></i></span>
+        <span class="lb-valor">${real(b.v)}</span>
+        <small class="lb-extra">${b.lista.length ? plural(b.lista.length, "contrato", "contratos") : "nada aqui"} · ${esc(b.explica)}</small>
+      </button>`).join("")}
+    </div>
+    ${gargalo
+      ? `<div class="dica-caixa ${gargalo.k === "vencido" ? "urgente" : ""}"><b>O que fazer:</b> ${esc(gargalo.acao)}</div>`
+      : `<div class="dica-caixa"><b>Tudo em dia.</b> Nenhum dinheiro parado depois de fechado.</div>`}
+  </div>`;
+}
+
+/* ---------- "O que os números dizem" (insights do ano) ---------- */
+function insightsDoAno(funil) {
+  const ano = fin.ano;
+  const doAno = S.contratos.filter((c) => fechado(c) && Number(c.ano) === ano);
+  const ttkAno = S.comissoes.filter((x) => noPeriodo(x.data, ano, 0));
+  const total = faturadoEm(ano, 0);
+  const itens = [];
+  if (!total) return `<div class="cartao"><h2>O que os números dizem</h2><p class="vazio">Sem faturamento em ${ano} ainda.</p></div>`;
+
+  // 1. Fonte de renda principal
+  const fontes = TIPOS_CONTRATO.map((t) => ({ t, v: doAno.filter((c) => c.tipo === t).reduce((s, c) => s + n2(c.valor), 0) }));
+  fontes.push({ t: "TikTok Shop", v: ttkAno.reduce((s, x) => s + n2(x.valor), 0) });
+  fontes.sort((a, b) => b.v - a.v);
+  const [f1, f2] = fontes;
+  itens.push({ ic: "financeiro", titulo: "Sua fonte de renda principal",
+    texto: `<b>${esc(f1.t)}</b>: ${pct(f1.v, total)}% do que você faturou em ${ano} (${real(f1.v)}).${f2 && f2.v ? ` Depois vem ${esc(f2.t)}, com ${pct(f2.v, total)}%.` : ""}`,
+    dica: pct(f1.v, total) >= 70
+      ? `Mais de 2/3 vem de um tipo só. Tente fechar pelo menos 1 trabalho por mês de ${esc(f2 && f2.v ? f2.t : "outro tipo")} para não depender só de ${esc(f1.t)}.`
+      : "Sua renda está bem dividida entre os tipos de trabalho. Isso dá segurança." });
+
+  // 2. Maior ganho
+  const maior = [...doAno].sort((a, b) => n2(b.valor) - n2(a.valor))[0];
+  const ticketAno = doAno.length ? doAno.reduce((s, c) => s + n2(c.valor), 0) / doAno.length : 0;
+  const meses = MESES_CURTOS.map((_, i) => faturadoEm(ano, i + 1));
+  const melhor = meses.indexOf(Math.max(...meses));
+  if (maior) itens.push({ ic: "estrela", titulo: "Seu maior ganho",
+    texto: `<b>${esc(maior.cliente)}</b>, ${real(maior.valor)}${ticketAno ? ` (${(n2(maior.valor) / ticketAno).toFixed(1).replace(".", ",")} vezes o seu ticket médio de ${real(ticketAno)})` : ""}. Melhor mês: <b>${MESES_LONGOS[melhor]}</b>, com ${real(meses[melhor])}.`,
+    dica: "Use esse trabalho como case no mídia kit e mande proposta para marcas do mesmo porte. Um contrato grande vale por vários pequenos." });
+
+  // 3. Gargalo
+  const g = funil.gargalo;
+  itens.push({ ic: "relogio", titulo: "Seu maior gargalo", alerta: !!g,
+    texto: g ? `<b>${real(g.v)}</b> parados em <b>${esc(g.nome.toLowerCase())}</b> (${plural(g.lista.length, "contrato", "contratos")}).` : "Nenhum dinheiro parado agora.",
+    dica: g ? g.acao : "Continue atualizando o status de cada contrato assim que ele andar." });
+
+  // 4. Recorrência
+  const porCliente = {};
+  doAno.forEach((c) => { const k = chaveCliente(c); (porCliente[k] = porCliente[k] || { nome: "", n: 0, v: 0 }); porCliente[k].nome = melhorNome(porCliente[k].nome, c.cliente); porCliente[k].n++; porCliente[k].v += n2(c.valor); });
+  const clientes = Object.values(porCliente);
+  const voltaram = clientes.filter((x) => x.n > 1).sort((a, b) => b.n - a.n || b.v - a.v);
+  const vVoltaram = voltaram.reduce((s, x) => s + x.v, 0);
+  const totalContratos = doAno.reduce((s, c) => s + n2(c.valor), 0);
+  itens.push({ ic: "marcas", titulo: "Clientes que voltam",
+    texto: voltaram.length
+      ? `${plural(voltaram.length, "marca fechou", "marcas fecharam")} mais de uma vez, de ${clientes.length} no ano: ${voltaram.slice(0, 3).map((x) => `${esc(x.nome)} (${x.n}x)`).join(", ")}. Elas somam ${pct(vVoltaram, totalContratos)}% dos contratos.`
+      : `Nenhuma das ${clientes.length} marcas do ano fechou duas vezes.`,
+    dica: `Você não tem cliente fixo, então todo mês começa do zero. Ofereça ${voltaram.length ? `para ${esc(voltaram[0].nome)}` : "para as marcas que gostaram do seu trabalho"} um pacote mensal (ex: 4 vídeos por mês com 10% de desconto). Um contrato fixo de ${real(Math.max(800, Math.round(ticketAno * 3 / 100) * 100))} por mês já dá uma base para o mês não começar do zero.` });
+
+  // 5. Concentração
+  const top = clientes.sort((a, b) => b.v - a.v)[0];
+  if (top) {
+    const p = pct(top.v, total);
+    itens.push({ ic: "grafico", titulo: "Dependência de uma marca", alerta: p >= 30,
+      texto: `Seu maior cliente do ano é <b>${esc(top.nome)}</b>, com ${p}% de tudo que você faturou.`,
+      dica: p >= 30 ? "É muito peso numa marca só: se ela parar, o mês cai junto. Use o tempo livre para abrir 2 ou 3 conversas novas por semana." : "Nenhuma marca pesa demais no seu faturamento. Bom sinal." });
+  }
+
+  // 6. Tempo para receber
+  const tempos = S.contratos.filter((c) => c.status === "Pago" && c.data_nf && (c.data_p1 || c.data_p2)).map((c) => {
+    const ultimo = [c.data_p1, c.data_p2].filter(Boolean).sort().pop();
+    return { dias: diasEntre(c.data_nf, ultimo), prazo: n2(c.prazo_dias) };
+  }).filter((x) => x.dias >= 0);
+  if (tempos.length >= 3) {
+    const medio = Math.round(tempos.reduce((s, x) => s + x.dias, 0) / tempos.length);
+    const prazoMedio = Math.round(tempos.reduce((s, x) => s + x.prazo, 0) / tempos.length);
+    itens.push({ ic: "calendario", titulo: "Quanto tempo o dinheiro demora",
+      texto: `Em média você recebe <b>${plural(medio, "dia", "dias")}</b> depois da nota fiscal (o prazo combinado médio é ${prazoMedio} dias).`,
+      dica: medio > 40 ? "Isso segura o seu caixa. Em trabalhos acima de R$ 800, peça 50% na assinatura e 50% na entrega, e tente prazo de 30 dias em vez de 60 ou 90." : "Seu dinheiro entra rápido. Mantenha o hábito de mandar a nota no dia da entrega." });
+  }
+
+  return `<div class="cartao">
+    <h2>O que os números dizem</h2>
+    <p class="sub" style="margin:-6px 0 10px">${ano}, calculado sozinho a partir dos seus contratos e do TikTok Shop</p>
+    <div class="insights">${itens.map((x) => `<div class="insight ${x.alerta ? "alerta" : ""}">
+      <span class="insight-ic">${ic(x.ic)}</span>
+      <div><b>${x.titulo}</b><p>${x.texto}</p><p class="insight-dica">${x.dica}</p></div>
+    </div>`).join("")}</div>
+  </div>`;
+}
+
 function desenharFinanceiro(el) {
   const todos = S.contratos;
   const anos = [...new Set([new Date().getFullYear(), ...todos.map((c) => Number(c.ano)).filter(Boolean)])].sort((a, b) => b - a);
   if (!anos.includes(fin.ano)) fin.ano = anos[0];
   const doAno = todos.filter((c) => Number(c.ano) === fin.ano);
   const doPeriodo = doAno.filter((c) => !fin.mes || Number(c.mes) === fin.mes);
-  const validos = doPeriodo.filter((c) => c.status !== "Cancelado");
-  // Comissões do TikTok Shop do período (contam como faturado e recebido no dia que caíram)
-  const comAno = S.comissoes.filter((x) => x.data && deISO(x.data).getFullYear() === fin.ano);
-  const comPeriodo = comAno.filter((x) => !fin.mes || deISO(x.data).getMonth() + 1 === fin.mes);
+  const validos = doPeriodo.filter(fechado);
+  // Comissões do TikTok Shop (contam como faturado e recebido no dia que caíram)
+  const comAno = S.comissoes.filter((x) => noPeriodo(x.data, fin.ano, 0));
+  const comPeriodo = comAno.filter((x) => noPeriodo(x.data, fin.ano, fin.mes));
   const totalTtk = comPeriodo.reduce((s, x) => s + n2(x.valor), 0);
-
-  // Números do período
-  const faturadoContratos = validos.reduce((s, c) => s + n2(c.valor), 0);
-  const faturado = faturadoContratos + totalTtk;
-  const recebido = validos.reduce((s, c) => s + recebidoDe(c), 0) + totalTtk;
-  const aReceber = validos.reduce((s, c) => s + saldoDe(c), 0);
-  const vencidos = validos.filter((c) => situacaoDe(c) === "Vencido");
-  const vencido = vencidos.reduce((s, c) => s + saldoDe(c), 0);
-  const ticket = validos.length ? faturadoContratos / validos.length : 0;
+  const faturado = validos.reduce((s, c) => s + n2(c.valor), 0) + totalTtk;
   const nomePeriodo = fin.mes ? `${MESES_LONGOS[fin.mes - 1]} de ${fin.ano}` : `${fin.ano}`;
+  const funil = ondeEstaODinheiro();
 
-  // Gráfico 1: faturado (mês de fechamento) x recebido (data real de cada parcela), no ano
-  const fatMes = Array(12).fill(0), recMes = Array(12).fill(0), prevMes = Array(12).fill(0);
-  doAno.filter((c) => c.status !== "Cancelado").forEach((c) => { if (c.mes) fatMes[c.mes - 1] += n2(c.valor); });
+  // Gráfico 1: faturado (mês de fechamento) x entrou na conta (dia de cada parcela), com a meta de cada mês
+  const fatMes = MESES_CURTOS.map((_, i) => faturadoEm(fin.ano, i + 1));
+  const recMes = MESES_CURTOS.map((_, i) => entrouEm(fin.ano, i + 1));
+  const metaMes = MESES_CURTOS.map((_, i) => metaDe(fin.ano, i + 1));
+  const prevMes = Array(12).fill(0);
   todos.forEach((c) => {
-    [[c.parcela1, c.data_p1], [c.parcela2, c.data_p2]].forEach(([v, d]) => {
-      if (v && d && deISO(d).getFullYear() === fin.ano) recMes[deISO(d).getMonth()] += n2(v);
-    });
     // Gráfico 2: previsão = o que falta receber, no mês da data prevista
     const prev = previstaDe(c), sal = saldoDe(c);
-    if (sal > 0 && prev && deISO(prev).getFullYear() === fin.ano && situacaoDe(c) !== "Cancelado") prevMes[deISO(prev).getMonth()] += sal;
+    if (sal > 0 && prev && deISO(prev).getFullYear() === fin.ano) prevMes[deISO(prev).getMonth()] += sal;
   });
-  comAno.forEach((x) => { const m = deISO(x.data).getMonth(); fatMes[m] += n2(x.valor); recMes[m] += n2(x.valor); });
-  const maxBarras = Math.max(1, ...fatMes, ...recMes);
+  const maxBarras = Math.max(1, ...fatMes, ...recMes, ...metaMes);
   const maxPrev = Math.max(1, ...prevMes);
   const mesHoje = new Date().getFullYear() === fin.ano ? new Date().getMonth() : -1;
+  const temMeta = metaMes.some(Boolean);
 
   const graficoMeses = `<div class="barras-mes" role="img" aria-label="Faturado e recebido por mês em ${fin.ano}">
-    ${MESES_CURTOS.map((m, i) => `<div class="grupo-mes ${fin.mes === i + 1 ? "foco" : ""}" data-dica="<b>${MESES_LONGOS[i]}</b><br>Faturado: ${real(fatMes[i])}<br>Recebido: ${real(recMes[i])}">
+    ${MESES_CURTOS.map((m, i) => `<div class="grupo-mes ${fin.mes === i + 1 ? "foco" : ""}" data-dica="<b>${MESES_LONGOS[i]}</b><br>Faturado: ${real(fatMes[i])}<br>Entrou na conta: ${real(recMes[i])}${metaMes[i] ? `<br>Meta: ${real(metaMes[i])} (${pct(fatMes[i], metaMes[i])}%)` : ""}">
       <div class="par-barras">
         <i class="b-fat" style="height:${(fatMes[i] / maxBarras) * 100}%"></i>
         <i class="b-rec" style="height:${(recMes[i] / maxBarras) * 100}%"></i>
+        ${metaMes[i] ? `<em class="m-meta" style="bottom:${(metaMes[i] / maxBarras) * 100}%"></em>` : ""}
       </div>
       <span>${m}</span>
     </div>`).join("")}
@@ -1735,11 +1990,14 @@ function desenharFinanceiro(el) {
   porTipo.sort((a, b) => b.v - a.v);
   const maxTipo = Math.max(1, ...porTipo.map((x) => x.v));
 
-  // Top clientes (junta "Torra" e "torra")
+  // Top clientes (junta "Torra" e "torra"), com quantas vezes cada marca já fechou em todos os anos
+  const vezes = {};
+  todos.filter(fechado).forEach((c) => { vezes[chaveCliente(c)] = (vezes[chaveCliente(c)] || 0) + 1; });
   const clientes = {};
   validos.forEach((c) => {
-    const k = String(c.cliente || "").trim().toLowerCase();
-    if (!clientes[k]) clientes[k] = { nome: String(c.cliente).trim(), v: 0, n: 0 };
+    const k = chaveCliente(c);
+    if (!clientes[k]) clientes[k] = { nome: "", v: 0, n: 0, vezes: vezes[k] || 1 };
+    clientes[k].nome = melhorNome(clientes[k].nome, c.cliente);
     clientes[k].v += n2(c.valor); clientes[k].n++;
   });
   const top = Object.values(clientes).sort((a, b) => b.v - a.v).slice(0, 6);
@@ -1757,20 +2015,17 @@ function desenharFinanceiro(el) {
       <button class="btn" type="button" id="csv-fin">${ic("baixar")}Baixar CSV</button>
       <button class="btn primario" type="button" id="add-contrato">${ic("mais")}Novo contrato</button>
     </div>
-    <div class="faixa-kpi">
-      <div class="kpi"><span>Faturado</span><strong>${real(faturado)}</strong><small>${nomePeriodo}${totalTtk ? " · com TikTok Shop" : ""}</small></div>
-      <div class="kpi"><span>Recebido</span><strong>${real(recebido)}</strong><small>${faturado ? Math.round((recebido / faturado) * 100) + "% do faturado" : "nada faturado ainda"}</small></div>
-      <div class="kpi"><span>A receber</span><strong>${real(aReceber)}</strong><small>${plural(validos.filter((c) => saldoDe(c) > 0).length, "contrato em aberto", "contratos em aberto")}</small></div>
-      <div class="kpi ${vencido ? "alerta" : ""}"><span>Vencido</span><strong>${real(vencido)}</strong><small>${vencidos.length ? plural(vencidos.length, "contrato atrasado", "contratos atrasados") : "nada atrasado"}</small></div>
-      <div class="kpi"><span>Contratos</span><strong>${num(validos.length)}</strong><small>ticket médio ${real(ticket)}</small></div>
-      <div class="kpi kpi-ttk"><span>TikTok Shop</span><strong>${real(totalTtk)}</strong><small>${comPeriodo.length ? plural(comPeriodo.length, "repasse", "repasses") + " no período" : "nenhum repasse lançado"}</small></div>
+    ${relatorioPeriodo()}
+    <div class="grade-fin">
+      ${cartaoFunil(funil)}
+      ${insightsDoAno(funil)}
     </div>
     ${cartaoTtk(comAno)}
     <div class="grade-fin">
       <div class="cartao">
-        <div class="barra" style="margin-bottom:4px"><h2 style="margin:0">Faturado x recebido em ${fin.ano}</h2><span class="espaco"></span>
-          <span class="legenda" style="margin:0"><span><i class="leg-fat"></i>Faturado (mês do fechamento)</span><span><i class="leg-rec"></i>Recebido (dia que o dinheiro entrou)</span></span></div>
-        ${doAno.length ? graficoMeses : `<p class="vazio">Nenhum contrato em ${fin.ano}.</p>`}
+        <div class="barra" style="margin-bottom:4px"><h2 style="margin:0">Faturado x entrou na conta em ${fin.ano}</h2><span class="espaco"></span>
+          <span class="legenda" style="margin:0"><span><i class="leg-fat"></i>Faturado (mês do fechamento)</span><span><i class="leg-rec"></i>Entrou na conta (dia que caiu)</span>${temMeta ? `<span><i class="leg-meta"></i>Meta</span>` : ""}</span></div>
+        ${fatMes.some(Boolean) || recMes.some(Boolean) ? graficoMeses : `<p class="vazio">Nenhum contrato em ${fin.ano}.</p>`}
       </div>
       <div class="cartao">
         <h2>Previsão de recebimento em ${fin.ano}</h2>
@@ -1784,29 +2039,40 @@ function desenharFinanceiro(el) {
         ${porTipo.length ? `<div class="lista-barras">${porTipo.map((x) => `<div class="linha-barra" data-dica="<b>${esc(x.t)}</b><br>${real(x.v)} em ${plural(x.n, x.repasse ? "repasse" : "contrato", x.repasse ? "repasses" : "contratos")}<br>${x.repasse ? "média por repasse" : "ticket médio"} ${real(x.ticket)}">
           <span class="lb-nome">${esc(x.t)}</span>
           <span class="lb-trilho"><i style="width:${(x.v / maxTipo) * 100}%"></i></span>
-          <span class="lb-valor">${real(x.v)} <small>${faturado ? Math.round((x.v / faturado) * 100) : 0}%</small></span>
+          <span class="lb-valor">${real(x.v)} <small>${pct(x.v, faturado)}%</small></span>
           <small class="lb-extra">${x.repasse ? `${plural(x.n, "repasse", "repasses")} · média ${real(x.ticket)}` : `${plural(x.n, "contrato", "contratos")} · ticket ${real(x.ticket)}`}</small>
-        </div>`).join("")}</div>` : `<p class="vazio">Sem contratos no período.</p>`}
+        </div>`).join("")}</div>` : `<p class="vazio">Sem contratos fechados no período.</p>`}
       </div>
       <div class="cartao">
         <h2>Clientes que mais pagaram</h2>
-        ${top.length ? `<div class="lista-barras">${top.map((x, i) => `<div class="linha-barra" data-dica="<b>${esc(x.nome)}</b><br>${real(x.v)} em ${plural(x.n, "contrato", "contratos")}">
+        ${top.length ? `<div class="lista-barras">${top.map((x, i) => `<div class="linha-barra" data-dica="<b>${esc(x.nome)}</b><br>${real(x.v)} em ${plural(x.n, "contrato", "contratos")}<br>${x.vezes > 1 ? `já fechou ${x.vezes} vezes com você` : "fechou uma vez só"}">
           <span class="lb-nome">${i + 1}. ${esc(x.nome)}</span>
           <span class="lb-trilho"><i style="width:${(x.v / maxTop) * 100}%"></i></span>
           <span class="lb-valor">${real(x.v)}</span>
-          <small class="lb-extra">${plural(x.n, "contrato", "contratos")}</small>
-        </div>`).join("")}</div>` : `<p class="vazio">Sem contratos no período.</p>`}
+          <small class="lb-extra">${plural(x.n, "contrato", "contratos")}${x.vezes > 1 ? ` <span class="etq verde">voltou ${x.vezes}x</span>` : ""}</small>
+        </div>`).join("")}</div>` : `<p class="vazio">Sem contratos fechados no período.</p>`}
       </div>
       <div class="cartao">
         <h2>Contratos por status</h2>
-        ${Object.keys(contaStatus).length ? `<div class="status-lista">${[...STATUS_CONTRATO.slice(0, 7), "Vencido", "Cancelado"].filter((s) => contaStatus[s]).map((s) => `<button type="button" class="status-item" data-filtrar="${esc(s)}"><span class="pilula ${classeStatus(s)}">${esc(s)}</span><b>${contaStatus[s]}</b></button>`).join("")}</div>
+        ${Object.keys(contaStatus).length ? `<div class="status-lista">${STATUS_FILTRO.filter((s) => contaStatus[s]).map((s) => `<button type="button" class="status-item" data-filtrar="${esc(s)}"><span class="pilula ${classeStatus(s)}">${esc(s)}</span><b>${contaStatus[s]}</b></button>`).join("")}</div>
           <p class="sub">Clique num status para ver só esses contratos na lista.</p>` : `<p class="vazio">Sem contratos no período.</p>`}
       </div>
     </div>
+    <details class="cartao como-usar">
+      <summary><b>Dicas para o painel mostrar a verdade</b></summary>
+      <ol>
+        <li><b>Toda proposta entra como "Em negociação"</b>, mesmo antes de fechar. Assim você vê quanto dinheiro está em jogo e não esquece de fazer follow-up. Se a marca disser não, mude para "Perdida".</li>
+        <li><b>Mude o status sempre que o trabalho andar.</b> Dá para fazer direto pela aba Campanhas, arrastando o cartão.</li>
+        <li><b>Coloque a data da nota fiscal no dia que enviar.</b> É ela que calcula a data prevista e avisa quando venceu.</li>
+        <li><b>Lance cada parcela no dia que o dinheiro caiu.</b> Quando o valor todo entrar, o contrato vira "Pago" sozinho.</li>
+        <li><b>Toda quarta, lance o repasse do TikTok Shop.</b> Leva 10 segundos e entra no faturado.</li>
+        <li><b>No dia 1 de cada mês</b>, defina a meta e olhe o card "Onde está o seu dinheiro". O gargalo é por onde começar o mês.</li>
+      </ol>
+    </details>
     <div class="barra" style="margin-top:4px">
       <h2 style="margin:0">Contratos de ${nomePeriodo}</h2>
       <div class="busca">${ic("busca")}<input type="search" id="busca-fin" placeholder="Buscar cliente ou descrição" value="${esc(fin.busca)}" aria-label="Buscar contratos"></div>
-      <select class="campo" id="fin-status" aria-label="Filtrar por status"><option value="">Todos os status</option>${[...STATUS_CONTRATO.slice(0, 7), "Vencido", "Cancelado"].map((s) => `<option ${fin.status === s ? "selected" : ""}>${s}</option>`).join("")}</select>
+      <select class="campo" id="fin-status" aria-label="Filtrar por status"><option value="">Todos os status</option>${STATUS_FILTRO.map((s) => `<option ${fin.status === s ? "selected" : ""}>${s}</option>`).join("")}</select>
     </div>
     <div class="tabela-caixa">
       <table>
@@ -1825,19 +2091,19 @@ function desenharFinanceiro(el) {
       : lista.map((c) => {
           const s = situacaoDe(c), prev = previstaDe(c), sal = saldoDe(c);
           const dias = prev ? diasEntre(prev, hojeISO()) : 0;
-          return `<tr class="clicavel ${c.status === "Cancelado" ? "escondido" : ""}" data-id="${esc(c.id)}">
+          return `<tr class="clicavel ${grupoDe(c.status) === "fora" ? "escondido" : ""}" data-id="${esc(c.id)}">
             <td><b>${esc(c.cliente)}</b></td>
             <td>${esc(c.tipo || "")}</td>
             <td class="corta" title="${esc(c.descricao || "")}">${esc(c.descricao || "")}</td>
             <td>${c.mes ? MESES_CURTOS[c.mes - 1] : ""}</td>
             <td class="num">${real(c.valor)}</td>
-            <td style="white-space:nowrap">${prev ? dataBR(prev) : `<span class="sub">sem nota</span>`}${s === "Vencido" ? `<span class="etq vermelha">${plural(dias, "dia", "dias")}</span>` : ""}</td>
+            <td style="white-space:nowrap">${prev ? dataBR(prev) : `<span class="sub">${fechado(c) ? "sem nota" : ""}</span>`}${s === "Vencido" ? `<span class="etq vermelha">${plural(dias, "dia", "dias")}</span>` : ""}</td>
             <td><span class="pilula ${classeStatus(s)}">${esc(s)}</span></td>
             <td class="num">${real(recebidoDe(c))}</td>
             <td class="num">${sal > 0 ? `<b>${real(sal)}</b>` : `<span class="sub">${real(0)}</span>`}</td>
           </tr>`;
         }).join("");
-    const tot = lista.filter((c) => c.status !== "Cancelado");
+    const tot = lista.filter(fechado);
     $("#conta-contratos").textContent = `${plural(lista.length, "contrato", "contratos")} · ${real(tot.reduce((s, c) => s + n2(c.valor), 0))} faturado · ${real(tot.reduce((s, c) => s + saldoDe(c), 0))} a receber`;
   };
   pintar();
@@ -1847,6 +2113,20 @@ function desenharFinanceiro(el) {
   $("#busca-fin").addEventListener("input", (e) => { fin.busca = e.target.value; pintar(); });
   $("#fin-status").onchange = (e) => { fin.status = e.target.value; pintar(); };
   $$("[data-filtrar]", el).forEach((b) => b.onclick = () => { fin.status = b.dataset.filtrar; desenhar(); $("#lista-contratos").scrollIntoView({ behavior: "smooth", block: "start" }); });
+  $$("[data-meta]", el).forEach((b) => b.onclick = () => formMeta(fin.ano, fin.mes));
+  // Clicar numa etapa do "onde está o seu dinheiro" mostra os contratos dela
+  $$("[data-balde]", el).forEach((b) => b.onclick = () => {
+    const balde = funil.baldes.find((x) => x.k === b.dataset.balde);
+    if (!balde || !balde.lista.length) return;
+    abrirJanelaSimples(balde.nome, `<p class="sub" style="margin-top:0">${esc(balde.explica)}</p>
+      <ul class="lista-balde">${balde.lista.map((c) => `<li><button type="button" class="link-btn" data-abrir-contrato="${esc(c.id)}"><b>${esc(c.cliente)}</b> ${c.descricao ? `· ${esc(c.descricao)}` : ""}</button>
+        <span class="pilula ${classeStatus(situacaoDe(c))}">${esc(situacaoDe(c))}</span><b>${real(balde.k === "negociacao" ? c.valor : saldoDe(c))}</b></li>`).join("")}</ul>
+      <div class="dica-caixa ${balde.k === "vencido" ? "urgente" : ""}"><b>O que fazer:</b> ${esc(balde.acao)}</div>`, "");
+    $$("[data-abrir-contrato]").forEach((x) => x.onclick = () => {
+      x.closest("dialog").close();
+      formContrato(S.contratos.find((c) => String(c.id) === x.dataset.abrirContrato));
+    });
+  });
   $("#add-contrato").onclick = () => formContrato();
   ligarCartaoTtk(el);
   $("#lista-contratos").addEventListener("click", (e) => {
@@ -1862,16 +2142,39 @@ function desenharFinanceiro(el) {
   ligarDicas(el);
 }
 
+function formMeta(ano, mes) {
+  const atual = metaDe(ano, mes);
+  const sug = sugestaoMeta(ano, mes);
+  abrirForm({
+    titulo: `Meta de ${MESES_LONGOS[mes - 1].toLowerCase()} de ${ano}`,
+    valores: { valor: atual || sug || "", repetir: false },
+    campos: [
+      { n: "valor", r: "Quanto você quer faturar no mês (R$)", t: "number", inteiro: true,
+        ajuda: sug ? `Sugestão: ${real(sug)}, que é a média dos seus últimos meses com faturamento mais 15%. Meta boa é a que puxa um pouco, sem ser impossível.` : "Comece com um valor um pouco acima do que você já faturou num mês bom." },
+      { n: "repetir", r: "Usar o mesmo valor nos próximos meses, até dezembro", t: "check", inteiro: true }
+    ],
+    aoSalvar: async (d) => {
+      if (!CAMPOS.metas || !CAMPOS.metas.length) { avisar("A tabela metas não existe no banco. Rode o banco.sql.", true); return false; }
+      const linhas = [];
+      for (let m = mes; m <= (d.repetir ? 12 : mes); m++) linhas.push({ ano, mes: m, valor: n2(d.valor) });
+      const { error } = await db.from("metas").upsert(linhas, { onConflict: "ano,mes" });
+      if (error) { avisar(traduzErro(error), true); return false; }
+      recarregar("metas");
+      return true;
+    }
+  });
+}
+
 function formContrato(c) {
   const hoje = new Date();
   abrirForm({
     titulo: c ? "Editar contrato" : "Novo contrato",
     tabela: "contratos",
-    valores: c || { tipo: "UGC", status: "Aguardando briefing", mes: hoje.getMonth() + 1, ano: hoje.getFullYear(), prazo_dias: 30 },
+    valores: c || { tipo: "UGC", status: "Em negociação", mes: hoje.getMonth() + 1, ano: hoje.getFullYear(), prazo_dias: 30 },
     campos: [
       { n: "cliente", r: "Marca / cliente", req: true, inteiro: true },
       { n: "tipo", r: "Tipo", t: "select", op: TIPOS_CONTRATO.map((t) => [t, t]) },
-      { n: "status", r: "Status", t: "select", op: STATUS_CONTRATO.map((s) => [s, s]) },
+      { n: "status", r: "Etapa", t: "select", op: STATUS_CONTRATO.map((s) => [s, s]) },
       { n: "descricao", r: "Descrição", inteiro: true, ph: "ex: 2 vídeos + 3 stories" },
       { n: "qtd", r: "Quantidade de vídeos", t: "number" },
       { n: "prazo_entrega", r: "Prazo de entrega para a marca", t: "date" },
@@ -1894,6 +2197,10 @@ function formContrato(c) {
       // Parcela vazia fica vazia (e não zero)
       ["parcela1", "parcela2"].forEach((k) => { if (!d[k]) d[k] = null; });
       if (d.prazo_dias === 0 && !(c && c.prazo_dias === 0)) d.prazo_dias = null;
+      // Ajudas automáticas: nota enviada sem data ganha a data de hoje; valor todo recebido vira Pago
+      if (["Nota fiscal enviada", "Aguardando pagamento"].includes(d.status) && !d.data_nf) d.data_nf = hojeISO();
+      const quitado = n2(d.valor) > 0 && n2(d.parcela1) + n2(d.parcela2) >= n2(d.valor);
+      if (quitado && grupoDe(d.status) === "dinheiro" && d.status !== "Pago") { d.status = "Pago"; setTimeout(() => avisar("Marquei como Pago: o valor todo já foi recebido."), 400); }
       const ok = await gravar("contratos", d, c ? c.id : null);
       if (ok) recarregar("contratos");
       return ok;
@@ -1903,25 +2210,25 @@ function formContrato(c) {
 }
 
 /* =============================================================
-   ABA CAMPANHAS (produção)
-   Mostra os mesmos contratos do Financeiro, num quadro de etapas
-   de produção. Cadastrou uma vez, aparece nas duas abas.
+   ABA CAMPANHAS (quadro de etapas)
+   Mostra os mesmos contratos do Financeiro, da negociação até o
+   pagamento. Cadastrou uma vez, aparece nas duas abas.
    ============================================================= */
-const ETAPAS_PRODUCAO = [
-  ["Aguardando briefing", "Briefing"],
-  ["Aprovação de roteiro", "Roteiro"],
-  ["Gravando", "Gravando"],
-  ["Editando", "Editando"],
-  ["Enviado p/ aprovação", "Aprovação"],
-  ["Entregue", "Entregue"]
+const COLUNAS_PRODUCAO = [
+  ["Negociação", ["Em negociação", "Assinatura de contrato"]],
+  ["Briefing", ["Aguardando briefing"]],
+  ["Roteiro", ["Roteiro em andamento", "Aguardando aprovação de roteiro"]],
+  ["Produção", ["Gravando", "Editando"]],
+  ["Aprovação", ["Enviado p/ aprovação"]],
+  ["Entregue", ["Entregue", "Nota fiscal enviada", "Aguardando pagamento"]],
+  ["Pago", ["Pago"]]
 ];
 const prod = { busca: "", soDestaque: false };
-// "Pago" também é um trabalho entregue; no quadro ele fica na coluna Entregue
-const colunaDe = (c) => (c.status === "Pago" ? "Entregue" : c.status);
-const entregue = (c) => c.status === "Entregue" || c.status === "Pago";
+const colunaDe = (c) => (COLUNAS_PRODUCAO.find((x) => x[1].includes(c.status)) || [null])[0];
+const entregue = (c) => grupoDe(c.status) === "dinheiro";
 
 function avisoEntrega(c) {
-  if (!c.prazo_entrega || entregue(c) || c.status === "Cancelado") return "";
+  if (!c.prazo_entrega || entregue(c) || !fechado(c)) return "";
   const d = diasEntre(hojeISO(), c.prazo_entrega);
   if (d < 0) return `<span class="etq vermelha">${plural(-d, "dia", "dias")} atrasada</span>`;
   if (d === 0) return `<span class="etq amarela">entrega hoje</span>`;
@@ -1930,8 +2237,9 @@ function avisoEntrega(c) {
 }
 
 function desenharProducao(el) {
-  const ativos = S.contratos.filter((c) => c.status !== "Cancelado");
-  const emProducao = ativos.filter((c) => !entregue(c));
+  const ativos = S.contratos.filter((c) => grupoDe(c.status) !== "fora");
+  const negociando = ativos.filter((c) => grupoDe(c.status) === "negociacao");
+  const emProducao = ativos.filter((c) => grupoDe(c.status) === "producao");
   const atrasadas = emProducao.filter((c) => c.prazo_entrega && c.prazo_entrega < hojeISO());
   const videos = emProducao.reduce((s, c) => s + (Number(c.qtd) || 0), 0);
   const agora = new Date();
@@ -1939,6 +2247,7 @@ function desenharProducao(el) {
 
   el.innerHTML = `
     <div class="faixa-kpi">
+      <div class="kpi"><span>Em negociação</span><strong>${num(negociando.length)}</strong><small>${real(negociando.reduce((s, c) => s + n2(c.valor), 0))} em propostas</small></div>
       <div class="kpi"><span>Em produção</span><strong>${num(emProducao.length)}</strong><small>${real(emProducao.reduce((s, c) => s + n2(c.valor), 0))} em contratos</small></div>
       <div class="kpi"><span>Vídeos para entregar</span><strong>${num(videos)}</strong><small>somando as campanhas abertas</small></div>
       <div class="kpi ${atrasadas.length ? "alerta" : ""}"><span>Atrasadas</span><strong>${num(atrasadas.length)}</strong><small>${atrasadas.length ? "passou do prazo de entrega" : "tudo em dia"}</small></div>
@@ -1951,22 +2260,23 @@ function desenharProducao(el) {
       <span class="sub">o mesmo cadastro do Financeiro</span>
       <button class="btn primario" type="button" id="add-prod">${ic("mais")}Nova campanha</button>
     </div>
-    <div class="quadro quadro-6" id="quadro-prod"></div>`;
+    <div class="quadro quadro-7" id="quadro-prod"></div>`;
 
   const pintar = () => {
     const q = prod.busca.toLowerCase();
     const lista = ativos.filter((c) => (!prod.soDestaque || c.favorita) && (!q || [c.cliente, c.descricao, c.obs].some((x) => String(x || "").toLowerCase().includes(q))));
-    $("#quadro-prod").innerHTML = ETAPAS_PRODUCAO.map(([valor, nome]) => {
-      let itens = lista.filter((c) => colunaDe(c) === valor)
-        .sort((a, b) => (b.favorita === true) - (a.favorita === true) || String(a.prazo_entrega || "9999").localeCompare(String(b.prazo_entrega || "9999")));
+    $("#quadro-prod").innerHTML = COLUNAS_PRODUCAO.map(([nome, sts]) => {
+      let itens = lista.filter((c) => colunaDe(c) === nome)
+        .sort((a, b) => (b.favorita === true) - (a.favorita === true) || sts.indexOf(b.status) - sts.indexOf(a.status) || String(a.prazo_entrega || "9999").localeCompare(String(b.prazo_entrega || "9999")));
       let resto = 0;
-      if (valor === "Entregue") { // só os mais recentes, o histórico completo está no Financeiro
+      if (nome === "Pago") { // só os mais recentes, o histórico completo está no Financeiro
         itens = itens.sort((a, b) => (n2(b.ano) * 100 + n2(b.mes)) - (n2(a.ano) * 100 + n2(a.mes)) || b.id - a.id);
         resto = Math.max(0, itens.length - 6); itens = itens.slice(0, 6);
       }
-      return `<section class="coluna col-prod" data-etapa="${esc(valor)}" aria-label="${nome}">
-        <header><b>${nome}</b><span class="pilula">${itens.length + resto}</span></header>
-        <div class="coluna-corpo">${itens.map(cartaoCampanha).join("") || `<p class="coluna-vazia">${valor === "Aguardando briefing" ? "Campanhas novas aparecem aqui" : "Arraste para cá"}</p>`}
+      const soma = itens.reduce((s, c) => s + (nome === "Entregue" ? saldoDe(c) : n2(c.valor)), 0);
+      return `<section class="coluna col-prod" data-coluna="${esc(nome)}" aria-label="${nome}">
+        <header><b>${nome}</b><span class="pilula">${itens.length + resto}</span>${soma && nome !== "Pago" ? `<small class="sub" style="margin-left:auto">${real(soma)}</small>` : ""}</header>
+        <div class="coluna-corpo">${itens.map(cartaoCampanha).join("") || `<p class="coluna-vazia">${nome === "Negociação" ? "Propostas novas aparecem aqui" : "Arraste para cá"}</p>`}
         ${resto ? `<button class="btn" type="button" data-ir-financeiro style="width:100%;justify-content:center">+${resto} no Financeiro</button>` : ""}</div>
       </section>`;
     }).join("");
@@ -1982,8 +2292,14 @@ function desenharProducao(el) {
   quadro.addEventListener("dragstart", (e) => { const c = e.target.closest(".cartao-ideia"); if (!c) return; arrastando = c.dataset.id; c.classList.add("arrastando"); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", arrastando); });
   quadro.addEventListener("dragend", (e) => { const c = e.target.closest(".cartao-ideia"); if (c) c.classList.remove("arrastando"); $$(".coluna.sobre", quadro).forEach((x) => x.classList.remove("sobre")); });
   quadro.addEventListener("dragover", (e) => { const col = e.target.closest(".coluna"); if (!col || !arrastando) return; e.preventDefault(); $$(".coluna.sobre", quadro).forEach((x) => { if (x !== col) x.classList.remove("sobre"); }); col.classList.add("sobre"); });
-  quadro.addEventListener("drop", (e) => { const col = e.target.closest(".coluna"); if (!col || !arrastando) return; e.preventDefault(); const id = arrastando; arrastando = null; moverCampanha(id, col.dataset.etapa); });
-  quadro.addEventListener("change", (e) => { const s = e.target.closest("[data-etapa-prod]"); if (s) moverCampanha(s.dataset.etapaProd, s.value); });
+  quadro.addEventListener("drop", (e) => {
+    const col = e.target.closest(".coluna"); if (!col || !arrastando) return;
+    e.preventDefault();
+    const c = S.contratos.find((x) => String(x.id) === arrastando); arrastando = null;
+    if (!c || colunaDe(c) === col.dataset.coluna) return;
+    mudarEtapa(c, COLUNAS_PRODUCAO.find((x) => x[0] === col.dataset.coluna)[1][0]);
+  });
+  quadro.addEventListener("change", (e) => { const s = e.target.closest("[data-etapa-prod]"); if (s) mudarEtapa(S.contratos.find((x) => String(x.id) === s.dataset.etapaProd), s.value); });
   quadro.addEventListener("click", async (e) => {
     if (e.target.closest("[data-ir-financeiro]")) { fin.status = ""; irPara("financeiro"); return; }
     if (e.target.closest("select")) return;
@@ -1997,6 +2313,7 @@ function desenharProducao(el) {
 }
 
 function cartaoCampanha(c) {
+  const s = situacaoDe(c);
   return `<article class="cartao-ideia cartao-campanha ${c.favorita ? "favorita" : ""}" draggable="true" data-id="${esc(c.id)}" tabindex="0">
     <div class="item-trans-topo">
       <span class="pilula ${c.tipo === "Influencer" ? "p-publicidade" : "p-conteudo"}">${esc(c.tipo || "")}</span>
@@ -2005,24 +2322,26 @@ function cartaoCampanha(c) {
     </div>
     <b>${esc(c.cliente)}</b>
     ${c.descricao ? `<small>${esc(c.descricao)}</small>` : ""}
-    <small>${c.prazo_entrega ? `Entrega ${dataBR(c.prazo_entrega)}` : "Sem prazo de entrega"}${avisoEntrega(c)}</small>
-    <small><b>${real(c.valor)}</b>${saldoDe(c) > 0 && entregue(c) ? ` · falta receber ${real(saldoDe(c))}` : c.status === "Pago" ? " · pago" : ""}</small>
+    ${fechado(c) && !entregue(c) ? `<small>${c.prazo_entrega ? `Entrega ${dataBR(c.prazo_entrega)}` : "Sem prazo de entrega"}${avisoEntrega(c)}</small>` : ""}
+    <small><b>${real(c.valor)}</b>${saldoDe(c) > 0 && entregue(c) ? ` · falta receber ${real(saldoDe(c))}` : ""}</small>
+    ${c.status !== "Pago" ? `<span class="pilula ${classeStatus(s)}" style="align-self:flex-start">${esc(s)}</span>` : ""}
     <select class="campo etapa-cartao" data-etapa-prod="${esc(c.id)}" aria-label="Mudar a etapa de ${esc(c.cliente)}">
-      ${ETAPAS_PRODUCAO.map(([v, n]) => `<option value="${esc(v)}" ${v === colunaDe(c) ? "selected" : ""}>${n}</option>`).join("")}
+      ${STATUS_CONTRATO.map((v) => `<option value="${esc(v)}" ${v === c.status ? "selected" : ""}>${esc(v)}</option>`).join("")}
     </select>
   </article>`;
 }
 
-async function moverCampanha(id, etapa) {
-  const c = S.contratos.find((x) => String(x.id) === String(id));
-  if (!c || colunaDe(c) === etapa) return;
-  // Entregue e já recebido por completo vira "Pago"
-  const novo = etapa === "Entregue" && saldoDe(c) === 0 && n2(c.valor) > 0 ? "Pago" : etapa;
-  const antes = c.status;
-  c.status = novo;
+async function mudarEtapa(c, novo) {
+  if (!c || c.status === novo) return;
+  // Entregue com o valor todo recebido já vira "Pago"
+  if (grupoDe(novo) === "dinheiro" && novo !== "Pago" && n2(c.valor) > 0 && recebidoDe(c) >= n2(c.valor)) novo = "Pago";
+  const dados = { status: novo };
+  if (["Nota fiscal enviada", "Aguardando pagamento"].includes(novo) && !c.data_nf) dados.data_nf = hojeISO();
+  const antes = { status: c.status, data_nf: c.data_nf };
+  Object.assign(c, dados);
   desenhar();
-  if (await gravar("contratos", { status: novo }, c.id)) avisar(`Movida para ${ETAPAS_PRODUCAO.find((x) => x[0] === etapa)[1]}.`);
-  else { c.status = antes; desenhar(); }
+  if (await gravar("contratos", dados, c.id)) avisar(`${c.cliente}: ${novo}.${dados.data_nf ? " Coloquei a data da nota como hoje." : ""}`);
+  else { Object.assign(c, antes); desenhar(); }
 }
 
 /* ---------- TikTok Shop: repasses de comissão (toda quarta) ---------- */
