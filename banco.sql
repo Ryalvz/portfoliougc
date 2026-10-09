@@ -524,3 +524,26 @@ alter table public.ig_historico enable row level security;
 drop policy if exists "dono le" on public.ig_historico;
 create policy "dono le" on public.ig_historico
   for select to authenticated using (public.eh_admin());
+
+
+-- -------------------------------------------------------------
+-- 19. AVISO DE PROPOSTA NOVA NO CELULAR E TIKTOK DE MANHÃ
+-- De 2 em 2 horas, das 8h às 22h (horário de Brasília), o ajudante
+-- "lembretes" confere o Gmail e avisa no celular quando chega
+-- proposta de gente de verdade (e-mail automático não avisa).
+-- Cada e-mail só gera um aviso (fica anotado em lembretes_enviados).
+-- -------------------------------------------------------------
+-- O repasse do TikTok Shop cai de madrugada: o aviso de quarta vem às 8h
+select cron.unschedule('lembretes-quarta');
+select cron.schedule('lembretes-quarta', '0 11 * * 3', $$
+  select net.http_post(
+    url := 'https://jlehawiwklvyvrzbfuiu.supabase.co/functions/v1/lembretes',
+    headers := '{"Content-Type": "application/json", "apikey": "sb_publishable_oZdhIWRB1gBabQH4xRJ2Xg__F8Lq0V0"}'::jsonb,
+    body := '{"tipo": "quarta"}'::jsonb)
+$$);
+select cron.schedule('lembretes-propostas', '0 1,11-23/2 * * *', $$
+  select net.http_post(
+    url := 'https://jlehawiwklvyvrzbfuiu.supabase.co/functions/v1/lembretes',
+    headers := '{"Content-Type": "application/json", "apikey": "sb_publishable_oZdhIWRB1gBabQH4xRJ2Xg__F8Lq0V0"}'::jsonb,
+    body := '{"tipo": "propostas"}'::jsonb)
+$$);
