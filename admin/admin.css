@@ -662,3 +662,29 @@ a.btn.pequeno { text-decoration: none; }
 @media (max-width: 620px) { .msg.minha { margin-left: 12px; } }
 .traduzir-barra { margin: 8px 0 0; }
 .traduzir-barra select.campo { padding: 5px 8px; }
+
+/* ---------- Instagram ---------- */
+.ig-topo { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-bottom: 14px; }
+.ig-foto { width: 52px; height: 52px; border-radius: 50%; object-fit: cover; display: grid; place-items: center; background: var(--tint-2); color: var(--cobalt); }
+.ig-topo > div:nth-child(2) { display: grid; }
+.ig-nome { font-size: 18px; color: var(--cobalt); }
+.ig-kpis { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.kpi-inicio.estatico { cursor: default; }
+.kpi-inicio.estatico:hover { border-color: var(--line); }
+.barras-dias { grid-template-columns: repeat(auto-fit, minmax(6px, 1fr)); height: 150px; gap: 2px; }
+.barras-dias .grupo-mes span { font-size: 8.5px; }
+.barras-semana { grid-template-columns: repeat(7, minmax(0, 1fr)); height: 150px; }
+.ig-posts { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.ig-post { display: grid; grid-template-rows: auto 1fr; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; text-decoration: none; color: inherit; }
+.ig-post:hover { border-color: var(--cobalt); }
+.ig-capa { position: relative; display: block; aspect-ratio: 1 / 1; background: var(--tint); }
+.ig-capa img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ig-capa .pilula { position: absolute; top: 8px; left: 8px; background: rgba(255, 255, 255, .92); }
+.ig-post-info { display: grid; gap: 4px; padding: 10px 12px 12px; }
+.ig-legenda { font-size: 12.5px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.ig-numeros { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 8px; font-size: 11.5px; color: var(--muted); }
+.ig-numeros b { color: var(--text); font-variant-numeric: tabular-nums; }
+.ig-conectar { max-width: 640px; }
+.ig-conectar .campo { width: 100%; margin-top: 8px; }
+@media (max-width: 1100px) { .ig-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 620px) { .ig-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

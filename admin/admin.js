@@ -82,6 +82,7 @@ const ESQUEMA = {
   comissoes_ttk: ["id", "data", "valor", "gmv", "itens", "obs"],
   metas: ["ano", "mes", "valor"],
   lembretes_adiados: ["chave", "ate"],
+  ig_historico: ["data", "seguidores", "posts"],
   contratos: ["id", "cliente", "tipo", "descricao", "valor", "mes", "ano", "data_nf", "prazo_dias", "status", "parcela1", "data_p1", "parcela2", "data_p2", "obs", "qtd", "prazo_entrega", "favorita", "criado_em"],
   transcricoes: ["id", "criado_em", "link", "plataforma", "categoria", "status", "titulo", "transcricao", "transcricao_original", "idioma_original", "minha_versao", "observacoes"],
   marcados: ["chave", "marcado"],
@@ -287,6 +288,7 @@ function baixarCSV(nome, cabecalho, linhas) {
 const DESENHOS = {
   inicio: desenharInicio,
   propostas: desenharPropostas,
+  instagram: desenharInstagram,
   portfolio: desenharPortfolio,
   marcas: desenharMarcas,
   calendario: desenharCalendario,
@@ -3237,5 +3239,248 @@ function ligarAcoesEmail(el) {
     const card = b.closest("[data-email]");
     const x = card ? (gm.emails || []).find((m) => m.id === card.dataset.email) : gm.aberto;
     if (x) acaoEmail(b.dataset.acaoEmail, x);
+  };
+}
+
+/* =============================================================
+   ABA REDES SOCIAIS: INSTAGRAM (@ryalvz)
+   Métricas oficiais do Instagram (pelo ajudante "instagram" no
+   Supabase): alcance, visualizações, interações, seguidores,
+   desempenho de cada post, formato que mais rende, melhor dia e
+   horário, público e os números para o mídia kit.
+   A chave de acesso fica guardada só no Supabase, nunca aqui.
+   ============================================================= */
+const ig = { dados: null, conectado: null, carregando: false, erro: "", dias: 30, ordem: "taxa", tipo: "" };
+const NOME_FORMATO = { REELS: "Reels", CARROSSEL: "Carrossel", FOTO: "Foto", VIDEO: "Vídeo" };
+const DIAS_CURTOS = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
+const compacto = (n) => { n = Math.round(Number(n) || 0); return n >= 1e6 ? (n / 1e6).toFixed(1).replace(".", ",") + " mi" : n >= 1e4 ? (n / 1e3).toFixed(1).replace(".", ",") + " mil" : num(n); };
+const interacoesDe = (p) => n2(p.total_interactions) || (n2(p.curtidas) + n2(p.comentarios) + n2(p.shares) + n2(p.saved));
+const taxaDe = (p) => (n2(p.reach) ? (interacoesDe(p) / n2(p.reach)) * 100 : 0);
+const pct1 = (v) => v.toFixed(1).replace(".", ",") + "%";
+const media = (lista, f) => (lista.length ? lista.reduce((s, x) => s + f(x), 0) / lista.length : 0);
+
+async function chamarInstagram(corpo) {
+  const { data, error } = await db.functions.invoke("instagram", { body: corpo });
+  if (error) {
+    const st = error.context && error.context.status;
+    throw new Error(st === 404 ? "O ajudante do Instagram ainda não foi publicado no Supabase." : "O ajudante do Instagram não respondeu. Tente de novo em instantes.");
+  }
+  return data || {};
+}
+
+async function carregarInstagram() {
+  if (ig.carregando) return;
+  ig.carregando = true; ig.erro = "";
+  if (abaAtual === "instagram") desenhar();
+  try {
+    const r = await chamarInstagram({ acao: "dados", dias: ig.dias });
+    ig.conectado = r.conectado !== false && !!r.perfil;
+    ig.dados = ig.conectado ? r : null;
+    if (r.erro) ig.erro = r.erro;
+    if (ig.conectado) S.igHistorico = await ler("ig_historico", (q, c) => (c.includes("data") ? q.order("data") : q)).catch(() => []);
+  } catch (e) { ig.erro = e.message; ig.conectado = ig.conectado ?? false; }
+  ig.carregando = false;
+  if (abaAtual === "instagram") desenhar();
+}
+
+function desenharInstagram(el) {
+  if (ig.conectado === null && !ig.carregando) { carregarInstagram(); }
+  if (ig.carregando && !ig.dados) { el.innerHTML = `<p class="vazio">Buscando as métricas do Instagram...</p>`; return; }
+  if (!ig.conectado) { desenharConectarInstagram(el); return; }
+
+  const d = ig.dados, p = d.perfil, a = d.atual || {}, b = d.anterior || {};
+  const posts = d.posts || [];
+  const novos = n2(a.seguiram) - n2(a.deixaram), novosAntes = n2(b.seguiram) - n2(b.deixaram);
+  const kpi = (rotulo, atual, antes, dica) => `<div class="kpi-inicio estatico" title="${esc(dica)}">
+      <span>${rotulo}</span><strong>${compacto(atual)}</strong><small>${variacao(atual, antes)} <span class="sub">vs ${d.dias} dias antes</span></small></div>`;
+
+  // Formatos
+  const formatos = ["REELS", "CARROSSEL", "FOTO", "VIDEO"].map((t) => {
+    const l = posts.filter((x) => x.tipo === t && n2(x.reach));
+    return { t, n: l.length, alcance: media(l, (x) => n2(x.reach)), taxa: media(l, taxaDe), salvos: media(l, (x) => n2(x.saved)) };
+  }).filter((x) => x.n);
+  const maxAlcFormato = Math.max(1, ...formatos.map((x) => x.alcance));
+
+  // Melhor dia e horário (pelo alcance médio dos seus posts)
+  const comAlcance = posts.filter((x) => n2(x.reach));
+  const porDia = DIAS_CURTOS.map((_, i) => { const l = comAlcance.filter((x) => new Date(x.data).getDay() === i); return { n: l.length, alcance: media(l, (x) => n2(x.reach)) }; });
+  const FAIXAS = [["madrugada", 0, 6], ["manhã", 6, 12], ["tarde", 12, 18], ["noite", 18, 24]];
+  const porHora = FAIXAS.map(([nome, de, ate]) => { const l = comAlcance.filter((x) => { const h = new Date(x.data).getHours(); return h >= de && h < ate; }); return { nome, de, ate, n: l.length, alcance: media(l, (x) => n2(x.reach)) }; });
+  const maxDia = Math.max(1, ...porDia.map((x) => x.alcance));
+
+  // Insights: onde focar
+  const dicas = [];
+  const melhorFormato = [...formatos].filter((x) => x.n >= 2).sort((x, y) => y.alcance - x.alcance)[0];
+  const piorFormato = [...formatos].filter((x) => x.n >= 2).sort((x, y) => x.alcance - y.alcance)[0];
+  if (melhorFormato && piorFormato && melhorFormato.t !== piorFormato.t && piorFormato.alcance) {
+    dicas.push({ ic: "play", titulo: "Formato que mais rende", texto: `<b>${NOME_FORMATO[melhorFormato.t]}</b> alcança em média <b>${compacto(melhorFormato.alcance)}</b> pessoas, ${(melhorFormato.alcance / piorFormato.alcance).toFixed(1).replace(".", ",")}x mais que ${NOME_FORMATO[piorFormato.t].toLowerCase()}.`, dica: `Priorize ${NOME_FORMATO[melhorFormato.t].toLowerCase()} para crescer. Use ${NOME_FORMATO[piorFormato.t].toLowerCase()} quando o objetivo for conteúdo salvável.` });
+  }
+  const melhorDia = porDia.map((x, i) => ({ ...x, i })).filter((x) => x.n >= 2).sort((x, y) => y.alcance - x.alcance)[0];
+  const melhorFaixa = porHora.filter((x) => x.n >= 2).sort((x, y) => y.alcance - x.alcance)[0];
+  if (melhorDia || melhorFaixa) dicas.push({ ic: "calendario", titulo: "Quando postar", texto: `Seus posts de <b>${melhorDia ? DIAS_SEMANA[melhorDia.i] : "qualquer dia"}</b>${melhorFaixa ? ` à <b>${melhorFaixa.nome}</b>` : ""} têm o maior alcance médio.`, dica: "Teste postar nesse dia e horário por 3 semanas seguidas e compare aqui." });
+  const salvavel = [...comAlcance].sort((x, y) => (n2(y.saved) + n2(y.shares)) - (n2(x.saved) + n2(x.shares)))[0];
+  if (salvavel && n2(salvavel.saved) + n2(salvavel.shares) > 0) dicas.push({ ic: "estrela", titulo: "O que as pessoas guardam e mandam", texto: `"${esc((salvavel.legenda || "Post sem legenda").slice(0, 70))}" teve <b>${num(salvavel.saved)}</b> salvamentos e <b>${num(salvavel.shares)}</b> compartilhamentos.`, dica: "Salvamento e compartilhamento são o que mais faz o Instagram entregar para gente nova. Faça mais conteúdos nessa linha." });
+  if (n2(b.reach)) {
+    const v = ((n2(a.reach) - n2(b.reach)) / n2(b.reach)) * 100;
+    dicas.push({ ic: "grafico", titulo: v >= 0 ? "Alcance subindo" : "Alcance caindo", alerta: v < -15, texto: `Seu alcance ${v >= 0 ? "subiu" : "caiu"} <b>${Math.abs(Math.round(v))}%</b> nos últimos ${d.dias} dias.`, dica: v >= 0 ? "Bom momento: mantenha a frequência e aproveite para fechar parcerias mostrando esse crescimento." : "Volte ao formato e ao tema dos seus posts com mais alcance (lista abaixo) e poste com mais constância." });
+  }
+  const reels = comAlcance.filter((x) => x.tipo === "REELS" && n2(x.ig_reels_avg_watch_time));
+  if (reels.length >= 2) {
+    const seg = media(reels, (x) => n2(x.ig_reels_avg_watch_time)) / 1000;
+    dicas.push({ ic: "relogio", titulo: "Tempo assistido nos Reels", alerta: seg < 3, texto: `Em média as pessoas assistem <b>${seg.toFixed(1).replace(".", ",")} s</b> dos seus Reels.`, dica: seg < 3 ? "Muita gente sai antes de 3 segundos: comece com o resultado ou uma frase forte, sem introdução." : "Boa retenção. Para segurar até o fim, deixe a revelação para os últimos segundos." });
+  }
+  const ultimos30 = posts.filter((x) => Date.now() - Date.parse(x.data) < 30 * 864e5).length;
+  dicas.push({ ic: "campanhas", titulo: "Frequência", alerta: ultimos30 < 8, texto: `Você postou <b>${plural(ultimos30, "vez", "vezes")}</b> nos últimos 30 dias.`, dica: ultimos30 < 8 ? "Para crescer, o ideal é 3 a 4 posts por semana. Use o banco de ideias (aba Transcrições) para não travar." : "Ótima constância. Agora foque em repetir os formatos que mais rendem." });
+  if (n2(a.reach) && novos > 0) dicas.push({ ic: "marcas", titulo: "Quem vê, segue?", texto: `A cada 1.000 pessoas alcançadas, <b>${((novos / n2(a.reach)) * 1000).toFixed(1).replace(".", ",")}</b> viraram seguidoras.`, dica: "Para converter mais, termine os vídeos com um motivo para seguir (série, parte 2, dica fixa toda semana)." });
+
+  // Posts ordenados
+  const ORDENS = [["taxa", "Engajamento"], ["reach", "Alcance"], ["saved", "Salvamentos"], ["shares", "Compartilhamentos"], ["data", "Mais recentes"]];
+  const valorOrdem = (x) => (ig.ordem === "taxa" ? taxaDe(x) : ig.ordem === "data" ? Date.parse(x.data) : n2(x[ig.ordem]));
+  const lista = posts.filter((x) => !ig.tipo || x.tipo === ig.tipo).sort((x, y) => valorOrdem(y) - valorOrdem(x));
+
+  // Mídia kit
+  const reelsTodos = comAlcance.filter((x) => x.tipo === "REELS");
+  const kit = { seguidores: n2(p.followers_count), alcanceReel: media(reelsTodos, (x) => n2(x.reach)), viewsReel: media(reelsTodos, (x) => n2(x.views)), taxa: media(comAlcance, taxaDe) };
+
+  // Público
+  const aud = d.publico || {};
+  const totalIdade = (aud.age || []).reduce((s, x) => s + x.valor, 0);
+  const totalGenero = (aud.gender || []).reduce((s, x) => s + x.valor, 0);
+  const NOME_GENERO = { F: "Mulheres", M: "Homens", U: "Não informado" };
+
+  // Crescimento guardado no painel
+  const hist = (S.igHistorico || []).filter((x) => x.seguidores != null);
+  const maxAlcDia = Math.max(1, ...(d.porDia || []).map((x) => x.valor));
+
+  el.innerHTML = `
+    <div class="ig-topo">
+      ${p.profile_picture_url ? `<img class="ig-foto" src="${esc(p.profile_picture_url)}" alt="" referrerpolicy="no-referrer">` : `<span class="ig-foto">${ic("insta")}</span>`}
+      <div><b class="ig-nome">@${esc(p.username)}</b><span class="sub">${compacto(p.followers_count)} seguidores · ${num(p.media_count)} posts · seguindo ${num(p.follows_count)}</span></div>
+      <span class="espaco"></span>
+      <div class="chips" role="group" aria-label="Período">${[7, 14, 30].map((n) => `<button class="chip" type="button" data-ig-dias="${n}" aria-pressed="${ig.dias === n}">${n} dias</button>`).join("")}</div>
+      <button class="btn" type="button" id="ig-atualizar" ${ig.carregando ? "disabled" : ""}>${ig.carregando ? "Atualizando..." : "Atualizar"}</button>
+    </div>
+    ${ig.erro ? `<div class="aviso-falta">${esc(ig.erro)}</div>` : ""}
+
+    <div class="inicio-kpis ig-kpis">
+      ${kpi("Alcance", n2(a.reach), n2(b.reach), "Pessoas diferentes que viram seus conteúdos")}
+      ${kpi("Visualizações", n2(a.views), n2(b.views), "Quantas vezes seus conteúdos foram vistos")}
+      ${kpi("Interações", n2(a.total_interactions), n2(b.total_interactions), "Curtidas, comentários, salvamentos e compartilhamentos")}
+      ${kpi("Contas engajadas", n2(a.accounts_engaged), n2(b.accounts_engaged), "Pessoas que interagiram com você")}
+      ${kpi("Novos seguidores", novos, novosAntes, "Quem seguiu menos quem deixou de seguir")}
+      ${kpi("Cliques no link", n2(a.profile_links_taps), n2(b.profile_links_taps), "Toques no link da bio")}
+    </div>
+
+    <div class="grade-fin">
+      <div class="cartao resumo-ano mostra-dicas">
+        <h2>Onde focar</h2>
+        <div class="insights">${[...dicas].sort((x, y) => (y.alerta ? 1 : 0) - (x.alerta ? 1 : 0)).slice(0, 5).map((x) => `<div class="insight ${x.alerta ? "alerta" : ""}"><span class="insight-ic">${ic(x.ic)}</span>
+          <div><b>${x.titulo}</b><p>${x.texto}</p><p class="insight-dica">${x.dica}</p></div></div>`).join("") || `<p class="vazio">Poste mais algumas vezes para o painel ter base para comparar.</p>`}</div>
+      </div>
+      <div class="coluna-inicio">
+        <div class="cartao">
+          <h2>Alcance por dia</h2>
+          ${(d.porDia || []).length ? `<div class="barras-mes barras-dias" role="img" aria-label="Alcance por dia">${d.porDia.map((x) => `<div class="grupo-mes" data-dica="<b>${dataBR(x.dia)}</b><br>Alcance: ${num(x.valor)}"><div class="par-barras"><i class="b-prev" style="height:${(x.valor / maxAlcDia) * 100}%"></i></div><span>${x.dia.slice(8, 10)}</span></div>`).join("")}</div>` : `<p class="vazio">Sem dados por dia.</p>`}
+        </div>
+        <div class="cartao">
+          <div class="barra" style="margin-bottom:6px"><h2 style="margin:0">Para o mídia kit</h2><span class="espaco"></span><button type="button" class="btn pequeno" id="ig-copiar">Copiar números</button></div>
+          <div class="rel-grade" style="margin-top:0;border-top:0">
+            <div><span>Seguidores</span><b>${compacto(kit.seguidores)}</b></div>
+            <div><span>Alcance médio por Reel</span><b>${compacto(kit.alcanceReel)}</b></div>
+            <div><span>Views médias por Reel</span><b>${compacto(kit.viewsReel)}</b></div>
+            <div><span>Engajamento médio</span><b>${pct1(kit.taxa)}</b></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grade-fin tres">
+      <div class="cartao">
+        <h2>Formato que mais rende</h2>
+        ${formatos.length ? `<div class="lista-barras">${formatos.map((x) => `<div class="linha-barra" data-dica="<b>${NOME_FORMATO[x.t]}</b><br>${plural(x.n, "post", "posts")}<br>Alcance médio: ${num(Math.round(x.alcance))}<br>Engajamento médio: ${pct1(x.taxa)}">
+          <span class="lb-nome">${NOME_FORMATO[x.t]}</span>
+          <span class="lb-trilho"><i style="width:${(x.alcance / maxAlcFormato) * 100}%"></i></span>
+          <span class="lb-valor">${compacto(x.alcance)}</span>
+          <small class="lb-extra">${plural(x.n, "post", "posts")} · engajamento ${pct1(x.taxa)} · ${num(Math.round(x.salvos))} salvos em média</small>
+        </div>`).join("")}</div>` : `<p class="vazio">Sem posts com métricas.</p>`}
+      </div>
+      <div class="cartao">
+        <h2>Melhor dia para postar</h2>
+        <div class="barras-mes barras-semana" role="img" aria-label="Alcance médio por dia da semana">${porDia.map((x, i) => `<div class="grupo-mes ${melhorDia && melhorDia.i === i ? "foco" : ""}" data-dica="<b>${DIAS_SEMANA[i]}</b><br>${plural(x.n, "post", "posts")}<br>Alcance médio: ${num(Math.round(x.alcance))}"><div class="par-barras"><i class="b-prev" style="height:${(x.alcance / maxDia) * 100}%"></i></div><span>${DIAS_CURTOS[i]}</span></div>`).join("")}</div>
+        <p class="sub" style="margin:8px 0 0">${porHora.filter((x) => x.n).map((x) => `${x.nome}: ${compacto(x.alcance)}`).join(" · ")}</p>
+      </div>
+      <div class="cartao">
+        <h2>Quem te segue</h2>
+        ${totalIdade ? `<div class="lista-barras">${(aud.age || []).slice(0, 5).map((x) => `<div class="linha-barra"><span class="lb-nome">${esc(x.nome)} anos</span><span class="lb-trilho"><i style="width:${(x.valor / totalIdade) * 100}%"></i></span><span class="lb-valor">${pct(x.valor, totalIdade)}%</span></div>`).join("")}</div>
+          <p class="sub" style="margin:10px 0 4px">${(aud.gender || []).map((x) => `${NOME_GENERO[x.nome] || x.nome}: ${pct(x.valor, totalGenero)}%`).join(" · ")}</p>
+          <p class="sub" style="margin:0">Cidades: ${(aud.city || []).slice(0, 4).map((x) => esc(x.nome.split(",")[0])).join(", ")}</p>`
+          : `<p class="vazio">O Instagram só mostra o público para contas com mais de 100 seguidores.</p>`}
+      </div>
+    </div>
+
+    ${hist.length >= 2 ? `<div class="cartao"><h2>Seguidores ao longo do tempo</h2>
+      <p class="sub" style="margin:-6px 0 6px">o painel guarda um ponto por dia em que você abre esta aba</p>
+      ${(() => { const min = Math.min(...hist.map((x) => x.seguidores)), max = Math.max(...hist.map((x) => x.seguidores)); return `<div class="barras-mes barras-dias">${hist.slice(-30).map((x) => `<div class="grupo-mes" data-dica="<b>${dataBR(x.data)}</b><br>${num(x.seguidores)} seguidores"><div class="par-barras"><i class="b-fat" style="height:${max === min ? 60 : 15 + ((x.seguidores - min) / (max - min)) * 85}%"></i></div><span>${String(x.data).slice(8, 10)}</span></div>`).join("")}</div>`; })()}
+    </div>` : ""}
+
+    <div class="barra" style="margin-top:4px">
+      <h2 style="margin:0">Seus posts</h2>
+      <div class="chips" role="group" aria-label="Ordenar">${ORDENS.map(([v, n]) => `<button class="chip" type="button" data-ig-ordem="${v}" aria-pressed="${ig.ordem === v}">${n}</button>`).join("")}</div>
+      <select class="campo" id="ig-tipo" aria-label="Formato"><option value="">Todos os formatos</option>${Object.entries(NOME_FORMATO).map(([v, n]) => `<option value="${v}" ${ig.tipo === v ? "selected" : ""}>${n}</option>`).join("")}</select>
+    </div>
+    <div class="ig-posts">${lista.map((x) => `<a class="ig-post" href="${esc(x.link)}" target="_blank" rel="noopener">
+      <span class="ig-capa">${x.capa ? `<img src="${esc(x.capa)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ""}<span class="pilula p-status">${NOME_FORMATO[x.tipo] || x.tipo}</span></span>
+      <span class="ig-post-info">
+        <small class="sub">${new Date(x.data).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}</small>
+        <span class="ig-legenda">${esc((x.legenda || "Sem legenda").slice(0, 90))}</span>
+        <span class="ig-numeros">
+          <span><b>${compacto(x.reach)}</b> alcance</span>
+          <span><b>${pct1(taxaDe(x))}</b> engaj.</span>
+          <span><b>${num(x.saved)}</b> salvos</span>
+          <span><b>${num(x.shares)}</b> compart.</span>
+        </span>
+      </span>
+    </a>`).join("") || `<p class="vazio">Nenhum post nesse formato.</p>`}</div>
+    <p class="sub" style="margin-top:14px">Dados oficiais do Instagram, atualizados às ${new Date(d.atualizado).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}. <button type="button" class="link-btn" id="ig-desconectar">desconectar o Instagram</button></p>`;
+
+  $$("[data-ig-dias]", el).forEach((b) => b.onclick = () => { ig.dias = Number(b.dataset.igDias); carregarInstagram(); });
+  $$("[data-ig-ordem]", el).forEach((b) => b.onclick = () => { ig.ordem = b.dataset.igOrdem; desenhar(); });
+  $("#ig-tipo").onchange = (e) => { ig.tipo = e.target.value; desenhar(); };
+  $("#ig-atualizar").onclick = () => carregarInstagram();
+  $("#ig-copiar").onclick = async () => {
+    const texto = `Instagram @${p.username}\nSeguidores: ${num(kit.seguidores)}\nAlcance médio por Reel: ${num(Math.round(kit.alcanceReel))}\nVisualizações médias por Reel: ${num(Math.round(kit.viewsReel))}\nTaxa de engajamento média: ${pct1(kit.taxa)}\nAlcance nos últimos ${d.dias} dias: ${num(a.reach)}`;
+    try { await navigator.clipboard.writeText(texto); avisar("Números copiados. É só colar no mídia kit ou na proposta."); } catch (_) { avisar("Não deu para copiar automaticamente.", true); }
+  };
+  $("#ig-desconectar").onclick = async () => {
+    if (!(await confirmar("Desconectar o Instagram do painel? Para voltar, vai precisar gerar uma chave nova na Meta.", "Sim, desconectar"))) return;
+    try { await chamarInstagram({ acao: "desconectar" }); ig.conectado = false; ig.dados = null; desenhar(); avisar("Instagram desconectado."); } catch (e) { avisar(e.message, true); }
+  };
+  ligarDicas(el);
+}
+
+function desenharConectarInstagram(el) {
+  el.innerHTML = `<div class="cartao gmail-conectar ig-conectar">
+    <span class="gmail-icone">${ic("insta")}</span>
+    <h2>Conecte o Instagram @ryalvz</h2>
+    <p>Com o Instagram conectado, o painel mostra alcance, visualizações, interações, seguidores ganhos, os posts que mais rendem, o melhor formato, o melhor dia para postar, o seu público e os números prontos para o mídia kit.</p>
+    <ol class="passos" style="text-align:left">
+      <li>No site da Meta (developers.facebook.com), abra o app <b>Painel Ryan</b>, vá em <b>Instagram</b> e depois em <b>Configuração da API com login do Instagram</b>.</li>
+      <li>Em <b>Gerar tokens de acesso</b>, clique em <b>Adicionar conta</b>, entre com o @ryalvz e depois em <b>Gerar token</b>.</li>
+      <li>Copie o token e cole aqui embaixo. Ele fica guardado só no Supabase e o painel renova sozinho antes de vencer.</li>
+    </ol>
+    ${ig.erro ? `<div class="aviso-falta">${esc(ig.erro)}</div>` : ""}
+    <input class="campo" type="password" id="ig-token" placeholder="Cole aqui o token do Instagram" autocomplete="off" spellcheck="false">
+    <button class="btn primario" type="button" id="ig-conectar">${ic("insta")}Conectar o Instagram</button>
+  </div>`;
+  $("#ig-conectar").onclick = async (e) => {
+    const token = $("#ig-token").value.trim();
+    if (!token) { avisar("Cole o token primeiro.", true); return; }
+    e.target.disabled = true; e.target.textContent = "Conferindo com a Meta...";
+    try {
+      const r = await chamarInstagram({ acao: "conectar", token });
+      if (r.erro) throw new Error(r.erro);
+      avisar(`Instagram @${r.usuario} conectado!`);
+      ig.conectado = null; ig.dados = null; carregarInstagram();
+    } catch (erro) { ig.erro = erro.message; desenhar(); }
   };
 }
