@@ -2931,12 +2931,22 @@ function lerRemetente(de) {
 const cabecalho = (m, n) => (((m.payload && m.payload.headers) || []).find((x) => x.name.toLowerCase() === n.toLowerCase()) || {}).value || "";
 
 // E-mail automático ou em massa? Devolve o motivo (ou "" se parece escrito por uma pessoa)
+// Assunto típico de aviso automático, chamado de suporte ou newsletter
+const ASSUNTO_ROBO = /\[#?\d{3,}\]|novo dispositivo|fez login|c[oó]digo de (verifica|acesso|seguran)|verify|verifica[cç][aã]o|redefinir senha|password|fatura|boleto|pix|pagamento (recebido|aprovado|confirmado)|recibo|seu pedido|pedido #|inscri[cç][oõ]es abertas|newsletter|webinar|edi[cç][aã]o #?\d|#\d{2,}\b|grupo do whatsapp/i;
+
 function motivoAutomatico(m, de) {
   if (cabecalho(m, "List-Unsubscribe") || cabecalho(m, "List-Id")) return "envio em massa";
+  if (cabecalho(m, "Feedback-ID") || cabecalho(m, "X-Feedback-Id") || cabecalho(m, "X-SES-Outgoing") || cabecalho(m, "X-Mailer")) return "ferramenta de envio em massa";
+  if (/^yes/i.test(cabecalho(m, "X-Spam-Flag")) || /^yes/i.test(cabecalho(m, "X-Spam-Status"))) return "marcado como spam";
   if (/bulk|list|junk/i.test(cabecalho(m, "Precedence"))) return "envio em massa";
   const auto = cabecalho(m, "Auto-Submitted");
   if (auto && !/^no$/i.test(auto)) return "automático";
   if (REMETENTE_ROBO.test(de.email.split("@")[0])) return "remetente automático";
+  if (/^(updates?|mail|email|news|mkt|marketing|send|info|noreply|notify|notifica[cç]oes?)\./i.test(de.email.split("@")[1] || "")) return "remetente automático";
+  // Mandado em cópia oculta para muita gente: o seu e-mail não aparece no "Para" nem no "Cc"
+  const destino = (cabecalho(m, "To") + " " + cabecalho(m, "Cc")).toLowerCase();
+  if (destino.trim() && !destino.includes(EMAIL_PROPOSTAS)) return "enviado em massa (cópia oculta)";
+  if (ASSUNTO_ROBO.test(cabecalho(m, "Subject"))) return "aviso automático";
   if (de.dominio && adiado("dominio-" + de.dominio)) return "você escondeu esse remetente";
   return "";
 }
@@ -2949,14 +2959,16 @@ async function lerPropostas() {
     const q = BUSCA_PROPOSTAS + (gm.busca ? " " + gm.busca : "");
     const lista = await gmailApi("messages?maxResults=60&q=" + encodeURIComponent(q));
     const ids = (lista.messages || []).map((x) => x.id);
-    const campos = ["From", "Subject", "Date", "List-Unsubscribe", "List-Id", "Precedence", "Auto-Submitted"].map((h) => "&metadataHeaders=" + h).join("");
+    const campos = ["From", "To", "Cc", "Subject", "Date", "List-Unsubscribe", "List-Id", "Precedence", "Auto-Submitted", "Feedback-ID", "X-Feedback-Id", "X-SES-Outgoing", "X-Mailer", "X-Spam-Flag", "X-Spam-Status"].map((h) => "&metadataHeaders=" + h).join("");
     const msgs = await Promise.all(ids.map((id) => gmailApi(`messages/${id}?format=metadata${campos}`).catch(() => null)));
     gm.emails = msgs.filter(Boolean).map((m) => {
       const de = lerRemetente(cabecalho(m, "From"));
       return { id: m.id, thread: m.threadId, de, assunto: cabecalho(m, "Subject") || "(sem assunto)", trecho: m.snippet || "",
         data: new Date(Number(m.internalDate) || Date.parse(cabecalho(m, "Date")) || Date.now()),
         novo: (m.labelIds || []).includes("UNREAD"), automatico: motivoAutomatico(m, de) };
-    }).filter((x) => x.de.email !== EMAIL_PROPOSTAS);
+    }).filter((x) => x.de.email !== EMAIL_PROPOSTAS)
+      // Uma conversa vira um cartão só (o e-mail mais recente dela)
+      .filter((x, i, todos) => todos.findIndex((y) => y.thread === x.thread) === i);
   } catch (e) {
     gm.erro = e.message || String(e);
   }
