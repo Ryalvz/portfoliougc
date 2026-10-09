@@ -3101,7 +3101,7 @@ async function lerPropostas() {
       const de = lerRemetente(cabecalho(m, "From"));
       return { id: m.id, thread: m.threadId, de, assunto: cabecalho(m, "Subject") || "(sem assunto)", trecho: semEntidades(m.snippet || ""),
         data: new Date(Number(m.internalDate) || Date.parse(cabecalho(m, "Date")) || Date.now()),
-        novo: (m.labelIds || []).includes("UNREAD"), automatico: motivoAutomatico(m, de),
+        novo: (m.labelIds || []).includes("UNREAD") && !adiado("lido-" + m.id), automatico: motivoAutomatico(m, de),
         importante: /proposta|or[cç]amento|briefing|contrato|campanha|parceria|pagamento|valor|cach[eê]|budget|rate|paid|collab/i.test(cabecalho(m, "Subject") + " " + (m.snippet || "")) };
     }).filter((x) => x.de.email !== EMAIL_PROPOSTAS)
       // Uma conversa vira um cartão só (o e-mail mais recente dela)
@@ -3143,7 +3143,19 @@ function semCitacao(t) {
   return (corte > 0 ? t.slice(0, corte) : t).replace(/\n>.*$/gm, "").trim();
 }
 
+// O painel só lê o Gmail (não muda nada lá), então guarda no banco o que você já abriu aqui.
+// Assim o e-mail deixa de aparecer como não lido no celular e no computador.
+function marcarLidoNoPainel(email) {
+  if (!email.novo) return;
+  email.novo = false;
+  const chave = "lido-" + email.id, ate = "2999-12-31";
+  S.adiados = S.adiados.filter((a) => a.chave !== chave).concat({ chave, ate });
+  propostasNovas = propostasVisiveis().filter((x) => x.novo).length;
+  db.from("lembretes_adiados").upsert({ chave, ate }, { onConflict: "chave" }).then(({ error }) => { if (error) console.warn("lido", error); });
+}
+
 async function abrirConversa(email) {
+  marcarLidoNoPainel(email);
   gm.aberto = email; gm.conversa = null; gm.carregandoConversa = true; gm.idioma = "pt"; gm.rascunho = ""; gm.rascunhoPt = "";
   desenhar();
   try {
