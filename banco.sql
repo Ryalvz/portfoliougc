@@ -374,3 +374,27 @@ update public.contratos
 
 -- Apaga a linha de exemplo da tabela antiga de campanhas
 delete from public.campanhas where exemplo = true;
+
+
+-- -------------------------------------------------------------
+-- 15. COMISSÕES DO TIKTOK SHOP
+-- Um lançamento por repasse (o TikTok paga toda quarta).
+-- data: o dia que o dinheiro caiu | valor: comissão recebida
+-- gmv / itens: opcionais, o quanto você vendeu naquela semana
+-- Entra no Financeiro como "TikTok Shop", somando no faturado,
+-- no recebido e nos gráficos. Só você (logado) vê e mexe.
+-- -------------------------------------------------------------
+create table if not exists public.comissoes_ttk (
+  id         bigint generated always as identity primary key,
+  criado_em  timestamptz not null default now(),
+  data       date not null,
+  valor      numeric(12, 2) not null default 0 check (valor >= 0),
+  gmv        numeric(12, 2) check (gmv >= 0),
+  itens      integer check (itens >= 0),
+  obs        text
+);
+alter table public.comissoes_ttk enable row level security;
+
+drop policy if exists "dono faz tudo" on public.comissoes_ttk;
+create policy "dono faz tudo" on public.comissoes_ttk
+  for all to authenticated using (public.eh_admin()) with check (public.eh_admin());
