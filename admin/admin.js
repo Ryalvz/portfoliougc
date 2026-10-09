@@ -348,7 +348,7 @@ async function iniciar(sessao) {
   $("#aba-inicio").innerHTML = '<p class="vazio">Carregando seus dados...</p>';
   await carregarTudo();
   irPara((location.hash || "").slice(1) || "inicio");
-  if (gmailConectado()) lerPropostas();
+  sincronizarGmail();
 }
 
 /* =============================================================
@@ -2939,31 +2939,65 @@ function carregarGoogle() {
   });
 }
 
-async function conectarGmail() {
-  await carregarGoogle();
+// Conexão permanente: o Ryan autoriza uma vez e o ajudante "gmail" do
+// Supabase guarda a autorização e entrega um acesso novo sempre que precisar.
+async function chamarGmail(corpo) {
+  const { data, error } = await db.functions.invoke("gmail", { body: corpo });
+  if (error) throw new Error(error.context && error.context.status === 404 ? "O ajudante do Gmail ainda não foi publicado no Supabase." : "O ajudante do Gmail não respondeu.");
+  return data || {};
+}
+function guardarAcesso(r) {
+  gm.token = r.access_token;
+  gm.expira = Date.now() + (Number(r.expires_in) || 3600) * 1000;
+  gm.escopo = r.scope || ESCOPOS_GMAIL;
+  try { sessionStorage.setItem("gmail-token", JSON.stringify({ token: gm.token, expira: gm.expira, escopo: gm.escopo })); } catch (_) {}
+  // Renova sozinho 5 minutos antes de vencer
+  clearTimeout(gm.renovar);
+  gm.renovar = setTimeout(() => sincronizarGmail(), Math.max(60000, gm.expira - Date.now() - 300000));
+}
+// Chamado ao abrir o painel e antes de vencer: busca um acesso novo sem pedir nada ao Ryan
+async function sincronizarGmail() {
+  try {
+    const r = await chamarGmail({ acao: "token" });
+    if (r.access_token) { gm.permanente = true; guardarAcesso(r); await lerPropostas(); return true; }
+    gm.permanente = false;
+    if (r.erro) gm.erro = r.erro;
+  } catch (e) { gm.erro = e.message; }
+  if (["inicio", "propostas"].includes(abaAtual)) desenhar();
+  return false;
+}
+
+// Primeira conexão (uma vez só): abre o Google numa janelinha e pede a autorização permanente
+function conectarGmail() {
   return new Promise((ok, falhou) => {
-    const cliente = google.accounts.oauth2.initTokenClient({
-      client_id: GOOGLE_CLIENT_ID,
-      scope: ESCOPOS_GMAIL,
-      hint: EMAIL_PROPOSTAS,
-      include_granted_scopes: true,
-      callback: (r) => {
-        if (r.error || !r.access_token) { falhou(new Error(r.error_description || r.error || "O Google não liberou o acesso.")); return; }
-        gm.token = r.access_token;
-        gm.expira = Date.now() + (Number(r.expires_in) || 3600) * 1000;
-        gm.escopo = r.scope || "";
-        try { sessionStorage.setItem("gmail-token", JSON.stringify({ token: gm.token, expira: gm.expira, escopo: gm.escopo })); } catch (_) {}
-        ok();
-      },
-      error_callback: (e) => falhou(new Error(e && e.type === "popup_closed" ? "A janela do Google foi fechada antes de terminar." : "O Google não abriu a janela de login. Libere pop-ups para este site."))
+    const volta = new URL("oauth.html", location.href); volta.search = ""; volta.hash = "";
+    const estado = Math.random().toString(36).slice(2);
+    const url = "https://accounts.google.com/o/oauth2/v2/auth?" + new URLSearchParams({
+      client_id: GOOGLE_CLIENT_ID, redirect_uri: volta.href, response_type: "code", scope: ESCOPOS_GMAIL,
+      access_type: "offline", prompt: "consent", include_granted_scopes: "true", login_hint: EMAIL_PROPOSTAS, state: estado
     });
-    cliente.requestAccessToken({ prompt: "" });
+    const janelaGoogle = window.open(url, "gmail-conectar", "width=520,height=680");
+    if (!janelaGoogle) { falhou(new Error("O navegador bloqueou a janela do Google. Libere pop-ups para este site e tente de novo.")); return; }
+    const ouvir = async (e) => {
+      if (e.origin !== location.origin || !e.data || e.data.tipo !== "gmail-code") return;
+      window.removeEventListener("message", ouvir);
+      if (e.data.erro || !e.data.code || e.data.state !== estado) { falhou(new Error(e.data.erro === "access_denied" ? "Você cancelou a autorização no Google." : "O Google não completou a conexão. Tente de novo.")); return; }
+      try {
+        const r = await chamarGmail({ acao: "conectar", code: e.data.code, redirect_uri: volta.href });
+        if (!r.access_token) throw new Error(r.erro || "Não deu para conectar.");
+        gm.permanente = true; gm.erro = "";
+        guardarAcesso(r);
+        ok();
+      } catch (erro) { falhou(erro); }
+    };
+    window.addEventListener("message", ouvir);
   });
 }
 
-function desconectarGmail() {
-  if (gm.token && window.google && google.accounts) google.accounts.oauth2.revoke(gm.token, () => {});
-  Object.assign(gm, { token: null, expira: 0, escopo: "", emails: null, aberto: null, conversa: null });
+async function desconectarGmail() {
+  try { await chamarGmail({ acao: "desconectar" }); } catch (_) {}
+  clearTimeout(gm.renovar);
+  Object.assign(gm, { token: null, expira: 0, escopo: "", emails: null, aberto: null, conversa: null, permanente: false });
   propostasNovas = 0;
   try { sessionStorage.removeItem("gmail-token"); } catch (_) {}
 }
@@ -2974,7 +3008,10 @@ async function gmailApi(caminho, opcoes = {}) {
     headers: { Authorization: "Bearer " + gm.token, ...(opcoes.corpo ? { "Content-Type": "application/json" } : {}) },
     body: opcoes.corpo ? JSON.stringify(opcoes.corpo) : undefined
   });
-  if (r.status === 401) { desconectarGmail(); throw new Error("O acesso ao Gmail expirou. Clique em Conectar o Gmail de novo."); }
+  if (r.status === 401) {
+    if (!opcoes.repetiu && await sincronizarGmail()) return gmailApi(caminho, { ...opcoes, repetiu: true });
+    throw new Error("O acesso ao Gmail expirou e não deu para renovar sozinho. Recarregue a página.");
+  }
   if (r.status === 403) throw new Error("O Google não deu permissão para isso. Clique em Desconectar e conecte de novo, aceitando todas as permissões.");
   if (!r.ok) throw new Error("O Gmail respondeu com erro " + r.status + ".");
   return r.json();
@@ -3245,12 +3282,13 @@ function cartaoEmail(x) {
 }
 
 function desenharPropostas(el) {
+  if (!gmailConectado() && gm.permanente === undefined) { el.innerHTML = `<p class="vazio">Sincronizando o Gmail...</p>`; return; }
   if (!gmailConectado()) {
     el.innerHTML = `<div class="cartao gmail-conectar">
       <span class="gmail-icone">${ic("email")}</span>
       <h2>Conecte o Gmail de propostas</h2>
       <p>O painel lê a caixa de entrada do <b>${esc(EMAIL_PROPOSTAS)}</b>, separa os e-mails de proposta escritos por pessoas e esconde os automáticos. Você responde daqui mesmo, sem abrir o Gmail.</p>
-      <p class="sub">O Google mostra um aviso de "app não verificado". É normal, o app é só seu: clique em <b>Continuar</b> e aceite as permissões de ver e enviar e-mails.</p>
+      <p class="sub">Você só faz isso <b>uma vez</b>: depois o painel fica sincronizado sozinho, em qualquer aba e no celular. O Google mostra um aviso de "app não verificado"; é normal, o app é só seu: clique em <b>Continuar</b> e aceite ver e enviar e-mails.</p>
       ${gm.erro ? `<div class="aviso-falta">${esc(gm.erro)}</div>` : ""}
       <button class="btn primario" type="button" id="conectar-gmail">${ic("email")}Conectar o Gmail</button>
     </div>`;
@@ -3271,7 +3309,7 @@ function desenharPropostas(el) {
     <div class="barra">
       <div class="busca">${ic("busca")}<input type="search" id="busca-gmail" placeholder="Filtrar mais (ex: nome da marca)" value="${esc(gm.busca)}" aria-label="Filtrar propostas"></div>
       <span class="espaco"></span>
-      <span class="sub">${esc(EMAIL_PROPOSTAS)} · conectado por mais ${minutos} min</span>
+      <span class="sub">${esc(EMAIL_PROPOSTAS)} · ${gm.permanente ? "sincronizado sozinho" : `conectado por mais ${minutos} min`}</span>
       <button class="btn" type="button" id="atualizar-gmail" ${gm.carregando ? "disabled" : ""}>${gm.carregando ? "Lendo..." : "Atualizar"}</button>
       <button class="btn" type="button" id="sair-gmail">Desconectar</button>
     </div>
@@ -3285,7 +3323,10 @@ function desenharPropostas(el) {
           ${gm.verAutomaticos ? `<div class="lista-emails">${automaticos.map(cartaoEmail).join("")}</div>` : ""}` : ""}`}`;
 
   $("#atualizar-gmail").onclick = () => lerPropostas();
-  $("#sair-gmail").onclick = () => { desconectarGmail(); desenhar(); avisar("Gmail desconectado."); };
+  $("#sair-gmail").onclick = async () => {
+    if (!(await confirmar("Desconectar o Gmail do painel? Para voltar, vai precisar conectar de novo.", "Sim, desconectar"))) return;
+    await desconectarGmail(); desenhar(); avisar("Gmail desconectado.");
+  };
   const ver = $("#ver-automaticos");
   if (ver) ver.onclick = () => { gm.verAutomaticos = !gm.verAutomaticos; desenhar(); };
   let espera;
@@ -3550,8 +3591,10 @@ function desenharConectarInstagram(el) {
 function quadrosEntrada() {
   // E-mails
   let emails;
-  if (!gmailConectado()) {
-    emails = `<p class="sub" style="margin:0 0 8px">Conecte o Gmail para ver aqui as propostas que chegaram.</p>
+  if (!gmailConectado() && gm.permanente !== false) {
+    emails = `<p class="vazio">Sincronizando o Gmail...</p>`;
+  } else if (!gmailConectado()) {
+    emails = `<p class="sub" style="margin:0 0 8px">Conecte o Gmail uma vez para ver aqui as propostas que chegam.</p>
       <button type="button" class="btn pequeno primario" id="inicio-conectar-gmail">${ic("email")}Conectar o Gmail</button>`;
   } else if (!gm.emails) {
     emails = `<p class="vazio">${gm.carregando ? "Lendo o seu Gmail..." : "Abrindo as propostas..."}</p>`;
