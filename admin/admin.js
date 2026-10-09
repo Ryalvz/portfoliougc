@@ -73,7 +73,7 @@ const ESQUEMA = {
   marcas: ["id", "nome", "instagram", "email", "telefone", "situacao", "obs", "ultimo_contato", "exemplo", "criado_em"],
   calendario: ["id", "titulo", "marca", "tipo", "data", "status", "exemplo"],
   campanhas: ["id", "campanha", "cliente", "tipo", "status", "qtd", "valor", "prazo", "pagamento", "ativa", "favorita", "exemplo"],
-  contratos: ["id", "cliente", "tipo", "descricao", "valor", "mes", "ano", "data_nf", "prazo_dias", "status", "parcela1", "data_p1", "parcela2", "data_p2", "obs"],
+  contratos: ["id", "cliente", "tipo", "descricao", "valor", "mes", "ano", "data_nf", "prazo_dias", "status", "parcela1", "data_p1", "parcela2", "data_p2", "obs", "qtd", "prazo_entrega", "favorita"],
   transcricoes: ["id", "criado_em", "link", "plataforma", "categoria", "status", "titulo", "transcricao", "transcricao_original", "idioma_original", "minha_versao", "observacoes"],
   marcados: ["chave", "marcado"],
   visitas: ["id", "data", "pagina", "origem"]
@@ -122,7 +122,7 @@ async function carregarTudo() {
     ler("videos", (q, c) => (c.includes("ordem") ? q.order("ordem", { ascending: true }) : q)),
     ler("marcas", (q, c) => (c.includes("criado_em") ? q.order("criado_em", { ascending: false }) : q)),
     ler("calendario"),
-    ler("campanhas"),
+    Promise.resolve([]), // a tabela antiga de campanhas não é mais usada
     ler("marcados"),
     ler("visitas", (q, c) => (c.includes("data") ? q.gte("data", desde.toISOString()).order("data").limit(10000) : q)),
     ler("transcricoes", (q, c) => (c.includes("criado_em") ? q.order("criado_em", { ascending: false }) : q)),
@@ -274,7 +274,7 @@ const DESENHOS = {
   portfolio: desenharPortfolio,
   marcas: desenharMarcas,
   calendario: desenharCalendario,
-  campanhas: desenharCampanhas,
+  campanhas: desenharProducao,
   transcricoes: desenharTranscricoes,
   financeiro: desenharFinanceiro,
   checklist: desenharChecklist
@@ -697,9 +697,10 @@ function eventosCalendario() {
     tipo: c.tipo || "gravar", titulo: c.titulo, marca: c.marca, data: String(c.data).slice(0, 10),
     feito: c.status === "feito", origem: "calendario", ref: c
   }));
-  const prazos = S.campanhas.filter((c) => c.prazo).map((c) => ({
-    tipo: "prazo", titulo: "Prazo: " + c.campanha, marca: c.cliente, data: String(c.prazo).slice(0, 10),
-    feito: c.status === "Entregue", origem: "campanha", ref: c
+  // Prazos de entrega das campanhas (tabela contratos)
+  const prazos = S.contratos.filter((c) => c.prazo_entrega && c.status !== "Cancelado").map((c) => ({
+    tipo: "prazo", titulo: "Entrega: " + c.cliente, marca: c.descricao, data: String(c.prazo_entrega).slice(0, 10),
+    feito: c.status === "Entregue" || c.status === "Pago", origem: "campanha", ref: c
   }));
   return itens.concat(prazos);
 }
@@ -782,12 +783,12 @@ function desenharCalendario(el) {
   $$("[data-atraso]", el).forEach((b) => b.onclick = async () => {
     const e = atrasados[Number(b.dataset.atraso)];
     if (e.origem === "calendario") { if (await gravar("calendario", { status: "feito" }, e.ref.id)) { avisar("Marcado como feito."); recarregar("calendario"); } }
-    else formCampanha(e.ref);
+    else formContrato(e.ref);
   });
 }
 
 const nomeTipo = (t) => (TIPOS_CAL.find((x) => x[0] === t) || [t, t === "prazo" ? "Prazo" : t])[1];
-function abrirEvento(e) { if (e.origem === "calendario") formCalendario(e.ref); else formCampanha(e.ref); }
+function abrirEvento(e) { if (e.origem === "calendario") formCalendario(e.ref); else formContrato(e.ref); }
 
 function abrirDia(iso, lista) {
   const d = abrirJanelaSimples(
@@ -1856,6 +1857,8 @@ function formContrato(c) {
       { n: "tipo", r: "Tipo", t: "select", op: TIPOS_CONTRATO.map((t) => [t, t]) },
       { n: "status", r: "Status", t: "select", op: STATUS_CONTRATO.map((s) => [s, s]) },
       { n: "descricao", r: "Descrição", inteiro: true, ph: "ex: 2 vídeos + 3 stories" },
+      { n: "qtd", r: "Quantidade de vídeos", t: "number" },
+      { n: "prazo_entrega", r: "Prazo de entrega para a marca", t: "date" },
       { n: "valor", r: "Valor total (R$)", t: "number" },
       { n: "mes", r: "Mês de fechamento", t: "select", op: MESES_LONGOS.map((m, i) => [i + 1, m]) },
       { n: "ano", r: "Ano", t: "number" },
@@ -1865,9 +1868,11 @@ function formContrato(c) {
       { n: "data_p1", r: "Dia que a parcela 1 entrou", t: "date" },
       { n: "parcela2", r: "Parcela 2 recebida (R$)", t: "number" },
       { n: "data_p2", r: "Dia que a parcela 2 entrou", t: "date" },
+      { n: "favorita", r: "Destacar com estrela", t: "check" },
       { n: "obs", r: "Observação", t: "textarea" }
     ],
     aoSalvar: async (d) => {
+      if (d.qtd === 0 && !(c && c.qtd === 0)) d.qtd = null;
       d.mes = Number(d.mes) || null;
       d.ano = Number(d.ano) || hoje.getFullYear();
       // Parcela vazia fica vazia (e não zero)
@@ -1879,4 +1884,127 @@ function formContrato(c) {
     },
     aoApagar: c ? async () => { const ok = await apagarLinha("contratos", c.id); if (ok) recarregar("contratos"); return ok; } : null
   });
+}
+
+/* =============================================================
+   ABA CAMPANHAS (produção)
+   Mostra os mesmos contratos do Financeiro, num quadro de etapas
+   de produção. Cadastrou uma vez, aparece nas duas abas.
+   ============================================================= */
+const ETAPAS_PRODUCAO = [
+  ["Aguardando briefing", "Briefing"],
+  ["Aprovação de roteiro", "Roteiro"],
+  ["Gravando", "Gravando"],
+  ["Editando", "Editando"],
+  ["Enviado p/ aprovação", "Aprovação"],
+  ["Entregue", "Entregue"]
+];
+const prod = { busca: "", soDestaque: false };
+// "Pago" também é um trabalho entregue; no quadro ele fica na coluna Entregue
+const colunaDe = (c) => (c.status === "Pago" ? "Entregue" : c.status);
+const entregue = (c) => c.status === "Entregue" || c.status === "Pago";
+
+function avisoEntrega(c) {
+  if (!c.prazo_entrega || entregue(c) || c.status === "Cancelado") return "";
+  const d = diasEntre(hojeISO(), c.prazo_entrega);
+  if (d < 0) return `<span class="etq vermelha">${plural(-d, "dia", "dias")} atrasada</span>`;
+  if (d === 0) return `<span class="etq amarela">entrega hoje</span>`;
+  if (d <= 3) return `<span class="etq amarela">entrega em ${plural(d, "dia", "dias")}</span>`;
+  return "";
+}
+
+function desenharProducao(el) {
+  const ativos = S.contratos.filter((c) => c.status !== "Cancelado");
+  const emProducao = ativos.filter((c) => !entregue(c));
+  const atrasadas = emProducao.filter((c) => c.prazo_entrega && c.prazo_entrega < hojeISO());
+  const videos = emProducao.reduce((s, c) => s + (Number(c.qtd) || 0), 0);
+  const agora = new Date();
+  const entreguesMes = ativos.filter((c) => entregue(c) && Number(c.mes) === agora.getMonth() + 1 && Number(c.ano) === agora.getFullYear());
+
+  el.innerHTML = `
+    <div class="faixa-kpi">
+      <div class="kpi"><span>Em produção</span><strong>${num(emProducao.length)}</strong><small>${real(emProducao.reduce((s, c) => s + n2(c.valor), 0))} em contratos</small></div>
+      <div class="kpi"><span>Vídeos para entregar</span><strong>${num(videos)}</strong><small>somando as campanhas abertas</small></div>
+      <div class="kpi ${atrasadas.length ? "alerta" : ""}"><span>Atrasadas</span><strong>${num(atrasadas.length)}</strong><small>${atrasadas.length ? "passou do prazo de entrega" : "tudo em dia"}</small></div>
+      <div class="kpi"><span>Entregues este mês</span><strong>${num(entreguesMes.length)}</strong><small>${MESES_LONGOS[agora.getMonth()]}</small></div>
+    </div>
+    <div class="barra">
+      <div class="busca">${ic("busca")}<input type="search" id="busca-prod" placeholder="Buscar cliente ou descrição" value="${esc(prod.busca)}" aria-label="Buscar campanhas"></div>
+      <div class="chips" role="group" aria-label="Filtro"><button class="chip" type="button" data-dest="0" aria-pressed="${!prod.soDestaque}">Todas</button><button class="chip" type="button" data-dest="1" aria-pressed="${prod.soDestaque}">★ Destaques</button></div>
+      <span class="espaco"></span>
+      <span class="sub">o mesmo cadastro do Financeiro</span>
+      <button class="btn primario" type="button" id="add-prod">${ic("mais")}Nova campanha</button>
+    </div>
+    <div class="quadro quadro-6" id="quadro-prod"></div>`;
+
+  const pintar = () => {
+    const q = prod.busca.toLowerCase();
+    const lista = ativos.filter((c) => (!prod.soDestaque || c.favorita) && (!q || [c.cliente, c.descricao, c.obs].some((x) => String(x || "").toLowerCase().includes(q))));
+    $("#quadro-prod").innerHTML = ETAPAS_PRODUCAO.map(([valor, nome]) => {
+      let itens = lista.filter((c) => colunaDe(c) === valor)
+        .sort((a, b) => (b.favorita === true) - (a.favorita === true) || String(a.prazo_entrega || "9999").localeCompare(String(b.prazo_entrega || "9999")));
+      let resto = 0;
+      if (valor === "Entregue") { // só os mais recentes, o histórico completo está no Financeiro
+        itens = itens.sort((a, b) => (n2(b.ano) * 100 + n2(b.mes)) - (n2(a.ano) * 100 + n2(a.mes)) || b.id - a.id);
+        resto = Math.max(0, itens.length - 6); itens = itens.slice(0, 6);
+      }
+      return `<section class="coluna col-prod" data-etapa="${esc(valor)}" aria-label="${nome}">
+        <header><b>${nome}</b><span class="pilula">${itens.length + resto}</span></header>
+        <div class="coluna-corpo">${itens.map(cartaoCampanha).join("") || `<p class="coluna-vazia">${valor === "Aguardando briefing" ? "Campanhas novas aparecem aqui" : "Arraste para cá"}</p>`}
+        ${resto ? `<button class="btn" type="button" data-ir-financeiro style="width:100%;justify-content:center">+${resto} no Financeiro</button>` : ""}</div>
+      </section>`;
+    }).join("");
+  };
+  pintar();
+
+  $("#busca-prod").addEventListener("input", (e) => { prod.busca = e.target.value; pintar(); });
+  $$("[data-dest]", el).forEach((b) => b.onclick = () => { prod.soDestaque = b.dataset.dest === "1"; desenhar(); });
+  $("#add-prod").onclick = () => formContrato();
+
+  const quadro = $("#quadro-prod");
+  let arrastando = null;
+  quadro.addEventListener("dragstart", (e) => { const c = e.target.closest(".cartao-ideia"); if (!c) return; arrastando = c.dataset.id; c.classList.add("arrastando"); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", arrastando); });
+  quadro.addEventListener("dragend", (e) => { const c = e.target.closest(".cartao-ideia"); if (c) c.classList.remove("arrastando"); $$(".coluna.sobre", quadro).forEach((x) => x.classList.remove("sobre")); });
+  quadro.addEventListener("dragover", (e) => { const col = e.target.closest(".coluna"); if (!col || !arrastando) return; e.preventDefault(); $$(".coluna.sobre", quadro).forEach((x) => { if (x !== col) x.classList.remove("sobre"); }); col.classList.add("sobre"); });
+  quadro.addEventListener("drop", (e) => { const col = e.target.closest(".coluna"); if (!col || !arrastando) return; e.preventDefault(); const id = arrastando; arrastando = null; moverCampanha(id, col.dataset.etapa); });
+  quadro.addEventListener("change", (e) => { const s = e.target.closest("[data-etapa-prod]"); if (s) moverCampanha(s.dataset.etapaProd, s.value); });
+  quadro.addEventListener("click", async (e) => {
+    if (e.target.closest("[data-ir-financeiro]")) { fin.status = ""; irPara("financeiro"); return; }
+    if (e.target.closest("select")) return;
+    const estrela = e.target.closest("[data-estrela]");
+    const cartao = e.target.closest(".cartao-ideia");
+    if (!cartao) return;
+    const c = S.contratos.find((x) => String(x.id) === cartao.dataset.id);
+    if (estrela) { if (await gravar("contratos", { favorita: !c.favorita }, c.id)) { c.favorita = !c.favorita; pintar(); } return; }
+    formContrato(c);
+  });
+}
+
+function cartaoCampanha(c) {
+  return `<article class="cartao-ideia cartao-campanha ${c.favorita ? "favorita" : ""}" draggable="true" data-id="${esc(c.id)}" tabindex="0">
+    <div class="item-trans-topo">
+      <span class="pilula ${c.tipo === "Influencer" ? "p-publicidade" : "p-conteudo"}">${esc(c.tipo || "")}</span>
+      ${c.qtd ? `<span class="pilula p-status">${plural(Number(c.qtd), "vídeo", "vídeos")}</span>` : ""}
+      <button class="icone-btn estrela ${c.favorita ? "on" : ""}" type="button" data-estrela aria-pressed="${!!c.favorita}" aria-label="${c.favorita ? "Tirar destaque" : "Destacar"}" style="margin-left:auto;width:24px;height:24px">${ic("estrela")}</button>
+    </div>
+    <b>${esc(c.cliente)}</b>
+    ${c.descricao ? `<small>${esc(c.descricao)}</small>` : ""}
+    <small>${c.prazo_entrega ? `Entrega ${dataBR(c.prazo_entrega)}` : "Sem prazo de entrega"}${avisoEntrega(c)}</small>
+    <small><b>${real(c.valor)}</b>${saldoDe(c) > 0 && entregue(c) ? ` · falta receber ${real(saldoDe(c))}` : c.status === "Pago" ? " · pago" : ""}</small>
+    <select class="campo etapa-cartao" data-etapa-prod="${esc(c.id)}" aria-label="Mudar a etapa de ${esc(c.cliente)}">
+      ${ETAPAS_PRODUCAO.map(([v, n]) => `<option value="${esc(v)}" ${v === colunaDe(c) ? "selected" : ""}>${n}</option>`).join("")}
+    </select>
+  </article>`;
+}
+
+async function moverCampanha(id, etapa) {
+  const c = S.contratos.find((x) => String(x.id) === String(id));
+  if (!c || colunaDe(c) === etapa) return;
+  // Entregue e já recebido por completo vira "Pago"
+  const novo = etapa === "Entregue" && saldoDe(c) === 0 && n2(c.valor) > 0 ? "Pago" : etapa;
+  const antes = c.status;
+  c.status = novo;
+  desenhar();
+  if (await gravar("contratos", { status: novo }, c.id)) avisar(`Movida para ${ETAPAS_PRODUCAO.find((x) => x[0] === etapa)[1]}.`);
+  else { c.status = antes; desenhar(); }
 }

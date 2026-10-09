@@ -452,3 +452,12 @@ details.tokscript > summary .emo { font-size: 16px; color: var(--cobalt); }
 .status-item:hover { border-color: var(--cobalt); }
 .dica-grafico { position: fixed; z-index: 120; pointer-events: none; background: var(--text); color: var(--parchment); font-size: 12px; line-height: 1.45; padding: 7px 10px; border-radius: 6px; box-shadow: 0 6px 18px rgba(0, 0, 0, .18); max-width: 240px; }
 @media (max-width: 620px) { .valor-barra { display: none; } .grupo-mes span { font-size: 8.5px; } .linha-barra { grid-template-columns: 1fr auto; } .lb-trilho { grid-column: 1 / -1; grid-row: 2; } }
+
+/* ---------- Campanhas (quadro de produção) ---------- */
+.quadro-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.col-prod > header { box-shadow: inset 0 3px 0 var(--cobalt); }
+.col-prod[data-etapa="Entregue"] > header { box-shadow: inset 0 3px 0 var(--green); }
+.cartao-campanha.favorita { box-shadow: inset 4px 0 0 var(--olive); }
+.cartao-campanha .etq { margin-left: 4px; }
+@media (max-width: 1300px) { .quadro-6 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 760px) { .quadro-6 { grid-template-columns: 1fr; } }
