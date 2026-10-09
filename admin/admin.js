@@ -2928,6 +2928,8 @@ function lerRemetente(de) {
   const marca = dominio && !pessoal ? dominio.charAt(0).toUpperCase() + dominio.slice(1) : (nome || email);
   return { nome: nome || email, email, marca, dominio: pessoal ? "" : dominioCompleto };
 }
+// O Gmail manda o trecho com códigos HTML (&#39; &amp;): volta para texto normal
+const semEntidades = (t) => new DOMParser().parseFromString(String(t), "text/html").documentElement.textContent || "";
 const cabecalho = (m, n) => (((m.payload && m.payload.headers) || []).find((x) => x.name.toLowerCase() === n.toLowerCase()) || {}).value || "";
 
 // E-mail automático ou em massa? Devolve o motivo (ou "" se parece escrito por uma pessoa)
@@ -2963,7 +2965,7 @@ async function lerPropostas() {
     const msgs = await Promise.all(ids.map((id) => gmailApi(`messages/${id}?format=metadata${campos}`).catch(() => null)));
     gm.emails = msgs.filter(Boolean).map((m) => {
       const de = lerRemetente(cabecalho(m, "From"));
-      return { id: m.id, thread: m.threadId, de, assunto: cabecalho(m, "Subject") || "(sem assunto)", trecho: m.snippet || "",
+      return { id: m.id, thread: m.threadId, de, assunto: cabecalho(m, "Subject") || "(sem assunto)", trecho: semEntidades(m.snippet || ""),
         data: new Date(Number(m.internalDate) || Date.parse(cabecalho(m, "Date")) || Date.now()),
         novo: (m.labelIds || []).includes("UNREAD"), automatico: motivoAutomatico(m, de) };
     }).filter((x) => x.de.email !== EMAIL_PROPOSTAS)
