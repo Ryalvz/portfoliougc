@@ -552,3 +552,18 @@ details.tokscript > summary .emo { font-size: 16px; color: var(--cobalt); }
 .lembrete.alerta .insight-ic { background: var(--red-bg); color: var(--red); }
 .lembrete-acoes { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
 @media (max-width: 700px) { .lembrete { grid-template-columns: 30px 1fr; } .lembrete-acoes { grid-column: 1 / -1; justify-content: flex-start; } }
+
+/* ---------- Financeiro mais limpo ---------- */
+.rel-grade { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 620px) { .rel-grade { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.resumo-ano .insight-dica { display: none; }
+.resumo-ano.mostra-dicas .insight-dica { display: block; }
+.resumo-ano .insights { gap: 10px; }
+.funil-linha .lb-extra { margin-top: 0; }
+.analise { margin: 4px 0 16px; }
+.analise > summary { cursor: pointer; list-style: none; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 12px 14px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); font-weight: 700; color: var(--cobalt); }
+.analise > summary::-webkit-details-marker { display: none; }
+.analise > summary::before { content: "▸"; transition: transform .15s; }
+.analise[open] > summary { margin-bottom: 16px; }
+.analise[open] > summary::before { transform: rotate(90deg); }
+.analise > summary .sub { font-weight: 400; }

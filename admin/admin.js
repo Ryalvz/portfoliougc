@@ -1752,7 +1752,7 @@ function ligarDicas(el) {
 
 const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0);
 function variacao(atual, antes) {
-  if (!antes) return atual ? `<span class="sobe">novo</span>` : `<span class="sub">sem dados</span>`;
+  if (!antes) return atual ? `<span class="sobe">novo</span>` : `<span class="sub">-</span>`;
   const p = Math.round(((atual - antes) / antes) * 100);
   return p >= 0 ? `<span class="sobe">▲ ${p}%</span>` : `<span class="desce">▼ ${-p}%</span>`;
 }
@@ -1776,12 +1776,12 @@ function relatorioPeriodo() {
     const antes = faturadoEm(pa, pm);
     const ult3 = [1, 2, 3].map((k) => faturadoEm(...mesAntes(ano, mes, k)));
     const med = ult3.reduce((s, v) => s + v, 0) / 3;
-    comparar = `<div><span>vs ${MESES_LONGOS[pm - 1]}</span><b>${variacao(fat, antes)}</b><small>${real(antes)}</small></div>`;
+    comparar = `<div><span>vs ${MESES_LONGOS[pm - 1].toLowerCase()}</span><b>${variacao(fat, antes)}</b>${antes ? `<small>${real(antes)}</small>` : ""}</div>`;
     media = `<div><span>Média dos 3 meses antes</span><b>${real(med)}</b><small>${fat >= med ? "este mês está acima" : "este mês está abaixo"}</small></div>`;
   } else {
     const antes = faturadoEm(ano - 1, 0);
     const mesesCom = MESES_CURTOS.map((_, i) => faturadoEm(ano, i + 1)).filter((v) => v > 0);
-    comparar = `<div><span>vs ${ano - 1}</span><b>${variacao(fat, antes)}</b><small>${real(antes)}</small></div>`;
+    comparar = `<div><span>vs ${ano - 1}</span><b>${variacao(fat, antes)}</b>${antes ? `<small>${real(antes)}</small>` : ""}</div>`;
     media = `<div><span>Média por mês</span><b>${real(mesesCom.length ? fat / mesesCom.length : 0)}</b><small>nos ${plural(mesesCom.length, "mês", "meses")} com faturamento</small></div>`;
   }
 
@@ -1823,12 +1823,10 @@ function relatorioPeriodo() {
       </div>
     </div>
     <div class="rel-grade">
-      <div><span>Entrou na conta</span><b>${real(entrou)}</b><small>pelo dia em que o dinheiro caiu</small></div>
+      <div><span>Entrou na conta</span><b>${real(entrou)}</b></div>
       ${comparar}
-      ${media}
-      <div><span>Contratos fechados</span><b>${num(fechadosP.length)}</b><small>ticket médio ${real(ticket)}</small></div>
-      <div><span>TikTok Shop</span><b>${real(ttk)}</b><small>${fat ? pct(ttk, fat) + "% do faturado" : "nenhum repasse"}</small></div>
-      <div><span>Em negociação</span><b>${real(vNeg)}</b><small>${negociando.length ? `${plural(negociando.length, "proposta aberta", "propostas abertas")}` : "nenhuma proposta aberta"}</small></div>
+      <div><span>TikTok Shop</span><b>${real(ttk)}</b></div>
+      <div><span>Em negociação</span><b>${real(vNeg)}</b>${negociando.length ? `<small>${plural(negociando.length, "proposta", "propostas")}</small>` : ""}</div>
     </div>
   </div>`;
 }
@@ -1837,21 +1835,22 @@ function relatorioPeriodo() {
 function cartaoFunil({ baldes, gargalo }) {
   const max = Math.max(1, ...baldes.map((b) => b.v));
   const aberto = baldes.filter((b) => b.k !== "negociacao").reduce((s, b) => s + b.v, 0);
+  const comDinheiro = baldes.filter((b) => b.v > 0);
   return `<div class="cartao">
-    <h2>Onde está o seu dinheiro agora</h2>
-    <p class="sub" style="margin:-6px 0 10px">todos os meses juntos · ${real(aberto)} fechado e ainda não recebido</p>
-    <div class="funil">
-      ${baldes.map((b) => `<button type="button" class="funil-linha f-${b.k} ${gargalo && gargalo.k === b.k ? "gargalo" : ""}" data-balde="${b.k}" ${b.lista.length ? "" : "disabled"}
+    <h2>Onde está o seu dinheiro</h2>
+    <p class="sub" style="margin:-6px 0 10px">${real(aberto)} para receber</p>
+    ${comDinheiro.length ? `<div class="funil">
+      ${comDinheiro.map((b) => `<button type="button" class="funil-linha f-${b.k} ${gargalo && gargalo.k === b.k ? "gargalo" : ""}" data-balde="${b.k}" ${b.lista.length ? "" : "disabled"}
         data-dica="<b>${esc(b.nome)}</b><br>${esc(b.explica)}${b.lista.length ? "<br>" + b.lista.slice(0, 5).map((c) => esc(c.cliente) + ": " + real(b.k === "negociacao" ? c.valor : saldoDe(c))).join("<br>") + (b.lista.length > 5 ? "<br>..." : "") : ""}">
         <span class="fl-nome">${esc(b.nome)}${gargalo && gargalo.k === b.k ? ` <span class="etq ${b.k === "vencido" ? "vermelha" : "amarela"}">gargalo</span>` : ""}</span>
         <span class="lb-trilho"><i style="width:${(b.v / max) * 100}%"></i></span>
         <span class="lb-valor">${real(b.v)}</span>
-        <small class="lb-extra">${b.lista.length ? plural(b.lista.length, "contrato", "contratos") : "nada aqui"} · ${esc(b.explica)}</small>
+        <small class="lb-extra">${plural(b.lista.length, "contrato", "contratos")}</small>
       </button>`).join("")}
-    </div>
+    </div>` : ""}
     ${gargalo
       ? `<div class="dica-caixa ${gargalo.k === "vencido" ? "urgente" : ""}"><b>O que fazer:</b> ${esc(gargalo.acao)}</div>`
-      : `<div class="dica-caixa"><b>Tudo em dia.</b> Nenhum dinheiro parado depois de fechado.</div>`}
+      : `<div class="dica-caixa"><b>Tudo em dia.</b> Nenhum dinheiro parado.</div>`}
   </div>`;
 }
 
@@ -1862,15 +1861,15 @@ function insightsDoAno(funil) {
   const ttkAno = S.comissoes.filter((x) => noPeriodo(x.data, ano, 0));
   const total = faturadoEm(ano, 0);
   const itens = [];
-  if (!total) return `<div class="cartao"><h2>O que os números dizem</h2><p class="vazio">Sem faturamento em ${ano} ainda.</p></div>`;
+  if (!total) return `<div class="cartao"><h2>Resumo de ${ano}</h2><p class="vazio">Sem faturamento em ${ano} ainda.</p></div>`;
 
   // 1. Fonte de renda principal
   const fontes = TIPOS_CONTRATO.map((t) => ({ t, v: doAno.filter((c) => c.tipo === t).reduce((s, c) => s + n2(c.valor), 0) }));
   fontes.push({ t: "TikTok Shop", v: ttkAno.reduce((s, x) => s + n2(x.valor), 0) });
   fontes.sort((a, b) => b.v - a.v);
   const [f1, f2] = fontes;
-  itens.push({ ic: "financeiro", titulo: "Sua fonte de renda principal",
-    texto: `<b>${esc(f1.t)}</b>: ${pct(f1.v, total)}% do que você faturou em ${ano} (${real(f1.v)}).${f2 && f2.v ? ` Depois vem ${esc(f2.t)}, com ${pct(f2.v, total)}%.` : ""}`,
+  itens.push({ ic: "financeiro", titulo: "Fonte principal",
+    texto: `<b>${esc(f1.t)}</b>, ${pct(f1.v, total)}% do que você faturou.`,
     dica: pct(f1.v, total) >= 70
       ? `Mais de 2/3 vem de um tipo só. Tente fechar pelo menos 1 trabalho por mês de ${esc(f2 && f2.v ? f2.t : "outro tipo")} para não depender só de ${esc(f1.t)}.`
       : "Sua renda está bem dividida entre os tipos de trabalho. Isso dá segurança." });
@@ -1880,15 +1879,9 @@ function insightsDoAno(funil) {
   const ticketAno = doAno.length ? doAno.reduce((s, c) => s + n2(c.valor), 0) / doAno.length : 0;
   const meses = MESES_CURTOS.map((_, i) => faturadoEm(ano, i + 1));
   const melhor = meses.indexOf(Math.max(...meses));
-  if (maior) itens.push({ ic: "estrela", titulo: "Seu maior ganho",
-    texto: `<b>${esc(maior.cliente)}</b>, ${real(maior.valor)}${ticketAno ? ` (${(n2(maior.valor) / ticketAno).toFixed(1).replace(".", ",")} vezes o seu ticket médio de ${real(ticketAno)})` : ""}. Melhor mês: <b>${MESES_LONGOS[melhor]}</b>, com ${real(meses[melhor])}.`,
+  if (maior) itens.push({ ic: "estrela", titulo: "Maior ganho",
+    texto: `<b>${esc(maior.cliente)}</b> (${real(maior.valor)}). Melhor mês: ${MESES_LONGOS[melhor].toLowerCase()}.`,
     dica: "Use esse trabalho como case no mídia kit e mande proposta para marcas do mesmo porte. Um contrato grande vale por vários pequenos." });
-
-  // 3. Gargalo
-  const g = funil.gargalo;
-  itens.push({ ic: "relogio", titulo: "Seu maior gargalo", alerta: !!g,
-    texto: g ? `<b>${real(g.v)}</b> parados em <b>${esc(g.nome.toLowerCase())}</b> (${plural(g.lista.length, "contrato", "contratos")}).` : "Nenhum dinheiro parado agora.",
-    dica: g ? g.acao : "Continue atualizando o status de cada contrato assim que ele andar." });
 
   // 4. Recorrência
   const porCliente = {};
@@ -1899,16 +1892,16 @@ function insightsDoAno(funil) {
   const totalContratos = doAno.reduce((s, c) => s + n2(c.valor), 0);
   itens.push({ ic: "marcas", titulo: "Clientes que voltam",
     texto: voltaram.length
-      ? `${plural(voltaram.length, "marca fechou", "marcas fecharam")} mais de uma vez, de ${clientes.length} no ano: ${voltaram.slice(0, 3).map((x) => `${esc(x.nome)} (${x.n}x)`).join(", ")}. Elas somam ${pct(vVoltaram, totalContratos)}% dos contratos.`
-      : `Nenhuma das ${clientes.length} marcas do ano fechou duas vezes.`,
+      ? `<b>${voltaram.length} de ${clientes.length}</b> marcas fecharam de novo (${pct(vVoltaram, totalContratos)}% dos contratos).`
+      : `Nenhuma marca fechou duas vezes ainda.`,
     dica: `Você não tem cliente fixo, então todo mês começa do zero. Ofereça ${voltaram.length ? `para ${esc(voltaram[0].nome)}` : "para as marcas que gostaram do seu trabalho"} um pacote mensal (ex: 4 vídeos por mês com 10% de desconto). Um contrato fixo de ${real(Math.max(800, Math.round(ticketAno * 3 / 100) * 100))} por mês já dá uma base para o mês não começar do zero.` });
 
   // 5. Concentração
   const top = clientes.sort((a, b) => b.v - a.v)[0];
-  if (top) {
+  if (top && pct(top.v, total) >= 30) {
     const p = pct(top.v, total);
     itens.push({ ic: "grafico", titulo: "Dependência de uma marca", alerta: p >= 30,
-      texto: `Seu maior cliente do ano é <b>${esc(top.nome)}</b>, com ${p}% de tudo que você faturou.`,
+      texto: `<b>${esc(top.nome)}</b> é ${p}% de tudo que você faturou.`,
       dica: p >= 30 ? "É muito peso numa marca só: se ela parar, o mês cai junto. Use o tempo livre para abrir 2 ou 3 conversas novas por semana." : "Nenhuma marca pesa demais no seu faturamento. Bom sinal." });
   }
 
@@ -1920,14 +1913,16 @@ function insightsDoAno(funil) {
   if (tempos.length >= 3) {
     const medio = Math.round(tempos.reduce((s, x) => s + x.dias, 0) / tempos.length);
     const prazoMedio = Math.round(tempos.reduce((s, x) => s + x.prazo, 0) / tempos.length);
-    itens.push({ ic: "calendario", titulo: "Quanto tempo o dinheiro demora",
-      texto: `Em média você recebe <b>${plural(medio, "dia", "dias")}</b> depois da nota fiscal (o prazo combinado médio é ${prazoMedio} dias).`,
+    itens.push({ ic: "calendario", titulo: "Tempo para receber",
+      texto: `<b>${plural(medio, "dia", "dias")}</b> depois da nota, em média.`,
       dica: medio > 40 ? "Isso segura o seu caixa. Em trabalhos acima de R$ 800, peça 50% na assinatura e 50% na entrega, e tente prazo de 30 dias em vez de 60 ou 90." : "Seu dinheiro entra rápido. Mantenha o hábito de mandar a nota no dia da entrega." });
   }
 
-  return `<div class="cartao">
-    <h2>O que os números dizem</h2>
-    <p class="sub" style="margin:-6px 0 10px">${ano}, calculado sozinho a partir dos seus contratos e do TikTok Shop</p>
+  let dicas = false;
+  try { dicas = localStorage.getItem("fin-dicas") === "1"; } catch (_) {}
+  return `<div class="cartao resumo-ano ${dicas ? "mostra-dicas" : ""}">
+    <div class="barra" style="margin-bottom:8px"><h2 style="margin:0">Resumo de ${ano}</h2><span class="espaco"></span>
+      <button type="button" class="link-btn" data-dicas>${dicas ? "esconder dicas" : "ver dicas"}</button></div>
     <div class="insights">${itens.map((x) => `<div class="insight ${x.alerta ? "alerta" : ""}">
       <span class="insight-ic">${ic(x.ic)}</span>
       <div><b>${x.titulo}</b><p>${x.texto}</p><p class="insight-dica">${x.dica}</p></div>
@@ -1949,6 +1944,8 @@ function desenharFinanceiro(el) {
   const faturado = validos.reduce((s, c) => s + n2(c.valor), 0) + totalTtk;
   const nomePeriodo = fin.mes ? `${MESES_LONGOS[fin.mes - 1]} de ${fin.ano}` : `${fin.ano}`;
   const funil = ondeEstaODinheiro();
+  let analiseAberta = false;
+  try { analiseAberta = localStorage.getItem("fin-analise") === "1"; } catch (_) {}
 
   // Gráfico 1: faturado (mês de fechamento) x entrou na conta (dia de cada parcela), com a meta de cada mês
   const fatMes = MESES_CURTOS.map((_, i) => faturadoEm(fin.ano, i + 1));
@@ -2025,6 +2022,8 @@ function desenharFinanceiro(el) {
       ${cartaoFunil(funil)}
       ${insightsDoAno(funil)}
     </div>
+    <details class="analise" id="analise" ${analiseAberta ? "open" : ""}>
+    <summary>Ver análise completa <span class="sub">gráficos, TikTok Shop, tipos de trabalho e clientes</span></summary>
     ${cartaoTtk(comAno)}
     <div class="grade-fin">
       <div class="cartao">
@@ -2074,6 +2073,7 @@ function desenharFinanceiro(el) {
         <li><b>No dia 1 de cada mês</b>, defina a meta e olhe o card "Onde está o seu dinheiro". O gargalo é por onde começar o mês.</li>
       </ol>
     </details>
+    </details>
     <div class="barra" style="margin-top:4px">
       <h2 style="margin:0">Contratos de ${nomePeriodo}</h2>
       <div class="busca">${ic("busca")}<input type="search" id="busca-fin" placeholder="Buscar cliente ou descrição" value="${esc(fin.busca)}" aria-label="Buscar contratos"></div>
@@ -2119,6 +2119,14 @@ function desenharFinanceiro(el) {
   $("#fin-status").onchange = (e) => { fin.status = e.target.value; pintar(); };
   $$("[data-filtrar]", el).forEach((b) => b.onclick = () => { fin.status = b.dataset.filtrar; desenhar(); $("#lista-contratos").scrollIntoView({ behavior: "smooth", block: "start" }); });
   $$("[data-meta]", el).forEach((b) => b.onclick = () => formMeta(fin.ano, fin.mes));
+  // Lembra se a análise completa e as dicas ficam abertas
+  $("#analise").addEventListener("toggle", (e) => { try { localStorage.setItem("fin-analise", e.target.open ? "1" : "0"); } catch (_) {} });
+  $$("[data-dicas]", el).forEach((b) => b.onclick = () => {
+    const card = b.closest(".resumo-ano");
+    const mostra = card.classList.toggle("mostra-dicas");
+    b.textContent = mostra ? "esconder dicas" : "ver dicas";
+    try { localStorage.setItem("fin-dicas", mostra ? "1" : "0"); } catch (_) {}
+  });
   // Clicar numa etapa do "onde está o seu dinheiro" mostra os contratos dela
   $$("[data-balde]", el).forEach((b) => b.onclick = () => {
     const balde = funil.baldes.find((x) => x.k === b.dataset.balde);
