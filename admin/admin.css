@@ -537,3 +537,18 @@ details.tokscript > summary .emo { font-size: 16px; color: var(--cobalt); }
 .cartao-campanha .etapa-cartao { width: 100%; min-width: 0; }
 .cartao-campanha > .pilula { white-space: normal; }
 .col-prod > header small { white-space: nowrap; }
+
+/* ---------- Lembretes do dia ---------- */
+.lembretes { background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--amber); border-radius: var(--radius); margin-bottom: 16px; }
+.lembretes summary { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 10px 14px; cursor: pointer; list-style: none; }
+.lembretes summary::-webkit-details-marker { display: none; }
+.lembretes summary::after { content: "▾"; margin-left: auto; color: var(--muted); transition: transform .15s; }
+.lembretes:not([open]) summary::after { transform: rotate(-90deg); }
+.sino { position: relative; display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; background: var(--amber-bg); color: var(--amber); }
+.sino i { position: absolute; top: -5px; right: -6px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--red); color: #fff; font-size: 10px; font-style: normal; font-weight: 700; line-height: 16px; text-align: center; }
+.lembretes ul { list-style: none; margin: 0; padding: 0 14px 10px; display: grid; gap: 0; }
+.lembrete { display: grid; grid-template-columns: 30px 1fr auto; gap: 8px 10px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+.lembrete p { margin: 0; font-size: 13px; line-height: 1.45; }
+.lembrete.alerta .insight-ic { background: var(--red-bg); color: var(--red); }
+.lembrete-acoes { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+@media (max-width: 700px) { .lembrete { grid-template-columns: 30px 1fr; } .lembrete-acoes { grid-column: 1 / -1; justify-content: flex-start; } }

@@ -75,12 +75,13 @@ const ESQUEMA = {
   campanhas: ["id", "campanha", "cliente", "tipo", "status", "qtd", "valor", "prazo", "pagamento", "ativa", "favorita", "exemplo"],
   comissoes_ttk: ["id", "data", "valor", "gmv", "itens", "obs"],
   metas: ["ano", "mes", "valor"],
-  contratos: ["id", "cliente", "tipo", "descricao", "valor", "mes", "ano", "data_nf", "prazo_dias", "status", "parcela1", "data_p1", "parcela2", "data_p2", "obs", "qtd", "prazo_entrega", "favorita"],
+  lembretes_adiados: ["chave", "ate"],
+  contratos: ["id", "cliente", "tipo", "descricao", "valor", "mes", "ano", "data_nf", "prazo_dias", "status", "parcela1", "data_p1", "parcela2", "data_p2", "obs", "qtd", "prazo_entrega", "favorita", "criado_em"],
   transcricoes: ["id", "criado_em", "link", "plataforma", "categoria", "status", "titulo", "transcricao", "transcricao_original", "idioma_original", "minha_versao", "observacoes"],
   marcados: ["chave", "marcado"],
   visitas: ["id", "data", "pagina", "origem"]
 };
-const S = { videos: [], marcas: [], calendario: [], campanhas: [], marcados: {}, visitas: [], transcricoes: [], contratos: [], comissoes: [], metas: [] };
+const S = { videos: [], marcas: [], calendario: [], campanhas: [], marcados: {}, visitas: [], transcricoes: [], contratos: [], comissoes: [], metas: [], adiados: [] };
 const CAMPOS = {};          // campos que existem de verdade em cada tabela
 const FALTAS = new Map();   // tabela -> o que faltou
 
@@ -120,7 +121,7 @@ async function ler(tabela, ajuste) {
 
 async function carregarTudo() {
   const desde = new Date(); desde.setHours(0, 0, 0, 0); desde.setDate(desde.getDate() - 13);
-  const [videos, marcas, calendario, campanhas, marcados, visitas, transcricoes, contratos, comissoes, metas] = await Promise.all([
+  const [videos, marcas, calendario, campanhas, marcados, visitas, transcricoes, contratos, comissoes, metas, adiados] = await Promise.all([
     ler("videos", (q, c) => (c.includes("ordem") ? q.order("ordem", { ascending: true }) : q)),
     ler("marcas", (q, c) => (c.includes("criado_em") ? q.order("criado_em", { ascending: false }) : q)),
     ler("calendario"),
@@ -130,9 +131,10 @@ async function carregarTudo() {
     ler("transcricoes", (q, c) => (c.includes("criado_em") ? q.order("criado_em", { ascending: false }) : q)),
     ler("contratos", (q, c) => (c.includes("id") ? q.order("id", { ascending: true }).limit(5000) : q)),
     ler("comissoes_ttk", (q, c) => (c.includes("data") ? q.order("data", { ascending: false }).limit(5000) : q)),
-    ler("metas")
+    ler("metas"),
+    ler("lembretes_adiados")
   ]);
-  Object.assign(S, { videos, marcas, calendario, campanhas, visitas, transcricoes, contratos, comissoes, metas });
+  Object.assign(S, { videos, marcas, calendario, campanhas, visitas, transcricoes, contratos, comissoes, metas, adiados });
   S.marcados = {};
   marcados.forEach((m) => { if (m.chave) S.marcados[m.chave] = m.marcado !== false; });
 }
@@ -303,6 +305,7 @@ function irPara(aba) {
 
 function desenhar() {
   const el = $("#aba-" + abaAtual);
+  try { pintarLembretes(); } catch (e) { console.error(e); }
   try { DESENHOS[abaAtual](el); }
   catch (e) {
     console.error(e);
@@ -326,6 +329,8 @@ async function iniciar(sessao) {
     $("#abrir-menu").setAttribute("aria-expanded", String(aberto));
   });
   $("#fundo-menu").addEventListener("click", fecharMenu);
+  $("#abrir-notificacoes").addEventListener("click", () => { fecharMenu(); abrirNotificacoes(); });
+  registrarServiceWorker();
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") fecharMenu(); });
 
   $("#aba-portfolio").innerHTML = '<p class="vazio">Carregando seus dados...</p>';
@@ -2409,4 +2414,215 @@ function formComissao(c) {
     },
     aoApagar: c ? async () => { const ok = await apagarLinha("comissoes_ttk", c.id); if (ok) recarregar("comissoes_ttk"); return ok; } : null
   });
+}
+
+/* =============================================================
+   LEMBRETES
+   O painel confere sozinho o que precisa da sua atenção e pergunta
+   com botões de resposta rápida:
+     repasse do TikTok Shop (a partir de quarta, até ser lançado)
+     pagamento vencido ou vencendo, trabalho entregue sem nota,
+     entrega chegando e negociação parada há 5 dias ou mais.
+   As mesmas regras mandam a notificação no celular (ajudante
+   "lembretes" no Supabase, em supabase/functions/lembretes).
+   ============================================================= */
+const somaDiasISO = (n, base = hojeISO()) => { const d = deISO(base); d.setDate(d.getDate() + n); return isoLocal(d); };
+const adiado = (chave) => S.adiados.some((a) => a.chave === chave && String(a.ate).slice(0, 10) >= hojeISO());
+
+async function adiarLembrete(chave, ate, aviso = "Certo, eu lembro de novo depois.") {
+  if (!CAMPOS.lembretes_adiados || !CAMPOS.lembretes_adiados.length) { avisar("A tabela lembretes_adiados não existe no banco. Rode o banco.sql.", true); return; }
+  const { error } = await db.from("lembretes_adiados").upsert({ chave, ate }, { onConflict: "chave" });
+  if (error) { avisar(traduzErro(error), true); return; }
+  S.adiados = S.adiados.filter((a) => a.chave !== chave).concat({ chave, ate });
+  avisar(aviso);
+  desenhar();
+}
+
+function calcularLembretes() {
+  const hoje = hojeISO();
+  const L = [];
+  const quarta = ultimaQuarta();
+  if (!S.comissoes.some((x) => String(x.data).slice(0, 10) === quarta) && !adiado("ttk-" + quarta)) {
+    L.push({ ic: "financeiro", nivel: quarta === hoje ? "" : "alerta",
+      texto: quarta === hoje ? "Hoje é quarta: <b>lance o repasse do TikTok Shop</b> que caiu." : `Falta lançar o <b>repasse do TikTok Shop</b> de quarta ${dataBR(quarta).slice(0, 5)}.`,
+      acoes: [["Lançar agora", true, () => formComissao()], ["Não teve repasse", false, () => adiarLembrete("ttk-" + quarta, somaDiasISO(6, quarta), "Anotado: sem repasse nessa semana.")]] });
+  }
+  S.contratos.forEach((c) => {
+    const nome = `<b>${esc(c.cliente)}</b>`;
+    const sal = saldoDe(c), prev = previstaDe(c);
+    const aberto = fechado(c) && c.status !== "Pago" && sal > 0;
+    if (aberto && prev && prev < hoje) {
+      const k = `vencido-${c.id}`;
+      if (!adiado(k)) L.push({ ic: "relogio", nivel: "alerta",
+        texto: `${nome} venceu há ${plural(diasEntre(prev, hoje), "dia", "dias")} (${real(sal)}). A marca já pagou?`,
+        acoes: [["Sim, recebi", true, () => formRecebi(c)], ["Ainda não, vou cobrar", false, () => adiarLembrete(k, somaDiasISO(2), "Combinado. Pergunto de novo em 3 dias.")]] });
+      return;
+    }
+    if (aberto && prev && prev >= hoje && prev <= somaDiasISO(2)) {
+      const k = `vence-${c.id}-${prev}`;
+      if (!adiado(k)) L.push({ ic: "calendario", nivel: "",
+        texto: `${nome} deve pagar ${prev === hoje ? "hoje" : "até " + dataBR(prev).slice(0, 5)} (${real(sal)}). O dinheiro já caiu?`,
+        acoes: [["Sim, recebi", true, () => formRecebi(c)], ["Ainda não", false, () => adiarLembrete(k, prev, "Certo. Se não cair até o prazo, eu aviso que venceu.")]] });
+    }
+    if (c.status === "Entregue" && !c.data_nf && sal > 0) {
+      const k = `nota-${c.id}`;
+      if (!adiado(k)) L.push({ ic: "transcricao", nivel: "",
+        texto: `${nome} foi entregue e está <b>sem nota fiscal</b>. Sem nota, o prazo de pagamento não começa a contar.`,
+        acoes: [["Enviei a nota hoje", true, () => mudarEtapa(c, "Nota fiscal enviada")], ["Lembrar amanhã", false, () => adiarLembrete(k, hoje)]] });
+    }
+    if (grupoDe(c.status) === "producao" && c.prazo_entrega && c.prazo_entrega <= somaDiasISO(1)) {
+      const k = `entrega-${c.id}-${c.prazo_entrega}`;
+      const d = diasEntre(hoje, c.prazo_entrega);
+      if (!adiado(k)) L.push({ ic: "campanhas", nivel: d < 0 ? "alerta" : "",
+        texto: `${nome}: ${d < 0 ? `a entrega está <b>atrasada há ${plural(-d, "dia", "dias")}</b>` : d === 0 ? "a entrega é <b>hoje</b>" : "a entrega é <b>amanhã</b>"} (${esc(c.status.toLowerCase())}).`,
+        acoes: [["Já entreguei", true, () => mudarEtapa(c, "Entregue")], ["Lembrar amanhã", false, () => adiarLembrete(k, hoje)]] });
+    }
+    if (grupoDe(c.status) === "negociacao" && c.criado_em && diasEntre(String(c.criado_em).slice(0, 10), hoje) >= 5) {
+      const k = `negocia-${c.id}`;
+      if (!adiado(k)) L.push({ ic: "marcas", nivel: "",
+        texto: `${nome} está em negociação há ${plural(diasEntre(String(c.criado_em).slice(0, 10), hoje), "dia", "dias")}${n2(c.valor) ? ` (${real(c.valor)})` : ""}. Já fez follow-up?`,
+        acoes: [["Fechou!", true, () => mudarEtapa(c, "Aguardando briefing")], ["Não fechou", false, () => mudarEtapa(c, "Perdida")], ["Lembrar em 3 dias", false, () => adiarLembrete(k, somaDiasISO(2))]] });
+    }
+  });
+  return L;
+}
+
+// "Sim, recebi": lança o pagamento na parcela livre e marca Pago quando completa o valor
+function formRecebi(c) {
+  abrirForm({
+    titulo: `Pagamento de ${c.cliente}`,
+    valores: { valor: saldoDe(c), data: hojeISO() },
+    campos: [
+      { n: "valor", r: "Quanto caiu (R$)", t: "number" },
+      { n: "data", r: "Dia que caiu", t: "date" }
+    ],
+    aoSalvar: async (d) => {
+      if (!n2(d.valor)) { avisar("Coloque o valor que caiu.", true); return false; }
+      const dados = {};
+      if (c.parcela1 == null || !n2(c.parcela1)) { dados.parcela1 = n2(d.valor); dados.data_p1 = d.data || hojeISO(); }
+      else if (c.parcela2 == null || !n2(c.parcela2)) { dados.parcela2 = n2(d.valor); dados.data_p2 = d.data || hojeISO(); }
+      else { dados.parcela2 = n2(c.parcela2) + n2(d.valor); dados.data_p2 = d.data || hojeISO(); }
+      const total = n2(dados.parcela1 ?? c.parcela1) + n2(dados.parcela2 ?? c.parcela2);
+      if (total >= n2(c.valor)) dados.status = "Pago";
+      else if (grupoDe(c.status) === "dinheiro") dados.status = "Aguardando pagamento";
+      const ok = await gravar("contratos", dados, c.id);
+      if (ok) { setTimeout(() => avisar(dados.status === "Pago" ? `${c.cliente} marcado como Pago.` : `Parcela lançada. Ainda faltam ${real(n2(c.valor) - total)}.`), 400); recarregar("contratos"); }
+      return ok;
+    }
+  });
+}
+
+let lembretesAtuais = [];
+function pintarLembretes() {
+  const caixa = $("#lembretes");
+  if (!caixa) return;
+  const L = calcularLembretes();
+  lembretesAtuais = L;
+  // Número no ícone do app no iPhone
+  try { if (navigator.setAppBadge) (L.length ? navigator.setAppBadge(L.length) : navigator.clearAppBadge()).catch(() => {}); } catch (_) {}
+  if (!L.length) { caixa.innerHTML = ""; return; }
+  let recolhido = false;
+  try { recolhido = localStorage.getItem("lembretes-recolhido") === hojeISO(); } catch (_) {}
+  caixa.innerHTML = `<details class="lembretes" ${recolhido ? "" : "open"}>
+    <summary><span class="sino">${ic("sino")}<i>${L.length}</i></span><b>${L.length === 1 ? "1 lembrete para hoje" : `${L.length} lembretes para hoje`}</b><span class="sub">o painel confere sozinho o que precisa de você</span></summary>
+    <ul>${L.map((x, i) => `<li class="lembrete ${x.nivel}">
+      <span class="insight-ic">${ic(x.ic)}</span>
+      <p>${x.texto}</p>
+      <div class="lembrete-acoes">${x.acoes.map(([r, p], j) => `<button type="button" class="btn pequeno ${p ? "primario" : ""}" data-lembrete="${i}" data-acao="${j}">${esc(r)}</button>`).join("")}</div>
+    </li>`).join("")}</ul>
+  </details>`;
+  const det = $("details", caixa);
+  det.addEventListener("toggle", () => { try { if (det.open) localStorage.removeItem("lembretes-recolhido"); else localStorage.setItem("lembretes-recolhido", hojeISO()); } catch (_) {} });
+  caixa.onclick = (e) => {
+    const b = e.target.closest("[data-lembrete]");
+    if (!b) return;
+    const l = lembretesAtuais[Number(b.dataset.lembrete)];
+    if (l) l.acoes[Number(b.dataset.acao)][2]();
+  };
+}
+
+/* ---------- Notificações no celular (app na tela de início) ---------- */
+const temPush = () => "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+const ehIPhone = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const comoApp = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+
+function registrarServiceWorker() {
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch((e) => console.warn("service worker", e));
+}
+
+function bytesDaChave(base64) {
+  const b = (base64 + "=".repeat((4 - (base64.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/");
+  return Uint8Array.from(atob(b), (c) => c.charCodeAt(0));
+}
+
+async function inscricaoAtual() {
+  if (!temPush()) return null;
+  try { const reg = await navigator.serviceWorker.getRegistration(); return reg ? await reg.pushManager.getSubscription() : null; } catch (_) { return null; }
+}
+
+async function ativarNotificacoes() {
+  const perm = await Notification.requestPermission();
+  if (perm !== "granted") { avisar("Sem permissão, o celular não deixa mandar notificação.", true); return false; }
+  const { data, error } = await db.functions.invoke("lembretes", { method: "GET" });
+  if (error || !data || !data.chave_publica) { avisar("Não consegui falar com o ajudante de lembretes no Supabase.", true); return false; }
+  const reg = (await navigator.serviceWorker.getRegistration()) || (await navigator.serviceWorker.register("sw.js"));
+  await navigator.serviceWorker.ready;
+  let sub = await reg.pushManager.getSubscription();
+  if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: bytesDaChave(data.chave_publica) });
+  const j = sub.toJSON();
+  const aparelho = ehIPhone() ? "iPhone" : /Android/.test(navigator.userAgent) ? "Android" : "Computador";
+  const { error: e2 } = await db.from("push_inscricoes").upsert({ endpoint: j.endpoint, inscricao: j, aparelho }, { onConflict: "endpoint" });
+  if (e2) { avisar(traduzErro(e2), true); return false; }
+  return true;
+}
+
+async function desativarNotificacoes() {
+  const sub = await inscricaoAtual();
+  if (!sub) return;
+  await db.from("push_inscricoes").delete().eq("endpoint", sub.endpoint);
+  await sub.unsubscribe();
+}
+
+async function mandarTeste() {
+  const { data, error } = await db.functions.invoke("lembretes", { body: { acao: "teste" } });
+  if (error || (data && data.erro)) { avisar((data && data.erro) || "O ajudante de lembretes não respondeu.", true); return; }
+  if (!data.enviados) avisar(data.erros && data.erros.length ? "O envio falhou: " + data.erros[0] : "Nenhum aparelho com notificação ligada.", true);
+  else avisar(`Notificação enviada para ${plural(data.enviados, "aparelho", "aparelhos")}. Ela chega em alguns segundos.`);
+}
+
+async function abrirNotificacoes() {
+  let corpo, pe = "";
+  const sub = await inscricaoAtual();
+  if (ehIPhone() && !comoApp()) {
+    corpo = `<p>No iPhone, as notificações só funcionam com o painel instalado como app. Leva 1 minuto:</p>
+      <ol class="passos">
+        <li>Abra este painel no <b>Safari</b>.</li>
+        <li>Toque no botão <b>Compartilhar</b> (o quadrado com a seta para cima).</li>
+        <li>Toque em <b>Adicionar à Tela de Início</b> e depois em <b>Adicionar</b>.</li>
+        <li>Abra o <b>Painel Ryan</b> pelo ícone novo, entre com o seu login e volte aqui em <b>Notificações no celular</b>.</li>
+      </ol>`;
+  } else if (!temPush()) {
+    corpo = `<p>Este navegador não aceita notificações. No iPhone, instale o painel na tela de início pelo Safari (precisa do iOS 16.4 ou mais novo).</p>`;
+  } else if (Notification.permission === "denied") {
+    corpo = `<p>As notificações deste app estão bloqueadas. No iPhone, vá em <b>Ajustes</b>, depois <b>Notificações</b>, toque em <b>Painel Ryan</b> e ligue <b>Permitir Notificações</b>. Depois volte aqui.</p>`;
+  } else if (sub && Notification.permission === "granted") {
+    corpo = `<p><b>Notificações ligadas neste aparelho.</b></p>
+      <ul class="passos"><li>Todo dia às 9h: um resumo do que está pendente (só quando tem algo).</li><li>Toda quarta às 18h: lembrete do repasse do TikTok Shop, se ainda não foi lançado.</li></ul>
+      <p class="sub">O número no ícone do app mostra quantos lembretes estão abertos.</p>`;
+    pe = `<button type="button" class="btn perigo esq" data-desligar>Desligar neste aparelho</button><button type="button" class="btn primario" data-teste>Mandar notificação de teste</button>`;
+  } else {
+    corpo = `<p>Ligue as notificações para receber:</p>
+      <ul class="passos"><li>Todo dia às 9h: um resumo do que está pendente (pagamento vencido, nota para enviar, entrega chegando, negociação parada).</li><li>Toda quarta às 18h: lembrete do repasse do TikTok Shop, se ainda não foi lançado.</li></ul>`;
+    pe = `<button type="button" class="btn primario" data-ligar>Ligar notificações</button>`;
+  }
+  const d = abrirJanelaSimples("Notificações no celular", corpo, pe);
+  const b = (s) => $(s, d);
+  if (b("[data-ligar]")) b("[data-ligar]").onclick = async (e) => {
+    e.target.disabled = true; e.target.textContent = "Ligando...";
+    try { if (await ativarNotificacoes()) { d.close(); avisar("Notificações ligadas!"); setTimeout(abrirNotificacoes, 300); } }
+    catch (erro) { avisar("Não deu para ligar: " + (erro.message || erro), true); }
+    e.target.disabled = false; e.target.textContent = "Ligar notificações";
+  };
+  if (b("[data-teste]")) b("[data-teste]").onclick = async (e) => { e.target.disabled = true; await mandarTeste(); e.target.disabled = false; };
+  if (b("[data-desligar]")) b("[data-desligar]").onclick = async () => { await desativarNotificacoes(); d.close(); avisar("Notificações desligadas neste aparelho."); };
 }
