@@ -43,6 +43,8 @@ const dataBR = (s) => (s ? String(s).slice(0, 10).split("-").reverse().join("/")
 let privado = false;
 try { privado = localStorage.getItem("modo-privado") === "1"; } catch (_) {}
 const OCULTO = "R$ ••••";
+// Quantidade de campanhas/contratos: também some no modo privado
+const qtd = (n, um, varios) => (privado ? (varios ? "•• " + varios : "••") : (varios ? plural(n, um, varios) : num(n)));
 const real = (v) => (privado ? OCULTO : new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(v) || 0));
 const num = (v) => (Number(v) || 0).toLocaleString("pt-BR");
 const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
@@ -1806,7 +1808,7 @@ function relatorioPeriodo() {
       </div>
       <p class="meta-texto">${p >= 100
         ? `Meta de ${real(meta)} batida${fat > meta ? `, com ${real(fat - meta)} a mais` : ""}. Parabéns!`
-        : `Meta ${real(meta)}. Faltam <b>${real(falta)}</b>${ehAgora ? ` em ${plural(diasFim, "dia", "dias")}` : ""}${trabalhos ? `, mais ou menos ${plural(trabalhos, "trabalho", "trabalhos")} no seu ticket médio` : ""}.`}
+        : `Meta ${real(meta)}. Faltam <b>${real(falta)}</b>${ehAgora ? ` em ${plural(diasFim, "dia", "dias")}` : ""}${trabalhos ? `, mais ou menos ${qtd(trabalhos, "trabalho", "trabalhos")} no seu ticket médio` : ""}.`}
         ${mes ? `<button type="button" class="link-btn" data-meta>mudar a meta</button>` : ""}</p>`;
   } else {
     const sug = mes ? sugestaoMeta(ano, mes) : 0;
@@ -1833,7 +1835,7 @@ function relatorioPeriodo() {
       <div><span>Entrou na conta</span><b>${real(entrou)}</b></div>
       ${comparar}
       <div><span>TikTok Shop</span><b>${real(ttk)}</b></div>
-      <div><span>Em negociação</span><b>${real(vNeg)}</b>${negociando.length ? `<small>${plural(negociando.length, "proposta", "propostas")}</small>` : ""}</div>
+      <div><span>Em negociação</span><b>${real(vNeg)}</b>${negociando.length ? `<small>${qtd(negociando.length, "proposta", "propostas")}</small>` : ""}</div>
     </div>
   </div>`;
 }
@@ -1852,7 +1854,7 @@ function cartaoFunil({ baldes, gargalo }) {
         <span class="fl-nome">${esc(b.nome)}${gargalo && gargalo.k === b.k ? ` <span class="etq ${b.k === "vencido" ? "vermelha" : "amarela"}">gargalo</span>` : ""}</span>
         <span class="lb-trilho"><i style="width:${(b.v / max) * 100}%"></i></span>
         <span class="lb-valor">${real(b.v)}</span>
-        <small class="lb-extra">${plural(b.lista.length, "contrato", "contratos")}</small>
+        <small class="lb-extra">${qtd(b.lista.length, "contrato", "contratos")}</small>
       </button>`).join("")}
     </div>` : ""}
     ${gargalo
@@ -1899,7 +1901,7 @@ function insightsDoAno(funil) {
   const totalContratos = doAno.reduce((s, c) => s + n2(c.valor), 0);
   itens.push({ ic: "marcas", titulo: "Clientes que voltam",
     texto: voltaram.length
-      ? `<b>${voltaram.length} de ${clientes.length}</b> marcas fecharam de novo (${pct(vVoltaram, totalContratos)}% dos contratos).`
+      ? `<b>${qtd(voltaram.length)} de ${qtd(clientes.length)}</b> marcas fecharam de novo (${pct(vVoltaram, totalContratos)}% dos contratos).`
       : `Nenhuma marca fechou duas vezes ainda.`,
     dica: `Você não tem cliente fixo, então todo mês começa do zero. Ofereça ${voltaram.length ? `para ${esc(voltaram[0].nome)}` : "para as marcas que gostaram do seu trabalho"} um pacote mensal (ex: 4 vídeos por mês com 10% de desconto). Um contrato fixo de ${real(Math.max(800, Math.round(ticketAno * 3 / 100) * 100))} por mês já dá uma base para o mês não começar do zero.` });
 
@@ -2047,25 +2049,25 @@ function desenharFinanceiro(el) {
     <div class="grade-fin tres">
       <div class="cartao">
         <h2>Por tipo de trabalho</h2>
-        ${porTipo.length ? `<div class="lista-barras">${porTipo.map((x) => `<div class="linha-barra" data-dica="<b>${esc(x.t)}</b><br>${real(x.v)} em ${plural(x.n, x.repasse ? "repasse" : "contrato", x.repasse ? "repasses" : "contratos")}<br>${x.repasse ? "média por repasse" : "ticket médio"} ${real(x.ticket)}">
+        ${porTipo.length ? `<div class="lista-barras">${porTipo.map((x) => `<div class="linha-barra" data-dica="<b>${esc(x.t)}</b><br>${real(x.v)} em ${qtd(x.n, x.repasse ? "repasse" : "contrato", x.repasse ? "repasses" : "contratos")}<br>${x.repasse ? "média por repasse" : "ticket médio"} ${real(x.ticket)}">
           <span class="lb-nome">${esc(x.t)}</span>
           <span class="lb-trilho"><i style="width:${(x.v / maxTipo) * 100}%"></i></span>
           <span class="lb-valor">${real(x.v)} <small>${pct(x.v, faturado)}%</small></span>
-          <small class="lb-extra">${x.repasse ? `${plural(x.n, "repasse", "repasses")} · média ${real(x.ticket)}` : `${plural(x.n, "contrato", "contratos")} · ticket ${real(x.ticket)}`}</small>
+          <small class="lb-extra">${x.repasse ? `${qtd(x.n, "repasse", "repasses")} · média ${real(x.ticket)}` : `${qtd(x.n, "contrato", "contratos")} · ticket ${real(x.ticket)}`}</small>
         </div>`).join("")}</div>` : `<p class="vazio">Sem contratos fechados no período.</p>`}
       </div>
       <div class="cartao">
         <h2>Clientes que mais pagaram</h2>
-        ${top.length ? `<div class="lista-barras">${top.map((x, i) => `<div class="linha-barra" data-dica="<b>${esc(x.nome)}</b><br>${real(x.v)} em ${plural(x.n, "contrato", "contratos")}<br>${x.vezes > 1 ? `já fechou ${x.vezes} vezes com você` : "fechou uma vez só"}">
+        ${top.length ? `<div class="lista-barras">${top.map((x, i) => `<div class="linha-barra" data-dica="<b>${esc(x.nome)}</b><br>${real(x.v)} em ${qtd(x.n, "contrato", "contratos")}<br>${x.vezes > 1 ? `já fechou ${qtd(x.vezes)} vezes com você` : "fechou uma vez só"}">
           <span class="lb-nome">${i + 1}. ${esc(x.nome)}</span>
           <span class="lb-trilho"><i style="width:${(x.v / maxTop) * 100}%"></i></span>
           <span class="lb-valor">${real(x.v)}</span>
-          <small class="lb-extra">${plural(x.n, "contrato", "contratos")}${x.vezes > 1 ? ` <span class="etq verde">voltou ${x.vezes}x</span>` : ""}</small>
+          <small class="lb-extra">${qtd(x.n, "contrato", "contratos")}${x.vezes > 1 ? ` <span class="etq verde">voltou ${qtd(x.vezes)}x</span>` : ""}</small>
         </div>`).join("")}</div>` : `<p class="vazio">Sem contratos fechados no período.</p>`}
       </div>
       <div class="cartao">
         <h2>Contratos por status</h2>
-        ${Object.keys(contaStatus).length ? `<div class="status-lista">${STATUS_FILTRO.filter((s) => contaStatus[s]).map((s) => `<button type="button" class="status-item" data-filtrar="${esc(s)}"><span class="pilula ${classeStatus(s)}">${esc(s)}</span><b>${contaStatus[s]}</b></button>`).join("")}</div>
+        ${Object.keys(contaStatus).length ? `<div class="status-lista">${STATUS_FILTRO.filter((s) => contaStatus[s]).map((s) => `<button type="button" class="status-item" data-filtrar="${esc(s)}"><span class="pilula ${classeStatus(s)}">${esc(s)}</span><b>${qtd(contaStatus[s])}</b></button>`).join("")}</div>
           <p class="sub">Clique num status para ver só esses contratos na lista.</p>` : `<p class="vazio">Sem contratos no período.</p>`}
       </div>
     </div>
@@ -2116,7 +2118,7 @@ function desenharFinanceiro(el) {
           </tr>`;
         }).join("");
     const tot = lista.filter(fechado);
-    $("#conta-contratos").textContent = `${plural(lista.length, "contrato", "contratos")} · ${real(tot.reduce((s, c) => s + n2(c.valor), 0))} faturado · ${real(tot.reduce((s, c) => s + saldoDe(c), 0))} a receber`;
+    $("#conta-contratos").textContent = `${qtd(lista.length, "contrato", "contratos")} · ${real(tot.reduce((s, c) => s + n2(c.valor), 0))} faturado · ${real(tot.reduce((s, c) => s + saldoDe(c), 0))} a receber`;
   };
   pintar();
 
@@ -2267,11 +2269,11 @@ function desenharProducao(el) {
 
   el.innerHTML = `
     <div class="faixa-kpi">
-      <div class="kpi"><span>Em negociação</span><strong>${num(negociando.length)}</strong><small>${real(negociando.reduce((s, c) => s + n2(c.valor), 0))} em propostas</small></div>
-      <div class="kpi"><span>Em produção</span><strong>${num(emProducao.length)}</strong><small>${real(emProducao.reduce((s, c) => s + n2(c.valor), 0))} em contratos</small></div>
-      <div class="kpi"><span>Vídeos para entregar</span><strong>${num(videos)}</strong><small>somando as campanhas abertas</small></div>
-      <div class="kpi ${atrasadas.length ? "alerta" : ""}"><span>Atrasadas</span><strong>${num(atrasadas.length)}</strong><small>${atrasadas.length ? "passou do prazo de entrega" : "tudo em dia"}</small></div>
-      <div class="kpi"><span>Entregues este mês</span><strong>${num(entreguesMes.length)}</strong><small>${MESES_LONGOS[agora.getMonth()]}</small></div>
+      <div class="kpi"><span>Em negociação</span><strong>${qtd(negociando.length)}</strong><small>${real(negociando.reduce((s, c) => s + n2(c.valor), 0))} em propostas</small></div>
+      <div class="kpi"><span>Em produção</span><strong>${qtd(emProducao.length)}</strong><small>${real(emProducao.reduce((s, c) => s + n2(c.valor), 0))} em contratos</small></div>
+      <div class="kpi"><span>Vídeos para entregar</span><strong>${qtd(videos)}</strong><small>somando as campanhas abertas</small></div>
+      <div class="kpi ${atrasadas.length ? "alerta" : ""}"><span>Atrasadas</span><strong>${qtd(atrasadas.length)}</strong><small>${atrasadas.length ? "passou do prazo de entrega" : "tudo em dia"}</small></div>
+      <div class="kpi"><span>Entregues este mês</span><strong>${qtd(entreguesMes.length)}</strong><small>${MESES_LONGOS[agora.getMonth()]}</small></div>
     </div>
     <div class="barra">
       <div class="busca">${ic("busca")}<input type="search" id="busca-prod" placeholder="Buscar cliente ou descrição" value="${esc(prod.busca)}" aria-label="Buscar campanhas"></div>
@@ -2295,9 +2297,9 @@ function desenharProducao(el) {
       }
       const soma = itens.reduce((s, c) => s + (nome === "Entregue" ? saldoDe(c) : n2(c.valor)), 0);
       return `<section class="coluna col-prod" data-coluna="${esc(nome)}" aria-label="${nome}">
-        <header><b>${nome}</b><span class="pilula">${itens.length + resto}</span>${soma && nome !== "Pago" ? `<small class="sub" style="margin-left:auto">${real(soma)}</small>` : ""}</header>
+        <header><b>${nome}</b><span class="pilula">${qtd(itens.length + resto)}</span>${soma && nome !== "Pago" ? `<small class="sub" style="margin-left:auto">${real(soma)}</small>` : ""}</header>
         <div class="coluna-corpo">${itens.map(cartaoCampanha).join("") || `<p class="coluna-vazia">${nome === "Negociação" ? "Propostas novas aparecem aqui" : "Arraste para cá"}</p>`}
-        ${resto ? `<button class="btn" type="button" data-ir-financeiro style="width:100%;justify-content:center">+${resto} no Financeiro</button>` : ""}</div>
+        ${resto ? `<button class="btn" type="button" data-ir-financeiro style="width:100%;justify-content:center">+${qtd(resto)} no Financeiro</button>` : ""}</div>
       </section>`;
     }).join("");
   };
@@ -2710,8 +2712,8 @@ function desenharInicio(el) {
       </button>
       <button type="button" class="kpi-inicio" data-ir="campanhas">
         <span>Em produção</span>
-        <strong>${plural(emProducao.length, "campanha", "campanhas")}</strong>
-        <small>${entregasSemana.length ? `${plural(entregasSemana.length, "entrega", "entregas")} nos próximos 7 dias` : "nenhuma entrega na semana"}</small>
+        <strong>${qtd(emProducao.length, "campanha", "campanhas")}</strong>
+        <small>${entregasSemana.length ? `${qtd(entregasSemana.length, "entrega", "entregas")} nos próximos 7 dias` : "nenhuma entrega na semana"}</small>
       </button>
       <button type="button" class="kpi-inicio" data-ir="portfolio">
         <span>Visitas no site</span>
