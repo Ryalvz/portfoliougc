@@ -73,11 +73,12 @@ const ESQUEMA = {
   marcas: ["id", "nome", "instagram", "email", "telefone", "situacao", "obs", "ultimo_contato", "exemplo", "criado_em"],
   calendario: ["id", "titulo", "marca", "tipo", "data", "status", "exemplo"],
   campanhas: ["id", "campanha", "cliente", "tipo", "status", "qtd", "valor", "prazo", "pagamento", "ativa", "favorita", "exemplo"],
+  contratos: ["id", "cliente", "tipo", "descricao", "valor", "mes", "ano", "data_nf", "prazo_dias", "status", "parcela1", "data_p1", "parcela2", "data_p2", "obs"],
   transcricoes: ["id", "criado_em", "link", "plataforma", "categoria", "status", "titulo", "transcricao", "transcricao_original", "idioma_original", "minha_versao", "observacoes"],
   marcados: ["chave", "marcado"],
   visitas: ["id", "data", "pagina", "origem"]
 };
-const S = { videos: [], marcas: [], calendario: [], campanhas: [], marcados: {}, visitas: [], transcricoes: [] };
+const S = { videos: [], marcas: [], calendario: [], campanhas: [], marcados: {}, visitas: [], transcricoes: [], contratos: [] };
 const CAMPOS = {};          // campos que existem de verdade em cada tabela
 const FALTAS = new Map();   // tabela -> o que faltou
 
@@ -117,16 +118,17 @@ async function ler(tabela, ajuste) {
 
 async function carregarTudo() {
   const desde = new Date(); desde.setHours(0, 0, 0, 0); desde.setDate(desde.getDate() - 13);
-  const [videos, marcas, calendario, campanhas, marcados, visitas, transcricoes] = await Promise.all([
+  const [videos, marcas, calendario, campanhas, marcados, visitas, transcricoes, contratos] = await Promise.all([
     ler("videos", (q, c) => (c.includes("ordem") ? q.order("ordem", { ascending: true }) : q)),
     ler("marcas", (q, c) => (c.includes("criado_em") ? q.order("criado_em", { ascending: false }) : q)),
     ler("calendario"),
     ler("campanhas"),
     ler("marcados"),
     ler("visitas", (q, c) => (c.includes("data") ? q.gte("data", desde.toISOString()).order("data").limit(10000) : q)),
-    ler("transcricoes", (q, c) => (c.includes("criado_em") ? q.order("criado_em", { ascending: false }) : q))
+    ler("transcricoes", (q, c) => (c.includes("criado_em") ? q.order("criado_em", { ascending: false }) : q)),
+    ler("contratos", (q, c) => (c.includes("id") ? q.order("id", { ascending: true }).limit(5000) : q))
   ]);
-  Object.assign(S, { videos, marcas, calendario, campanhas, visitas, transcricoes });
+  Object.assign(S, { videos, marcas, calendario, campanhas, visitas, transcricoes, contratos });
   S.marcados = {};
   marcados.forEach((m) => { if (m.chave) S.marcados[m.chave] = m.marcado !== false; });
 }
@@ -274,6 +276,7 @@ const DESENHOS = {
   calendario: desenharCalendario,
   campanhas: desenharCampanhas,
   transcricoes: desenharTranscricoes,
+  financeiro: desenharFinanceiro,
   checklist: desenharChecklist
 };
 let abaAtual = "portfolio";
@@ -1612,4 +1615,268 @@ function pintarDetalheTrans() {
     if (!(await confirmar(`Apagar "${t.titulo || "esta ideia"}" do seu banco de ideias?`))) return;
     if (await apagarLinha("transcricoes", t.id)) { trans.sel = null; avisar("Apagada."); recarregar("transcricoes"); }
   };
+}
+
+/* =============================================================
+   ABA 7: FINANCEIRO
+   Os contratos (tabela contratos), no lugar da planilha de
+   contabilidade. O painel calcula: data prevista (nota + prazo),
+   recebido (parcela 1 + 2), saldo e vencido (prazo passou e ainda
+   falta receber).
+   ============================================================= */
+const TIPOS_CONTRATO = ["UGC", "Influencer", "Freelance", "Videomaker", "Infoproduto/Comissão", "Outro"];
+const STATUS_CONTRATO = ["Aguardando briefing", "Aprovação de roteiro", "Gravando", "Editando", "Enviado p/ aprovação", "Entregue", "Pago", "Cancelado"];
+const MESES_CURTOS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+const MESES_LONGOS = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+const fin = { ano: new Date().getFullYear(), mes: 0, busca: "", status: "", ordem: "recente" };
+
+const n2 = (v) => Number(v) || 0;
+const recebidoDe = (c) => n2(c.parcela1) + n2(c.parcela2);
+const saldoDe = (c) => (c.status === "Cancelado" ? 0 : Math.max(0, Math.round((n2(c.valor) - recebidoDe(c)) * 100) / 100));
+function previstaDe(c) {
+  if (!c.data_nf || c.prazo_dias == null) return null;
+  const d = deISO(c.data_nf); d.setDate(d.getDate() + Number(c.prazo_dias));
+  return isoLocal(d);
+}
+// Vencido é automático: o prazo passou, ainda falta receber e não está pago/cancelado
+function situacaoDe(c) {
+  if (c.status === "Pago" || c.status === "Cancelado") return c.status;
+  const prev = previstaDe(c);
+  if (saldoDe(c) > 0 && prev && prev < hojeISO()) return "Vencido";
+  return c.status;
+}
+const classeStatus = (s) => ({ "Pago": "p-pago", "Entregue": "p-cliente", "Vencido": "p-vencido", "Cancelado": "p-parada", "Enviado p/ aprovação": "p-conversando" }[s] || "p-pendente");
+
+// Tooltip único para todos os gráficos do financeiro
+function ligarDicas(el) {
+  let dica = $("#dica-grafico");
+  if (!dica) { dica = document.createElement("div"); dica.id = "dica-grafico"; dica.className = "dica-grafico"; dica.hidden = true; document.body.appendChild(dica); }
+  el.addEventListener("pointermove", (e) => {
+    const alvo = e.target.closest("[data-dica]");
+    if (!alvo) { dica.hidden = true; return; }
+    dica.innerHTML = alvo.dataset.dica;
+    dica.hidden = false;
+    const w = dica.offsetWidth;
+    dica.style.left = Math.min(window.innerWidth - w - 8, e.clientX + 14) + "px";
+    dica.style.top = (e.clientY + 16) + "px";
+  });
+  el.addEventListener("pointerleave", () => { dica.hidden = true; });
+}
+
+function desenharFinanceiro(el) {
+  const todos = S.contratos;
+  const anos = [...new Set([new Date().getFullYear(), ...todos.map((c) => Number(c.ano)).filter(Boolean)])].sort((a, b) => b - a);
+  if (!anos.includes(fin.ano)) fin.ano = anos[0];
+  const doAno = todos.filter((c) => Number(c.ano) === fin.ano);
+  const doPeriodo = doAno.filter((c) => !fin.mes || Number(c.mes) === fin.mes);
+  const validos = doPeriodo.filter((c) => c.status !== "Cancelado");
+
+  // Números do período
+  const faturado = validos.reduce((s, c) => s + n2(c.valor), 0);
+  const recebido = validos.reduce((s, c) => s + recebidoDe(c), 0);
+  const aReceber = validos.reduce((s, c) => s + saldoDe(c), 0);
+  const vencidos = validos.filter((c) => situacaoDe(c) === "Vencido");
+  const vencido = vencidos.reduce((s, c) => s + saldoDe(c), 0);
+  const ticket = validos.length ? faturado / validos.length : 0;
+  const nomePeriodo = fin.mes ? `${MESES_LONGOS[fin.mes - 1]} de ${fin.ano}` : `${fin.ano}`;
+
+  // Gráfico 1: faturado (mês de fechamento) x recebido (data real de cada parcela), no ano
+  const fatMes = Array(12).fill(0), recMes = Array(12).fill(0), prevMes = Array(12).fill(0);
+  doAno.filter((c) => c.status !== "Cancelado").forEach((c) => { if (c.mes) fatMes[c.mes - 1] += n2(c.valor); });
+  todos.forEach((c) => {
+    [[c.parcela1, c.data_p1], [c.parcela2, c.data_p2]].forEach(([v, d]) => {
+      if (v && d && deISO(d).getFullYear() === fin.ano) recMes[deISO(d).getMonth()] += n2(v);
+    });
+    // Gráfico 2: previsão = o que falta receber, no mês da data prevista
+    const prev = previstaDe(c), sal = saldoDe(c);
+    if (sal > 0 && prev && deISO(prev).getFullYear() === fin.ano && situacaoDe(c) !== "Cancelado") prevMes[deISO(prev).getMonth()] += sal;
+  });
+  const maxBarras = Math.max(1, ...fatMes, ...recMes);
+  const maxPrev = Math.max(1, ...prevMes);
+  const mesHoje = new Date().getFullYear() === fin.ano ? new Date().getMonth() : -1;
+
+  const graficoMeses = `<div class="barras-mes" role="img" aria-label="Faturado e recebido por mês em ${fin.ano}">
+    ${MESES_CURTOS.map((m, i) => `<div class="grupo-mes ${fin.mes === i + 1 ? "foco" : ""}" data-dica="<b>${MESES_LONGOS[i]}</b><br>Faturado: ${real(fatMes[i])}<br>Recebido: ${real(recMes[i])}">
+      <div class="par-barras">
+        <i class="b-fat" style="height:${(fatMes[i] / maxBarras) * 100}%"></i>
+        <i class="b-rec" style="height:${(recMes[i] / maxBarras) * 100}%"></i>
+      </div>
+      <span>${m}</span>
+    </div>`).join("")}
+  </div>`;
+  const graficoPrev = prevMes.every((v) => !v)
+    ? `<p class="vazio">Nada a receber com data prevista em ${fin.ano}. Quando um contrato tiver nota fiscal e prazo, o valor que falta aparece aqui no mês certo.</p>`
+    : `<div class="barras-mes" role="img" aria-label="Previsão de recebimento por mês em ${fin.ano}">
+      ${MESES_CURTOS.map((m, i) => `<div class="grupo-mes ${i === mesHoje ? "hoje" : ""}" data-dica="<b>${MESES_LONGOS[i]}</b><br>A receber: ${real(prevMes[i])}${i < mesHoje && prevMes[i] ? "<br>já passou do prazo" : ""}">
+        <b class="valor-barra">${prevMes[i] ? Math.round(prevMes[i]).toLocaleString("pt-BR") : ""}</b>
+        <div class="par-barras"><i class="b-prev ${i < mesHoje && prevMes[i] ? "atrasada" : ""}" style="height:${(prevMes[i] / maxPrev) * 100}%"></i></div>
+        <span>${m}</span>
+      </div>`).join("")}
+    </div>`;
+
+  // Por tipo: faturado, %, ticket médio e quantidade
+  const porTipo = TIPOS_CONTRATO.map((t) => {
+    const l = validos.filter((c) => c.tipo === t);
+    const v = l.reduce((s, c) => s + n2(c.valor), 0);
+    return { t, v, n: l.length, ticket: l.length ? v / l.length : 0 };
+  }).filter((x) => x.n).sort((a, b) => b.v - a.v);
+  const maxTipo = Math.max(1, ...porTipo.map((x) => x.v));
+
+  // Top clientes (junta "Torra" e "torra")
+  const clientes = {};
+  validos.forEach((c) => {
+    const k = String(c.cliente || "").trim().toLowerCase();
+    if (!clientes[k]) clientes[k] = { nome: String(c.cliente).trim(), v: 0, n: 0 };
+    clientes[k].v += n2(c.valor); clientes[k].n++;
+  });
+  const top = Object.values(clientes).sort((a, b) => b.v - a.v).slice(0, 6);
+  const maxTop = Math.max(1, ...top.map((x) => x.v));
+
+  // Por status (com o vencido automático)
+  const contaStatus = {};
+  doPeriodo.forEach((c) => { const s = situacaoDe(c); contaStatus[s] = (contaStatus[s] || 0) + 1; });
+
+  el.innerHTML = `
+    <div class="barra">
+      <select class="campo" id="fin-ano" aria-label="Ano">${anos.map((a) => `<option ${a === fin.ano ? "selected" : ""}>${a}</option>`).join("")}</select>
+      <select class="campo" id="fin-mes" aria-label="Mês"><option value="0">Ano todo</option>${MESES_LONGOS.map((m, i) => `<option value="${i + 1}" ${fin.mes === i + 1 ? "selected" : ""}>${m}</option>`).join("")}</select>
+      <span class="espaco"></span>
+      <button class="btn" type="button" id="csv-fin">${ic("baixar")}Baixar CSV</button>
+      <button class="btn primario" type="button" id="add-contrato">${ic("mais")}Novo contrato</button>
+    </div>
+    <div class="faixa-kpi">
+      <div class="kpi"><span>Faturado</span><strong>${real(faturado)}</strong><small>${nomePeriodo}</small></div>
+      <div class="kpi"><span>Recebido</span><strong>${real(recebido)}</strong><small>${faturado ? Math.round((recebido / faturado) * 100) + "% do faturado" : "nada faturado ainda"}</small></div>
+      <div class="kpi"><span>A receber</span><strong>${real(aReceber)}</strong><small>${plural(validos.filter((c) => saldoDe(c) > 0).length, "contrato em aberto", "contratos em aberto")}</small></div>
+      <div class="kpi ${vencido ? "alerta" : ""}"><span>Vencido</span><strong>${real(vencido)}</strong><small>${vencidos.length ? plural(vencidos.length, "contrato atrasado", "contratos atrasados") : "nada atrasado"}</small></div>
+      <div class="kpi"><span>Contratos</span><strong>${num(validos.length)}</strong><small>ticket médio ${real(ticket)}</small></div>
+    </div>
+    <div class="grade-fin">
+      <div class="cartao">
+        <div class="barra" style="margin-bottom:4px"><h2 style="margin:0">Faturado x recebido em ${fin.ano}</h2><span class="espaco"></span>
+          <span class="legenda" style="margin:0"><span><i class="leg-fat"></i>Faturado (mês do fechamento)</span><span><i class="leg-rec"></i>Recebido (dia que o dinheiro entrou)</span></span></div>
+        ${doAno.length ? graficoMeses : `<p class="vazio">Nenhum contrato em ${fin.ano}.</p>`}
+      </div>
+      <div class="cartao">
+        <h2>Previsão de recebimento em ${fin.ano}</h2>
+        <p class="sub" style="margin:-6px 0 6px">o que ainda falta receber, no mês da data prevista (nota + prazo)</p>
+        ${graficoPrev}
+      </div>
+    </div>
+    <div class="grade-fin tres">
+      <div class="cartao">
+        <h2>Por tipo de trabalho</h2>
+        ${porTipo.length ? `<div class="lista-barras">${porTipo.map((x) => `<div class="linha-barra" data-dica="<b>${esc(x.t)}</b><br>${real(x.v)} em ${plural(x.n, "contrato", "contratos")}<br>ticket médio ${real(x.ticket)}">
+          <span class="lb-nome">${esc(x.t)}</span>
+          <span class="lb-trilho"><i style="width:${(x.v / maxTipo) * 100}%"></i></span>
+          <span class="lb-valor">${real(x.v)} <small>${faturado ? Math.round((x.v / faturado) * 100) : 0}%</small></span>
+          <small class="lb-extra">${plural(x.n, "contrato", "contratos")} · ticket ${real(x.ticket)}</small>
+        </div>`).join("")}</div>` : `<p class="vazio">Sem contratos no período.</p>`}
+      </div>
+      <div class="cartao">
+        <h2>Clientes que mais pagaram</h2>
+        ${top.length ? `<div class="lista-barras">${top.map((x, i) => `<div class="linha-barra" data-dica="<b>${esc(x.nome)}</b><br>${real(x.v)} em ${plural(x.n, "contrato", "contratos")}">
+          <span class="lb-nome">${i + 1}. ${esc(x.nome)}</span>
+          <span class="lb-trilho"><i style="width:${(x.v / maxTop) * 100}%"></i></span>
+          <span class="lb-valor">${real(x.v)}</span>
+          <small class="lb-extra">${plural(x.n, "contrato", "contratos")}</small>
+        </div>`).join("")}</div>` : `<p class="vazio">Sem contratos no período.</p>`}
+      </div>
+      <div class="cartao">
+        <h2>Contratos por status</h2>
+        ${Object.keys(contaStatus).length ? `<div class="status-lista">${[...STATUS_CONTRATO.slice(0, 7), "Vencido", "Cancelado"].filter((s) => contaStatus[s]).map((s) => `<button type="button" class="status-item" data-filtrar="${esc(s)}"><span class="pilula ${classeStatus(s)}">${esc(s)}</span><b>${contaStatus[s]}</b></button>`).join("")}</div>
+          <p class="sub">Clique num status para ver só esses contratos na lista.</p>` : `<p class="vazio">Sem contratos no período.</p>`}
+      </div>
+    </div>
+    <div class="barra" style="margin-top:4px">
+      <h2 style="margin:0">Contratos de ${nomePeriodo}</h2>
+      <div class="busca">${ic("busca")}<input type="search" id="busca-fin" placeholder="Buscar cliente ou descrição" value="${esc(fin.busca)}" aria-label="Buscar contratos"></div>
+      <select class="campo" id="fin-status" aria-label="Filtrar por status"><option value="">Todos os status</option>${[...STATUS_CONTRATO.slice(0, 7), "Vencido", "Cancelado"].map((s) => `<option ${fin.status === s ? "selected" : ""}>${s}</option>`).join("")}</select>
+    </div>
+    <div class="tabela-caixa">
+      <table>
+        <thead><tr><th>Cliente</th><th>Tipo</th><th>Descrição</th><th>Mês</th><th class="num">Valor</th><th>Previsto</th><th>Status</th><th class="num">Recebido</th><th class="num">Saldo</th></tr></thead>
+        <tbody id="lista-contratos"></tbody>
+      </table>
+    </div>
+    <p class="contagem" id="conta-contratos"></p>`;
+
+  const pintar = () => {
+    const q = fin.busca.toLowerCase();
+    const lista = doPeriodo.filter((c) => (!fin.status || situacaoDe(c) === fin.status) && (!q || [c.cliente, c.descricao, c.obs].some((x) => String(x || "").toLowerCase().includes(q))))
+      .sort((a, b) => (n2(b.mes) - n2(a.mes)) || (String(b.data_nf || "").localeCompare(String(a.data_nf || ""))) || (b.id - a.id));
+    $("#lista-contratos").innerHTML = lista.length === 0
+      ? `<tr><td colspan="9"><p class="vazio">${todos.length ? "Nenhum contrato com esse filtro." : "Nenhum contrato ainda. Clique em Novo contrato."}</p></td></tr>`
+      : lista.map((c) => {
+          const s = situacaoDe(c), prev = previstaDe(c), sal = saldoDe(c);
+          const dias = prev ? diasEntre(prev, hojeISO()) : 0;
+          return `<tr class="clicavel ${c.status === "Cancelado" ? "escondido" : ""}" data-id="${esc(c.id)}">
+            <td><b>${esc(c.cliente)}</b></td>
+            <td>${esc(c.tipo || "")}</td>
+            <td class="corta" title="${esc(c.descricao || "")}">${esc(c.descricao || "")}</td>
+            <td>${c.mes ? MESES_CURTOS[c.mes - 1] : ""}</td>
+            <td class="num">${real(c.valor)}</td>
+            <td style="white-space:nowrap">${prev ? dataBR(prev) : `<span class="sub">sem nota</span>`}${s === "Vencido" ? `<span class="etq vermelha">${plural(dias, "dia", "dias")}</span>` : ""}</td>
+            <td><span class="pilula ${classeStatus(s)}">${esc(s)}</span></td>
+            <td class="num">${real(recebidoDe(c))}</td>
+            <td class="num">${sal > 0 ? `<b>${real(sal)}</b>` : `<span class="sub">${real(0)}</span>`}</td>
+          </tr>`;
+        }).join("");
+    const tot = lista.filter((c) => c.status !== "Cancelado");
+    $("#conta-contratos").textContent = `${plural(lista.length, "contrato", "contratos")} · ${real(tot.reduce((s, c) => s + n2(c.valor), 0))} faturado · ${real(tot.reduce((s, c) => s + saldoDe(c), 0))} a receber`;
+  };
+  pintar();
+
+  $("#fin-ano").onchange = (e) => { fin.ano = Number(e.target.value); desenhar(); };
+  $("#fin-mes").onchange = (e) => { fin.mes = Number(e.target.value); desenhar(); };
+  $("#busca-fin").addEventListener("input", (e) => { fin.busca = e.target.value; pintar(); });
+  $("#fin-status").onchange = (e) => { fin.status = e.target.value; pintar(); };
+  $$("[data-filtrar]", el).forEach((b) => b.onclick = () => { fin.status = b.dataset.filtrar; desenhar(); $("#lista-contratos").scrollIntoView({ behavior: "smooth", block: "start" }); });
+  $("#add-contrato").onclick = () => formContrato();
+  $("#lista-contratos").addEventListener("click", (e) => {
+    const tr = e.target.closest("tr[data-id]");
+    if (tr) formContrato(todos.find((c) => String(c.id) === tr.dataset.id));
+  });
+  $("#csv-fin").onclick = () => baixarCSV("financeiro",
+    ["Cliente", "Tipo", "Descrição", "Valor", "Mês", "Ano", "Data da nota", "Prazo (dias)", "Data prevista", "Status", "Parcela 1", "Data pgto P1", "Parcela 2", "Data pgto P2", "Recebido", "Saldo", "Obs"],
+    todos.map((c) => [c.cliente, c.tipo, c.descricao, n2(c.valor).toFixed(2).replace(".", ","), c.mes ? MESES_LONGOS[c.mes - 1] : "", c.ano, dataBR(c.data_nf), c.prazo_dias, dataBR(previstaDe(c)), situacaoDe(c),
+      c.parcela1 != null ? n2(c.parcela1).toFixed(2).replace(".", ",") : "", dataBR(c.data_p1), c.parcela2 != null ? n2(c.parcela2).toFixed(2).replace(".", ",") : "", dataBR(c.data_p2),
+      recebidoDe(c).toFixed(2).replace(".", ","), saldoDe(c).toFixed(2).replace(".", ","), c.obs]));
+  ligarDicas(el);
+}
+
+function formContrato(c) {
+  const hoje = new Date();
+  abrirForm({
+    titulo: c ? "Editar contrato" : "Novo contrato",
+    tabela: "contratos",
+    valores: c || { tipo: "UGC", status: "Aguardando briefing", mes: hoje.getMonth() + 1, ano: hoje.getFullYear(), prazo_dias: 30 },
+    campos: [
+      { n: "cliente", r: "Marca / cliente", req: true, inteiro: true },
+      { n: "tipo", r: "Tipo", t: "select", op: TIPOS_CONTRATO.map((t) => [t, t]) },
+      { n: "status", r: "Status", t: "select", op: STATUS_CONTRATO.map((s) => [s, s]) },
+      { n: "descricao", r: "Descrição", inteiro: true, ph: "ex: 2 vídeos + 3 stories" },
+      { n: "valor", r: "Valor total (R$)", t: "number" },
+      { n: "mes", r: "Mês de fechamento", t: "select", op: MESES_LONGOS.map((m, i) => [i + 1, m]) },
+      { n: "ano", r: "Ano", t: "number" },
+      { n: "data_nf", r: "Data da nota fiscal", t: "date" },
+      { n: "prazo_dias", r: "Prazo para pagar (dias)", t: "number" },
+      { n: "parcela1", r: "Parcela 1 recebida (R$)", t: "number" },
+      { n: "data_p1", r: "Dia que a parcela 1 entrou", t: "date" },
+      { n: "parcela2", r: "Parcela 2 recebida (R$)", t: "number" },
+      { n: "data_p2", r: "Dia que a parcela 2 entrou", t: "date" },
+      { n: "obs", r: "Observação", t: "textarea" }
+    ],
+    aoSalvar: async (d) => {
+      d.mes = Number(d.mes) || null;
+      d.ano = Number(d.ano) || hoje.getFullYear();
+      // Parcela vazia fica vazia (e não zero)
+      ["parcela1", "parcela2"].forEach((k) => { if (!d[k]) d[k] = null; });
+      if (d.prazo_dias === 0 && !(c && c.prazo_dias === 0)) d.prazo_dias = null;
+      const ok = await gravar("contratos", d, c ? c.id : null);
+      if (ok) recarregar("contratos");
+      return ok;
+    },
+    aoApagar: c ? async () => { const ok = await apagarLinha("contratos", c.id); if (ok) recarregar("contratos"); return ok; } : null
+  });
 }
