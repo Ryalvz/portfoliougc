@@ -607,3 +607,23 @@ details.tokscript > summary .emo { font-size: 16px; color: var(--cobalt); }
 .item-dia > .sub, .item-dia > .etq { flex: none; }
 @media (max-width: 1000px) { .inicio-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .grade-inicio { grid-template-columns: 1fr; } }
 @media (max-width: 420px) { .kpi-inicio strong { font-size: 18px; } }
+
+/* ---------- Cabeçalho: olho (esconder valores) e sino dos lembretes ---------- */
+.cabeca-acoes { display: flex; align-items: center; gap: 6px; }
+.cabeca-icone { width: 38px; height: 38px; border-radius: 50%; color: var(--text); }
+.cabeca-icone svg.i { width: 20px; height: 20px; }
+#modo-privado[aria-pressed="true"] { background: var(--tint-2); color: var(--cobalt); }
+.sino-caixa { position: relative; }
+#abrir-lembretes { position: relative; }
+#sino-conta { position: absolute; top: 2px; right: 1px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: #e8848f; color: #fff; font-size: 11px; font-style: normal; font-weight: 700; line-height: 18px; text-align: center; box-shadow: 0 0 0 2px var(--parchment); }
+.painel-lembretes { position: absolute; top: calc(100% + 8px); right: 0; z-index: 60; width: 400px; max-height: min(70vh, 560px); overflow: auto; background: var(--card); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 16px 40px rgba(26, 42, 108, .18); }
+.painel-lembretes header { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 14px 16px 8px; position: sticky; top: 0; background: var(--card); }
+.painel-lembretes ul { list-style: none; margin: 0; padding: 0 16px 8px; }
+.painel-lembretes .lembrete { grid-template-columns: 30px 1fr; }
+.painel-lembretes .lembrete-acoes { grid-column: 2; justify-content: flex-start; }
+.painel-lembretes .vazio { margin: 6px 16px 16px; }
+.privado .valor-barra { visibility: hidden; }
+@media (max-width: 860px) {
+  .some-celular { display: none; }
+  .painel-lembretes { position: fixed; top: 64px; left: 12px; right: 12px; width: auto; max-height: calc(100vh - 90px); }
+}

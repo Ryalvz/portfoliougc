@@ -17,7 +17,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&display=swap" rel="stylesheet">
 <!-- Ao mudar admin.css ou admin.js, aumente o número do ?v= para o navegador baixar a versão nova -->
-<link rel="stylesheet" href="admin.css?v=15">
+<link rel="stylesheet" href="admin.css?v=16">
 </head>
 <body>
 
@@ -53,6 +53,7 @@
   <symbol id="i-relogio" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
   <symbol id="i-grafico" viewBox="0 0 24 24"><path d="M12 3v9h9"/><path d="M20.5 15A9 9 0 1 1 9 3.5"/></symbol>
   <symbol id="i-casa" viewBox="0 0 24 24"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></symbol>
+  <symbol id="i-olho-fechado" viewBox="0 0 24 24"><path d="M10.6 5.1A10.6 10.6 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-2.2 3.1M6.6 6.6C3.7 8.5 2 12 2 12s3.5 7 10 7a9.7 9.7 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/><path d="M3 3l18 18"/></symbol>
   <symbol id="i-sino" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></symbol>
 </svg>
 
@@ -87,14 +88,20 @@
       <button class="icone-btn" type="button" id="alternar-menu" aria-label="Mostrar ou esconder o menu"><svg class="i"><use href="#i-menu"/></svg></button>
       <h1 id="titulo">Início</h1>
     </div>
-    <a class="btn" href="../" target="_blank" rel="noopener"><svg class="i"><use href="#i-link"/></svg>Ver meu site</a>
+    <div class="cabeca-acoes">
+      <button class="icone-btn cabeca-icone" type="button" id="modo-privado" aria-pressed="false" aria-label="Esconder valores" title="Esconder valores"><svg class="i"><use href="#i-olho"/></svg></button>
+      <!-- Lembretes do dia (TikTok Shop, pagamentos, notas, entregas, negociações) -->
+      <div class="sino-caixa">
+        <button class="icone-btn cabeca-icone" type="button" id="abrir-lembretes" aria-expanded="false" aria-controls="lembretes" aria-label="Lembretes"><svg class="i"><use href="#i-sino"/></svg><i id="sino-conta" hidden></i></button>
+        <div class="painel-lembretes" id="lembretes" hidden></div>
+      </div>
+      <a class="btn" href="../" target="_blank" rel="noopener"><svg class="i"><use href="#i-link"/></svg><span class="some-celular">Ver meu site</span></a>
+    </div>
   </div>
 
   <!-- Aviso quando falta alguma tabela ou campo no banco -->
   <div id="avisos"></div>
 
-  <!-- Lembretes do dia (TikTok Shop, pagamentos, notas, entregas, negociações) -->
-  <div id="lembretes"></div>
 
   <section id="aba-inicio" data-titulo="Início"></section>
   <section id="aba-portfolio" data-titulo="Portfólio" hidden></section>
@@ -109,8 +116,8 @@
 <dialog id="janela"></dialog>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="../js/banco.js?v=15"></script>
-<script src="../js/biblioteca.js?v=15"></script>
-<script src="admin.js?v=15"></script>
+<script src="../js/banco.js?v=16"></script>
+<script src="../js/biblioteca.js?v=16"></script>
+<script src="admin.js?v=16"></script>
 </body>
 </html>

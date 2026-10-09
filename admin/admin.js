@@ -39,7 +39,11 @@ const hojeISO = () => isoLocal(new Date());
 const deISO = (s) => { const [y, m, d] = String(s).slice(0, 10).split("-").map(Number); return new Date(y, m - 1, d); };
 const diasEntre = (a, b) => Math.round((deISO(b) - deISO(a)) / 86400000);
 const dataBR = (s) => (s ? String(s).slice(0, 10).split("-").reverse().join("/") : "");
-const real = (v) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(v) || 0);
+// Modo privado: esconde todos os valores em R$ (para mostrar o painel para alguém)
+let privado = false;
+try { privado = localStorage.getItem("modo-privado") === "1"; } catch (_) {}
+const OCULTO = "R$ ••••";
+const real = (v) => (privado ? OCULTO : new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(v) || 0));
 const num = (v) => (Number(v) || 0).toLocaleString("pt-BR");
 const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
 const ordenaTexto = new Intl.Collator("pt-BR", { sensitivity: "base", numeric: true }).compare;
@@ -335,6 +339,7 @@ async function iniciar(sessao) {
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") fecharMenu(); });
 
   ligarMenuRetratil();
+  ligarCabecalho();
   $("#aba-inicio").innerHTML = '<p class="vazio">Carregando seus dados...</p>';
   await carregarTudo();
   irPara((location.hash || "").slice(1) || "inicio");
@@ -1978,7 +1983,7 @@ function desenharFinanceiro(el) {
     ? `<p class="vazio">Nada a receber com data prevista em ${fin.ano}. Quando um contrato tiver nota fiscal e prazo, o valor que falta aparece aqui no mês certo.</p>`
     : `<div class="barras-mes" role="img" aria-label="Previsão de recebimento por mês em ${fin.ano}">
       ${MESES_CURTOS.map((m, i) => `<div class="grupo-mes ${i === mesHoje ? "hoje" : ""}" data-dica="<b>${MESES_LONGOS[i]}</b><br>A receber: ${real(prevMes[i])}${i < mesHoje && prevMes[i] ? "<br>já passou do prazo" : ""}">
-        <b class="valor-barra">${prevMes[i] ? Math.round(prevMes[i]).toLocaleString("pt-BR") : ""}</b>
+        <b class="valor-barra">${prevMes[i] && !privado ? Math.round(prevMes[i]).toLocaleString("pt-BR") : ""}</b>
         <div class="par-barras"><i class="b-prev ${i < mesHoje && prevMes[i] ? "atrasada" : ""}" style="height:${(prevMes[i] / maxPrev) * 100}%"></i></div>
         <span>${m}</span>
       </div>`).join("")}
@@ -2385,7 +2390,7 @@ function cartaoTtk(comAno) {
     ${barras.length ? `<div class="grade-ttk">
       <div class="barras-mes barras-ttk" role="img" aria-label="Últimos repasses do TikTok Shop">
         ${barras.map((x) => `<div class="grupo-mes" data-ttk="${esc(x.id)}" data-dica="<b>${dataBR(x.data)}</b><br>Comissão: ${real(x.valor)}${x.gmv ? `<br>GMV: ${real(x.gmv)}` : ""}${x.itens ? `<br>${plural(Number(x.itens), "item vendido", "itens vendidos")}` : ""}">
-          <b class="valor-barra">${Math.round(n2(x.valor)).toLocaleString("pt-BR")}</b>
+          <b class="valor-barra">${privado ? "" : Math.round(n2(x.valor)).toLocaleString("pt-BR")}</b>
           <div class="par-barras"><i class="b-prev" style="height:${(n2(x.valor) / max) * 100}%"></i></div>
           <span>${dataBR(x.data).slice(0, 5)}</span>
         </div>`).join("")}
@@ -2530,23 +2535,20 @@ function pintarLembretes() {
   lembretesAtuais = L;
   // Número no ícone do app no iPhone
   try { if (navigator.setAppBadge) (L.length ? navigator.setAppBadge(L.length) : navigator.clearAppBadge()).catch(() => {}); } catch (_) {}
-  if (!L.length) { caixa.innerHTML = ""; return; }
-  let recolhido = false;
-  try { recolhido = localStorage.getItem("lembretes-recolhido") === hojeISO(); } catch (_) {}
-  caixa.innerHTML = `<details class="lembretes" ${recolhido ? "" : "open"}>
-    <summary><span class="sino">${ic("sino")}<i>${L.length}</i></span><b>${L.length === 1 ? "1 lembrete para hoje" : `${L.length} lembretes para hoje`}</b><span class="sub">o painel confere sozinho o que precisa de você</span></summary>
-    <ul>${L.map((x, i) => `<li class="lembrete ${x.nivel}">
+  const conta = $("#sino-conta");
+  if (conta) { conta.hidden = !L.length; conta.textContent = L.length > 9 ? "9+" : String(L.length); }
+  $("#abrir-lembretes").setAttribute("aria-label", L.length ? plural(L.length, "lembrete", "lembretes") : "Nenhum lembrete");
+  caixa.innerHTML = `<header><b>Lembretes</b><span class="sub">${L.length ? plural(L.length, "coisa precisa", "coisas precisam") + " de você" : "tudo em dia"}</span></header>
+    ${L.length ? `<ul>${L.map((x, i) => `<li class="lembrete ${x.nivel}">
       <span class="insight-ic">${ic(x.ic)}</span>
       <p>${x.texto}</p>
       <div class="lembrete-acoes">${x.acoes.map(([r, p], j) => `<button type="button" class="btn pequeno ${p ? "primario" : ""}" data-lembrete="${i}" data-acao="${j}">${esc(r)}</button>`).join("")}</div>
-    </li>`).join("")}</ul>
-  </details>`;
-  const det = $("details", caixa);
-  det.addEventListener("toggle", () => { try { if (det.open) localStorage.removeItem("lembretes-recolhido"); else localStorage.setItem("lembretes-recolhido", hojeISO()); } catch (_) {} });
+    </li>`).join("")}</ul>` : `<p class="vazio">Nenhum lembrete agora. Tudo em dia!</p>`}`;
   caixa.onclick = (e) => {
     const b = e.target.closest("[data-lembrete]");
     if (!b) return;
     const l = lembretesAtuais[Number(b.dataset.lembrete)];
+    fecharLembretes();
     if (l) l.acoes[Number(b.dataset.acao)][2]();
   };
 }
@@ -2789,4 +2791,40 @@ function ligarMenuRetratil() {
     raiz.classList.toggle("topo-escondido", y > ultimo && y > 60);
     ultimo = y;
   }, { passive: true });
+}
+
+/* ---------- Sino dos lembretes e botão de esconder valores ---------- */
+function fecharLembretes() {
+  const p = $("#lembretes");
+  if (!p || p.hidden) return;
+  p.hidden = true;
+  $("#abrir-lembretes").setAttribute("aria-expanded", "false");
+}
+
+function ligarCabecalho() {
+  const botao = $("#abrir-lembretes"), painel = $("#lembretes");
+  botao.addEventListener("click", (e) => {
+    e.stopPropagation();
+    painel.hidden = !painel.hidden;
+    botao.setAttribute("aria-expanded", String(!painel.hidden));
+  });
+  document.addEventListener("click", (e) => { if (!e.target.closest(".sino-caixa")) fecharLembretes(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") fecharLembretes(); });
+
+  const olho = $("#modo-privado");
+  const pintarOlho = () => {
+    document.documentElement.classList.toggle("privado", privado);
+    olho.setAttribute("aria-pressed", String(privado));
+    olho.setAttribute("aria-label", privado ? "Mostrar valores" : "Esconder valores");
+    olho.title = privado ? "Mostrar valores" : "Esconder valores";
+    $("use", olho).setAttribute("href", privado ? "#i-olho-fechado" : "#i-olho");
+  };
+  pintarOlho();
+  olho.addEventListener("click", () => {
+    privado = !privado;
+    try { localStorage.setItem("modo-privado", privado ? "1" : "0"); } catch (_) {}
+    pintarOlho();
+    desenhar();
+    avisar(privado ? "Valores escondidos. Pode mostrar o painel tranquilo." : "Valores visíveis de novo.");
+  });
 }
