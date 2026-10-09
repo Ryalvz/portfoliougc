@@ -1,7 +1,7 @@
 {
   "name": "Painel Ryan Alves",
   "short_name": "Painel Ryan",
-  "start_url": "./#financeiro",
+  "start_url": "./",
   "scope": "../",
   "display": "standalone",
   "background_color": "#F0EEEA",

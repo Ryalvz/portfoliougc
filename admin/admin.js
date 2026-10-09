@@ -279,6 +279,7 @@ function baixarCSV(nome, cabecalho, linhas) {
 
 /* ---------- 3. ABAS ---------- */
 const DESENHOS = {
+  inicio: desenharInicio,
   portfolio: desenharPortfolio,
   marcas: desenharMarcas,
   calendario: desenharCalendario,
@@ -287,10 +288,10 @@ const DESENHOS = {
   financeiro: desenharFinanceiro,
   checklist: desenharChecklist
 };
-let abaAtual = "portfolio";
+let abaAtual = "inicio";
 
 function irPara(aba) {
-  if (!DESENHOS[aba]) aba = "portfolio";
+  if (!DESENHOS[aba]) aba = "inicio";
   abaAtual = aba;
   $$(".menu-item").forEach((b) => { if (b.dataset.aba === aba) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
   $$("main > section").forEach((s) => { s.hidden = s.id !== "aba-" + aba; });
@@ -333,9 +334,10 @@ async function iniciar(sessao) {
   registrarServiceWorker();
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") fecharMenu(); });
 
-  $("#aba-portfolio").innerHTML = '<p class="vazio">Carregando seus dados...</p>';
+  ligarMenuRetratil();
+  $("#aba-inicio").innerHTML = '<p class="vazio">Carregando seus dados...</p>';
   await carregarTudo();
-  irPara((location.hash || "").slice(1) || "portfolio");
+  irPara((location.hash || "").slice(1) || "inicio");
 }
 
 /* =============================================================
@@ -2633,4 +2635,158 @@ async function abrirNotificacoes() {
   };
   if (b("[data-teste]")) b("[data-teste]").onclick = async (e) => { e.target.disabled = true; await mandarTeste(); e.target.disabled = false; };
   if (b("[data-desligar]")) b("[data-desligar]").onclick = async () => { await desativarNotificacoes(); d.close(); avisar("Notificações desligadas neste aparelho."); };
+}
+
+/* =============================================================
+   ABA INÍCIO
+   O resumo do dia numa tela só: dinheiro do mês, o que tem para
+   hoje (agenda e entregas), ideias em andamento, contatos novos e
+   visitas do site. Os lembretes aparecem em cima, como em toda aba.
+   ============================================================= */
+const DIAS_SEMANA = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
+
+function desenharInicio(el) {
+  const agora = new Date();
+  const hoje = hojeISO();
+  const ano = agora.getFullYear(), mes = agora.getMonth() + 1;
+  const h = agora.getHours();
+  const saudacao = h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite";
+
+  // Dinheiro
+  const fat = faturadoEm(ano, mes);
+  const meta = metaDe(ano, mes);
+  const aReceber = S.contratos.reduce((s, c) => s + saldoDe(c), 0);
+  const vencido = S.contratos.filter((c) => situacaoDe(c) === "Vencido").reduce((s, c) => s + saldoDe(c), 0);
+
+  // Produção
+  const emProducao = S.contratos.filter((c) => grupoDe(c.status) === "producao");
+  const entregasSemana = emProducao.filter((c) => c.prazo_entrega && c.prazo_entrega <= somaDiasISO(7));
+
+  // Visitas do site
+  const diaDe = (v) => isoLocal(new Date(v.data));
+  const visitasHoje = S.visitas.filter((v) => diaDe(v) === hoje).length;
+  const visitas7 = S.visitas.filter((v) => diaDe(v) > somaDiasISO(-7)).length;
+
+  // Agenda: atrasados, hoje e próximos 7 dias
+  const eventos = eventosCalendario().filter((e) => !e.feito);
+  const atrasados = eventos.filter((e) => e.data < hoje && e.data >= somaDiasISO(-30));
+  const deHoje = eventos.filter((e) => e.data === hoje);
+  const proximos = eventos.filter((e) => e.data > hoje && e.data <= somaDiasISO(7)).sort((a, b) => a.data.localeCompare(b.data));
+  const linhaEvento = (e, extra = "") => `<button type="button" class="item-dia" data-evento="${esc(e.origem)}:${esc(e.ref.id)}">
+      <span class="pilula ${e.tipo === "prazo" ? "p-pendente" : "p-conversando"}">${esc(nomeTipo(e.tipo))}</span>
+      <span class="item-dia-texto"><b>${esc(e.titulo || "")}</b>${e.marca ? `<small>${esc(e.marca)}</small>` : ""}</span>
+      ${extra}
+    </button>`;
+
+  // Ideias em andamento e contatos novos
+  const ideias = S.transcricoes.filter((t) => ["agora", "fazendo"].includes(etapaDe(t)))
+    .sort((a, b) => (etapaDe(a) === "fazendo" ? 0 : 1) - (etapaDe(b) === "fazendo" ? 0 : 1)).slice(0, 5);
+  const leads = S.marcas.filter((m) => m.situacao === "lead" && !m.exemplo)
+    .sort((a, b) => String(b.criado_em || "").localeCompare(String(a.criado_em || ""))).slice(0, 4);
+
+  const pctMeta = meta ? Math.min(100, pct(fat, meta)) : 0;
+  el.innerHTML = `
+    <div class="inicio-topo">
+      <div><h2 class="saudacao">${saudacao}, Ryan</h2><p class="sub">${DIAS_SEMANA[agora.getDay()]}, ${agora.getDate()} de ${MESES_LONGOS[agora.getMonth()].toLowerCase()}</p></div>
+      <div class="inicio-acoes">
+        <button class="btn" type="button" data-rapido="ideia">${ic("mais")}Ideia</button>
+        <button class="btn" type="button" data-rapido="ttk">${ic("mais")}Repasse TikTok</button>
+        <button class="btn primario" type="button" data-rapido="contrato">${ic("mais")}Contrato</button>
+      </div>
+    </div>
+
+    <div class="inicio-kpis">
+      <button type="button" class="kpi-inicio" data-ir="financeiro">
+        <span>Faturado em ${MESES_LONGOS[mes - 1].toLowerCase()}</span>
+        <strong>${real(fat)}</strong>
+        ${meta ? `<span class="meta-trilho mini ${fat >= meta ? "batida" : ""}"><i style="width:${pctMeta}%"></i></span><small>${pct(fat, meta)}% da meta de ${real(meta)}</small>` : `<small>sem meta definida</small>`}
+      </button>
+      <button type="button" class="kpi-inicio ${vencido ? "alerta" : ""}" data-ir="financeiro">
+        <span>Para receber</span>
+        <strong>${real(aReceber)}</strong>
+        <small>${vencido ? `${real(vencido)} vencido` : "nada vencido"}</small>
+      </button>
+      <button type="button" class="kpi-inicio" data-ir="campanhas">
+        <span>Em produção</span>
+        <strong>${plural(emProducao.length, "campanha", "campanhas")}</strong>
+        <small>${entregasSemana.length ? `${plural(entregasSemana.length, "entrega", "entregas")} nos próximos 7 dias` : "nenhuma entrega na semana"}</small>
+      </button>
+      <button type="button" class="kpi-inicio" data-ir="portfolio">
+        <span>Visitas no site</span>
+        <strong>${plural(visitasHoje, "hoje", "hoje")}</strong>
+        <small>${plural(visitas7, "visita", "visitas")} nos últimos 7 dias</small>
+      </button>
+    </div>
+
+    <div class="grade-inicio">
+      <div class="cartao">
+        <div class="barra" style="margin-bottom:6px"><h2 style="margin:0">Hoje</h2><span class="espaco"></span><button type="button" class="link-btn" data-ir="calendario">abrir calendário</button></div>
+        ${atrasados.length || deHoje.length
+          ? `<div class="lista-dia">${atrasados.map((e) => linhaEvento(e, `<span class="etq vermelha">${plural(diasEntre(e.data, hoje), "dia", "dias")} atrasado</span>`)).join("")}${deHoje.map((e) => linhaEvento(e)).join("")}</div>`
+          : `<p class="vazio">Nada marcado para hoje.</p>`}
+        <h2 class="sub-titulo">Próximos 7 dias</h2>
+        ${proximos.length
+          ? `<div class="lista-dia">${proximos.slice(0, 6).map((e) => linhaEvento(e, `<span class="sub">${DIAS_SEMANA[deISO(e.data).getDay()].slice(0, 3)} ${dataBR(e.data).slice(0, 5)}</span>`)).join("")}</div>${proximos.length > 6 ? `<p class="sub">e mais ${proximos.length - 6} no calendário</p>` : ""}`
+          : `<p class="vazio">Semana livre por enquanto.</p>`}
+      </div>
+      <div class="coluna-inicio">
+        <div class="cartao">
+          <div class="barra" style="margin-bottom:6px"><h2 style="margin:0">Ideias em andamento</h2><span class="espaco"></span><button type="button" class="link-btn" data-ir="transcricoes">ver todas</button></div>
+          ${ideias.length
+            ? `<div class="lista-dia">${ideias.map((t) => `<button type="button" class="item-dia" data-ideia="${esc(t.id)}">
+                <span class="pilula ${etapaDe(t) === "fazendo" ? "p-conversando" : "p-pendente"}">${etapaDe(t) === "fazendo" ? "Fazendo" : "Fazer agora"}</span>
+                <span class="item-dia-texto"><b>${esc(t.titulo || "Ideia sem título")}</b><small>${esc(nomeCategoria(t.categoria))}</small></span>
+              </button>`).join("")}</div>`
+            : `<p class="vazio">Nenhuma ideia em "Fazer agora" ou "Fazendo".</p>`}
+        </div>
+        <div class="cartao">
+          <div class="barra" style="margin-bottom:6px"><h2 style="margin:0">Contatos novos</h2><span class="espaco"></span><button type="button" class="link-btn" data-ir="marcas">ver marcas</button></div>
+          ${leads.length
+            ? `<div class="lista-dia">${leads.map((m) => `<button type="button" class="item-dia" data-ir="marcas">
+                <span class="pilula p-lead">Lead</span>
+                <span class="item-dia-texto"><b>${esc(m.nome || "")}</b><small>${esc(m.instagram || m.email || "")}${m.criado_em ? ` · ${dataBR(String(m.criado_em).slice(0, 10)).slice(0, 5)}` : ""}</small></span>
+              </button>`).join("")}</div>`
+            : `<p class="vazio">Nenhum contato novo pelo site.</p>`}
+        </div>
+      </div>
+    </div>`;
+
+  el.onclick = (e) => {
+    const ir = e.target.closest("[data-ir]");
+    if (ir) { irPara(ir.dataset.ir); return; }
+    const ev = e.target.closest("[data-evento]");
+    if (ev) {
+      const [origem, id] = ev.dataset.evento.split(":");
+      if (origem === "campanha") formContrato(S.contratos.find((c) => String(c.id) === id));
+      else formCalendario(S.calendario.find((c) => String(c.id) === id));
+      return;
+    }
+    const ideia = e.target.closest("[data-ideia]");
+    if (ideia) { trans.sel = ideia.dataset.ideia; irPara("transcricoes"); return; }
+    const r = e.target.closest("[data-rapido]");
+    if (!r) return;
+    if (r.dataset.rapido === "contrato") formContrato();
+    else if (r.dataset.rapido === "ttk") formComissao();
+    else { irPara("transcricoes"); setTimeout(() => { const i = $("#form-add-trans input, #form-add-trans textarea"); if (i) i.focus(); }, 100); }
+  };
+}
+
+/* ---------- Mostrar e esconder o menu lateral ---------- */
+function ligarMenuRetratil() {
+  const raiz = document.documentElement;
+  try { if (localStorage.getItem("menu-oculto") === "1") raiz.classList.add("menu-oculto"); } catch (_) {}
+  $("#alternar-menu").addEventListener("click", () => {
+    // No celular abre a gaveta; no computador recolhe ou mostra o menu
+    if (matchMedia("(max-width: 860px)").matches) { $("#abrir-menu").click(); return; }
+    const oculto = raiz.classList.toggle("menu-oculto");
+    try { localStorage.setItem("menu-oculto", oculto ? "1" : "0"); } catch (_) {}
+  });
+  // No celular, a barra de cima some ao rolar para baixo e volta ao rolar para cima
+  let ultimo = window.scrollY;
+  window.addEventListener("scroll", () => {
+    const y = window.scrollY;
+    if (Math.abs(y - ultimo) < 8) return;
+    raiz.classList.toggle("topo-escondido", y > ultimo && y > 60);
+    ultimo = y;
+  }, { passive: true });
 }

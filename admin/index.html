@@ -17,7 +17,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&display=swap" rel="stylesheet">
 <!-- Ao mudar admin.css ou admin.js, aumente o número do ?v= para o navegador baixar a versão nova -->
-<link rel="stylesheet" href="admin.css?v=14">
+<link rel="stylesheet" href="admin.css?v=15">
 </head>
 <body>
 
@@ -52,6 +52,7 @@
   <symbol id="i-traduzir" viewBox="0 0 24 24"><path d="M4 5h8M8 3v2M5 9c1.5 3 4 5 7 6M11 5c-1 4-3.5 7-7 9"/><path d="M13 21l4-9 4 9M14.5 18h5"/></symbol>
   <symbol id="i-relogio" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
   <symbol id="i-grafico" viewBox="0 0 24 24"><path d="M12 3v9h9"/><path d="M20.5 15A9 9 0 1 1 9 3.5"/></symbol>
+  <symbol id="i-casa" viewBox="0 0 24 24"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></symbol>
   <symbol id="i-sino" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></symbol>
 </svg>
 
@@ -63,6 +64,7 @@
 
 <aside class="menu" id="menu" aria-label="Menu do painel">
   <div class="menu-marca">Ryan Alves <small>painel</small></div>
+  <button class="menu-item" type="button" data-aba="inicio"><svg class="i"><use href="#i-casa"/></svg>Início</button>
   <div class="menu-grupo">Meu site</div>
   <button class="menu-item" type="button" data-aba="portfolio"><svg class="i"><use href="#i-portfolio"/></svg>Portfólio</button>
   <button class="menu-item" type="button" data-aba="marcas"><svg class="i"><use href="#i-marcas"/></svg>Marcas</button>
@@ -81,7 +83,10 @@
 
 <main class="principal">
   <div class="cabeca">
-    <h1 id="titulo">Portfólio</h1>
+    <div class="cabeca-titulo">
+      <button class="icone-btn" type="button" id="alternar-menu" aria-label="Mostrar ou esconder o menu"><svg class="i"><use href="#i-menu"/></svg></button>
+      <h1 id="titulo">Início</h1>
+    </div>
     <a class="btn" href="../" target="_blank" rel="noopener"><svg class="i"><use href="#i-link"/></svg>Ver meu site</a>
   </div>
 
@@ -91,7 +96,8 @@
   <!-- Lembretes do dia (TikTok Shop, pagamentos, notas, entregas, negociações) -->
   <div id="lembretes"></div>
 
-  <section id="aba-portfolio" data-titulo="Portfólio"></section>
+  <section id="aba-inicio" data-titulo="Início"></section>
+  <section id="aba-portfolio" data-titulo="Portfólio" hidden></section>
   <section id="aba-marcas" data-titulo="Marcas" hidden></section>
   <section id="aba-calendario" data-titulo="Calendário" hidden></section>
   <section id="aba-campanhas" data-titulo="Campanhas" hidden></section>
@@ -103,8 +109,8 @@
 <dialog id="janela"></dialog>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="../js/banco.js?v=14"></script>
-<script src="../js/biblioteca.js?v=14"></script>
-<script src="admin.js?v=14"></script>
+<script src="../js/banco.js?v=15"></script>
+<script src="../js/biblioteca.js?v=15"></script>
+<script src="admin.js?v=15"></script>
 </body>
 </html>
