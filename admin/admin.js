@@ -73,12 +73,13 @@ const ESQUEMA = {
   marcas: ["id", "nome", "instagram", "email", "telefone", "situacao", "obs", "ultimo_contato", "exemplo", "criado_em"],
   calendario: ["id", "titulo", "marca", "tipo", "data", "status", "exemplo"],
   campanhas: ["id", "campanha", "cliente", "tipo", "status", "qtd", "valor", "prazo", "pagamento", "ativa", "favorita", "exemplo"],
+  comissoes_ttk: ["id", "data", "valor", "gmv", "itens", "obs"],
   contratos: ["id", "cliente", "tipo", "descricao", "valor", "mes", "ano", "data_nf", "prazo_dias", "status", "parcela1", "data_p1", "parcela2", "data_p2", "obs", "qtd", "prazo_entrega", "favorita"],
   transcricoes: ["id", "criado_em", "link", "plataforma", "categoria", "status", "titulo", "transcricao", "transcricao_original", "idioma_original", "minha_versao", "observacoes"],
   marcados: ["chave", "marcado"],
   visitas: ["id", "data", "pagina", "origem"]
 };
-const S = { videos: [], marcas: [], calendario: [], campanhas: [], marcados: {}, visitas: [], transcricoes: [], contratos: [] };
+const S = { videos: [], marcas: [], calendario: [], campanhas: [], marcados: {}, visitas: [], transcricoes: [], contratos: [], comissoes: [] };
 const CAMPOS = {};          // campos que existem de verdade em cada tabela
 const FALTAS = new Map();   // tabela -> o que faltou
 
@@ -118,7 +119,7 @@ async function ler(tabela, ajuste) {
 
 async function carregarTudo() {
   const desde = new Date(); desde.setHours(0, 0, 0, 0); desde.setDate(desde.getDate() - 13);
-  const [videos, marcas, calendario, campanhas, marcados, visitas, transcricoes, contratos] = await Promise.all([
+  const [videos, marcas, calendario, campanhas, marcados, visitas, transcricoes, contratos, comissoes] = await Promise.all([
     ler("videos", (q, c) => (c.includes("ordem") ? q.order("ordem", { ascending: true }) : q)),
     ler("marcas", (q, c) => (c.includes("criado_em") ? q.order("criado_em", { ascending: false }) : q)),
     ler("calendario"),
@@ -126,9 +127,10 @@ async function carregarTudo() {
     ler("marcados"),
     ler("visitas", (q, c) => (c.includes("data") ? q.gte("data", desde.toISOString()).order("data").limit(10000) : q)),
     ler("transcricoes", (q, c) => (c.includes("criado_em") ? q.order("criado_em", { ascending: false }) : q)),
-    ler("contratos", (q, c) => (c.includes("id") ? q.order("id", { ascending: true }).limit(5000) : q))
+    ler("contratos", (q, c) => (c.includes("id") ? q.order("id", { ascending: true }).limit(5000) : q)),
+    ler("comissoes_ttk", (q, c) => (c.includes("data") ? q.order("data", { ascending: false }).limit(5000) : q))
   ]);
-  Object.assign(S, { videos, marcas, calendario, campanhas, visitas, transcricoes, contratos });
+  Object.assign(S, { videos, marcas, calendario, campanhas, visitas, transcricoes, contratos, comissoes });
   S.marcados = {};
   marcados.forEach((m) => { if (m.chave) S.marcados[m.chave] = m.marcado !== false; });
 }
@@ -156,7 +158,9 @@ async function recarregar(tabela) {
     marcas: (q, c) => (c.includes("criado_em") ? q.order("criado_em", { ascending: false }) : q),
     transcricoes: (q, c) => (c.includes("criado_em") ? q.order("criado_em", { ascending: false }) : q)
   };
-  S[tabela] = await ler(tabela, ajustes[tabela]);
+  const chave = tabela === "comissoes_ttk" ? "comissoes" : tabela;
+  if (tabela === "comissoes_ttk") ajustes.comissoes_ttk = (q, c) => (c.includes("data") ? q.order("data", { ascending: false }).limit(5000) : q);
+  S[chave] = await ler(tabela, ajustes[tabela]);
   desenhar();
 }
 
@@ -1671,14 +1675,19 @@ function desenharFinanceiro(el) {
   const doAno = todos.filter((c) => Number(c.ano) === fin.ano);
   const doPeriodo = doAno.filter((c) => !fin.mes || Number(c.mes) === fin.mes);
   const validos = doPeriodo.filter((c) => c.status !== "Cancelado");
+  // Comissões do TikTok Shop do período (contam como faturado e recebido no dia que caíram)
+  const comAno = S.comissoes.filter((x) => x.data && deISO(x.data).getFullYear() === fin.ano);
+  const comPeriodo = comAno.filter((x) => !fin.mes || deISO(x.data).getMonth() + 1 === fin.mes);
+  const totalTtk = comPeriodo.reduce((s, x) => s + n2(x.valor), 0);
 
   // Números do período
-  const faturado = validos.reduce((s, c) => s + n2(c.valor), 0);
-  const recebido = validos.reduce((s, c) => s + recebidoDe(c), 0);
+  const faturadoContratos = validos.reduce((s, c) => s + n2(c.valor), 0);
+  const faturado = faturadoContratos + totalTtk;
+  const recebido = validos.reduce((s, c) => s + recebidoDe(c), 0) + totalTtk;
   const aReceber = validos.reduce((s, c) => s + saldoDe(c), 0);
   const vencidos = validos.filter((c) => situacaoDe(c) === "Vencido");
   const vencido = vencidos.reduce((s, c) => s + saldoDe(c), 0);
-  const ticket = validos.length ? faturado / validos.length : 0;
+  const ticket = validos.length ? faturadoContratos / validos.length : 0;
   const nomePeriodo = fin.mes ? `${MESES_LONGOS[fin.mes - 1]} de ${fin.ano}` : `${fin.ano}`;
 
   // Gráfico 1: faturado (mês de fechamento) x recebido (data real de cada parcela), no ano
@@ -1692,6 +1701,7 @@ function desenharFinanceiro(el) {
     const prev = previstaDe(c), sal = saldoDe(c);
     if (sal > 0 && prev && deISO(prev).getFullYear() === fin.ano && situacaoDe(c) !== "Cancelado") prevMes[deISO(prev).getMonth()] += sal;
   });
+  comAno.forEach((x) => { const m = deISO(x.data).getMonth(); fatMes[m] += n2(x.valor); recMes[m] += n2(x.valor); });
   const maxBarras = Math.max(1, ...fatMes, ...recMes);
   const maxPrev = Math.max(1, ...prevMes);
   const mesHoje = new Date().getFullYear() === fin.ano ? new Date().getMonth() : -1;
@@ -1720,7 +1730,9 @@ function desenharFinanceiro(el) {
     const l = validos.filter((c) => c.tipo === t);
     const v = l.reduce((s, c) => s + n2(c.valor), 0);
     return { t, v, n: l.length, ticket: l.length ? v / l.length : 0 };
-  }).filter((x) => x.n).sort((a, b) => b.v - a.v);
+  }).filter((x) => x.n);
+  if (comPeriodo.length) porTipo.push({ t: "TikTok Shop", v: totalTtk, n: comPeriodo.length, ticket: totalTtk / comPeriodo.length, repasse: true });
+  porTipo.sort((a, b) => b.v - a.v);
   const maxTipo = Math.max(1, ...porTipo.map((x) => x.v));
 
   // Top clientes (junta "Torra" e "torra")
@@ -1746,12 +1758,14 @@ function desenharFinanceiro(el) {
       <button class="btn primario" type="button" id="add-contrato">${ic("mais")}Novo contrato</button>
     </div>
     <div class="faixa-kpi">
-      <div class="kpi"><span>Faturado</span><strong>${real(faturado)}</strong><small>${nomePeriodo}</small></div>
+      <div class="kpi"><span>Faturado</span><strong>${real(faturado)}</strong><small>${nomePeriodo}${totalTtk ? " · com TikTok Shop" : ""}</small></div>
       <div class="kpi"><span>Recebido</span><strong>${real(recebido)}</strong><small>${faturado ? Math.round((recebido / faturado) * 100) + "% do faturado" : "nada faturado ainda"}</small></div>
       <div class="kpi"><span>A receber</span><strong>${real(aReceber)}</strong><small>${plural(validos.filter((c) => saldoDe(c) > 0).length, "contrato em aberto", "contratos em aberto")}</small></div>
       <div class="kpi ${vencido ? "alerta" : ""}"><span>Vencido</span><strong>${real(vencido)}</strong><small>${vencidos.length ? plural(vencidos.length, "contrato atrasado", "contratos atrasados") : "nada atrasado"}</small></div>
       <div class="kpi"><span>Contratos</span><strong>${num(validos.length)}</strong><small>ticket médio ${real(ticket)}</small></div>
+      <div class="kpi kpi-ttk"><span>TikTok Shop</span><strong>${real(totalTtk)}</strong><small>${comPeriodo.length ? plural(comPeriodo.length, "repasse", "repasses") + " no período" : "nenhum repasse lançado"}</small></div>
     </div>
+    ${cartaoTtk(comAno)}
     <div class="grade-fin">
       <div class="cartao">
         <div class="barra" style="margin-bottom:4px"><h2 style="margin:0">Faturado x recebido em ${fin.ano}</h2><span class="espaco"></span>
@@ -1767,11 +1781,11 @@ function desenharFinanceiro(el) {
     <div class="grade-fin tres">
       <div class="cartao">
         <h2>Por tipo de trabalho</h2>
-        ${porTipo.length ? `<div class="lista-barras">${porTipo.map((x) => `<div class="linha-barra" data-dica="<b>${esc(x.t)}</b><br>${real(x.v)} em ${plural(x.n, "contrato", "contratos")}<br>ticket médio ${real(x.ticket)}">
+        ${porTipo.length ? `<div class="lista-barras">${porTipo.map((x) => `<div class="linha-barra" data-dica="<b>${esc(x.t)}</b><br>${real(x.v)} em ${plural(x.n, x.repasse ? "repasse" : "contrato", x.repasse ? "repasses" : "contratos")}<br>${x.repasse ? "média por repasse" : "ticket médio"} ${real(x.ticket)}">
           <span class="lb-nome">${esc(x.t)}</span>
           <span class="lb-trilho"><i style="width:${(x.v / maxTipo) * 100}%"></i></span>
           <span class="lb-valor">${real(x.v)} <small>${faturado ? Math.round((x.v / faturado) * 100) : 0}%</small></span>
-          <small class="lb-extra">${plural(x.n, "contrato", "contratos")} · ticket ${real(x.ticket)}</small>
+          <small class="lb-extra">${x.repasse ? `${plural(x.n, "repasse", "repasses")} · média ${real(x.ticket)}` : `${plural(x.n, "contrato", "contratos")} · ticket ${real(x.ticket)}`}</small>
         </div>`).join("")}</div>` : `<p class="vazio">Sem contratos no período.</p>`}
       </div>
       <div class="cartao">
@@ -1834,6 +1848,7 @@ function desenharFinanceiro(el) {
   $("#fin-status").onchange = (e) => { fin.status = e.target.value; pintar(); };
   $$("[data-filtrar]", el).forEach((b) => b.onclick = () => { fin.status = b.dataset.filtrar; desenhar(); $("#lista-contratos").scrollIntoView({ behavior: "smooth", block: "start" }); });
   $("#add-contrato").onclick = () => formContrato();
+  ligarCartaoTtk(el);
   $("#lista-contratos").addEventListener("click", (e) => {
     const tr = e.target.closest("tr[data-id]");
     if (tr) formContrato(todos.find((c) => String(c.id) === tr.dataset.id));
@@ -1842,7 +1857,8 @@ function desenharFinanceiro(el) {
     ["Cliente", "Tipo", "Descrição", "Valor", "Mês", "Ano", "Data da nota", "Prazo (dias)", "Data prevista", "Status", "Parcela 1", "Data pgto P1", "Parcela 2", "Data pgto P2", "Recebido", "Saldo", "Obs"],
     todos.map((c) => [c.cliente, c.tipo, c.descricao, n2(c.valor).toFixed(2).replace(".", ","), c.mes ? MESES_LONGOS[c.mes - 1] : "", c.ano, dataBR(c.data_nf), c.prazo_dias, dataBR(previstaDe(c)), situacaoDe(c),
       c.parcela1 != null ? n2(c.parcela1).toFixed(2).replace(".", ",") : "", dataBR(c.data_p1), c.parcela2 != null ? n2(c.parcela2).toFixed(2).replace(".", ",") : "", dataBR(c.data_p2),
-      recebidoDe(c).toFixed(2).replace(".", ","), saldoDe(c).toFixed(2).replace(".", ","), c.obs]));
+      recebidoDe(c).toFixed(2).replace(".", ","), saldoDe(c).toFixed(2).replace(".", ","), c.obs])
+    .concat(S.comissoes.map((x) => ["TikTok Shop (repasse)", "TikTok Shop", x.gmv ? `GMV ${real(x.gmv)}` : "", n2(x.valor).toFixed(2).replace(".", ","), MESES_LONGOS[deISO(x.data).getMonth()], deISO(x.data).getFullYear(), "", "", "", "Pago", n2(x.valor).toFixed(2).replace(".", ","), dataBR(x.data), "", "", n2(x.valor).toFixed(2).replace(".", ","), "0,00", x.obs])));
   ligarDicas(el);
 }
 
@@ -2007,4 +2023,71 @@ async function moverCampanha(id, etapa) {
   desenhar();
   if (await gravar("contratos", { status: novo }, c.id)) avisar(`Movida para ${ETAPAS_PRODUCAO.find((x) => x[0] === etapa)[1]}.`);
   else { c.status = antes; desenhar(); }
+}
+
+/* ---------- TikTok Shop: repasses de comissão (toda quarta) ---------- */
+// A última quarta-feira (ou hoje, se hoje for quarta)
+function ultimaQuarta() {
+  const d = new Date();
+  d.setDate(d.getDate() - ((d.getDay() - 3 + 7) % 7));
+  return isoLocal(d);
+}
+
+function cartaoTtk(comAno) {
+  const ultimos = [...S.comissoes].sort((a, b) => String(b.data).localeCompare(String(a.data)));
+  const barras = ultimos.slice(0, 12).reverse();
+  const max = Math.max(1, ...barras.map((x) => n2(x.valor)));
+  const totalAno = comAno.reduce((s, x) => s + n2(x.valor), 0);
+  const media = comAno.length ? totalAno / comAno.length : 0;
+  const lancadoUltima = S.comissoes.some((x) => String(x.data).slice(0, 10) === ultimaQuarta());
+  return `<div class="cartao cartao-ttk">
+    <div class="barra" style="margin-bottom:6px">
+      <h2 style="margin:0">Comissões do TikTok Shop</h2>
+      <span class="sub">${comAno.length ? `${real(totalAno)} em ${fin.ano} · média ${real(media)} por repasse` : `nenhum repasse em ${fin.ano}`}</span>
+      <span class="espaco"></span>
+      ${lancadoUltima ? `<span class="pilula p-pago">quarta ${dataBR(ultimaQuarta()).slice(0, 5)} lançada</span>` : `<span class="pilula p-pendente">falta lançar a quarta ${dataBR(ultimaQuarta()).slice(0, 5)}</span>`}
+      <button class="btn primario" type="button" id="add-ttk">${ic("mais")}Lançar repasse</button>
+    </div>
+    ${barras.length ? `<div class="grade-ttk">
+      <div class="barras-mes barras-ttk" role="img" aria-label="Últimos repasses do TikTok Shop">
+        ${barras.map((x) => `<div class="grupo-mes" data-ttk="${esc(x.id)}" data-dica="<b>${dataBR(x.data)}</b><br>Comissão: ${real(x.valor)}${x.gmv ? `<br>GMV: ${real(x.gmv)}` : ""}${x.itens ? `<br>${plural(Number(x.itens), "item vendido", "itens vendidos")}` : ""}">
+          <b class="valor-barra">${Math.round(n2(x.valor)).toLocaleString("pt-BR")}</b>
+          <div class="par-barras"><i class="b-prev" style="height:${(n2(x.valor) / max) * 100}%"></i></div>
+          <span>${dataBR(x.data).slice(0, 5)}</span>
+        </div>`).join("")}
+      </div>
+      <ul class="lista-ttk">${ultimos.slice(0, 5).map((x) => `<li><button type="button" class="link-ttk" data-ttk="${esc(x.id)}"><span>${dataBR(x.data)}</span><b>${real(x.valor)}</b>${x.gmv ? `<small>GMV ${real(x.gmv)}</small>` : ""}</button></li>`).join("")}</ul>
+    </div>
+    <p class="sub" style="margin:6px 0 0">os últimos 12 repasses. Clique num repasse para editar.</p>`
+    : `<p class="vazio">Lance aqui o valor que o TikTok Shop paga toda quarta. Ele soma no faturado, no recebido e nos gráficos do Financeiro.</p>`}
+  </div>`;
+}
+
+function ligarCartaoTtk(el) {
+  const b = $("#add-ttk", el);
+  if (b) b.onclick = () => formComissao();
+  $$("[data-ttk]", el).forEach((x) => x.addEventListener("click", () => formComissao(S.comissoes.find((c) => String(c.id) === x.dataset.ttk))));
+}
+
+function formComissao(c) {
+  abrirForm({
+    titulo: c ? "Editar repasse do TikTok Shop" : "Lançar repasse do TikTok Shop",
+    tabela: "comissoes_ttk",
+    valores: c || { data: ultimaQuarta() },
+    campos: [
+      { n: "data", r: "Dia que caiu (quarta)", t: "date", req: true },
+      { n: "valor", r: "Comissão recebida (R$)", t: "number" },
+      { n: "gmv", r: "GMV da semana (opcional)", t: "number" },
+      { n: "itens", r: "Itens vendidos (opcional)", t: "number" },
+      { n: "obs", r: "Observação", t: "textarea", ph: "ex: produto que mais vendeu na semana" }
+    ],
+    aoSalvar: async (d) => {
+      if (!d.gmv) d.gmv = null;
+      if (!d.itens) d.itens = null;
+      const ok = await gravar("comissoes_ttk", d, c ? c.id : null);
+      if (ok) recarregar("comissoes_ttk");
+      return ok;
+    },
+    aoApagar: c ? async () => { const ok = await apagarLinha("comissoes_ttk", c.id); if (ok) recarregar("comissoes_ttk"); return ok; } : null
+  });
 }

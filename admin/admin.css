@@ -461,3 +461,14 @@ details.tokscript > summary .emo { font-size: 16px; color: var(--cobalt); }
 .cartao-campanha .etq { margin-left: 4px; }
 @media (max-width: 1300px) { .quadro-6 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 760px) { .quadro-6 { grid-template-columns: 1fr; } }
+
+/* ---------- TikTok Shop no Financeiro ---------- */
+.cartao-ttk { border-left: 4px solid #1F3FC3; }
+.grade-ttk { display: grid; grid-template-columns: 1fr 240px; gap: 16px; align-items: end; }
+.barras-ttk { height: 150px; }
+.barras-ttk .grupo-mes { cursor: pointer; }
+.lista-ttk { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.link-ttk { width: 100%; display: grid; grid-template-columns: 1fr auto; gap: 0 8px; text-align: left; border: 1px solid var(--line); background: var(--card); border-radius: var(--radius); padding: 6px 10px; cursor: pointer; font: inherit; color: inherit; font-size: 13px; }
+.link-ttk:hover { border-color: var(--cobalt); }
+.link-ttk small { grid-column: 1 / -1; color: var(--muted); font-size: 11.5px; }
+@media (max-width: 760px) { .grade-ttk { grid-template-columns: 1fr; } }
