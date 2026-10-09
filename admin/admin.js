@@ -2838,26 +2838,31 @@ function ligarCabecalho() {
 
 /* =============================================================
    ABA PROPOSTAS (Gmail)
-   Lê o Gmail de propostas (heyryan.ugc@gmail.com) só para leitura
-   e separa os e-mails com cara de proposta de UGC/publi.
+   Lê o Gmail de propostas (heyryan.ugc@gmail.com), separa os
+   e-mails com cara de proposta e esconde os automáticos e em massa
+   (plataformas, bancos, newsletters, "no-reply"). Dá para abrir a
+   conversa e responder daqui mesmo.
    O login é feito pelo Google numa janela própria: a senha nunca
    passa pelo painel. O ID abaixo é público (não é segredo).
-   O acesso vale por cerca de 1 hora; depois é só clicar em
-   "Conectar o Gmail" de novo.
+   O acesso vale por cerca de 1 hora; depois é só conectar de novo.
    ============================================================= */
 const GOOGLE_CLIENT_ID = "317757639743-datc7u3k3d7hauj06q6viqefstliqkle.apps.googleusercontent.com";
 const EMAIL_PROPOSTAS = "heyryan.ugc@gmail.com";
-const PALAVRAS_PROPOSTA = ["ugc", "\"user generated\"", "proposta", "parceria", "publi", "publicidade", "publipost", "campanha", "collab", "collaboration", "briefing", "orçamento", "orcamento", "\"mídia kit\"", "\"media kit\"", "midiakit", "influenciador", "influencer", "creator", "\"criador de conteúdo\"", "permuta", "cachê", "cache"];
-const BUSCA_PROPOSTAS = `in:inbox newer_than:90d -category:promotions -category:social -category:forums (${PALAVRAS_PROPOSTA.join(" OR ")})`;
+const ESCOPOS_GMAIL = "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send";
+const PALAVRAS_PROPOSTA = ["ugc", "\"user generated\"", "proposta", "parceria", "publi", "publicidade", "publipost", "campanha", "collab", "collaboration", "briefing", "orçamento", "orcamento", "\"mídia kit\"", "\"media kit\"", "midiakit", "influenciador", "influencer", "creator", "\"criador de conteúdo\"", "permuta", "cachê", "cache", "job", "contratar", "freela"];
+const BUSCA_PROPOSTAS = `in:inbox newer_than:90d -category:promotions -category:social -category:forums -category:updates (${PALAVRAS_PROPOSTA.join(" OR ")})`;
 const DOMINIOS_PESSOAIS = ["gmail", "hotmail", "outlook", "yahoo", "icloud", "live", "bol", "uol", "terra", "me"];
-const gm = { token: null, expira: 0, carregando: false, emails: null, erro: "", busca: "", ultimaLeitura: 0 };
+// Remetentes que são robôs ou envio em massa (o começo do e-mail, antes do @)
+const REMETENTE_ROBO = /^(no-?reply|nao-?responda|naoresponda|donotreply|do-?not-?reply|notifica|notification|news|newsletter|marketing|mkt|comunicad|todomundo|support|suporte|faleconosco|fale-conosco|atendimento|info|noticias|alert|update|mailer|bounce|hello|team|time|equipe|contato-?noreply|campanhas|digest|community|comunidade|creators?|parcerias-?noreply|plataforma)/i;
+const gm = { token: null, expira: 0, escopo: "", carregando: false, emails: null, erro: "", busca: "", verAutomaticos: false, aberto: null, conversa: null, carregandoConversa: false };
 let propostasNovas = 0;
 
 try {
   const t = JSON.parse(sessionStorage.getItem("gmail-token") || "null");
-  if (t && t.expira > Date.now()) { gm.token = t.token; gm.expira = t.expira; }
+  if (t && t.expira > Date.now()) { gm.token = t.token; gm.expira = t.expira; gm.escopo = t.escopo || ""; }
 } catch (_) {}
 const gmailConectado = () => !!gm.token && gm.expira > Date.now() + 30000;
+const podeResponder = () => gm.escopo.includes("gmail.send");
 
 function carregarGoogle() {
   if (window.google && google.accounts && google.accounts.oauth2) return Promise.resolve();
@@ -2876,13 +2881,15 @@ async function conectarGmail() {
   return new Promise((ok, falhou) => {
     const cliente = google.accounts.oauth2.initTokenClient({
       client_id: GOOGLE_CLIENT_ID,
-      scope: "https://www.googleapis.com/auth/gmail.readonly",
+      scope: ESCOPOS_GMAIL,
       hint: EMAIL_PROPOSTAS,
+      include_granted_scopes: true,
       callback: (r) => {
         if (r.error || !r.access_token) { falhou(new Error(r.error_description || r.error || "O Google não liberou o acesso.")); return; }
         gm.token = r.access_token;
         gm.expira = Date.now() + (Number(r.expires_in) || 3600) * 1000;
-        try { sessionStorage.setItem("gmail-token", JSON.stringify({ token: gm.token, expira: gm.expira })); } catch (_) {}
+        gm.escopo = r.scope || "";
+        try { sessionStorage.setItem("gmail-token", JSON.stringify({ token: gm.token, expira: gm.expira, escopo: gm.escopo })); } catch (_) {}
         ok();
       },
       error_callback: (e) => falhou(new Error(e && e.type === "popup_closed" ? "A janela do Google foi fechada antes de terminar." : "O Google não abriu a janela de login. Libere pop-ups para este site."))
@@ -2893,13 +2900,19 @@ async function conectarGmail() {
 
 function desconectarGmail() {
   if (gm.token && window.google && google.accounts) google.accounts.oauth2.revoke(gm.token, () => {});
-  gm.token = null; gm.expira = 0; gm.emails = null; propostasNovas = 0;
+  Object.assign(gm, { token: null, expira: 0, escopo: "", emails: null, aberto: null, conversa: null });
+  propostasNovas = 0;
   try { sessionStorage.removeItem("gmail-token"); } catch (_) {}
 }
 
-async function gmailApi(caminho) {
-  const r = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/" + caminho, { headers: { Authorization: "Bearer " + gm.token } });
+async function gmailApi(caminho, opcoes = {}) {
+  const r = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/" + caminho, {
+    method: opcoes.metodo || "GET",
+    headers: { Authorization: "Bearer " + gm.token, ...(opcoes.corpo ? { "Content-Type": "application/json" } : {}) },
+    body: opcoes.corpo ? JSON.stringify(opcoes.corpo) : undefined
+  });
   if (r.status === 401) { desconectarGmail(); throw new Error("O acesso ao Gmail expirou. Clique em Conectar o Gmail de novo."); }
+  if (r.status === 403) throw new Error("O Google não deu permissão para isso. Clique em Desconectar e conecte de novo, aceitando todas as permissões.");
   if (!r.ok) throw new Error("O Gmail respondeu com erro " + r.status + ".");
   return r.json();
 }
@@ -2909,9 +2922,23 @@ function lerRemetente(de) {
   const m = String(de || "").match(/^\s*"?([^"<]*?)"?\s*<([^>]+)>/);
   const nome = m ? m[1].trim() : "";
   const email = (m ? m[2] : de || "").trim().toLowerCase();
-  const dominio = (email.split("@")[1] || "").split(".")[0];
-  const marca = dominio && !DOMINIOS_PESSOAIS.includes(dominio) ? dominio.charAt(0).toUpperCase() + dominio.slice(1) : (nome || email);
-  return { nome: nome || email, email, marca };
+  const dominioCompleto = email.split("@")[1] || "";
+  const dominio = dominioCompleto.split(".")[0];
+  const pessoal = DOMINIOS_PESSOAIS.includes(dominio);
+  const marca = dominio && !pessoal ? dominio.charAt(0).toUpperCase() + dominio.slice(1) : (nome || email);
+  return { nome: nome || email, email, marca, dominio: pessoal ? "" : dominioCompleto };
+}
+const cabecalho = (m, n) => (((m.payload && m.payload.headers) || []).find((x) => x.name.toLowerCase() === n.toLowerCase()) || {}).value || "";
+
+// E-mail automático ou em massa? Devolve o motivo (ou "" se parece escrito por uma pessoa)
+function motivoAutomatico(m, de) {
+  if (cabecalho(m, "List-Unsubscribe") || cabecalho(m, "List-Id")) return "envio em massa";
+  if (/bulk|list|junk/i.test(cabecalho(m, "Precedence"))) return "envio em massa";
+  const auto = cabecalho(m, "Auto-Submitted");
+  if (auto && !/^no$/i.test(auto)) return "automático";
+  if (REMETENTE_ROBO.test(de.email.split("@")[0])) return "remetente automático";
+  if (de.dominio && adiado("dominio-" + de.dominio)) return "você escondeu esse remetente";
+  return "";
 }
 
 async function lerPropostas() {
@@ -2920,34 +2947,187 @@ async function lerPropostas() {
   if (abaAtual === "propostas") desenhar();
   try {
     const q = BUSCA_PROPOSTAS + (gm.busca ? " " + gm.busca : "");
-    const lista = await gmailApi("messages?maxResults=40&q=" + encodeURIComponent(q));
+    const lista = await gmailApi("messages?maxResults=60&q=" + encodeURIComponent(q));
     const ids = (lista.messages || []).map((x) => x.id);
-    const cabecalhos = ["From", "Subject", "Date"].map((h) => "&metadataHeaders=" + h).join("");
-    const msgs = await Promise.all(ids.map((id) => gmailApi(`messages/${id}?format=metadata${cabecalhos}`).catch(() => null)));
+    const campos = ["From", "Subject", "Date", "List-Unsubscribe", "List-Id", "Precedence", "Auto-Submitted"].map((h) => "&metadataHeaders=" + h).join("");
+    const msgs = await Promise.all(ids.map((id) => gmailApi(`messages/${id}?format=metadata${campos}`).catch(() => null)));
     gm.emails = msgs.filter(Boolean).map((m) => {
-      const h = (n) => ((m.payload && m.payload.headers) || []).find((x) => x.name.toLowerCase() === n.toLowerCase())?.value || "";
-      return { id: m.id, thread: m.threadId, de: lerRemetente(h("From")), assunto: h("Subject") || "(sem assunto)", trecho: m.snippet || "",
-        data: new Date(Number(m.internalDate) || Date.parse(h("Date")) || Date.now()), novo: (m.labelIds || []).includes("UNREAD") };
-    });
-    gm.ultimaLeitura = Date.now();
+      const de = lerRemetente(cabecalho(m, "From"));
+      return { id: m.id, thread: m.threadId, de, assunto: cabecalho(m, "Subject") || "(sem assunto)", trecho: m.snippet || "",
+        data: new Date(Number(m.internalDate) || Date.parse(cabecalho(m, "Date")) || Date.now()),
+        novo: (m.labelIds || []).includes("UNREAD"), automatico: motivoAutomatico(m, de) };
+    }).filter((x) => x.de.email !== EMAIL_PROPOSTAS);
   } catch (e) {
     gm.erro = e.message || String(e);
   }
   gm.carregando = false;
-  const visiveis = (gm.emails || []).filter((x) => !adiado("email-" + x.id));
-  propostasNovas = visiveis.filter((x) => x.novo).length;
+  propostasNovas = propostasVisiveis().filter((x) => x.novo).length;
   desenhar();
 }
 
+const propostasVisiveis = () => (gm.emails || []).filter((x) => !x.automatico && !adiado("email-" + x.id));
 const marcarEmailTratado = (id, aviso) => adiarLembrete("email-" + id, "2999-12-31", aviso);
+
+/* ---------- Conversa aberta e resposta ---------- */
+function decodificar(b64) {
+  try {
+    const bin = atob(String(b64 || "").replace(/-/g, "+").replace(/_/g, "/"));
+    return new TextDecoder("utf-8").decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
+  } catch (_) { return ""; }
+}
+// Pega o texto da mensagem (prefere o texto simples; se só tiver HTML, tira as tags)
+function textoDaMensagem(parte) {
+  if (!parte) return "";
+  if (parte.mimeType === "text/plain" && parte.body && parte.body.data) return decodificar(parte.body.data);
+  for (const p of parte.parts || []) { const t = textoDaMensagem(p); if (t) return t; }
+  if (parte.mimeType === "text/html" && parte.body && parte.body.data) {
+    const doc = new DOMParser().parseFromString(decodificar(parte.body.data), "text/html");
+    $$("style, script", doc).forEach((x) => x.remove());
+    $$("br, p, div, li, tr", doc).forEach((x) => x.append("\n"));
+    return (doc.body.textContent || "").replace(/\n{3,}/g, "\n\n").trim();
+  }
+  return "";
+}
+// Esconde o histórico citado ("Em ... escreveu:") para a conversa ficar limpa
+function semCitacao(t) {
+  const corte = t.search(/\n(On .+wrote:|Em .+escreveu:|-{2,}\s*Mensagem original|De: .+\nEnviada)/i);
+  return (corte > 0 ? t.slice(0, corte) : t).replace(/\n>.*$/gm, "").trim();
+}
+
+async function abrirConversa(email) {
+  gm.aberto = email; gm.conversa = null; gm.carregandoConversa = true;
+  desenhar();
+  try {
+    const th = await gmailApi(`threads/${email.thread}?format=full`);
+    gm.conversa = (th.messages || []).map((m) => ({
+      id: m.id, de: lerRemetente(cabecalho(m, "From")), para: cabecalho(m, "To"), responderPara: cabecalho(m, "Reply-To"),
+      data: new Date(Number(m.internalDate) || Date.now()), assunto: cabecalho(m, "Subject"),
+      messageId: cabecalho(m, "Message-ID") || cabecalho(m, "Message-Id"), referencias: cabecalho(m, "References"),
+      texto: semCitacao(textoDaMensagem(m.payload) || m.snippet || "")
+    }));
+  } catch (e) { gm.erro = e.message; gm.aberto = null; }
+  gm.carregandoConversa = false;
+  desenhar();
+}
+
+const base64Utf8 = (t) => { const b = new TextEncoder().encode(t); let s = ""; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode(...b.subarray(i, i + 0x8000)); return btoa(s); };
+const base64Url = (t) => base64Utf8(t).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const assuntoMime = (t) => (/^[\x20-\x7e]*$/.test(t) ? t : `=?UTF-8?B?${base64Utf8(t)}?=`);
+
+async function enviarResposta(texto) {
+  const msgs = gm.conversa || [];
+  const alvo = [...msgs].reverse().find((m) => m.de.email !== EMAIL_PROPOSTAS) || msgs[msgs.length - 1];
+  if (!alvo) throw new Error("Não achei para quem responder.");
+  const para = alvo.responderPara || (alvo.de.nome && alvo.de.nome !== alvo.de.email ? `${alvo.de.nome} <${alvo.de.email}>` : alvo.de.email);
+  const assunto = /^re:/i.test(alvo.assunto || gm.aberto.assunto) ? (alvo.assunto || gm.aberto.assunto) : "Re: " + (alvo.assunto || gm.aberto.assunto);
+  const corpo = base64Utf8(texto).replace(/(.{76})/g, "$1\r\n");
+  const linhas = [`To: ${para}`, `Subject: ${assuntoMime(assunto)}`];
+  if (alvo.messageId) linhas.push(`In-Reply-To: ${alvo.messageId}`, `References: ${[alvo.referencias, alvo.messageId].filter(Boolean).join(" ")}`);
+  linhas.push("MIME-Version: 1.0", "Content-Type: text/plain; charset=UTF-8", "Content-Transfer-Encoding: base64", "", corpo);
+  const mensagem = linhas.join("\r\n");
+  await gmailApi("messages/send", { metodo: "POST", corpo: { raw: base64Url(mensagem), threadId: gm.aberto.thread } });
+}
+
+// Modelos de resposta rápida (dá para editar antes de mandar)
+function modelosResposta(email) {
+  const marca = email.de.marca;
+  const site = "https://ryalvz.github.io/portfoliougc/";
+  return [
+    ["Pedir briefing", `Oi, tudo bem?\n\nObrigado pelo contato! Fiquei muito feliz com o interesse da ${marca}.\n\nPara eu montar uma proposta certinha, você consegue me mandar:\n- o briefing ou a ideia da campanha\n- quantos vídeos e em quais formatos\n- se é para uso orgânico ou anúncio (e por quanto tempo)\n- o prazo de entrega\n\nMeu portfólio está aqui: ${site}\n\nUm abraço,\nRyan Alves`],
+    ["Mandar portfólio e valores", `Oi, tudo bem?\n\nObrigado por pensar em mim para essa campanha!\n\nSegue meu portfólio com os trabalhos mais recentes: ${site}\n\nMeus pacotes começam a partir de R$ ___ por vídeo, e o valor final depende da quantidade, do formato e do direito de uso. Se você me passar esses detalhes, eu mando a proposta fechada ainda hoje.\n\nUm abraço,\nRyan Alves`],
+    ["Recusar com educação", `Oi, tudo bem?\n\nMuito obrigado pelo convite e pela confiança! Neste momento não vou conseguir participar dessa campanha, mas adoraria trabalhar com a ${marca} em uma próxima oportunidade.\n\nUm abraço,\nRyan Alves`]
+  ];
+}
+
+function desenharConversa(el) {
+  const x = gm.aberto;
+  el.innerHTML = `
+    <div class="barra">
+      <button class="btn" type="button" id="voltar-propostas">${ic("esq")}Voltar às propostas</button>
+      <span class="espaco"></span>
+      <button type="button" class="btn" data-acao-email="contrato">Virar contrato</button>
+      <button type="button" class="btn" data-acao-email="marca">Salvar marca</button>
+    </div>
+    <div class="cartao conversa">
+      <h2 class="conversa-assunto">${esc(x.assunto)}</h2>
+      ${gm.carregandoConversa ? `<p class="vazio">Abrindo a conversa...</p>` : (gm.conversa || []).map((m) => `<div class="msg ${m.de.email === EMAIL_PROPOSTAS ? "minha" : ""}">
+        <div class="email-topo"><b>${m.de.email === EMAIL_PROPOSTAS ? "Você" : esc(m.de.nome)}</b><span class="sub">${esc(m.de.email)}</span><span class="espaco"></span><span class="sub">${m.data.toLocaleString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span></div>
+        <div class="msg-texto">${esc(m.texto)}</div>
+      </div>`).join("")}
+    </div>
+    ${gm.carregandoConversa ? "" : `<div class="cartao responder">
+      <div class="barra" style="margin-bottom:8px"><h2 style="margin:0">Responder ${esc(x.de.nome)}</h2><span class="espaco"></span>
+        <span class="chips">${modelosResposta(x).map(([n], i) => `<button type="button" class="chip" data-modelo="${i}">${esc(n)}</button>`).join("")}</span></div>
+      ${podeResponder() ? "" : `<div class="aviso-falta">Para responder daqui, o Google precisa da sua permissão de envio. Clique em <b>Liberar respostas</b> e aceite no Google.</div>`}
+      <textarea class="campo" id="texto-resposta" rows="9" placeholder="Escreva a sua resposta ou escolha um modelo acima."></textarea>
+      <div class="barra" style="margin:8px 0 0">
+        <span class="sub">vai de ${esc(EMAIL_PROPOSTAS)}, dentro da mesma conversa no Gmail</span>
+        <span class="espaco"></span>
+        ${podeResponder() ? `<button class="btn primario" type="button" id="enviar-resposta">${ic("email")}Enviar resposta</button>` : `<button class="btn primario" type="button" id="liberar-respostas">Liberar respostas</button>`}
+      </div>
+    </div>`}`;
+
+  $("#voltar-propostas").onclick = () => { gm.aberto = null; gm.conversa = null; desenhar(); };
+  $$("[data-modelo]", el).forEach((b) => b.onclick = () => { $("#texto-resposta").value = modelosResposta(x)[Number(b.dataset.modelo)][1]; $("#texto-resposta").focus(); });
+  const liberar = $("#liberar-respostas");
+  if (liberar) liberar.onclick = async () => {
+    const rascunho = $("#texto-resposta").value;
+    try { await conectarGmail(); desenhar(); $("#texto-resposta").value = rascunho; } catch (e) { avisar(e.message, true); }
+  };
+  const enviar = $("#enviar-resposta");
+  if (enviar) enviar.onclick = async () => {
+    const texto = $("#texto-resposta").value.trim();
+    if (!texto) { avisar("Escreva a resposta antes de enviar.", true); return; }
+    if (texto.includes("R$ ___")) { avisar("Troque o R$ ___ pelo seu valor antes de enviar.", true); return; }
+    if (!(await confirmar(`Enviar esta resposta para ${x.de.email}?`, "Sim, enviar"))) return;
+    enviar.disabled = true; enviar.textContent = "Enviando...";
+    try { await enviarResposta(texto); avisar("Resposta enviada!"); await abrirConversa(x); }
+    catch (e) { avisar("Não deu para enviar: " + e.message, true); enviar.disabled = false; enviar.textContent = "Enviar resposta"; }
+  };
+}
+
+function acaoEmail(tipo, x) {
+  const quando = x.data.toLocaleDateString("pt-BR");
+  if (tipo === "ignorar") marcarEmailTratado(x.id, "Tirei da lista de propostas.");
+  else if (tipo === "esconder-remetente") adiarLembrete("dominio-" + x.de.dominio, "2999-12-31", `Não mostro mais e-mails de ${x.de.dominio}.`).then(() => lerPropostas());
+  else if (tipo === "marca") formMarca(null, {
+    valores: { nome: x.de.marca, email: x.de.email, obs: `Chegou por e-mail em ${quando}: "${x.assunto}"` },
+    depois: () => marcarEmailTratado(x.id, "Marca salva como lead. O e-mail saiu da lista.")
+  });
+  else if (tipo === "contrato") formContrato(null, {
+    valores: { cliente: x.de.marca, descricao: x.assunto.slice(0, 120), status: "Em negociação", obs: `Proposta por e-mail de ${x.de.nome} <${x.de.email}> em ${quando}.` },
+    depois: () => marcarEmailTratado(x.id, "Proposta virou contrato em negociação. O e-mail saiu da lista.")
+  });
+  else if (tipo === "abrir") abrirConversa(x);
+}
+
+function cartaoEmail(x) {
+  return `<article class="email-card ${x.novo ? "novo" : ""} ${x.automatico ? "automatico" : ""}" data-email="${esc(x.id)}">
+    <span class="email-avatar">${esc((x.de.marca || "?").charAt(0).toUpperCase())}</span>
+    <div class="email-corpo">
+      <button type="button" class="email-abrir" data-acao-email="abrir">
+        <span class="email-topo"><b>${esc(x.de.nome)}</b><span class="sub">${esc(x.de.email)}</span><span class="espaco"></span><span class="sub">${x.data.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}</span></span>
+        <span class="email-assunto">${x.novo ? `<i class="ponto-novo" aria-label="não lido"></i>` : ""}${esc(x.assunto)}</span>
+        <span class="email-trecho">${esc(x.trecho)}</span>
+      </button>
+      ${x.automatico ? `<p class="sub" style="margin:0">escondido: ${esc(x.automatico)}</p>` : `<div class="lembrete-acoes" style="justify-content:flex-start">
+        <button type="button" class="btn pequeno primario" data-acao-email="abrir">Responder</button>
+        <button type="button" class="btn pequeno" data-acao-email="contrato">Virar contrato</button>
+        <button type="button" class="btn pequeno" data-acao-email="marca">Salvar marca</button>
+        <button type="button" class="btn pequeno" data-acao-email="ignorar">Não é proposta</button>
+        ${x.de.dominio ? `<button type="button" class="link-btn pequeno-link" data-acao-email="esconder-remetente">esconder sempre ${esc(x.de.dominio)}</button>` : ""}
+      </div>`}
+    </div>
+  </article>`;
+}
 
 function desenharPropostas(el) {
   if (!gmailConectado()) {
     el.innerHTML = `<div class="cartao gmail-conectar">
       <span class="gmail-icone">${ic("email")}</span>
       <h2>Conecte o Gmail de propostas</h2>
-      <p>O painel lê a caixa de entrada do <b>${esc(EMAIL_PROPOSTAS)}</b> e separa sozinho os e-mails de UGC, publi, parceria, campanha e orçamento. Só leitura: o painel não apaga, não envia e não mexe em nada.</p>
-      <p class="sub">Na primeira vez o Google mostra um aviso de "app não verificado". É normal, o app é só seu: clique em <b>Continuar</b>.</p>
+      <p>O painel lê a caixa de entrada do <b>${esc(EMAIL_PROPOSTAS)}</b>, separa os e-mails de proposta escritos por pessoas e esconde os automáticos. Você responde daqui mesmo, sem abrir o Gmail.</p>
+      <p class="sub">O Google mostra um aviso de "app não verificado". É normal, o app é só seu: clique em <b>Continuar</b> e aceite as permissões de ver e enviar e-mails.</p>
       ${gm.erro ? `<div class="aviso-falta">${esc(gm.erro)}</div>` : ""}
       <button class="btn primario" type="button" id="conectar-gmail">${ic("email")}Conectar o Gmail</button>
     </div>`;
@@ -2958,9 +3138,11 @@ function desenharPropostas(el) {
     };
     return;
   }
-  if (!gm.emails && !gm.carregando && !gm.erro) { lerPropostas(); }
+  if (gm.aberto) { desenharConversa(el); ligarAcoesEmail(el); return; }
+  if (!gm.emails && !gm.carregando && !gm.erro) lerPropostas();
 
-  const visiveis = (gm.emails || []).filter((x) => !adiado("email-" + x.id));
+  const visiveis = propostasVisiveis();
+  const automaticos = (gm.emails || []).filter((x) => x.automatico && !adiado("email-" + x.id));
   const minutos = Math.max(1, Math.round((gm.expira - Date.now()) / 60000));
   el.innerHTML = `
     <div class="barra">
@@ -2972,41 +3154,28 @@ function desenharPropostas(el) {
     </div>
     ${gm.erro ? `<div class="aviso-falta">${esc(gm.erro)}</div>` : ""}
     ${gm.carregando && !gm.emails ? `<p class="vazio">Lendo o seu Gmail...</p>`
-      : !visiveis.length ? `<p class="vazio">Nenhuma proposta nova nos últimos 90 dias. Quando chegar e-mail falando de UGC, publi, parceria ou orçamento, ele aparece aqui.</p>`
-      : `<p class="sub" style="margin:0 0 8px">${plural(visiveis.length, "e-mail com cara de proposta", "e-mails com cara de proposta")} nos últimos 90 dias${propostasNovas ? ` · <b>${plural(propostasNovas, "não lido", "não lidos")}</b>` : ""}</p>
-        <div class="lista-emails">${visiveis.map((x) => `<article class="email-card ${x.novo ? "novo" : ""}" data-email="${esc(x.id)}">
-          <span class="email-avatar">${esc((x.de.marca || "?").charAt(0).toUpperCase())}</span>
-          <div class="email-corpo">
-            <div class="email-topo"><b>${esc(x.de.nome)}</b><span class="sub">${esc(x.de.email)}</span><span class="espaco"></span><span class="sub">${x.data.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}</span></div>
-            <p class="email-assunto">${x.novo ? `<i class="ponto-novo" aria-label="não lido"></i>` : ""}${esc(x.assunto)}</p>
-            <p class="email-trecho">${esc(x.trecho)}</p>
-            <div class="lembrete-acoes" style="justify-content:flex-start">
-              <button type="button" class="btn pequeno primario" data-acao-email="contrato">Virar contrato</button>
-              <button type="button" class="btn pequeno" data-acao-email="marca">Salvar marca</button>
-              <a class="btn pequeno" href="https://mail.google.com/mail/u/${encodeURIComponent(EMAIL_PROPOSTAS)}/#all/${esc(x.thread)}" target="_blank" rel="noopener">Abrir no Gmail</a>
-              <button type="button" class="btn pequeno" data-acao-email="ignorar">Não é proposta</button>
-            </div>
-          </div>
-        </article>`).join("")}</div>`}`;
+      : `${visiveis.length
+          ? `<p class="sub" style="margin:0 0 8px">${plural(visiveis.length, "proposta escrita por uma pessoa", "propostas escritas por pessoas")} nos últimos 90 dias${propostasNovas ? ` · <b>${plural(propostasNovas, "não lida", "não lidas")}</b>` : ""}</p>
+            <div class="lista-emails">${visiveis.map(cartaoEmail).join("")}</div>`
+          : `<p class="vazio">Nenhuma proposta de pessoa nos últimos 90 dias. Os e-mails automáticos e de plataformas ficam escondidos.</p>`}
+        ${automaticos.length ? `<button type="button" class="link-btn ver-automaticos" id="ver-automaticos">${gm.verAutomaticos ? "esconder" : "ver"} ${plural(automaticos.length, "e-mail automático escondido", "e-mails automáticos escondidos")}</button>
+          ${gm.verAutomaticos ? `<div class="lista-emails">${automaticos.map(cartaoEmail).join("")}</div>` : ""}` : ""}`}`;
 
   $("#atualizar-gmail").onclick = () => lerPropostas();
   $("#sair-gmail").onclick = () => { desconectarGmail(); desenhar(); avisar("Gmail desconectado."); };
+  const ver = $("#ver-automaticos");
+  if (ver) ver.onclick = () => { gm.verAutomaticos = !gm.verAutomaticos; desenhar(); };
   let espera;
   $("#busca-gmail").addEventListener("input", (e) => { gm.busca = e.target.value.trim(); clearTimeout(espera); espera = setTimeout(lerPropostas, 700); });
+  ligarAcoesEmail(el);
+}
+
+function ligarAcoesEmail(el) {
   el.onclick = (e) => {
     const b = e.target.closest("[data-acao-email]");
     if (!b) return;
-    const x = (gm.emails || []).find((m) => m.id === b.closest("[data-email]").dataset.email);
-    if (!x) return;
-    const quando = x.data.toLocaleDateString("pt-BR");
-    if (b.dataset.acaoEmail === "ignorar") marcarEmailTratado(x.id, "Tirei da lista de propostas.");
-    else if (b.dataset.acaoEmail === "marca") formMarca(null, {
-      valores: { nome: x.de.marca, email: x.de.email, obs: `Chegou por e-mail em ${quando}: "${x.assunto}"` },
-      depois: () => marcarEmailTratado(x.id, "Marca salva como lead. O e-mail saiu da lista.")
-    });
-    else formContrato(null, {
-      valores: { cliente: x.de.marca, descricao: x.assunto.slice(0, 120), status: "Em negociação", obs: `Proposta por e-mail de ${x.de.nome} <${x.de.email}> em ${quando}.` },
-      depois: () => marcarEmailTratado(x.id, "Proposta virou contrato em negociação. O e-mail saiu da lista.")
-    });
+    const card = b.closest("[data-email]");
+    const x = card ? (gm.emails || []).find((m) => m.id === card.dataset.email) : gm.aberto;
+    if (x) acaoEmail(b.dataset.acaoEmail, x);
   };
 }

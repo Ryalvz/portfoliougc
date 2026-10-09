@@ -645,3 +645,18 @@ details.tokscript > summary .emo { font-size: 16px; color: var(--cobalt); }
 .ponto-novo { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--cobalt); }
 a.btn.pequeno { text-decoration: none; }
 @media (max-width: 620px) { .email-card { grid-template-columns: 1fr; } .email-avatar { display: none; } }
+.email-abrir { display: block; width: 100%; text-align: left; font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+.email-abrir > span { display: flex; }
+.email-abrir .email-trecho { display: -webkit-box; }
+.email-abrir:hover .email-assunto { color: var(--cobalt); }
+.email-card.automatico { opacity: .7; }
+.ver-automaticos { margin: 14px 0 8px; display: inline-block; font-size: 13px; }
+.pequeno-link { font-size: 12px; font-weight: 500; color: var(--muted); align-self: center; }
+.conversa { display: grid; gap: 10px; }
+.conversa-assunto { font-size: 16px; color: var(--cobalt); }
+.msg { border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; }
+.msg.minha { background: var(--tint); border-color: transparent; margin-left: 40px; }
+.msg-texto { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13.5px; line-height: 1.55; margin-top: 6px; max-height: 420px; overflow: auto; }
+.responder { margin-top: 16px; }
+.responder textarea { width: 100%; resize: vertical; line-height: 1.5; }
+@media (max-width: 620px) { .msg.minha { margin-left: 12px; } }
