@@ -315,3 +315,40 @@ alter table public.transcricoes alter column link drop not null;
 alter table public.transcricoes drop constraint if exists transcricoes_status_check;
 alter table public.transcricoes add constraint transcricoes_status_check
   check (status in ('ideia', 'agora', 'fazendo', 'feito'));
+
+
+-- -------------------------------------------------------------
+-- 13. TABELA CONTRATOS (financeiro)
+-- Um contrato por linha, como na sua planilha de contabilidade.
+-- O painel calcula sozinho: data prevista de pagamento (nota + prazo),
+-- total recebido (parcela 1 + parcela 2), saldo e se está vencido.
+-- mes / ano: mês de fechamento do trabalho
+-- Os seus dados NÃO ficam neste arquivo (ele é público no GitHub):
+-- eles foram importados direto no banco, que só você acessa.
+-- -------------------------------------------------------------
+create table if not exists public.contratos (
+  id          bigint generated always as identity primary key,
+  criado_em   timestamptz not null default now(),
+  cliente     text not null,
+  tipo        text not null default 'UGC'
+              check (tipo in ('UGC', 'Influencer', 'Freelance', 'Videomaker', 'Infoproduto/Comissão', 'Outro')),
+  descricao   text,
+  valor       numeric(12, 2) not null default 0 check (valor >= 0),
+  mes         integer check (mes between 1 and 12),
+  ano         integer not null default extract(year from now())::integer,
+  data_nf     date,
+  prazo_dias  integer check (prazo_dias >= 0),
+  status      text not null default 'Aguardando briefing'
+              check (status in ('Aguardando briefing', 'Aprovação de roteiro', 'Gravando', 'Editando',
+                                'Enviado p/ aprovação', 'Entregue', 'Pago', 'Vencido', 'Cancelado')),
+  parcela1    numeric(12, 2),
+  data_p1     date,
+  parcela2    numeric(12, 2),
+  data_p2     date,
+  obs         text
+);
+alter table public.contratos enable row level security;
+
+drop policy if exists "dono faz tudo" on public.contratos;
+create policy "dono faz tudo" on public.contratos
+  for all to authenticated using (public.eh_admin()) with check (public.eh_admin());
