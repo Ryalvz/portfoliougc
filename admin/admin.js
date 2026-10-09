@@ -2257,7 +2257,7 @@ const COLUNAS_PRODUCAO = [
   ["Entregue", ["Entregue", "Nota fiscal enviada", "Aguardando pagamento"]],
   ["Pago", ["Pago"]]
 ];
-const prod = { busca: "", soDestaque: false };
+const prod = { busca: "", soDestaque: false, mes: "" }; // mes: "" (todos) ou "2026-10"
 const colunaDe = (c) => (COLUNAS_PRODUCAO.find((x) => x[1].includes(c.status)) || [null])[0];
 const entregue = (c) => grupoDe(c.status) === "dinheiro";
 
@@ -2271,13 +2271,18 @@ function avisoEntrega(c) {
 }
 
 function desenharProducao(el) {
-  const ativos = S.contratos.filter((c) => grupoDe(c.status) !== "fora");
+  // Meses que têm campanha, do mais novo para o mais antigo
+  const chaveMes = (c) => c.ano && c.mes ? `${c.ano}-${pad(Number(c.mes))}` : "";
+  const meses = [...new Set(S.contratos.filter((c) => grupoDe(c.status) !== "fora").map(chaveMes).filter(Boolean))].sort().reverse();
+  const nomeMes = (k) => `${MESES_LONGOS[Number(k.slice(5)) - 1]} ${k.slice(0, 4)}`;
+  const ativos = S.contratos.filter((c) => grupoDe(c.status) !== "fora" && (!prod.mes || chaveMes(c) === prod.mes));
   const negociando = ativos.filter((c) => grupoDe(c.status) === "negociacao");
   const emProducao = ativos.filter((c) => grupoDe(c.status) === "producao");
   const atrasadas = emProducao.filter((c) => c.prazo_entrega && c.prazo_entrega < hojeISO());
   const videos = emProducao.reduce((s, c) => s + (Number(c.qtd) || 0), 0);
   const agora = new Date();
-  const entreguesMes = ativos.filter((c) => entregue(c) && Number(c.mes) === agora.getMonth() + 1 && Number(c.ano) === agora.getFullYear());
+  const mesKpi = prod.mes || `${agora.getFullYear()}-${pad(agora.getMonth() + 1)}`;
+  const entreguesMes = ativos.filter((c) => entregue(c) && chaveMes(c) === mesKpi);
 
   el.innerHTML = `
     <div class="faixa-kpi">
@@ -2285,11 +2290,15 @@ function desenharProducao(el) {
       <div class="kpi"><span>Em produção</span><strong>${qtd(emProducao.length)}</strong><small>${real(emProducao.reduce((s, c) => s + n2(c.valor), 0))} em contratos</small></div>
       <div class="kpi"><span>Vídeos para entregar</span><strong>${qtd(videos)}</strong><small>somando as campanhas abertas</small></div>
       <div class="kpi ${atrasadas.length ? "alerta" : ""}"><span>Atrasadas</span><strong>${qtd(atrasadas.length)}</strong><small>${atrasadas.length ? "passou do prazo de entrega" : "tudo em dia"}</small></div>
-      <div class="kpi"><span>Entregues este mês</span><strong>${qtd(entreguesMes.length)}</strong><small>${MESES_LONGOS[agora.getMonth()]}</small></div>
+      <div class="kpi"><span>${prod.mes ? "Entregues no mês" : "Entregues este mês"}</span><strong>${qtd(entreguesMes.length)}</strong><small>${nomeMes(mesKpi)}</small></div>
     </div>
     <div class="barra">
       <div class="busca">${ic("busca")}<input type="search" id="busca-prod" placeholder="Buscar cliente ou descrição" value="${esc(prod.busca)}" aria-label="Buscar campanhas"></div>
       <div class="chips" role="group" aria-label="Filtro"><button class="chip" type="button" data-dest="0" aria-pressed="${!prod.soDestaque}">Todas</button><button class="chip" type="button" data-dest="1" aria-pressed="${prod.soDestaque}">★ Destaques</button></div>
+      <label class="filtro-mes">${ic("calendario")}<select id="mes-prod" aria-label="Filtrar por mês">
+        <option value="">Todos os meses</option>
+        ${meses.map((k) => `<option value="${k}" ${prod.mes === k ? "selected" : ""}>${nomeMes(k)}</option>`).join("")}
+      </select></label>
       <span class="espaco"></span>
       <span class="sub">o mesmo cadastro do Financeiro</span>
       <button class="btn primario" type="button" id="add-prod">${ic("mais")}Nova campanha</button>
@@ -2303,7 +2312,7 @@ function desenharProducao(el) {
       let itens = lista.filter((c) => colunaDe(c) === nome)
         .sort((a, b) => (b.favorita === true) - (a.favorita === true) || sts.indexOf(b.status) - sts.indexOf(a.status) || String(a.prazo_entrega || "9999").localeCompare(String(b.prazo_entrega || "9999")));
       let resto = 0;
-      if (nome === "Pago") { // só os mais recentes, o histórico completo está no Financeiro
+      if (nome === "Pago" && !prod.mes) { // só os mais recentes, o histórico completo está no Financeiro
         itens = itens.sort((a, b) => (n2(b.ano) * 100 + n2(b.mes)) - (n2(a.ano) * 100 + n2(a.mes)) || b.id - a.id);
         resto = Math.max(0, itens.length - 6); itens = itens.slice(0, 6);
       }
@@ -2318,6 +2327,7 @@ function desenharProducao(el) {
   pintar();
 
   $("#busca-prod").addEventListener("input", (e) => { prod.busca = e.target.value; pintar(); });
+  $("#mes-prod").onchange = (e) => { prod.mes = e.target.value; desenhar(); };
   $$("[data-dest]", el).forEach((b) => b.onclick = () => { prod.soDestaque = b.dataset.dest === "1"; desenhar(); });
   $("#add-prod").onclick = () => formContrato();
 

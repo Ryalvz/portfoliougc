@@ -714,3 +714,9 @@ a.btn.pequeno { text-decoration: none; }
 .menu-blocos { display: grid; gap: 10px; }
 .menu-bloco { border-top: 1px solid var(--line); padding-top: 4px; }
 .menu-bloco .menu-grupo { padding-top: 8px; }
+
+/* Filtro de mês (Campanhas) */
+.filtro-mes { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--card); border-radius: var(--radius); padding: 0 10px; color: var(--muted); }
+.filtro-mes select { border: 0; background: none; font: inherit; font-size: 13px; font-weight: 600; color: var(--text); padding: 8px 2px; cursor: pointer; }
+.filtro-mes select:focus { outline: none; }
+.filtro-mes:focus-within { border-color: var(--cobalt); }
