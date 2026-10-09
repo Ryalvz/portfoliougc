@@ -627,3 +627,21 @@ details.tokscript > summary .emo { font-size: 16px; color: var(--cobalt); }
   .some-celular { display: none; }
   .painel-lembretes { position: fixed; top: 64px; left: 12px; right: 12px; width: auto; max-height: calc(100vh - 90px); }
 }
+
+/* ---------- Propostas (Gmail) ---------- */
+.gmail-conectar { max-width: 560px; margin: 24px auto; text-align: center; display: grid; justify-items: center; gap: 6px; padding: 28px 24px; }
+.gmail-conectar p { margin: 0; font-size: 13.5px; line-height: 1.5; }
+.gmail-icone { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 14px; background: var(--tint-2); color: var(--cobalt); margin-bottom: 4px; }
+.gmail-icone svg.i { width: 26px; height: 26px; }
+.gmail-conectar .btn { margin-top: 10px; }
+.lista-emails { display: grid; gap: 8px; }
+.email-card { display: grid; grid-template-columns: 40px 1fr; gap: 12px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; }
+.email-card.novo { border-left: 4px solid var(--cobalt); }
+.email-avatar { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: var(--olive-tint); color: #5e5a3a; font-weight: 700; font-size: 16px; }
+.email-corpo { min-width: 0; }
+.email-topo { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; font-size: 13px; }
+.email-assunto { margin: 3px 0 2px; font-weight: 700; font-size: 14px; display: flex; align-items: center; gap: 6px; }
+.email-trecho { margin: 0 0 8px; font-size: 12.5px; color: var(--muted); line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.ponto-novo { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--cobalt); }
+a.btn.pequeno { text-decoration: none; }
+@media (max-width: 620px) { .email-card { grid-template-columns: 1fr; } .email-avatar { display: none; } }

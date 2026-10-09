@@ -286,6 +286,7 @@ function baixarCSV(nome, cabecalho, linhas) {
 /* ---------- 3. ABAS ---------- */
 const DESENHOS = {
   inicio: desenharInicio,
+  propostas: desenharPropostas,
   portfolio: desenharPortfolio,
   marcas: desenharMarcas,
   calendario: desenharCalendario,
@@ -345,6 +346,7 @@ async function iniciar(sessao) {
   $("#aba-inicio").innerHTML = '<p class="vazio">Carregando seus dados...</p>';
   await carregarTudo();
   irPara((location.hash || "").slice(1) || "inicio");
+  if (gmailConectado()) lerPropostas();
 }
 
 /* =============================================================
@@ -687,11 +689,11 @@ function desenharMarcas(el) {
   });
 }
 
-function formMarca(m) {
+function formMarca(m, extra = {}) {
   abrirForm({
     titulo: m ? "Editar marca" : "Adicionar marca",
     tabela: "marcas",
-    valores: m || { situacao: "lead", ultimo_contato: hojeISO() },
+    valores: m || { situacao: "lead", ultimo_contato: hojeISO(), ...(extra.valores || {}) },
     campos: [
       { n: "nome", r: "Marca", req: true, inteiro: true },
       { n: "instagram", r: "Instagram", ph: "@marca" },
@@ -701,7 +703,7 @@ function formMarca(m) {
       { n: "ultimo_contato", r: "Último contato", t: "date" },
       { n: "obs", r: "Observação", t: "textarea" }
     ],
-    aoSalvar: async (d) => { const ok = await gravar("marcas", d, m ? m.id : null); if (ok) recarregar("marcas"); return ok; },
+    aoSalvar: async (d) => { const ok = await gravar("marcas", d, m ? m.id : null); if (ok) { recarregar("marcas"); if (extra.depois) extra.depois(); } return ok; },
     aoApagar: m ? async () => { const ok = await apagarLinha("marcas", m.id); if (ok) recarregar("marcas"); return ok; } : null
   });
 }
@@ -2187,12 +2189,12 @@ function formMeta(ano, mes) {
   });
 }
 
-function formContrato(c) {
+function formContrato(c, extra = {}) {
   const hoje = new Date();
   abrirForm({
     titulo: c ? "Editar contrato" : "Novo contrato",
     tabela: "contratos",
-    valores: c || { tipo: "UGC", status: "Em negociação", mes: hoje.getMonth() + 1, ano: hoje.getFullYear(), prazo_dias: 30 },
+    valores: c || { tipo: "UGC", status: "Em negociação", mes: hoje.getMonth() + 1, ano: hoje.getFullYear(), prazo_dias: 30, ...(extra.valores || {}) },
     campos: [
       { n: "cliente", r: "Marca / cliente", req: true, inteiro: true },
       { n: "tipo", r: "Tipo", t: "select", op: TIPOS_CONTRATO.map((t) => [t, t]) },
@@ -2224,7 +2226,7 @@ function formContrato(c) {
       const quitado = n2(d.valor) > 0 && n2(d.parcela1) + n2(d.parcela2) >= n2(d.valor);
       if (quitado && grupoDe(d.status) === "dinheiro" && d.status !== "Pago") { d.status = "Pago"; setTimeout(() => avisar("Marquei como Pago: o valor todo já foi recebido."), 400); }
       const ok = await gravar("contratos", d, c ? c.id : null);
-      if (ok) recarregar("contratos");
+      if (ok) { recarregar("contratos"); if (extra.depois) extra.depois(); }
       return ok;
     },
     aoApagar: c ? async () => { const ok = await apagarLinha("contratos", c.id); if (ok) recarregar("contratos"); return ok; } : null
@@ -2458,6 +2460,9 @@ async function adiarLembrete(chave, ate, aviso = "Certo, eu lembro de novo depoi
 function calcularLembretes() {
   const hoje = hojeISO();
   const L = [];
+  if (propostasNovas) L.push({ ic: "email", nivel: "",
+    texto: `${propostasNovas === 1 ? "Chegou <b>1 proposta nova</b>" : `Chegaram <b>${propostasNovas} propostas novas</b>`} no Gmail.`,
+    acoes: [["Ver propostas", true, () => irPara("propostas")]] });
   const quarta = ultimaQuarta();
   if (!S.comissoes.some((x) => String(x.data).slice(0, 10) === quarta) && !adiado("ttk-" + quarta)) {
     L.push({ ic: "financeiro", nivel: quarta === hoje ? "" : "alerta",
@@ -2829,4 +2834,179 @@ function ligarCabecalho() {
     desenhar();
     avisar(privado ? "Valores escondidos. Pode mostrar o painel tranquilo." : "Valores visíveis de novo.");
   });
+}
+
+/* =============================================================
+   ABA PROPOSTAS (Gmail)
+   Lê o Gmail de propostas (heyryan.ugc@gmail.com) só para leitura
+   e separa os e-mails com cara de proposta de UGC/publi.
+   O login é feito pelo Google numa janela própria: a senha nunca
+   passa pelo painel. O ID abaixo é público (não é segredo).
+   O acesso vale por cerca de 1 hora; depois é só clicar em
+   "Conectar o Gmail" de novo.
+   ============================================================= */
+const GOOGLE_CLIENT_ID = "317757639743-datc7u3k3d7hauj06q6viqefstliqkle.apps.googleusercontent.com";
+const EMAIL_PROPOSTAS = "heyryan.ugc@gmail.com";
+const PALAVRAS_PROPOSTA = ["ugc", "\"user generated\"", "proposta", "parceria", "publi", "publicidade", "publipost", "campanha", "collab", "collaboration", "briefing", "orçamento", "orcamento", "\"mídia kit\"", "\"media kit\"", "midiakit", "influenciador", "influencer", "creator", "\"criador de conteúdo\"", "permuta", "cachê", "cache"];
+const BUSCA_PROPOSTAS = `in:inbox newer_than:90d -category:promotions -category:social -category:forums (${PALAVRAS_PROPOSTA.join(" OR ")})`;
+const DOMINIOS_PESSOAIS = ["gmail", "hotmail", "outlook", "yahoo", "icloud", "live", "bol", "uol", "terra", "me"];
+const gm = { token: null, expira: 0, carregando: false, emails: null, erro: "", busca: "", ultimaLeitura: 0 };
+let propostasNovas = 0;
+
+try {
+  const t = JSON.parse(sessionStorage.getItem("gmail-token") || "null");
+  if (t && t.expira > Date.now()) { gm.token = t.token; gm.expira = t.expira; }
+} catch (_) {}
+const gmailConectado = () => !!gm.token && gm.expira > Date.now() + 30000;
+
+function carregarGoogle() {
+  if (window.google && google.accounts && google.accounts.oauth2) return Promise.resolve();
+  return new Promise((ok, falhou) => {
+    const sc = document.createElement("script");
+    sc.src = "https://accounts.google.com/gsi/client";
+    sc.async = true;
+    sc.onload = () => ok();
+    sc.onerror = () => falhou(new Error("Não consegui carregar o login do Google. Confira a internet."));
+    document.head.appendChild(sc);
+  });
+}
+
+async function conectarGmail() {
+  await carregarGoogle();
+  return new Promise((ok, falhou) => {
+    const cliente = google.accounts.oauth2.initTokenClient({
+      client_id: GOOGLE_CLIENT_ID,
+      scope: "https://www.googleapis.com/auth/gmail.readonly",
+      hint: EMAIL_PROPOSTAS,
+      callback: (r) => {
+        if (r.error || !r.access_token) { falhou(new Error(r.error_description || r.error || "O Google não liberou o acesso.")); return; }
+        gm.token = r.access_token;
+        gm.expira = Date.now() + (Number(r.expires_in) || 3600) * 1000;
+        try { sessionStorage.setItem("gmail-token", JSON.stringify({ token: gm.token, expira: gm.expira })); } catch (_) {}
+        ok();
+      },
+      error_callback: (e) => falhou(new Error(e && e.type === "popup_closed" ? "A janela do Google foi fechada antes de terminar." : "O Google não abriu a janela de login. Libere pop-ups para este site."))
+    });
+    cliente.requestAccessToken({ prompt: "" });
+  });
+}
+
+function desconectarGmail() {
+  if (gm.token && window.google && google.accounts) google.accounts.oauth2.revoke(gm.token, () => {});
+  gm.token = null; gm.expira = 0; gm.emails = null; propostasNovas = 0;
+  try { sessionStorage.removeItem("gmail-token"); } catch (_) {}
+}
+
+async function gmailApi(caminho) {
+  const r = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/" + caminho, { headers: { Authorization: "Bearer " + gm.token } });
+  if (r.status === 401) { desconectarGmail(); throw new Error("O acesso ao Gmail expirou. Clique em Conectar o Gmail de novo."); }
+  if (!r.ok) throw new Error("O Gmail respondeu com erro " + r.status + ".");
+  return r.json();
+}
+
+// Quem mandou: nome, e-mail e um palpite do nome da marca (pelo domínio do e-mail)
+function lerRemetente(de) {
+  const m = String(de || "").match(/^\s*"?([^"<]*?)"?\s*<([^>]+)>/);
+  const nome = m ? m[1].trim() : "";
+  const email = (m ? m[2] : de || "").trim().toLowerCase();
+  const dominio = (email.split("@")[1] || "").split(".")[0];
+  const marca = dominio && !DOMINIOS_PESSOAIS.includes(dominio) ? dominio.charAt(0).toUpperCase() + dominio.slice(1) : (nome || email);
+  return { nome: nome || email, email, marca };
+}
+
+async function lerPropostas() {
+  if (!gmailConectado() || gm.carregando) return;
+  gm.carregando = true; gm.erro = "";
+  if (abaAtual === "propostas") desenhar();
+  try {
+    const q = BUSCA_PROPOSTAS + (gm.busca ? " " + gm.busca : "");
+    const lista = await gmailApi("messages?maxResults=40&q=" + encodeURIComponent(q));
+    const ids = (lista.messages || []).map((x) => x.id);
+    const cabecalhos = ["From", "Subject", "Date"].map((h) => "&metadataHeaders=" + h).join("");
+    const msgs = await Promise.all(ids.map((id) => gmailApi(`messages/${id}?format=metadata${cabecalhos}`).catch(() => null)));
+    gm.emails = msgs.filter(Boolean).map((m) => {
+      const h = (n) => ((m.payload && m.payload.headers) || []).find((x) => x.name.toLowerCase() === n.toLowerCase())?.value || "";
+      return { id: m.id, thread: m.threadId, de: lerRemetente(h("From")), assunto: h("Subject") || "(sem assunto)", trecho: m.snippet || "",
+        data: new Date(Number(m.internalDate) || Date.parse(h("Date")) || Date.now()), novo: (m.labelIds || []).includes("UNREAD") };
+    });
+    gm.ultimaLeitura = Date.now();
+  } catch (e) {
+    gm.erro = e.message || String(e);
+  }
+  gm.carregando = false;
+  const visiveis = (gm.emails || []).filter((x) => !adiado("email-" + x.id));
+  propostasNovas = visiveis.filter((x) => x.novo).length;
+  desenhar();
+}
+
+const marcarEmailTratado = (id, aviso) => adiarLembrete("email-" + id, "2999-12-31", aviso);
+
+function desenharPropostas(el) {
+  if (!gmailConectado()) {
+    el.innerHTML = `<div class="cartao gmail-conectar">
+      <span class="gmail-icone">${ic("email")}</span>
+      <h2>Conecte o Gmail de propostas</h2>
+      <p>O painel lê a caixa de entrada do <b>${esc(EMAIL_PROPOSTAS)}</b> e separa sozinho os e-mails de UGC, publi, parceria, campanha e orçamento. Só leitura: o painel não apaga, não envia e não mexe em nada.</p>
+      <p class="sub">Na primeira vez o Google mostra um aviso de "app não verificado". É normal, o app é só seu: clique em <b>Continuar</b>.</p>
+      ${gm.erro ? `<div class="aviso-falta">${esc(gm.erro)}</div>` : ""}
+      <button class="btn primario" type="button" id="conectar-gmail">${ic("email")}Conectar o Gmail</button>
+    </div>`;
+    $("#conectar-gmail").onclick = async (e) => {
+      e.target.disabled = true; e.target.textContent = "Abrindo o Google...";
+      try { await conectarGmail(); await lerPropostas(); }
+      catch (erro) { gm.erro = erro.message; desenhar(); }
+    };
+    return;
+  }
+  if (!gm.emails && !gm.carregando && !gm.erro) { lerPropostas(); }
+
+  const visiveis = (gm.emails || []).filter((x) => !adiado("email-" + x.id));
+  const minutos = Math.max(1, Math.round((gm.expira - Date.now()) / 60000));
+  el.innerHTML = `
+    <div class="barra">
+      <div class="busca">${ic("busca")}<input type="search" id="busca-gmail" placeholder="Filtrar mais (ex: nome da marca)" value="${esc(gm.busca)}" aria-label="Filtrar propostas"></div>
+      <span class="espaco"></span>
+      <span class="sub">${esc(EMAIL_PROPOSTAS)} · conectado por mais ${minutos} min</span>
+      <button class="btn" type="button" id="atualizar-gmail" ${gm.carregando ? "disabled" : ""}>${gm.carregando ? "Lendo..." : "Atualizar"}</button>
+      <button class="btn" type="button" id="sair-gmail">Desconectar</button>
+    </div>
+    ${gm.erro ? `<div class="aviso-falta">${esc(gm.erro)}</div>` : ""}
+    ${gm.carregando && !gm.emails ? `<p class="vazio">Lendo o seu Gmail...</p>`
+      : !visiveis.length ? `<p class="vazio">Nenhuma proposta nova nos últimos 90 dias. Quando chegar e-mail falando de UGC, publi, parceria ou orçamento, ele aparece aqui.</p>`
+      : `<p class="sub" style="margin:0 0 8px">${plural(visiveis.length, "e-mail com cara de proposta", "e-mails com cara de proposta")} nos últimos 90 dias${propostasNovas ? ` · <b>${plural(propostasNovas, "não lido", "não lidos")}</b>` : ""}</p>
+        <div class="lista-emails">${visiveis.map((x) => `<article class="email-card ${x.novo ? "novo" : ""}" data-email="${esc(x.id)}">
+          <span class="email-avatar">${esc((x.de.marca || "?").charAt(0).toUpperCase())}</span>
+          <div class="email-corpo">
+            <div class="email-topo"><b>${esc(x.de.nome)}</b><span class="sub">${esc(x.de.email)}</span><span class="espaco"></span><span class="sub">${x.data.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}</span></div>
+            <p class="email-assunto">${x.novo ? `<i class="ponto-novo" aria-label="não lido"></i>` : ""}${esc(x.assunto)}</p>
+            <p class="email-trecho">${esc(x.trecho)}</p>
+            <div class="lembrete-acoes" style="justify-content:flex-start">
+              <button type="button" class="btn pequeno primario" data-acao-email="contrato">Virar contrato</button>
+              <button type="button" class="btn pequeno" data-acao-email="marca">Salvar marca</button>
+              <a class="btn pequeno" href="https://mail.google.com/mail/u/${encodeURIComponent(EMAIL_PROPOSTAS)}/#all/${esc(x.thread)}" target="_blank" rel="noopener">Abrir no Gmail</a>
+              <button type="button" class="btn pequeno" data-acao-email="ignorar">Não é proposta</button>
+            </div>
+          </div>
+        </article>`).join("")}</div>`}`;
+
+  $("#atualizar-gmail").onclick = () => lerPropostas();
+  $("#sair-gmail").onclick = () => { desconectarGmail(); desenhar(); avisar("Gmail desconectado."); };
+  let espera;
+  $("#busca-gmail").addEventListener("input", (e) => { gm.busca = e.target.value.trim(); clearTimeout(espera); espera = setTimeout(lerPropostas, 700); });
+  el.onclick = (e) => {
+    const b = e.target.closest("[data-acao-email]");
+    if (!b) return;
+    const x = (gm.emails || []).find((m) => m.id === b.closest("[data-email]").dataset.email);
+    if (!x) return;
+    const quando = x.data.toLocaleDateString("pt-BR");
+    if (b.dataset.acaoEmail === "ignorar") marcarEmailTratado(x.id, "Tirei da lista de propostas.");
+    else if (b.dataset.acaoEmail === "marca") formMarca(null, {
+      valores: { nome: x.de.marca, email: x.de.email, obs: `Chegou por e-mail em ${quando}: "${x.assunto}"` },
+      depois: () => marcarEmailTratado(x.id, "Marca salva como lead. O e-mail saiu da lista.")
+    });
+    else formContrato(null, {
+      valores: { cliente: x.de.marca, descricao: x.assunto.slice(0, 120), status: "Em negociação", obs: `Proposta por e-mail de ${x.de.nome} <${x.de.email}> em ${quando}.` },
+      depois: () => marcarEmailTratado(x.id, "Proposta virou contrato em negociação. O e-mail saiu da lista.")
+    });
+  };
 }

@@ -17,7 +17,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&display=swap" rel="stylesheet">
 <!-- Ao mudar admin.css ou admin.js, aumente o número do ?v= para o navegador baixar a versão nova -->
-<link rel="stylesheet" href="admin.css?v=17">
+<link rel="stylesheet" href="admin.css?v=18">
 </head>
 <body>
 
@@ -54,6 +54,7 @@
   <symbol id="i-grafico" viewBox="0 0 24 24"><path d="M12 3v9h9"/><path d="M20.5 15A9 9 0 1 1 9 3.5"/></symbol>
   <symbol id="i-casa" viewBox="0 0 24 24"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></symbol>
   <symbol id="i-olho-fechado" viewBox="0 0 24 24"><path d="M10.6 5.1A10.6 10.6 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-2.2 3.1M6.6 6.6C3.7 8.5 2 12 2 12s3.5 7 10 7a9.7 9.7 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/><path d="M3 3l18 18"/></symbol>
+  <symbol id="i-email" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></symbol>
   <symbol id="i-sino" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></symbol>
 </svg>
 
@@ -70,6 +71,7 @@
   <button class="menu-item" type="button" data-aba="portfolio"><svg class="i"><use href="#i-portfolio"/></svg>Portfólio</button>
   <button class="menu-item" type="button" data-aba="marcas"><svg class="i"><use href="#i-marcas"/></svg>Marcas</button>
   <div class="menu-grupo">Minha rotina</div>
+  <button class="menu-item" type="button" data-aba="propostas"><svg class="i"><use href="#i-email"/></svg>Propostas</button>
   <button class="menu-item" type="button" data-aba="calendario"><svg class="i"><use href="#i-calendario"/></svg>Calendário</button>
   <button class="menu-item" type="button" data-aba="campanhas"><svg class="i"><use href="#i-campanhas"/></svg>Campanhas</button>
   <button class="menu-item" type="button" data-aba="financeiro"><svg class="i"><use href="#i-financeiro"/></svg>Financeiro</button>
@@ -105,6 +107,7 @@
 
   <section id="aba-inicio" data-titulo="Início"></section>
   <section id="aba-portfolio" data-titulo="Portfólio" hidden></section>
+  <section id="aba-propostas" data-titulo="Propostas" hidden></section>
   <section id="aba-marcas" data-titulo="Marcas" hidden></section>
   <section id="aba-calendario" data-titulo="Calendário" hidden></section>
   <section id="aba-campanhas" data-titulo="Campanhas" hidden></section>
@@ -116,8 +119,8 @@
 <dialog id="janela"></dialog>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="../js/banco.js?v=17"></script>
-<script src="../js/biblioteca.js?v=17"></script>
-<script src="admin.js?v=17"></script>
+<script src="../js/banco.js?v=18"></script>
+<script src="../js/biblioteca.js?v=18"></script>
+<script src="admin.js?v=18"></script>
 </body>
 </html>
