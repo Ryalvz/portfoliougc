@@ -1767,6 +1767,11 @@ function ligarDicas(el) {
 const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0);
 function variacao(atual, antes) {
   if (!antes) return atual ? `<span class="sobe">novo</span>` : `<span class="sub">-</span>`;
+  if (antes < 0 || atual < 0) {
+    // Com número negativo (ex.: saldo de seguidores) porcentagem não faz sentido: mostra a diferença
+    const dif = atual - antes;
+    return dif >= 0 ? `<span class="sobe">▲ ${dif}</span>` : `<span class="desce">▼ ${-dif}</span>`;
+  }
   const p = Math.round(((atual - antes) / antes) * 100);
   return p >= 0 ? `<span class="sobe">▲ ${p}%</span>` : `<span class="desce">▼ ${-p}%</span>`;
 }
