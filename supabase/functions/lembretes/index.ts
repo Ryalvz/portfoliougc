@@ -3,6 +3,7 @@
 // Confere o painel e manda notificação para o celular do Ryan:
 //   tipo "diario" (todo dia, 9h): resumo do que está pendente
 //   tipo "quarta" (quarta, 8h): repasse do TikTok Shop (cai de madrugada)
+//   tipo "rapidos" (a cada minuto): lembretes rápidos que chegaram na hora
 //   tipo "propostas" (de 2 em 2 horas, das 8h às 22h): proposta nova no Gmail
 //   Na segunda, o resumo das 9h começa com um balanço da semana.
 //   Todo dia ele também renova a conexão do Instagram e avisa se o
@@ -324,6 +325,19 @@ Deno.serve(async (req) => {
       const L = await calcularLembretes(hoje);
       const conteudo = L.length ? montarNotificacao(L) : { titulo: "Notificações ligadas", corpo: "Tudo certo! Quando tiver algo pendente, o aviso chega aqui.", url: "./", total: 0 };
       return resposta({ ...(await enviar(conteudo)), lembretes: L.length });
+    }
+
+    // Relógio de cada minuto: lembrete rápido que chegou na hora
+    if (corpo.tipo === "rapidos") {
+      const { data: naHora } = await db.from("lembretes_rapidos").select("id,texto")
+        .eq("feito", false).eq("avisado", false).lte("quando", new Date().toISOString()).limit(10);
+      if (!naHora?.length) return resposta({ pulado: "nenhum lembrete agora" });
+      for (const r of naHora) {
+        // Marca antes de mandar, para nunca chegar repetido
+        await db.from("lembretes_rapidos").update({ avisado: true }).eq("id", r.id);
+        await enviar({ titulo: "Lembrete", corpo: r.texto, url: "./#inicio", tag: "rapido-" + r.id });
+      }
+      return resposta({ lembretes: naHora.length });
     }
 
     // Relógio de 2 em 2 horas: proposta nova no Gmail
