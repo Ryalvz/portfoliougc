@@ -547,3 +547,33 @@ select cron.schedule('lembretes-propostas', '0 1,11-23/2 * * *', $$
     headers := '{"Content-Type": "application/json", "apikey": "sb_publishable_oZdhIWRB1gBabQH4xRJ2Xg__F8Lq0V0"}'::jsonb,
     body := '{"tipo": "propostas"}'::jsonb)
 $$);
+
+
+-- -------------------------------------------------------------
+-- 20. LEMBRETES RÁPIDOS
+-- Você escreve ("cobrar a RAMPY do pagamento"), escolhe quando, e
+-- na hora o celular recebe a notificação. O relógio confere a
+-- cada minuto se tem lembrete na hora de avisar.
+-- feito: você marcou como resolvido | avisado: a notificação já foi
+-- -------------------------------------------------------------
+create table if not exists public.lembretes_rapidos (
+  id        bigint generated always as identity primary key,
+  texto     text not null,
+  quando    timestamptz not null,
+  feito     boolean not null default false,
+  avisado   boolean not null default false,
+  criado_em timestamptz not null default now()
+);
+create index if not exists lembretes_rapidos_pendentes on public.lembretes_rapidos (quando) where not feito;
+alter table public.lembretes_rapidos enable row level security;
+
+drop policy if exists "dono faz tudo" on public.lembretes_rapidos;
+create policy "dono faz tudo" on public.lembretes_rapidos
+  for all to authenticated using (public.eh_admin()) with check (public.eh_admin());
+
+select cron.schedule('lembretes-rapidos', '* * * * *', $$
+  select net.http_post(
+    url := 'https://jlehawiwklvyvrzbfuiu.supabase.co/functions/v1/lembretes',
+    headers := '{"Content-Type": "application/json", "apikey": "sb_publishable_oZdhIWRB1gBabQH4xRJ2Xg__F8Lq0V0"}'::jsonb,
+    body := '{"tipo": "rapidos"}'::jsonb)
+$$);
