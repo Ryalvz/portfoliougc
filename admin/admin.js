@@ -83,12 +83,13 @@ const ESQUEMA = {
   metas: ["ano", "mes", "valor"],
   lembretes_adiados: ["chave", "ate"],
   ig_historico: ["data", "seguidores", "posts"],
+  lembretes_rapidos: ["id", "texto", "quando", "feito", "avisado", "criado_em"],
   contratos: ["id", "cliente", "tipo", "descricao", "valor", "mes", "ano", "data_nf", "prazo_dias", "status", "parcela1", "data_p1", "parcela2", "data_p2", "obs", "qtd", "prazo_entrega", "favorita", "criado_em"],
   transcricoes: ["id", "criado_em", "link", "plataforma", "categoria", "status", "titulo", "transcricao", "transcricao_original", "idioma_original", "minha_versao", "observacoes"],
   marcados: ["chave", "marcado"],
   visitas: ["id", "data", "pagina", "origem"]
 };
-const S = { videos: [], marcas: [], calendario: [], campanhas: [], marcados: {}, visitas: [], transcricoes: [], contratos: [], comissoes: [], metas: [], adiados: [] };
+const S = { videos: [], marcas: [], calendario: [], campanhas: [], marcados: {}, visitas: [], transcricoes: [], contratos: [], comissoes: [], metas: [], adiados: [], rapidos: [] };
 const CAMPOS = {};          // campos que existem de verdade em cada tabela
 const FALTAS = new Map();   // tabela -> o que faltou
 
@@ -128,7 +129,7 @@ async function ler(tabela, ajuste) {
 
 async function carregarTudo() {
   const desde = new Date(); desde.setHours(0, 0, 0, 0); desde.setDate(desde.getDate() - 13);
-  const [videos, marcas, calendario, campanhas, marcados, visitas, transcricoes, contratos, comissoes, metas, adiados] = await Promise.all([
+  const [videos, marcas, calendario, campanhas, marcados, visitas, transcricoes, contratos, comissoes, metas, adiados, rapidos] = await Promise.all([
     ler("videos", (q, c) => (c.includes("ordem") ? q.order("ordem", { ascending: true }) : q)),
     ler("marcas", (q, c) => (c.includes("criado_em") ? q.order("criado_em", { ascending: false }) : q)),
     ler("calendario"),
@@ -139,9 +140,10 @@ async function carregarTudo() {
     ler("contratos", (q, c) => (c.includes("id") ? q.order("id", { ascending: true }).limit(5000) : q)),
     ler("comissoes_ttk", (q, c) => (c.includes("data") ? q.order("data", { ascending: false }).limit(5000) : q)),
     ler("metas"),
-    ler("lembretes_adiados")
+    ler("lembretes_adiados"),
+    lerRapidos()
   ]);
-  Object.assign(S, { videos, marcas, calendario, campanhas, visitas, transcricoes, contratos, comissoes, metas, adiados });
+  Object.assign(S, { videos, marcas, calendario, campanhas, visitas, transcricoes, contratos, comissoes, metas, adiados, rapidos });
   S.marcados = {};
   marcados.forEach((m) => { if (m.chave) S.marcados[m.chave] = m.marcado !== false; });
 }
@@ -348,6 +350,8 @@ async function iniciar(sessao) {
   $("#aba-inicio").innerHTML = '<p class="vazio">Carregando seus dados...</p>';
   await carregarTudo();
   irPara((location.hash || "").slice(1) || "inicio");
+  // A cada minuto o sino confere se algum lembrete rápido chegou na hora
+  setInterval(() => { try { pintarLembretes(); } catch (_) {} }, 60000);
   // Tocar numa notificação com o painel já aberto troca de aba
   window.addEventListener("hashchange", () => { const aba = (location.hash || "").slice(1); if (aba && aba !== abaAtual) irPara(aba); });
   sincronizarGmail();
@@ -2477,9 +2481,93 @@ async function adiarLembrete(chave, ate, aviso = "Certo, eu lembro de novo depoi
   desenhar();
 }
 
+/* ---------- Lembretes rápidos ----------
+   Você escreve ("cobrar a RAMPY do pagamento"), escolhe quando, e na
+   hora o celular avisa (ajudante "lembretes", relógio de cada minuto).
+   Enquanto não marcar "Feito", ele fica no sino. */
+const lerRapidos = () => ler("lembretes_rapidos", (q, c) => (c.includes("feito") ? q.eq("feito", false).order("quando", { ascending: true }) : q));
+async function recarregarRapidos() { S.rapidos = await lerRapidos(); desenhar(); }
+
+const QUANDO_RAPIDO = [["1h", "Em 1 hora"], ["3h", "Em 3 horas"], ["hoje18", "Hoje 18h"], ["amanha9", "Amanhã 9h"], ["segunda9", "Segunda 9h"]];
+function quandoRapido(op) {
+  const d = new Date(); d.setSeconds(0, 0);
+  if (op === "1h") d.setHours(d.getHours() + 1);
+  else if (op === "3h") d.setHours(d.getHours() + 3);
+  else if (op === "hoje18") d.setHours(18, 0);
+  else if (op === "amanha9") { d.setDate(d.getDate() + 1); d.setHours(9, 0); }
+  else if (op === "segunda9") { d.setDate(d.getDate() + ((8 - d.getDay()) % 7 || 7)); d.setHours(9, 0); }
+  return d;
+}
+const paraCampoHora = (d) => `${isoLocal(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+function quandoTexto(iso) {
+  const d = new Date(iso), hoje = hojeISO(), dia = isoLocal(d);
+  const hora = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  if (dia === hoje) return `hoje ${hora}`;
+  if (dia === somaDiasISO(1)) return `amanhã ${hora}`;
+  return `${DIAS_SEMANA[d.getDay()].slice(0, 3)} ${dataBR(dia).slice(0, 5)} ${hora}`;
+}
+
+function formLembreteRapido(r) {
+  if (!CAMPOS.lembretes_rapidos || !CAMPOS.lembretes_rapidos.length) { avisar("A tabela lembretes_rapidos não existe no banco. Rode o banco.sql.", true); return; }
+  const d = janela();
+  const inicial = r ? new Date(r.quando) : quandoRapido("amanha9");
+  const opcoes = QUANDO_RAPIDO.filter(([k]) => k !== "hoje18" || new Date().getHours() < 17);
+  d.innerHTML = `<form class="form-janela" novalidate>
+    <div class="janela-topo"><h3>${r ? "Editar lembrete" : "Novo lembrete"}</h3><button type="button" class="icone-btn" data-fechar aria-label="Fechar">${ic("fechar")}</button></div>
+    <div class="janela-corpo"><div class="form-grade">
+      <div class="inteiro"><label for="f-texto">O que lembrar</label><input class="campo" style="width:100%" id="f-texto" name="texto" value="${esc(r ? r.texto : "")}" placeholder="Ex.: cobrar o time da RAMPY sobre o pagamento" autocomplete="off"></div>
+      <div class="inteiro"><label>Quando avisar</label>
+        <div class="chips quando-chips" role="group" aria-label="Atalhos de horário">${opcoes.map(([k, t]) => `<button type="button" class="chip" data-quando="${k}" aria-pressed="${!r && k === "amanha9"}">${t}</button>`).join("")}</div>
+      </div>
+      <div class="inteiro"><label for="f-quando">Dia e hora</label><input class="campo" style="width:100%" id="f-quando" name="quando" type="datetime-local" value="${paraCampoHora(inicial)}"></div>
+    </div><p class="sub" style="margin:10px 0 0">Na hora marcada chega a notificação no celular, e o lembrete fica no sino até você marcar "Feito".</p></div>
+    <div class="janela-pe">
+      ${r ? `<button type="button" class="btn perigo esq" data-apagar>${ic("apagar")}Apagar</button>` : ""}
+      <button type="button" class="btn" data-fechar>Cancelar</button>
+      <button type="submit" class="btn primario">${ic("sino")}Salvar lembrete</button>
+    </div></form>`;
+  const f = $("form", d);
+  $$("[data-fechar]", d).forEach((b) => b.addEventListener("click", () => d.close()));
+  $$("[data-quando]", d).forEach((b) => b.addEventListener("click", () => {
+    f.elements.quando.value = paraCampoHora(quandoRapido(b.dataset.quando));
+    $$("[data-quando]", d).forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+  }));
+  f.elements.quando.addEventListener("input", () => $$("[data-quando]", d).forEach((x) => x.setAttribute("aria-pressed", "false")));
+  if (r) $("[data-apagar]", d).addEventListener("click", async () => {
+    if (!(await confirmar("Apagar esse lembrete?"))) return;
+    if (await apagarLinha("lembretes_rapidos", r.id)) { d.close(); recarregarRapidos(); }
+  });
+  f.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const texto = f.elements.texto.value.trim();
+    if (!texto) { f.elements.texto.focus(); avisar("Escreva o que é pra lembrar.", true); return; }
+    const quando = new Date(f.elements.quando.value);
+    if (isNaN(quando)) { avisar("Escolha o dia e a hora.", true); return; }
+    const btn = $('button[type="submit"]', f); btn.disabled = true;
+    const ok = await gravar("lembretes_rapidos", { texto, quando: quando.toISOString(), avisado: false, feito: false }, r ? r.id : null);
+    btn.disabled = false;
+    if (ok) { d.close(); avisar(`Combinado! Eu te aviso ${quandoTexto(quando.toISOString())}.`); recarregarRapidos(); }
+  });
+  d.showModal();
+  f.elements.texto.focus();
+}
+async function concluirRapido(r) {
+  if (await gravar("lembretes_rapidos", { feito: true }, r.id)) { avisar("Feito! Tirei da lista."); recarregarRapidos(); }
+}
+async function adiarRapido(r, op) {
+  const quando = quandoRapido(op).toISOString();
+  if (await gravar("lembretes_rapidos", { quando, avisado: false }, r.id)) { avisar(`Certo, eu lembro de novo ${quandoTexto(quando)}.`); recarregarRapidos(); }
+}
+
 function calcularLembretes() {
   const hoje = hojeISO();
   const L = [];
+  // Lembretes rápidos que chegaram na hora vêm primeiro
+  const agoraMs = Date.now();
+  S.rapidos.filter((r) => !r.feito && Date.parse(r.quando) <= agoraMs).forEach((r) => {
+    L.push({ ic: "sino", nivel: "alerta", texto: `<b>${esc(r.texto)}</b><br><span class="sub">lembrete de ${quandoTexto(r.quando)}</span>`,
+      acoes: [["Feito", true, () => concluirRapido(r)], ["+1 hora", false, () => adiarRapido(r, "1h")], ["Amanhã 9h", false, () => adiarRapido(r, "amanha9")]] });
+  });
   const naoVistas = propostasNaoVistas();
   if (naoVistas.length) {
     const imp = naoVistas.filter((x) => x.importante).length;
@@ -2644,13 +2732,20 @@ function pintarLembretes() {
   const conta = $("#sino-conta");
   if (conta) { conta.hidden = !L.length; conta.textContent = L.length > 9 ? "9+" : String(L.length); }
   $("#abrir-lembretes").setAttribute("aria-label", L.length ? plural(L.length, "lembrete", "lembretes") : "Nenhum lembrete");
-  caixa.innerHTML = `<header><b>Lembretes</b><span class="sub">${L.length ? plural(L.length, "coisa precisa", "coisas precisam") + " de você" : "tudo em dia"}</span></header>
+  const proximos = S.rapidos.filter((r) => !r.feito && Date.parse(r.quando) > Date.now());
+  caixa.innerHTML = `<header><div><b>Lembretes</b><span class="sub">${L.length ? plural(L.length, "coisa precisa", "coisas precisam") + " de você" : "tudo em dia"}</span></div>
+      <button type="button" class="btn pequeno primario" data-novo-rapido>${ic("mais")}Lembrete</button></header>
     ${L.length ? `<ul>${L.map((x, i) => `<li class="lembrete ${x.nivel}">
       <span class="insight-ic">${ic(x.ic)}</span>
       <p>${x.texto}</p>
       <div class="lembrete-acoes">${x.acoes.map(([r, p], j) => `<button type="button" class="btn pequeno ${p ? "primario" : ""}" data-lembrete="${i}" data-acao="${j}">${esc(r)}</button>`).join("")}</div>
-    </li>`).join("")}</ul>` : `<p class="vazio">Nenhum lembrete agora. Tudo em dia!</p>`}`;
+    </li>`).join("")}</ul>` : `<p class="vazio">Nenhum lembrete agora. Tudo em dia!</p>`}
+    ${proximos.length ? `<div class="proximos-rapidos"><span class="sub">Vou te lembrar</span>${proximos.slice(0, 8).map((r) => `<button type="button" class="item-dia" data-rapido-id="${esc(r.id)}">
+      <span class="etq">${esc(quandoTexto(r.quando))}</span><span class="item-dia-texto"><b>${esc(r.texto)}</b></span></button>`).join("")}</div>` : ""}`;
   caixa.onclick = (e) => {
+    if (e.target.closest("[data-novo-rapido]")) { fecharLembretes(); formLembreteRapido(); return; }
+    const ed = e.target.closest("[data-rapido-id]");
+    if (ed) { fecharLembretes(); formLembreteRapido(S.rapidos.find((r) => String(r.id) === ed.dataset.rapidoId)); return; }
     const b = e.target.closest("[data-lembrete]");
     if (!b) return;
     const l = lembretesAtuais[Number(b.dataset.lembrete)];
@@ -2797,6 +2892,7 @@ function desenharInicio(el) {
     <div class="inicio-topo">
       <div><h2 class="saudacao">${saudacao}, Ryan</h2><p class="sub">${DIAS_SEMANA[agora.getDay()]}, ${agora.getDate()} de ${MESES_LONGOS[agora.getMonth()].toLowerCase()}</p></div>
       <div class="inicio-acoes">
+        <button class="btn" type="button" data-rapido="lembrete">${ic("sino")}Lembrete</button>
         <button class="btn" type="button" data-rapido="ideia">${ic("mais")}Ideia</button>
         <button class="btn" type="button" data-rapido="ttk">${ic("mais")}Repasse TikTok</button>
         <button class="btn primario" type="button" data-rapido="contrato">${ic("mais")}Contrato</button>
@@ -2881,7 +2977,8 @@ function desenharInicio(el) {
     if (ideia) { trans.sel = ideia.dataset.ideia; irPara("transcricoes"); return; }
     const r = e.target.closest("[data-rapido]");
     if (!r) return;
-    if (r.dataset.rapido === "contrato") formContrato();
+    if (r.dataset.rapido === "lembrete") formLembreteRapido();
+    else if (r.dataset.rapido === "contrato") formContrato();
     else if (r.dataset.rapido === "ttk") formComissao();
     else { irPara("transcricoes"); setTimeout(() => { const i = $("#form-add-trans input, #form-add-trans textarea"); if (i) i.focus(); }, 100); }
   };

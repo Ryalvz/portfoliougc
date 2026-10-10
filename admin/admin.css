@@ -720,3 +720,11 @@ a.btn.pequeno { text-decoration: none; }
 .filtro-mes select { border: 0; background: none; font: inherit; font-size: 13px; font-weight: 600; color: var(--text); padding: 8px 2px; cursor: pointer; }
 .filtro-mes select:focus { outline: none; }
 .filtro-mes:focus-within { border-color: var(--cobalt); }
+
+/* Lembretes rápidos */
+.painel-lembretes header .btn { flex: none; align-self: center; }
+.painel-lembretes header > div { display: flex; flex-direction: column; gap: 2px; }
+.proximos-rapidos { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; padding: 10px 12px 12px; border-top: 1px solid var(--line); }
+.proximos-rapidos > .sub { padding: 0 6px 4px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; font-size: 11px; }
+.proximos-rapidos .etq { flex: none; }
+.quando-chips { display: flex; }
