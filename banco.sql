@@ -595,3 +595,52 @@ create index if not exists marcas_nicho on public.marcas (nicho);
 -- -------------------------------------------------------------
 alter table public.marcas add column if not exists favorita boolean not null default false;
 alter table public.marcas add column if not exists fixada boolean not null default false;
+
+
+-- -------------------------------------------------------------
+-- 23. CONTATOS DO SITE (separados da lista de marcas)
+-- Quem preenche o formulário "Bora criar juntos?" ou pede o mídia
+-- kit entra aqui, e não mais na tabela de marcas. Aparece na aba
+-- Portfólio do admin, e o celular recebe um aviso na hora.
+--   tipo:    contato (formulário) ou midia_kit (card do mídia kit)
+--   visto:   você já abriu a aba e viu
+--   avisado: a notificação do celular já saiu
+-- -------------------------------------------------------------
+create table if not exists public.contatos_site (
+  id        bigint generated always as identity primary key,
+  criado_em timestamptz not null default now(),
+  tipo      text not null default 'contato' check (tipo in ('contato', 'midia_kit')),
+  nome      text not null check (char_length(nome) between 1 and 150),
+  marca     text check (char_length(marca) <= 150),
+  email     text not null check (char_length(email) <= 200),
+  whats     text check (char_length(whats) <= 40),
+  mensagem  text check (char_length(mensagem) <= 3000),
+  visto     boolean not null default false,
+  avisado   boolean not null default false
+);
+alter table public.contatos_site enable row level security;
+
+drop policy if exists "dono faz tudo" on public.contatos_site;
+create policy "dono faz tudo" on public.contatos_site
+  for all to authenticated using (public.eh_admin()) with check (public.eh_admin());
+
+-- O site só consegue CRIAR um contato novo (não lê, não edita, não apaga)
+drop policy if exists "site cria contato" on public.contatos_site;
+create policy "site cria contato" on public.contatos_site
+  for insert to anon
+  with check (visto = false and avisado = false);
+
+-- Assim que um contato chega, chama o ajudante "lembretes" para
+-- mandar a notificação no celular (a chave aqui é a pública).
+create or replace function public.avisar_contato_site() returns trigger
+language plpgsql security definer set search_path = public, extensions as $$
+begin
+  perform net.http_post(
+    url := 'https://jlehawiwklvyvrzbfuiu.supabase.co/functions/v1/lembretes',
+    headers := '{"Content-Type": "application/json", "apikey": "sb_publishable_oZdhIWRB1gBabQH4xRJ2Xg__F8Lq0V0"}'::jsonb,
+    body := '{"tipo": "contato"}'::jsonb);
+  return new;
+end $$;
+drop trigger if exists contato_site_avisa on public.contatos_site;
+create trigger contato_site_avisa after insert on public.contatos_site
+  for each row execute function public.avisar_contato_site();
