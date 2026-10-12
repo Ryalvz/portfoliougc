@@ -879,7 +879,8 @@ dialog.pro-cheia iframe { flex: 1; width: 100%; border: 0; background: #fff; }
   .abas-nicho { flex-wrap: wrap; overflow: visible; padding-bottom: 0; }
 }
 #aba-marcas table { table-layout: auto; }
-#aba-marcas td.col-email { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#aba-marcas td.col-email { white-space: nowrap; }
+#aba-marcas td.col-email a { display: inline-block; max-width: 220px; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
 #aba-marcas td.corta { max-width: 220px; }
 #aba-marcas td:last-child, #aba-marcas th:last-child { white-space: nowrap; }
 #aba-marcas td:nth-child(3) { min-width: 130px; }
