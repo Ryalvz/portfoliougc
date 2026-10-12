@@ -4087,17 +4087,17 @@ Se fizer sentido, é só responder este e-mail que eu mando ideias e valores.
 Abraço,
 Ryan Alves`;
 const pro = {
-  envio: "resend", escrita: "texto", publico: "selecionadas", pularRepetidos: true,
+  envio: "gmail", escrita: "texto", publico: "selecionadas", pularRepetidos: true,
   assunto: MODELO_ASSUNTO, texto: MODELO_TEXTO, html: "", botaoTexto: "Ver meu portfólio", botaoLink: "https://ryalvz.github.io/portfoliougc/",
   envios: null, optout: null, falta: [], carregando: false, carregado: false, buscaHist: "",
   testeFeito: "", filaPulados: [], sairConferido: false
 };
 // O rascunho fica guardado neste aparelho, para você não perder o texto
 (function lerRascunho() {
-  try { const r = JSON.parse(localStorage.getItem("prospeccao-rascunho") || "null"); if (r) ["envio", "escrita", "assunto", "texto", "html", "botaoTexto", "botaoLink"].forEach((k) => { if (r[k] != null) pro[k] = r[k]; }); } catch (_) {}
+  try { const r = JSON.parse(localStorage.getItem("prospeccao-rascunho") || "null"); if (r && r.v !== 2) delete r.envio; if (r) ["envio", "escrita", "assunto", "texto", "html", "botaoTexto", "botaoLink"].forEach((k) => { if (r[k] != null) pro[k] = r[k]; }); } catch (_) {}
 })();
 function guardarRascunho() {
-  try { localStorage.setItem("prospeccao-rascunho", JSON.stringify({ envio: pro.envio, escrita: pro.escrita, assunto: pro.assunto, texto: pro.texto, html: pro.html, botaoTexto: pro.botaoTexto, botaoLink: pro.botaoLink })); } catch (_) {}
+  try { localStorage.setItem("prospeccao-rascunho", JSON.stringify({ v: 2, envio: pro.envio, escrita: pro.escrita, assunto: pro.assunto, texto: pro.texto, html: pro.html, botaoTexto: pro.botaoTexto, botaoLink: pro.botaoLink })); } catch (_) {}
 }
 
 // O primeiro e-mail válido do campo (tem marca com vários e-mails no mesmo campo)
@@ -4262,8 +4262,9 @@ function desenharProspeccao(el) {
       <div class="pro-form">
         <div class="cartao">
           <div class="pro-modos" role="radiogroup" aria-label="Como enviar">
-            <button type="button" role="radio" data-envio="resend" aria-checked="${pro.envio === "resend"}"><b>Automático</b><small>pelo Resend, em lotes</small></button>
-            <button type="button" role="radio" data-envio="rascunho" aria-checked="${pro.envio === "rascunho"}"><b>Rascunho</b><small>pelo Gmail, uma por vez</small></button>
+            <button type="button" role="radio" data-envio="gmail" aria-checked="${pro.envio === "gmail"}"><b>Pelo meu Gmail</b><small>sai do ${esc(EMAIL_PROPOSTAS)}</small></button>
+            <button type="button" role="radio" data-envio="resend" aria-checked="${pro.envio === "resend"}"><b>Resend</b><small>precisa de domínio próprio</small></button>
+            <button type="button" role="radio" data-envio="rascunho" aria-checked="${pro.envio === "rascunho"}"><b>Rascunho</b><small>uma por vez, você confere</small></button>
           </div>
           <h3 class="pro-titulo">1. Pra quem vai</h3>
           <p class="pro-origem">${ic("marcas")}Os e-mails vêm da sua aba Marcas.</p>
@@ -4341,8 +4342,24 @@ function desenharProspeccao(el) {
   const pintarEnviar = (r = destinatariosDe(pro.publico)) => {
     const caixa = $("#pro-enviar");
     if (pro.envio === "rascunho") { pintarFila(caixa, r); return; }
-    const assinatura = pro.assunto + "|" + htmlAtual();
+    const assinatura = pro.envio + "|" + pro.assunto + "|" + htmlAtual();
     const testado = pro.testeFeito === assinatura;
+    if (pro.envio === "gmail") {
+      const sobra = Math.max(0, LIMITE_GMAIL_DIA - enviadosHojeGmail());
+      const vai = Math.min(sobra, r.lista.length);
+      caixa.innerHTML = `<h3 class="pro-titulo">3. Enviar pelo seu Gmail</h3>
+        ${gmailConectado() ? "" : `<div class="pro-alerta">O Gmail ainda está conectando. Espere alguns segundos ou abra a aba Propostas.</div>`}
+        <div class="pro-acoes">
+          <button class="btn" type="button" id="pro-teste">${ic("email")}Enviar teste pra mim</button>
+          <button class="btn primario" type="button" id="pro-disparar" ${!testado || !vai || pro.publico === "teste" || !gmailConectado() ? "disabled" : ""}>${ic("subir")}Disparar para ${plural(vai, "marca", "marcas")}</button>
+        </div>
+        <p class="ajuda">${testado ? "Teste enviado. Confira no celular e, se estiver tudo certo, pode disparar." : "Mande o teste pra você primeiro. O botão de disparar libera depois do teste."}
+          Hoje ainda dá pra mandar <b>${num(sobra)} de ${LIMITE_GMAIL_DIA}</b>${r.lista.length > sobra ? `, então ${plural(r.lista.length - sobra, "marca fica", "marcas ficam")} pra amanhã` : ""}. Os e-mails saem com pausa de alguns segundos entre um e outro, como se fosse você mandando.</p>
+        <div id="pro-progresso"></div>`;
+      $("#pro-teste").onclick = enviarTesteGmail;
+      $("#pro-disparar").onclick = () => dispararGmail(destinatariosDe(pro.publico));
+      return;
+    }
     caixa.innerHTML = `<h3 class="pro-titulo">3. Enviar</h3>
       <div class="pro-acoes">
         <button class="btn" type="button" id="pro-teste">${ic("email")}Enviar teste pra mim</button>
@@ -4429,18 +4446,20 @@ async function enviarTeste() {
   const d = destinatariosDe(pro.publico === "teste" ? "todas" : pro.publico).lista[0] || { nome: "Natura", marca: "Natura" };
   try {
     const r = await chamarCarteiro({ teste: true, assunto: pro.assunto, html: htmlAtual(), destinatarios: [{ email: EMAIL_PROPOSTAS, nome: d.nome, marca: d.marca }] });
-    if (r.enviados) { pro.testeFeito = pro.assunto + "|" + htmlAtual(); avisar(`Teste enviado para ${EMAIL_PROPOSTAS}, com o nome "${d.nome}". Abra no celular para conferir.`); }
+    if (r.enviados) { pro.testeFeito = "resend|" + pro.assunto + "|" + htmlAtual(); avisar(`Teste enviado para ${EMAIL_PROPOSTAS}, com o nome "${d.nome}". Abra no celular para conferir.`); }
     else avisar("O teste não saiu: " + explicarErroResend((r.erros || [])[0] || "erro desconhecido"), true);
   } catch (e) { avisar(explicarErroResend(e.message), true); }
   desenhar();
 }
-function confirmarDisparo(r) {
+function confirmarDisparo(r, nota = "") {
   return new Promise((resolve) => {
     const semSair = pro.escrita === "html" && !/sair/i.test(pro.html);
     const c = document.createElement("dialog");
     c.innerHTML = `<div class="janela-topo"><h3>Confirmar o disparo</h3></div>
       <div class="janela-corpo"><p class="pro-confirma">Vai para <b>${plural(r.lista.length, "marca", "marcas")}</b>, da lista <b>${esc(nomePublico(pro.publico))}</b>, e não dá pra desfazer.</p>
         <p class="sub">Assunto: ${esc(pro.assunto)}</p>
+        ${pro.envio === "gmail" ? `<p class="sub">Sai do seu e-mail ${esc(EMAIL_PROPOSTAS)}, um por um.</p>` : ""}
+        ${nota ? `<p class="sub">${esc(nota)}</p>` : ""}
         ${semSair ? `<div class="pro-alerta">O seu HTML está sem o rodapé do SAIR. Sem ele a marca não tem como pedir para sair da lista. Use "Começar do modelo pronto" para ter o rodapé.</div>` : ""}</div>
       <div class="janela-pe"><button type="button" class="btn" data-n>Cancelar</button><button type="button" class="btn primario" data-s>${semSair ? "Disparar mesmo assim" : "Sim, disparar"}</button></div>`;
     document.body.appendChild(c);
@@ -4470,11 +4489,14 @@ async function disparar(r) {
     }
   } catch (e) { soma.erros.unshift(e.message); }
   await Promise.all([carregarProspeccao(true), recarregar("marcas")]);
+  mostrarResumoDisparo(soma, "A cota diária do Resend acabou no meio do disparo.");
+}
+function mostrarResumoDisparo(soma, motivoParada) {
   const corpo = `<div class="pro-resumo">
       <div><strong>${num(soma.enviados)}</strong><span>enviados</span></div>
       <div><strong>${num(soma.falharam)}</strong><span>falhas</span></div>
       <div><strong>${num(soma.pulados)}</strong><span>pulados</span></div></div>
-    ${soma.cotaAcabou ? `<div class="pro-alerta"><b>A cota diária do Resend acabou no meio do disparo.</b> ${plural(soma.faltaram, "marca ficou", "marcas ficaram")} sem receber.
+    ${soma.cotaAcabou ? `<div class="pro-alerta"><b>${esc(motivoParada)}</b> ${plural(soma.faltaram, "marca ficou", "marcas ficaram")} sem receber.
       Volte amanhã, cole o mesmo assunto e o mesmo texto e deixe marcada a caixinha "Pular quem já recebeu este mesmo assunto". Aí ele manda só para quem faltou.</div>` : ""}
     ${soma.erros.length ? `<p class="sub">Motivo das falhas: ${esc(explicarErroResend(soma.erros[0]))}</p>` : ""}
     ${pro.publico === "selecionadas" && S.marcas.some((m) => m.selecionada) ? `<p>Quer limpar a seleção da aba Marcas? Se for mandar para a mesma lista de novo, deixe como está.</p>` : ""}`;
@@ -4483,6 +4505,68 @@ async function disparar(r) {
     : `<button type="button" class="btn primario" data-fechar>Fechar</button>`;
   const d = abrirJanelaSimples("Disparo concluído", corpo, pe);
   if ($("#pro-limpar-sel", d)) $("#pro-limpar-sel", d).onclick = async () => { await limparSelecao(); d.close(); };
+}
+
+/* ---------- Envio pelo seu Gmail (sai do seu próprio e-mail) ----------
+   Usa a conexão do Gmail que o painel já tem. Manda um por um, com
+   pausa de alguns segundos, e no máximo LIMITE_GMAIL_DIA por dia, para
+   o Google não achar que é envio em massa. */
+const LIMITE_GMAIL_DIA = 50;
+function enviadosHojeGmail() {
+  const hoje = hojeISO();
+  return (pro.envios || []).filter((x) => x.via === "gmail" && x.status === "ok" && isoLocal(new Date(x.criado_em)) === hoje).length;
+}
+function mensagemGmail(d) {
+  const fronteira = "painel-" + Math.random().toString(36).slice(2);
+  const b64 = (t) => base64Utf8(t).replace(/(.{76})/g, "$1\r\n");
+  return [`From: Ryan Alves <${EMAIL_PROPOSTAS}>`, `To: ${d.email}`, `Subject: ${assuntoMime(assuntoPara(d))}`,
+    `List-Unsubscribe: <mailto:${EMAIL_PROPOSTAS}?subject=SAIR>`, "MIME-Version: 1.0",
+    `Content-Type: multipart/alternative; boundary="${fronteira}"`, "",
+    `--${fronteira}`, "Content-Type: text/plain; charset=UTF-8", "Content-Transfer-Encoding: base64", "", b64(textoPuroPara(d)),
+    `--${fronteira}`, "Content-Type: text/html; charset=UTF-8", "Content-Transfer-Encoding: base64", "", b64(preencherChaves(htmlAtual(), d.nome, d.marca)),
+    `--${fronteira}--`, ""].join("\r\n");
+}
+const mandarPeloGmail = async (d) => (await gmailApi("messages/send", { metodo: "POST", corpo: { raw: base64Url(mensagemGmail(d)) } })).id;
+
+async function enviarTesteGmail() {
+  const b = $("#pro-teste"); b.disabled = true; b.textContent = "Enviando teste...";
+  const d = destinatariosDe(pro.publico === "teste" ? "todas" : pro.publico).lista[0] || { nome: "Natura", marca: "Natura" };
+  try {
+    await mandarPeloGmail({ ...d, email: EMAIL_PROPOSTAS });
+    pro.testeFeito = "gmail|" + pro.assunto + "|" + htmlAtual();
+    avisar(`Teste enviado do seu Gmail para você mesmo, com o nome "${d.nome}". Confira no celular.`);
+  } catch (e) { avisar("O teste não saiu: " + e.message, true); }
+  desenhar();
+}
+
+async function dispararGmail(r) {
+  const sobra = Math.max(0, LIMITE_GMAIL_DIA - enviadosHojeGmail());
+  const lote = r.lista.slice(0, sobra);
+  if (!lote.length) { avisar(`Você já mandou ${LIMITE_GMAIL_DIA} hoje pelo Gmail. Continue amanhã.`, true); return; }
+  if (!(await confirmarDisparo({ ...r, lista: lote }, r.lista.length > lote.length ? `As outras ${num(r.lista.length - lote.length)} ficam pra amanhã, por causa do limite de ${LIMITE_GMAIL_DIA} por dia.` : ""))) return;
+  const caixa = $("#pro-progresso"), total = lote.length;
+  $$("#pro-teste, #pro-disparar").forEach((b) => { b.disabled = true; });
+  const soma = { enviados: 0, falharam: 0, pulados: 0, cotaAcabou: false, faltaram: 0, erros: [] };
+  const barra = (feitos) => { caixa.innerHTML = `<div class="pro-barra"><i style="width:${Math.round((feitos / total) * 100)}%"></i></div><small class="sub">${num(feitos)} de ${num(total)}. Não feche esta aba até terminar.</small>`; };
+  barra(0);
+  const ids = [];
+  let seguidos = 0;
+  for (let i = 0; i < total; i++) {
+    const d = lote[i];
+    if ((pro.optout || []).some((x) => x.email === d.email)) { soma.pulados++; barra(i + 1); continue; }
+    let id = null, erro = null;
+    try { id = await mandarPeloGmail(d); } catch (e) { erro = e.message; }
+    if (pro.envios) await db.from("email_envios").insert({ email: d.email, assunto: pro.assunto, status: id ? "ok" : "erro", erro: erro && erro.slice(0, 1000), resend_id: id, via: "gmail", marca_id: d.marca_id });
+    if (id) { soma.enviados++; seguidos = 0; if (d.marca_id) ids.push(d.marca_id); }
+    else { soma.falharam++; seguidos++; if (soma.erros.length < 3) soma.erros.push(erro); }
+    barra(i + 1);
+    // O Google pediu para parar (limite) ou 3 erros seguidos: para na hora
+    if (/429|limit|quota/i.test(erro || "") || seguidos >= 3) { soma.cotaAcabou = true; soma.faltaram = total - i - 1; break; }
+    if (i < total - 1) await new Promise((ok) => setTimeout(ok, 4000 + Math.random() * 4000));
+  }
+  if (ids.length && temCampo("marcas", "email_enviado_em")) await db.from("marcas").update({ email_enviado_em: hojeISO() }).in("id", ids);
+  await Promise.all([carregarProspeccao(true), recarregar("marcas")]);
+  mostrarResumoDisparo(soma, "O Gmail pediu uma pausa no meio do disparo.");
 }
 
 /* ---------- Modo rascunho (plano B, sem Resend) ---------- */
