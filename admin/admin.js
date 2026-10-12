@@ -4237,12 +4237,12 @@ function desenharProspeccao(el) {
   </section>`;
 
   const cartoes = `<div class="pro-cartoes">
-    ${[["principal", numero(comEmail.length, true), "Marcas com e-mail", `${num(S.marcas.length - comEmail.length)} sem e-mail na base`],
+    ${[["cor-principal", numero(comEmail.length, true), "Marcas com e-mail", `${num(S.marcas.length - comEmail.length)} sem e-mail na base`],
        ["ambar", numero(selecionadas.filter((m) => !m.email_enviado_em).length, temProspeccao()), "A enviar", "selecionadas e ainda sem e-mail"],
        ["verde", numero(receberam.size, temEnvios), "Já receberam", temEnvios ? "e-mails diferentes" : "falta a tabela de registro"],
        ["vermelho", numero((pro.envios || []).filter((x) => x.status === "erro").length, temEnvios), "Falhas", "e-mails que deram erro"],
        ["azul", numero((pro.optout || []).length, temOptout), "Descadastrados", "responderam SAIR"]]
-      .map(([cor, v, r, ctx]) => `<div class="pro-cartao ${cor}"><strong>${v}</strong><span>${r}</span>${ctx ? `<small>${ctx}</small>` : ""}</div>`).join("")}
+      .map(([cor, v, r, ctx]) => `<div class="pro-cartao ${cor === "cor-principal" ? "" : cor}"><strong>${v}</strong><span>${r}</span>${ctx ? `<small>${ctx}</small>` : ""}</div>`).join("")}
   </div>`;
 
   const aviso = pro.falta.length ? `<div class="aviso-falta" role="alert"><b>Falta preparar o banco para a prospecção:</b> ${pro.falta.map(esc).join(", ")}. Rode o arquivo <b>disparo.sql</b> no SQL Editor do Supabase. O resto da aba continua funcionando.</div>` : "";
