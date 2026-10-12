@@ -1018,7 +1018,7 @@ if ("IntersectionObserver" in window) {
 const isEmail = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 const checkIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m8 12 3 3 5-6"/></svg>';
 
-// Cada envio vira uma marca na tabela "marcas" do admin, com a situação "lead"
+// Cada envio vira um contato na tabela "contatos_site" (aba Portfólio do admin, com aviso no celular)
 $("#contact-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const f = e.target;
@@ -1039,16 +1039,14 @@ $("#contact-form").addEventListener("submit", async (e) => {
   const btn = f.querySelector('button[type="submit"]');
   btn.disabled = true;
   btn.textContent = "Enviando...";
-  const d = new Date();
-  const hoje = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   try {
-    await window.bancoInserir("marcas", {
-      nome: (marca || nome).slice(0, 150),
+    await window.bancoInserir("contatos_site", {
+      tipo: "contato",
+      nome: nome.slice(0, 150),
+      marca: marca ? marca.slice(0, 150) : null,
       email: email.slice(0, 200),
-      telefone: whats ? whats.slice(0, 40) : null,
-      situacao: "lead",
-      ultimo_contato: hoje,
-      obs: `Veio pelo formulário do site. Contato: ${nome}.${marca ? "" : " (não informou a marca)"}\n\n${msg}`.slice(0, 3000)
+      whats: whats ? whats.slice(0, 40) : null,
+      mensagem: msg.slice(0, 3000)
     });
   } catch (_) {
     btn.disabled = false;
@@ -1142,12 +1140,10 @@ $("#kit-form").addEventListener("submit", (e) => {
   const nome = f.nome.value.trim();
   if (!nome) { f.nome.setAttribute("aria-invalid", "true"); f.nome.focus(); return; }
   if (!isEmail(f.email.value.trim())) { f.email.setAttribute("aria-invalid", "true"); f.email.focus(); return; }
-  // Quem pede o mídia kit também entra na base de marcas como lead
+  // Quem pede o mídia kit entra nos contatos do site (aba Portfólio do admin, com aviso no celular)
   if (window.bancoInserir) {
-    window.bancoInserir("marcas", {
-      nome: nome.slice(0, 150), email: f.email.value.trim().slice(0, 200), situacao: "lead",
-      ultimo_contato: new Date().toLocaleDateString("sv-SE"),
-      obs: "Pediu o mídia kit pelo card do site."
+    window.bancoInserir("contatos_site", {
+      tipo: "midia_kit", nome: nome.slice(0, 150), email: f.email.value.trim().slice(0, 200)
     }).catch(() => {});
   }
   $("#kit-content").innerHTML = `<div class="success" tabindex="-1">${checkIcon}<h2 id="kit-title">Prontinho!</h2><p>Valeu, ${esc(nome.split(" ")[0])}! O mídia kit vai chegar no seu e-mail.</p></div>`;
