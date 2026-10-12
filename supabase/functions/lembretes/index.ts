@@ -3,6 +3,7 @@
 // Confere o painel e manda notificação para o celular do Ryan:
 //   tipo "diario" (todo dia, 9h): resumo do que está pendente
 //   tipo "quarta" (quarta, 8h): repasse do TikTok Shop (cai de madrugada)
+//   tipo "contato" (na hora): alguém preencheu o formulário do site
 //   tipo "rapidos" (a cada minuto): lembretes rápidos que chegaram na hora
 //   tipo "propostas" (de 2 em 2 horas, das 8h às 22h): proposta nova no Gmail
 //   Na segunda, o resumo das 9h começa com um balanço da semana.
@@ -331,7 +332,23 @@ Deno.serve(async (req) => {
       return resposta({ ...(await enviar(conteudo)), lembretes: L.length });
     }
 
-    // Relógio de cada minuto: lembrete rápido que chegou na hora
+    // Alguém preencheu o formulário do site ou pediu o mídia kit
+    if (corpo.tipo === "contato") {
+      const { data: novos } = await db.from("contatos_site").select("id,tipo,nome,marca,mensagem").eq("avisado", false).order("id").limit(5);
+      if (!novos?.length) return resposta({ pulado: "nenhum contato novo" });
+      await db.from("contatos_site").update({ avisado: true }).in("id", novos.map((x) => x.id));
+      for (const c of novos) {
+        const quem = c.marca ? `${c.nome} (${c.marca})` : c.nome;
+        await enviar({
+          titulo: c.tipo === "midia_kit" ? `${quem} pediu seu mídia kit` : `Novo contato pelo site: ${quem}`,
+          corpo: c.tipo === "midia_kit" ? "Abra o painel para mandar o mídia kit." : String(c.mensagem || "").slice(0, 160),
+          url: "./#portfolio", tag: "contato-" + c.id,
+        });
+      }
+      return resposta({ contatos: novos.length });
+    }
+
+        // Relógio de cada minuto: lembrete rápido que chegou na hora
     if (corpo.tipo === "rapidos") {
       const { data: naHora } = await db.from("lembretes_rapidos").select("id,texto")
         .eq("feito", false).eq("avisado", false).lte("quando", new Date().toISOString()).limit(10);
