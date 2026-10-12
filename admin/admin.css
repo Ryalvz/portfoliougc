@@ -756,3 +756,115 @@ tr.fixada td { background: var(--tint); }
 .aba-favoritas svg { width: 14px; height: 14px; }
 .aba-favoritas:not([aria-selected="true"]) svg { color: var(--olive); fill: var(--olive); }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* =============================================================
+   PROSPECÇÃO
+   ============================================================= */
+/* Seleção na aba Marcas */
+.barra-selecao { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 10px 14px; margin-bottom: 10px; background: var(--tint); border: 1px solid var(--line); border-radius: 10px; }
+.barra-selecao-n { display: inline-flex; align-items: center; gap: 6px; color: var(--cobalt); }
+.barra-selecao-n svg { width: 16px; height: 16px; }
+.col-sel { width: 1%; padding-right: 0; }
+.col-sel input { width: 16px; height: 16px; accent-color: var(--cobalt); cursor: pointer; }
+.col-sel input:disabled { cursor: not-allowed; opacity: .35; }
+tr.selecionada td { background: rgba(31, 63, 195, .1); }
+
+/* 1. Capa */
+.pro-capa {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 20px;
+  padding: 26px 28px; margin-bottom: 16px; border-radius: 18px; color: #fff;
+  background: linear-gradient(135deg, var(--cobalt) 0%, #142a8a 100%);
+  box-shadow: 0 14px 34px rgba(31, 63, 195, .22);
+}
+.pro-capa-texto { display: flex; gap: 16px; align-items: flex-start; flex: 1 1 420px; min-width: 0; }
+.pro-capa-icone { flex: none; display: grid; place-items: center; width: 52px; height: 52px; border-radius: 14px; background: rgba(255, 255, 255, .16); border: 1px solid rgba(255, 255, 255, .22); }
+.pro-capa-icone svg { width: 26px; height: 26px; color: #fff; }
+.pro-capa h2 { margin: 0 0 4px; font-size: 24px; color: #fff; }
+.pro-capa p { margin: 0; max-width: 560px; color: rgba(255, 255, 255, .86); font-size: 14px; line-height: 1.5; }
+.pro-etiquetas { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+.pro-etiquetas span { font-size: 12px; font-weight: 600; padding: 5px 11px; border-radius: 999px; background: rgba(255, 255, 255, .14); border: 1px solid rgba(255, 255, 255, .2); }
+.pro-capa-numero { text-align: right; }
+.pro-capa-numero strong { display: block; font-size: 44px; line-height: 1; font-variant-numeric: tabular-nums; }
+.pro-capa-numero span { font-size: 13px; color: rgba(255, 255, 255, .8); }
+
+/* 2. Cartões coloridos */
+.pro-cartoes { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 18px; }
+.pro-cartao { --cor: var(--cobalt); position: relative; overflow: hidden; display: grid; gap: 2px; padding: 16px 16px 14px 20px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; }
+.pro-cartao::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: var(--cor); }
+.pro-cartao strong { font-size: 28px; line-height: 1.1; color: var(--cor); font-variant-numeric: tabular-nums; }
+.pro-cartao span { font-weight: 700; font-size: 13px; }
+.pro-cartao small { font-size: 11.5px; color: var(--muted); }
+.pro-cartao.verde { --cor: var(--green); }
+.pro-cartao.ambar { --cor: #b7791f; }
+.pro-cartao.azul { --cor: #2f7bd6; }
+.pro-cartao.vermelho { --cor: #c4473a; }
+
+/* Formulário + prévia lado a lado */
+.pro-grade { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; align-items: start; margin-bottom: 18px; }
+.pro-form { display: grid; gap: 14px; min-width: 0; }
+.pro-form .cartao { border-radius: 14px; padding: 18px; margin: 0; }
+.pro-titulo { margin: 0 0 10px; font-size: 14px; color: var(--cobalt); }
+.pro-origem { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; font-size: 12.5px; font-weight: 600; color: var(--muted); }
+.pro-origem svg { width: 15px; height: 15px; }
+.pro-form select.campo, .pro-form input.campo, .pro-form textarea.campo { width: 100%; }
+.pro-contagem { display: grid; gap: 2px; margin: 10px 0 8px; padding: 10px 12px; background: var(--tint); border-radius: 10px; }
+.pro-contagem strong { font-size: 15px; color: var(--cobalt); }
+.pro-contagem small { font-size: 12px; color: var(--muted); }
+.pro-check { font-size: 13px; }
+.pro-modos { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+.pro-modos button { display: grid; gap: 1px; text-align: left; font: inherit; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--text); cursor: pointer; }
+.pro-modos button small { color: var(--muted); font-size: 11.5px; }
+.pro-modos button[aria-checked="true"] { border-color: var(--cobalt); background: var(--tint); box-shadow: inset 0 0 0 1px var(--cobalt); }
+.pro-modos button[aria-checked="true"] b { color: var(--cobalt); }
+.pro-escrita { margin-bottom: 4px; }
+.pro-rotulo { display: block; margin: 12px 0 4px; font-size: 12px; font-weight: 700; color: var(--muted); }
+.pro-texto { min-height: 240px; line-height: 1.55; resize: vertical; }
+.pro-html { min-height: 320px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; line-height: 1.5; resize: vertical; }
+.pro-botao-campos { display: grid; grid-template-columns: 1fr 1.4fr; gap: 10px; }
+.pro-acoes { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 6px; }
+.pro-alerta { display: grid; gap: 8px; justify-items: start; padding: 10px 12px; border-radius: 10px; background: var(--amber-bg); color: var(--amber); font-size: 13px; }
+.pro-barra { height: 10px; border-radius: 999px; background: var(--tint-2); overflow: hidden; margin: 10px 0 4px; }
+.pro-barra i { display: block; height: 100%; background: linear-gradient(90deg, var(--cobalt), #4b6be0); transition: width .3s ease; }
+.pro-confirma { font-size: 15px; margin: 0 0 8px; }
+.pro-resumo { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 12px; }
+.pro-resumo div { text-align: center; padding: 12px; border-radius: 12px; background: var(--tint); }
+.pro-resumo strong { display: block; font-size: 26px; color: var(--cobalt); }
+.pro-resumo span { font-size: 12px; color: var(--muted); }
+.pro-vazio { text-align: center; padding: 34px 20px; display: grid; justify-items: center; gap: 6px; }
+
+/* Fila do modo rascunho */
+.pro-fila-item { margin: 10px 0 12px; padding: 14px; border-radius: 12px; border: 1px solid var(--line); background: #fff; }
+.pro-fila-para { display: grid; margin-bottom: 8px; }
+.pro-fila-para small { color: var(--muted); }
+.pro-fila-assunto { margin: 0 0 8px; font-weight: 700; }
+.pro-fila-texto { margin: 0; max-height: 220px; overflow: auto; white-space: pre-wrap; font: inherit; font-size: 13px; line-height: 1.5; color: #333; }
+
+/* 3. Prévia em destaque */
+.pro-previa-coluna { position: sticky; top: 16px; min-width: 0; }
+.pro-previa-topo { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.pro-palco { padding: 26px 22px; border-radius: 18px; background: #e4e1da; }
+.pro-janela-email { background: #fff; border-radius: 14px; box-shadow: 0 18px 40px rgba(26, 42, 108, .16), 0 2px 6px rgba(26, 42, 108, .08); overflow: hidden; }
+.pro-email-cabeca { display: flex; gap: 12px; align-items: center; padding: 16px 18px; border-bottom: 1px solid #eee; }
+.pro-avatar { flex: none; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; background: var(--cobalt); color: #fff; font-weight: 700; }
+.pro-email-cabeca strong { display: block; font-size: 16px; color: #1f2430; line-height: 1.3; }
+.pro-email-cabeca small { font-size: 12px; color: #6b7080; }
+#pro-previa { display: block; width: 100%; height: 560px; border: 0; background: #fff; }
+.pro-lembrete { margin: 10px 4px 0; text-align: center; }
+dialog.pro-cheia { width: min(760px, calc(100vw - 24px)); height: calc(100vh - 60px); max-height: none; padding: 0; display: flex; flex-direction: column; }
+dialog.pro-cheia:not([open]) { display: none; }
+dialog.pro-cheia::backdrop { background: rgba(10, 18, 50, .62); }
+dialog.pro-cheia iframe { flex: 1; width: 100%; border: 0; background: #fff; }
+.pro-historico { border-radius: 14px; }
+.pro-historico .tabela-caixa { max-height: 420px; overflow: auto; margin-top: 10px; }
+
+@media (max-width: 1000px) {
+  .pro-grade { grid-template-columns: minmax(0, 1fr); }
+  .pro-previa-coluna { position: static; }
+  #pro-previa { height: 480px; }
+}
+@media (max-width: 600px) {
+  .pro-capa { padding: 20px; border-radius: 16px; }
+  .pro-capa-numero { text-align: left; }
+  .pro-palco { padding: 14px 10px; }
+  .pro-botao-campos { grid-template-columns: 1fr; }
+}
