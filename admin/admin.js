@@ -84,12 +84,13 @@ const ESQUEMA = {
   lembretes_adiados: ["chave", "ate"],
   ig_historico: ["data", "seguidores", "posts"],
   lembretes_rapidos: ["id", "texto", "quando", "feito", "avisado", "criado_em"],
+  contatos_site: ["id", "criado_em", "tipo", "nome", "marca", "email", "whats", "mensagem", "visto"],
   contratos: ["id", "cliente", "tipo", "descricao", "valor", "mes", "ano", "data_nf", "prazo_dias", "status", "parcela1", "data_p1", "parcela2", "data_p2", "obs", "qtd", "prazo_entrega", "favorita", "criado_em"],
   transcricoes: ["id", "criado_em", "link", "plataforma", "categoria", "status", "titulo", "transcricao", "transcricao_original", "idioma_original", "minha_versao", "observacoes"],
   marcados: ["chave", "marcado"],
   visitas: ["id", "data", "pagina", "origem"]
 };
-const S = { videos: [], marcas: [], calendario: [], campanhas: [], marcados: {}, visitas: [], transcricoes: [], contratos: [], comissoes: [], metas: [], adiados: [], rapidos: [] };
+const S = { videos: [], marcas: [], calendario: [], campanhas: [], marcados: {}, visitas: [], transcricoes: [], contratos: [], comissoes: [], metas: [], adiados: [], rapidos: [], contatos_site: [] };
 const CAMPOS = {};          // campos que existem de verdade em cada tabela
 const FALTAS = new Map();   // tabela -> o que faltou
 
@@ -129,7 +130,7 @@ async function ler(tabela, ajuste) {
 
 async function carregarTudo() {
   const desde = new Date(); desde.setHours(0, 0, 0, 0); desde.setDate(desde.getDate() - 13);
-  const [videos, marcas, calendario, campanhas, marcados, visitas, transcricoes, contratos, comissoes, metas, adiados, rapidos] = await Promise.all([
+  const [videos, marcas, calendario, campanhas, marcados, visitas, transcricoes, contratos, comissoes, metas, adiados, rapidos, contatos_site] = await Promise.all([
     ler("videos", (q, c) => (c.includes("ordem") ? q.order("ordem", { ascending: true }) : q)),
     ler("marcas", (q, c) => (c.includes("criado_em") ? q.order("criado_em", { ascending: false }) : q)),
     ler("calendario"),
@@ -141,9 +142,10 @@ async function carregarTudo() {
     ler("comissoes_ttk", (q, c) => (c.includes("data") ? q.order("data", { ascending: false }).limit(5000) : q)),
     ler("metas"),
     ler("lembretes_adiados"),
-    lerRapidos()
+    lerRapidos(),
+    lerContatosSite()
   ]);
-  Object.assign(S, { videos, marcas, calendario, campanhas, visitas, transcricoes, contratos, comissoes, metas, adiados, rapidos });
+  Object.assign(S, { videos, marcas, calendario, campanhas, visitas, transcricoes, contratos, comissoes, metas, adiados, rapidos, contatos_site });
   S.marcados = {};
   marcados.forEach((m) => { if (m.chave) S.marcados[m.chave] = m.marcado !== false; });
 }
@@ -305,6 +307,7 @@ let abaAtual = "inicio";
 
 function irPara(aba) {
   if (!DESENHOS[aba]) aba = "inicio";
+  if (aba !== "portfolio" && typeof contatosNovosNaTela !== "undefined") contatosNovosNaTela.clear();
   abaAtual = aba;
   $$(".menu-item").forEach((b) => { if (b.dataset.aba === aba) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
   $$("main > section").forEach((s) => { s.hidden = s.id !== "aba-" + aba; });
@@ -354,6 +357,12 @@ async function iniciar(sessao) {
   irPara((location.hash || "").slice(1) || "inicio");
   // A cada minuto o sino confere se algum lembrete rápido chegou na hora
   setInterval(() => { try { pintarLembretes(); } catch (_) {} }, 60000);
+  // A cada 2 minutos confere se chegou contato novo pelo site
+  setInterval(async () => {
+    const antes = S.contatos_site.length;
+    S.contatos_site = await lerContatosSite();
+    if (S.contatos_site.length !== antes) { if (abaAtual === "portfolio" || abaAtual === "inicio") desenhar(); else pintarLembretes(); }
+  }, 120000);
   // Tocar numa notificação com o painel já aberto troca de aba
   window.addEventListener("hashchange", () => { const aba = (location.hash || "").slice(1); if (aba && aba !== abaAtual) irPara(aba); });
   sincronizarGmail();
@@ -397,7 +406,7 @@ function desenharPortfolio(el) {
     ? `<p class="vazio">Aqui aparece de onde as pessoas chegam ao seu site: Instagram, Google, WhatsApp, link direto.</p>`
     : `<ul class="origens">${listaOrigens.map(([o, n]) => `<li><span>${esc(o)}</span><b>${n}</b><span class="trilho"><i style="width:${(n / total14) * 100}%"></i></span></li>`).join("")}</ul>`;
 
-  el.innerHTML = `
+  el.innerHTML = quadroContatosSite() + `
     <div class="faixa-kpi">
       <div class="kpi"><span>Visitas em 14 dias</span><strong>${num(total14)}</strong></div>
       <div class="kpi"><span>Visitas hoje</span><strong>${num(porDia[hoje])}</strong></div>
@@ -424,6 +433,7 @@ function desenharPortfolio(el) {
     </div>`;
 
   $("#add-video").addEventListener("click", () => formVideo());
+  ligarContatosSite(el);
   const corpo = $("#lista-videos");
   corpo.addEventListener("click", async (e) => {
     const tr = e.target.closest("tr[data-id]");
@@ -832,6 +842,14 @@ async function importarPlanilha(arq) {
   d.showModal();
 }
 
+// Na lista: o primeiro e-mail, e "+3" quando a marca tem mais (todos aparecem ao passar o mouse)
+const temInstaMarcas = () => S.marcas.some((m) => String(m.instagram || "").trim());
+function emailsDaMarca(m) {
+  const todos = String(m.email || "").split(/[\s,;/]+/).map((x) => x.trim()).filter((x) => x.includes("@"));
+  if (!todos.length) return esc(m.email || "");
+  return `<a href="mailto:${esc(todos[0])}" title="${esc(todos.join("\n"))}">${esc(todos[0])}</a>${todos.length > 1 ? ` <span class="etq" title="${esc(todos.slice(1).join("\n"))}">+${todos.length - 1}</span>` : ""}`;
+}
+
 // Seleção para a prospecção: o resumo em cima da tabela
 let listaMarcasVisivel = [];
 function pintarBarraSelecao() {
@@ -887,7 +905,7 @@ function desenharMarcas(el) {
     ${temProspeccao() ? `<div class="barra-selecao" id="barra-selecao"></div>` : ""}
     <div class="tabela-caixa">
       <table>
-        <thead><tr>${temProspeccao() ? `<th class="col-sel"><span class="sr">Selecionar</span></th>` : ""}<th class="col-acoes-marca"><span class="sr">Favoritar e fixar</span></th><th>Marca</th><th>Nicho</th><th>Instagram</th><th>E-mail</th><th>Telefone</th><th>Situação</th><th>Observação</th><th>Último contato</th></tr></thead>
+        <thead><tr>${temProspeccao() ? `<th class="col-sel"><span class="sr">Selecionar</span></th>` : ""}<th class="col-acoes-marca"><span class="sr">Favoritar e fixar</span></th><th>Marca</th><th>Nicho</th>${temInstaMarcas() ? "<th>Instagram</th>" : ""}<th>E-mail</th><th>Telefone</th><th>Situação</th><th>Observação</th><th>Último contato</th></tr></thead>
         <tbody id="lista-marcas"></tbody>
       </table>
     </div>
@@ -916,8 +934,8 @@ function desenharMarcas(el) {
             </td>
             <td><b>${esc(m.nome)}</b>${m.exemplo ? '<span class="pilula p-exemplo">exemplo</span>' : ""}</td>
             <td>${m.nicho ? `<span class="etq">${esc(nichoPadrao(m.nicho))}</span>` : ""}</td>
-            <td>${ig ? `<a href="${ig}" target="_blank" rel="noopener">${esc(m.instagram)}</a>` : esc(m.instagram || "")}</td>
-            <td>${m.email ? `<a href="mailto:${esc(m.email)}">${esc(m.email)}</a>` : ""}</td>
+            ${temInstaMarcas() ? `<td>${ig ? `<a href="${ig}" target="_blank" rel="noopener">${esc(m.instagram)}</a>` : esc(m.instagram || "")}</td>` : ""}
+            <td class="col-email">${emailsDaMarca(m)}</td>
             <td style="white-space:nowrap">${esc(m.telefone || "")} ${wa ? `<a class="icone-btn" href="${wa}" target="_blank" rel="noopener" title="Abrir no WhatsApp" aria-label="Abrir ${esc(m.nome)} no WhatsApp">${ic("whats")}</a>` : ""}</td>
             <td><span class="pilula p-${esc(m.situacao)}">${esc(nomeSituacao(m.situacao))}</span></td>
             <td class="corta" title="${esc(m.obs || "")}">${esc(m.obs || "")}</td>
@@ -2833,6 +2851,11 @@ async function adiarRapido(r, op) {
 function calcularLembretes() {
   const hoje = hojeISO();
   const L = [];
+  // Contato novo pelo site (formulário ou mídia kit) vem primeiro
+  const novosSite = S.contatos_site.filter((c) => !c.visto);
+  if (novosSite.length) L.push({ aba: "portfolio", ic: "email", nivel: "alerta",
+    texto: `${novosSite.length === 1 ? "<b>1 contato novo</b>" : `<b>${novosSite.length} contatos novos</b>`} pelo seu site: ${novosSite.slice(0, 2).map((c) => esc(c.marca || c.nome)).join(", ")}.`,
+    acoes: [["Ver contatos", true, () => irPara("portfolio")]] });
   // Lembretes rápidos que chegaram na hora vêm primeiro
   const agoraMs = Date.now();
   S.rapidos.filter((r) => !r.feito && Date.parse(r.quando) <= agoraMs).forEach((r) => {
@@ -4624,4 +4647,78 @@ async function limparSelecao() {
   S.marcas.forEach((m) => { m.selecionada = false; });
   avisar("Seleção limpa.");
   desenhar();
+}
+
+/* =============================================================
+   CONTATOS DO SITE (aba Portfólio)
+   Quem preenche "Bora criar juntos?" ou pede o mídia kit cai aqui,
+   separado da lista de marcas. O celular avisa na hora (ajudante
+   "lembretes", tipo "contato") e o sino mostra até você abrir.
+   ============================================================= */
+const lerContatosSite = () => ler("contatos_site", (q, c) => (c.includes("criado_em") ? q.order("criado_em", { ascending: false }).limit(300) : q));
+let contatosNovosNaTela = new Set();
+
+function quadroContatosSite() {
+  if (!CAMPOS.contatos_site || !CAMPOS.contatos_site.length) return "";
+  const lista = S.contatos_site;
+  // O que estava sem ver continua com a etiqueta "Novo" enquanto você estiver na aba
+  lista.filter((c) => !c.visto).forEach((c) => contatosNovosNaTela.add(c.id));
+  const novos = lista.filter((c) => contatosNovosNaTela.has(c.id)).length;
+  const quando = (iso) => new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+  return `<section class="cartao contatos-site">
+    <div class="barra" style="margin-bottom:8px"><h2 style="margin:0">${ic("email")} Contatos pelo site</h2>
+      ${novos ? `<span class="pilula p-pendente">${plural(novos, "novo", "novos")}</span>` : ""}
+      <span class="espaco"></span><span class="sub">quem preencheu o formulário ou pediu o mídia kit</span></div>
+    ${lista.length ? `<div class="contatos-lista">${lista.slice(0, 12).map((c) => {
+      const wa = linkWhats(c.whats);
+      const assunto = c.tipo === "midia_kit" ? "Meu mídia kit" : "Re: seu contato pelo meu portfólio";
+      const gmail = "https://mail.google.com/mail/?view=cm&fs=1&authuser=" + encodeURIComponent(EMAIL_PROPOSTAS) + "&to=" + encodeURIComponent(c.email) + "&su=" + encodeURIComponent(assunto)
+        + "&body=" + encodeURIComponent(`Oi, ${String(c.nome).split(" ")[0]}! Tudo bem?\n\n`);
+      return `<article class="contato-site ${contatosNovosNaTela.has(c.id) ? "novo" : ""}" data-contato="${esc(c.id)}">
+        <div class="contato-topo">
+          <span class="pilula ${c.tipo === "midia_kit" ? "p-conversando" : "p-cliente"}">${c.tipo === "midia_kit" ? "Pediu o mídia kit" : "Formulário"}</span>
+          ${contatosNovosNaTela.has(c.id) ? `<span class="etq amarela">Novo</span>` : ""}
+          <span class="espaco"></span><small class="sub">${quando(c.criado_em)}</small>
+        </div>
+        <b>${esc(c.nome)}${c.marca ? ` <span class="sub">· ${esc(c.marca)}</span>` : ""}</b>
+        <small><a href="mailto:${esc(c.email)}">${esc(c.email)}</a>${c.whats ? ` · ${esc(c.whats)}` : ""}</small>
+        ${c.mensagem ? `<p class="contato-msg">${esc(c.mensagem)}</p>` : ""}
+        <div class="contato-acoes">
+          <a class="btn pequeno primario" href="${esc(gmail)}" target="_blank" rel="noopener">${ic("email")}Responder</a>
+          ${wa ? `<a class="btn pequeno" href="${wa}" target="_blank" rel="noopener">${ic("whats")}WhatsApp</a>` : ""}
+          <button class="btn pequeno" type="button" data-contato-marca>${ic("marcas")}Salvar como marca</button>
+          <button class="icone-btn perigo" type="button" data-contato-apagar aria-label="Apagar contato" title="Apagar contato">${ic("apagar")}</button>
+        </div>
+      </article>`;
+    }).join("")}</div>${lista.length > 12 ? `<p class="sub" style="margin:8px 0 0">e mais ${num(lista.length - 12)} contatos antigos.</p>` : ""}`
+    : `<p class="vazio">Quando uma marca preencher o formulário do seu site ou pedir o mídia kit, ela aparece aqui e o seu celular avisa na hora.</p>`}
+  </section>`;
+}
+
+function ligarContatosSite(el) {
+  const caixa = $(".contatos-site", el);
+  if (!caixa) return;
+  // Abriu a aba: os novos contam como vistos (o sino apaga), mas a etiqueta "Novo" fica até sair da aba
+  const naoVistos = S.contatos_site.filter((c) => !c.visto).map((c) => c.id);
+  if (naoVistos.length) {
+    db.from("contatos_site").update({ visto: true }).in("id", naoVistos).then(({ error }) => {
+      if (error) return;
+      S.contatos_site.forEach((c) => { if (naoVistos.includes(c.id)) c.visto = true; });
+      pintarLembretes();
+    });
+  }
+  caixa.addEventListener("click", async (e) => {
+    const art = e.target.closest("[data-contato]");
+    if (!art) return;
+    const c = S.contatos_site.find((x) => String(x.id) === art.dataset.contato);
+    if (e.target.closest("[data-contato-marca]")) {
+      formMarca(null, { valores: { nome: c.marca || c.nome, email: c.email, telefone: c.whats || "", situacao: "conversando", ultimo_contato: hojeISO(),
+        obs: `Veio pelo site (${c.tipo === "midia_kit" ? "pediu o mídia kit" : "formulário"}). Contato: ${c.nome}.${c.mensagem ? "\n\n" + c.mensagem : ""}`.slice(0, 3000) } });
+      return;
+    }
+    if (e.target.closest("[data-contato-apagar]")) {
+      if (!(await confirmar(`Apagar o contato de ${c.nome}?`))) return;
+      if (await apagarLinha("contatos_site", c.id)) { S.contatos_site = S.contatos_site.filter((x) => x.id !== c.id); desenhar(); }
+    }
+  });
 }
