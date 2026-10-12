@@ -627,13 +627,13 @@ const SITUACOES = [["lead", "Lead"], ["conversando", "Conversando"], ["cliente",
 const nomeSituacao = (s) => (SITUACOES.find((x) => x[0] === s) || [s, s || ""])[1];
 const filtroMarcas = { busca: "", situacao: "", nicho: "" };
 // Nichos sugeridos (você pode escrever outro qualquer no cadastro)
-const NICHOS_MARCAS = ["Tech", "Casa e decoração", "Moda", "Beleza", "Alimentação", "Bebidas", "Fitness", "Saúde", "Pets", "Infantil", "Finanças", "Educação", "Viagem", "Games", "Automotivo", "Serviços"];
+const NICHOS_MARCAS = ["Agência", "Tech", "Casa e decoração", "Moda", "Beleza", "Alimentação", "Bebidas", "Fitness", "Saúde", "Pets", "Infantil", "Finanças", "Educação", "Viagem", "Games", "Automotivo", "Varejo", "Imóveis", "Serviços"];
 // Junta "tech", "Tecnologia" e "TECH" no mesmo nicho
 function nichoPadrao(v) {
   const t = String(v || "").trim();
   if (!t) return "";
   const k = semAcento(t);
-  const pistas = [["Tech", /^tech|tecnolog|eletronic|gadget|software|app/], ["Casa e decoração", /casa|decor|lar\b|moveis|cozinha|utilidade/], ["Moda", /moda|roupa|vestuario|calcad|acessori|fashion/],
+  const pistas = [["Agência", /agencia|agency|plataforma de creator|casting/], ["Varejo", /varejo|e-?commerce|marketplace|loja de departamento/], ["Imóveis", /imove|imobili|construtora|incorporadora/], ["Tech", /^tech|tecnolog|eletronic|gadget|software|app/], ["Casa e decoração", /casa|decor|lar\b|moveis|cozinha|utilidade/], ["Moda", /moda|roupa|vestuario|calcad|acessori|fashion/],
     ["Beleza", /beleza|cosmet|maquiag|skin|cabelo|perfum|beauty/], ["Alimentação", /aliment|comida|food|restaurante|snack/], ["Bebidas", /bebida|drink|cerveja|vinho|cafe/],
     ["Fitness", /fitness|academia|suplement|esporte|treino/], ["Saúde", /saude|farmac|bem.?estar|wellness/], ["Pets", /pet|cachorro|gato|animal/], ["Infantil", /infantil|bebe|crianca|kids|brinquedo/],
     ["Finanças", /financ|banco|fintech|investim|cripto/], ["Educação", /educa|curso|escola|ensino/], ["Viagem", /viage|turismo|hotel|travel/], ["Games", /game|jogo/], ["Automotivo", /auto|carro|moto/]];
