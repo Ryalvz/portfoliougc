@@ -577,3 +577,12 @@ select cron.schedule('lembretes-rapidos', '* * * * *', $$
     headers := '{"Content-Type": "application/json", "apikey": "sb_publishable_oZdhIWRB1gBabQH4xRJ2Xg__F8Lq0V0"}'::jsonb,
     body := '{"tipo": "rapidos"}'::jsonb)
 $$);
+
+
+-- -------------------------------------------------------------
+-- 21. NICHO DAS MARCAS
+-- Separa as marcas em abas por nicho (Tech, Casa e decoração,
+-- Moda, Beleza...). Você escreve no cadastro ou vem da planilha.
+-- -------------------------------------------------------------
+alter table public.marcas add column if not exists nicho text check (char_length(nicho) <= 60);
+create index if not exists marcas_nicho on public.marcas (nicho);
