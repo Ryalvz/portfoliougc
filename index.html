@@ -291,11 +291,12 @@
   .work-meta .tag { border: 1px solid rgba(240, 238, 234, .7); padding: 1px 6px; border-radius: 3px; text-transform: uppercase; letter-spacing: 1px; font-size: 11px; color: var(--parchment); }
   .work-meta .new { background: var(--parchment); color: var(--cobalt); font-weight: 700; padding: 1px 6px; border-radius: 3px; }
 
-  /* Ponteiro do mouse: claquete 🎬 (só no computador) */
+  /* Ponteiro do mouse: claquete 🎬 (imagem PNG, só no computador) */
   @media (pointer: fine) {
-    html, body { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Ctext x='1' y='25' font-size='24'%3E%F0%9F%8E%AC%3C/text%3E%3C/svg%3E") 4 4, auto; }
-    a, button, [role="button"], .work-v, .filter, label[for], summary { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Ctext x='1' y='25' font-size='24'%3E%F0%9F%8E%AC%3C/text%3E%3C/svg%3E") 4 4, pointer; }
-    input, textarea { cursor: text; }
+    html, body { cursor: url("cursor-claquete.png") 6 6, auto; cursor: image-set(url("cursor-claquete.png") 1x, url("cursor-claquete@2x.png") 2x) 6 6, auto; }
+    /* !important porque outras partes do site pedem a "mãozinha" padrão */
+    a, button, [role="button"], .work-v, .work-v *, .filter, .row-seta, label[for], summary, video, .btn { cursor: url("cursor-claquete.png") 6 6, pointer !important; cursor: image-set(url("cursor-claquete.png") 1x, url("cursor-claquete@2x.png") 2x) 6 6, pointer !important; }
+    input, textarea, select { cursor: text !important; }
   }
 
   /* Fileiras no estilo catálogo: título grande, frase, setas e cards em pé */
@@ -310,9 +311,12 @@
   .row-seta:disabled { opacity: .3; cursor: default; }
   .row .row-scroller { gap: 16px; padding: 4px 2px 18px; margin: 0; scroll-snap-type: x mandatory; scrollbar-width: none; }
   .row .row-scroller::-webkit-scrollbar { display: none; }
+  /* A parte dos trabalhos usa mais da largura da tela, para os vídeos ficarem grandes */
+  #trabalhos .wrap { max-width: 1520px; }
+  /* Cards grandes: 4 por linha no computador, 3 no tablet, 1 e um pedaço no celular */
   @media (min-width: 600px) { .row .row-scroller { grid-auto-columns: calc((100% - 32px) / 3); } }
-  @media (min-width: 1000px) { .row .row-scroller { grid-auto-columns: calc((100% - 64px) / 5); } }
-  @media (max-width: 599px) { .row .row-scroller { grid-auto-columns: 64%; } .row-nav { display: none; } }
+  @media (min-width: 1000px) { .row .row-scroller { grid-auto-columns: calc((100% - 72px) / 4); gap: 24px; } }
+  @media (max-width: 599px) { .row .row-scroller { grid-auto-columns: 78%; } .row-nav { display: none; } }
   .work-v { display: block; position: relative; aspect-ratio: 9 / 16; border-radius: 18px; overflow: hidden; background: #0d1a4d; color: var(--parchment); text-decoration: none; cursor: pointer; box-shadow: 0 10px 26px rgba(0, 0, 0, .22); }
   /* Card parado no lugar: nada de aumentar ou subir (isso fazia a tela "pular") */
   .work.work-v, .work.work-v:hover, .work.work-v:focus-within { transform: none; transition: box-shadow .2s; z-index: auto; }
@@ -321,9 +325,9 @@
   .work-v::after { content: ""; position: absolute; inset: 45% 0 0 0; background: linear-gradient(180deg, transparent, rgba(8, 14, 40, .82)); pointer-events: none; }
   .work-pill { position: absolute; top: 14px; left: 14px; z-index: 2; background: rgba(250, 248, 244, .94); color: #1a2240; font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; padding: 6px 11px; border-radius: 999px; max-width: calc(100% - 70px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .work-v .work-info { position: absolute; inset: auto 0 0 0; z-index: 2; padding: 0 16px 16px; background: none; }
-  .work-v .work-info h4 { margin: 0 0 6px; font-size: 19px; font-weight: 700; line-height: 1.2; color: #fff; text-shadow: 0 1px 8px rgba(0, 0, 0, .35); }
+  .work-v .work-info h4 { margin: 0 0 6px; font-size: 22px; font-weight: 700; line-height: 1.2; color: #fff; text-shadow: 0 1px 8px rgba(0, 0, 0, .35); }
   .work-nicho { display: block; font-size: 11px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; color: rgba(255, 255, 255, .78); }
-  .work-play { position: absolute; left: 50%; top: 50%; z-index: 3; width: 62px; height: 62px; margin: -31px 0 0 -31px; border-radius: 50%; border: 0; background: rgba(250, 248, 244, .92); color: var(--cobalt); display: grid; place-items: center; cursor: inherit; box-shadow: 0 8px 24px rgba(0, 0, 0, .3); transition: transform .2s, opacity .2s; }
+  .work-play { position: absolute; left: 50%; top: 50%; z-index: 3; width: 72px; height: 72px; margin: -36px 0 0 -36px; border-radius: 50%; border: 0; background: rgba(250, 248, 244, .92); color: var(--cobalt); display: grid; place-items: center; box-shadow: 0 8px 24px rgba(0, 0, 0, .3); transition: transform .2s, opacity .2s; }
   .work-play svg { width: 26px; height: 26px; fill: currentColor; margin-left: 3px; }
   .work-v:hover .work-play { background: #fff; }
   .work-v.tocando .work-play { opacity: 0; transform: scale(.8); }
