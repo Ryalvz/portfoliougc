@@ -314,7 +314,9 @@
   @media (min-width: 1000px) { .row .row-scroller { grid-auto-columns: calc((100% - 64px) / 5); } }
   @media (max-width: 599px) { .row .row-scroller { grid-auto-columns: 64%; } .row-nav { display: none; } }
   .work-v { display: block; position: relative; aspect-ratio: 9 / 16; border-radius: 18px; overflow: hidden; background: #0d1a4d; color: var(--parchment); text-decoration: none; cursor: pointer; box-shadow: 0 10px 26px rgba(0, 0, 0, .22); }
-  .work-v:hover, .work-v:focus-within { transform: translateY(-4px); box-shadow: 0 16px 34px rgba(0, 0, 0, .3); }
+  /* Card parado no lugar: nada de aumentar ou subir (isso fazia a tela "pular") */
+  .work.work-v, .work.work-v:hover, .work.work-v:focus-within { transform: none; transition: box-shadow .2s; z-index: auto; }
+  .work.work-v:hover, .work.work-v:focus-visible { box-shadow: 0 0 0 3px rgba(250, 248, 244, .85), 0 10px 26px rgba(0, 0, 0, .22); }
   .work-v video, .work-v img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
   .work-v::after { content: ""; position: absolute; inset: 45% 0 0 0; background: linear-gradient(180deg, transparent, rgba(8, 14, 40, .82)); pointer-events: none; }
   .work-pill { position: absolute; top: 14px; left: 14px; z-index: 2; background: rgba(250, 248, 244, .94); color: #1a2240; font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; padding: 6px 11px; border-radius: 999px; max-width: calc(100% - 70px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -323,10 +325,10 @@
   .work-nicho { display: block; font-size: 11px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; color: rgba(255, 255, 255, .78); }
   .work-play { position: absolute; left: 50%; top: 50%; z-index: 3; width: 62px; height: 62px; margin: -31px 0 0 -31px; border-radius: 50%; border: 0; background: rgba(250, 248, 244, .92); color: var(--cobalt); display: grid; place-items: center; cursor: inherit; box-shadow: 0 8px 24px rgba(0, 0, 0, .3); transition: transform .2s, opacity .2s; }
   .work-play svg { width: 26px; height: 26px; fill: currentColor; margin-left: 3px; }
-  .work-v:hover .work-play { transform: scale(1.08); }
+  .work-v:hover .work-play { background: #fff; }
   .work-v.tocando .work-play { opacity: 0; transform: scale(.8); }
   .work-v.tocando .work-pill, .work-v.tocando .work-info, .work-v.tocando::after { opacity: 0; transition: opacity .3s; }
-  .work-v.tocando:hover .work-info, .work-v.tocando:hover .work-pill { opacity: 1; }
+
   .work-som { position: absolute; top: 12px; right: 12px; z-index: 3; width: 36px; height: 36px; border-radius: 50%; border: 0; background: rgba(8, 14, 40, .55); color: #fff; display: grid; place-items: center; cursor: pointer; }
   .work-som svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
   .work-v.com-som .work-som { background: var(--parchment); color: var(--cobalt); }
