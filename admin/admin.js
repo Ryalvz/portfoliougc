@@ -638,6 +638,182 @@ function linkWhats(tel) {
   return "https://wa.me/" + d;
 }
 
+/* ---------- Importar planilha de leads ----------
+   Você escolhe o arquivo (Excel, CSV ou Numbers exportado), o painel
+   descobre sozinho qual coluna é o nome, o @, o e-mail, o telefone...
+   mostra uma prévia e sobe só as marcas que ainda não estão na base.
+   O que não tem coluna própria (site, nicho, responsável) vai para a
+   Observação, para nada se perder. */
+const CAMPOS_IMPORT = [["", "Ignorar"], ["nome", "Marca"], ["instagram", "Instagram"], ["email", "E-mail"], ["telefone", "Telefone"], ["situacao", "Situação"], ["ultimo_contato", "Último contato"], ["obs", "Observação"]];
+const semAcento = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+const PISTAS_COLUNA = [
+  ["email", /e-?mail|correio/],
+  ["instagram", /insta|^ig$|arroba|^@|perfil/],
+  ["telefone", /telefone|whats|zap|celular|fone|phone|^tel/],
+  ["situacao", /status|situac|etapa|fase|andamento/],
+  ["ultimo_contato", /ultimo contato|contato em|data|last contact|quando/],
+  ["nome", /marca|empresa|nome|brand|company|loja|cliente|razao|fantasia/]
+];
+
+let bibliotecaPlanilha = null;
+function carregarLeitorPlanilha() {
+  if (window.XLSX) return Promise.resolve(window.XLSX);
+  if (!bibliotecaPlanilha) bibliotecaPlanilha = new Promise((ok, falha) => {
+    const sc = document.createElement("script");
+    sc.src = "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js";
+    sc.onload = () => ok(window.XLSX);
+    sc.onerror = () => { bibliotecaPlanilha = null; falha(new Error("Não consegui abrir o leitor de planilhas. Confira a internet e tente de novo.")); };
+    document.head.appendChild(sc);
+  });
+  return bibliotecaPlanilha;
+}
+
+function adivinharColuna(titulo, valores) {
+  const t = semAcento(titulo);
+  for (const [campo, re] of PISTAS_COLUNA) if (t && re.test(t)) return campo;
+  // Sem título que ajude: olha o conteúdo
+  const amostra = valores.filter(Boolean).slice(0, 20).map(String);
+  if (!amostra.length) return "";
+  const parte = (re) => amostra.filter((v) => re.test(v)).length / amostra.length;
+  if (parte(/^[^\s@]+@[^\s@]+\.[^\s@]+$/) > .6) return "email";
+  if (parte(/^@|instagram\.com/i) > .6) return "instagram";
+  if (parte(/^[\d\s()+.-]{8,}$/) > .6) return "telefone";
+  return "obs";
+}
+
+function limparInstagram(v) {
+  const t = String(v || "").trim();
+  if (!t) return "";
+  const m = t.match(/instagram\.com\/([A-Za-z0-9._]+)/i);
+  const h = (m ? m[1] : t).replace(/^@+/, "").replace(/[/?#].*$/, "").trim();
+  return h && /^[A-Za-z0-9._]+$/.test(h) ? "@" + h : t.slice(0, 100);
+}
+function situacaoDe(v) {
+  const t = semAcento(v);
+  if (!t) return "lead";
+  if (/cliente|fechad|ganh|contrat/.test(t)) return "cliente";
+  if (/convers|negoci|respond|contato|andamento|proposta/.test(t)) return "conversando";
+  if (/parad|perd|nao|recus|sem resposta|frio|inativ/.test(t)) return "parada";
+  return "lead";
+}
+function dataDe(v) {
+  if (v == null || v === "") return null;
+  if (typeof v === "number" && v > 20000 && v < 80000) { const d = new Date(Math.round((v - 25569) * 864e5)); return d.toISOString().slice(0, 10); }
+  if (v instanceof Date && !isNaN(v)) return isoLocal(v);
+  const t = String(v).trim();
+  let m = t.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})/);
+  if (m) { const a = m[3].length === 2 ? "20" + m[3] : m[3]; return `${a}-${pad(m[2])}-${pad(m[1])}`; }
+  m = t.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[1]}-${m[2]}-${m[3]}` : null;
+}
+
+// Lê todas as abas da planilha e acha a linha de títulos de cada uma
+async function lerPlanilha(arq) {
+  const XLSX = await carregarLeitorPlanilha();
+  const wb = XLSX.read(await arq.arrayBuffer(), { type: "array", cellDates: true });
+  const blocos = [];
+  wb.SheetNames.forEach((aba) => {
+    const linhas = XLSX.utils.sheet_to_json(wb.Sheets[aba], { header: 1, defval: "", raw: true })
+      .filter((l) => l.some((c) => String(c).trim() !== ""));
+    if (linhas.length < 1) return;
+    // A linha de títulos é a primeira (entre as 10 primeiras) com mais palavras conhecidas
+    let iTit = 0, melhor = -1;
+    linhas.slice(0, 10).forEach((l, i) => {
+      const pontos = l.filter((c) => typeof c === "string" && PISTAS_COLUNA.some(([, re]) => re.test(semAcento(c)))).length;
+      if (pontos > melhor) { melhor = pontos; iTit = i; }
+    });
+    const temTitulo = melhor > 0;
+    const titulos = temTitulo ? linhas[iTit].map((c) => String(c).trim()) : linhas[0].map((_, j) => `Coluna ${j + 1}`);
+    const dados = linhas.slice(temTitulo ? iTit + 1 : 0);
+    const largura = Math.max(titulos.length, ...dados.map((l) => l.length));
+    while (titulos.length < largura) titulos.push(`Coluna ${titulos.length + 1}`);
+    blocos.push({ aba, titulos, dados });
+  });
+  return blocos;
+}
+
+function montarMarcas(blocos, mapas) {
+  const chave = (t) => semAcento(t).replace(/^@/, "").replace(/[^a-z0-9]/g, "");
+  const existentes = new Set();
+  S.marcas.forEach((m) => [m.nome, m.email, m.instagram].forEach((x) => { const k = chave(x); if (k) existentes.add(k); }));
+  const novas = [], vistas = new Set();
+  let repetidas = 0, vazias = 0;
+  blocos.forEach((b, ib) => b.dados.forEach((l) => {
+    const m = { nome: "", instagram: "", email: "", telefone: "", situacao: "lead", ultimo_contato: null, obs: [] };
+    b.titulos.forEach((tit, j) => {
+      const campo = mapas[ib][j], v = l[j];
+      if (!campo || v == null || String(v).trim() === "") return;
+      if (campo === "obs") { m.obs.push(`${tit}: ${v instanceof Date ? dataBR(isoLocal(v)) : String(v).trim()}`); return; }
+      if (campo === "instagram") m.instagram = m.instagram || limparInstagram(v);
+      else if (campo === "email") m.email = m.email || String(v).trim().toLowerCase();
+      else if (campo === "telefone") m.telefone = m.telefone || String(v).trim();
+      else if (campo === "situacao") m.situacao = situacaoDe(v);
+      else if (campo === "ultimo_contato") m.ultimo_contato = dataDe(v);
+      else if (campo === "nome") m.nome = m.nome || String(v).trim();
+    });
+    if (!m.nome) m.nome = m.instagram ? m.instagram.replace(/^@/, "") : m.email ? (m.email.split("@")[1] || "").split(".")[0] : "";
+    if (!m.nome) { vazias++; return; }
+    const ks = [m.nome, m.email, m.instagram].map(chave).filter(Boolean);
+    if (ks.some((k) => existentes.has(k) || vistas.has(k))) { repetidas++; return; }
+    ks.forEach((k) => vistas.add(k));
+    novas.push({ nome: m.nome.slice(0, 150), instagram: m.instagram.slice(0, 100) || null, email: m.email.slice(0, 200) || null,
+      telefone: m.telefone.slice(0, 40) || null, situacao: m.situacao, ultimo_contato: m.ultimo_contato,
+      obs: m.obs.length ? ("Importado da planilha. " + m.obs.join(" | ")).slice(0, 3000) : "Importado da planilha." });
+  }));
+  return { novas, repetidas, vazias };
+}
+
+async function importarPlanilha(arq) {
+  avisar("Lendo a planilha...");
+  let blocos;
+  try { blocos = await lerPlanilha(arq); } catch (e) { avisar("Não consegui ler esse arquivo. Salve como Excel (.xlsx) ou CSV e tente de novo. " + (e.message || ""), true); return; }
+  if (!blocos.length) { avisar("A planilha está vazia.", true); return; }
+  const mapas = blocos.map((b) => b.titulos.map((t, j) => adivinharColuna(t, b.dados.map((l) => l[j]))));
+  // Só uma coluna de nome por aba: as outras viram observação
+  mapas.forEach((mp) => { let achou = false; mp.forEach((c, j) => { if (c === "nome") { if (achou) mp[j] = "obs"; achou = true; } }); });
+
+  const d = janela();
+  const pintar = () => {
+    const { novas, repetidas, vazias } = montarMarcas(blocos, mapas);
+    d.innerHTML = `<form class="form-janela importar" novalidate>
+      <div class="janela-topo"><h3>Importar ${esc(arq.name)}</h3><button type="button" class="icone-btn" data-fechar aria-label="Fechar">${ic("fechar")}</button></div>
+      <div class="janela-corpo">
+        <p class="importar-resumo"><b>${plural(novas.length, "marca nova", "marcas novas")}</b> para entrar${repetidas ? ` · ${plural(repetidas, "já estava", "já estavam")} na sua base (fica de fora)` : ""}${vazias ? ` · ${plural(vazias, "linha sem nome", "linhas sem nome")}` : ""}</p>
+        <p class="sub" style="margin:0 0 6px">Confira o que é cada coluna. Se eu errei alguma, é só trocar:</p>
+        ${blocos.map((b, ib) => `<div class="importar-colunas">${blocos.length > 1 ? `<b class="sub">Aba ${esc(b.aba)}</b>` : ""}
+          ${b.titulos.map((t, j) => `<label><span title="${esc(t)}">${esc(t)}</span><select class="campo" data-aba="${ib}" data-col="${j}">${CAMPOS_IMPORT.map(([v, r]) => `<option value="${v}" ${mapas[ib][j] === v ? "selected" : ""}>${r}</option>`).join("")}</select></label>`).join("")}</div>`).join("")}
+        ${novas.length ? `<div class="tabela-caixa importar-previa"><table><thead><tr><th>Marca</th><th>Instagram</th><th>E-mail</th><th>Telefone</th><th>Situação</th></tr></thead>
+          <tbody>${novas.slice(0, 8).map((m) => `<tr><td><b>${esc(m.nome)}</b></td><td>${esc(m.instagram || "")}</td><td>${esc(m.email || "")}</td><td>${esc(m.telefone || "")}</td><td>${esc(nomeSituacao(m.situacao))}</td></tr>`).join("")}</tbody></table></div>
+          ${novas.length > 8 ? `<p class="sub" style="margin:6px 0 0">e mais ${num(novas.length - 8)}...</p>` : ""}` : `<p class="vazio">Nenhuma marca nova para importar.</p>`}
+      </div>
+      <div class="janela-pe">
+        <button type="button" class="btn" data-fechar>Cancelar</button>
+        <button type="submit" class="btn primario" ${novas.length ? "" : "disabled"}>${ic("subir")}Importar ${plural(novas.length, "marca", "marcas")}</button>
+      </div></form>`;
+    $$("[data-fechar]", d).forEach((b) => b.addEventListener("click", () => d.close()));
+    $$("select[data-col]", d).forEach((s) => s.addEventListener("change", () => {
+      const ib = Number(s.dataset.aba), j = Number(s.dataset.col);
+      if (s.value === "nome") mapas[ib].forEach((c, k) => { if (c === "nome" && k !== j) mapas[ib][k] = "obs"; });
+      mapas[ib][j] = s.value; pintar();
+    }));
+    $("form", d).addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const btn = $('button[type="submit"]', d); btn.disabled = true;
+      let feitas = 0;
+      for (let i = 0; i < novas.length; i += 200) {
+        btn.textContent = `Subindo ${num(Math.min(i + 200, novas.length))} de ${num(novas.length)}...`;
+        const { error } = await db.from("marcas").insert(novas.slice(i, i + 200));
+        if (error) { avisar(traduzErro(error), true); break; }
+        feitas += Math.min(200, novas.length - i);
+      }
+      d.close();
+      if (feitas) { avisar(`Pronto! ${plural(feitas, "marca entrou", "marcas entraram")} como Lead na sua base.`); filtroMarcas.busca = ""; recarregar("marcas"); }
+    });
+  };
+  pintar();
+  d.showModal();
+}
+
 function desenharMarcas(el) {
   el.innerHTML = `
     <div class="barra">
@@ -648,6 +824,8 @@ function desenharMarcas(el) {
       </select>
       <span class="espaco"></span>
       <button class="btn" type="button" id="csv-marcas">${ic("baixar")}Baixar CSV</button>
+      <button class="btn" type="button" id="importar-marcas">${ic("subir")}Importar planilha</button>
+      <input type="file" id="arquivo-marcas" accept=".xlsx,.xls,.csv,.tsv,.ods,.numbers" hidden>
       <button class="btn primario" type="button" id="add-marca">${ic("mais")}Adicionar marca</button>
     </div>
     <div class="tabela-caixa">
@@ -687,6 +865,8 @@ function desenharMarcas(el) {
   $("#busca-marcas").addEventListener("input", (e) => { filtroMarcas.busca = e.target.value; pintar(); });
   $("#filtro-situacao").addEventListener("change", (e) => { filtroMarcas.situacao = e.target.value; pintar(); });
   $("#add-marca").addEventListener("click", () => formMarca());
+  $("#importar-marcas").addEventListener("click", () => $("#arquivo-marcas").click());
+  $("#arquivo-marcas").addEventListener("change", (e) => { const arq = e.target.files[0]; e.target.value = ""; if (arq) importarPlanilha(arq); });
   $("#csv-marcas").addEventListener("click", () => baixarCSV("marcas",
     ["Marca", "Instagram", "E-mail", "Telefone", "Situação", "Observação", "Último contato"],
     S.marcas.map((m) => [m.nome, m.instagram, m.email, m.telefone, nomeSituacao(m.situacao), m.obs, dataBR(m.ultimo_contato)])));

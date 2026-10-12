@@ -728,3 +728,12 @@ a.btn.pequeno { text-decoration: none; }
 .proximos-rapidos > .sub { padding: 0 6px 4px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; font-size: 11px; }
 .proximos-rapidos .etq { flex: none; }
 .quando-chips { display: flex; }
+
+/* Importar planilha (Marcas) */
+dialog:has(.importar) { width: min(860px, calc(100vw - 24px)); }
+.importar-resumo { margin: 0 0 12px; font-size: 14px; }
+.importar-colunas { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; margin-bottom: 14px; }
+.importar-colunas > b { grid-column: 1 / -1; }
+.importar-colunas label { display: grid; gap: 3px; font-size: 12px; font-weight: 600; min-width: 0; }
+.importar-colunas label span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+.importar-previa { max-height: 260px; overflow: auto; }
