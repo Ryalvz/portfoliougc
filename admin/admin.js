@@ -688,7 +688,7 @@ function limparInstagram(v) {
   const h = (m ? m[1] : t).replace(/^@+/, "").replace(/[/?#].*$/, "").trim();
   return h && /^[A-Za-z0-9._]+$/.test(h) ? "@" + h : t.slice(0, 100);
 }
-function situacaoDe(v) {
+function situacaoDaPlanilha(v) {
   const t = semAcento(v);
   if (!t) return "lead";
   if (/cliente|fechad|ganh|contrat/.test(t)) return "cliente";
@@ -747,7 +747,7 @@ function montarMarcas(blocos, mapas) {
       if (campo === "instagram") m.instagram = m.instagram || limparInstagram(v);
       else if (campo === "email") m.email = m.email || String(v).trim().toLowerCase();
       else if (campo === "telefone") m.telefone = m.telefone || String(v).trim();
-      else if (campo === "situacao") m.situacao = situacaoDe(v);
+      else if (campo === "situacao") m.situacao = situacaoDaPlanilha(v);
       else if (campo === "ultimo_contato") m.ultimo_contato = dataDe(v);
       else if (campo === "nome") m.nome = m.nome || String(v).trim();
     });
