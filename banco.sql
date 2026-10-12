@@ -586,3 +586,12 @@ $$);
 -- -------------------------------------------------------------
 alter table public.marcas add column if not exists nicho text check (char_length(nicho) <= 60);
 create index if not exists marcas_nicho on public.marcas (nicho);
+
+
+-- -------------------------------------------------------------
+-- 22. MARCAS FAVORITAS E FIXADAS
+-- favorita: estrela (aparece na aba "Favoritas")
+-- fixada: alfinete (fica sempre no topo da lista)
+-- -------------------------------------------------------------
+alter table public.marcas add column if not exists favorita boolean not null default false;
+alter table public.marcas add column if not exists fixada boolean not null default false;
