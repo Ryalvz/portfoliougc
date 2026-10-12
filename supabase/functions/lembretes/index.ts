@@ -87,6 +87,10 @@ async function calcularLembretes(hoje: string): Promise<Lembrete[]> {
   const adiado = (k: string) => adiados.some((a) => a.chave === k && a.ate >= hoje);
   const L: Lembrete[] = [];
 
+  // Lembretes que você escreveu, já na hora e ainda sem "Feito", vêm primeiro
+  const { data: seus } = await db.from("lembretes_rapidos").select("texto").eq("feito", false).lte("quando", new Date().toISOString()).order("quando");
+  for (const r of seus || []) L.push({ tipo: "rapido", texto: r.texto, url: "./#inicio" });
+
   // Agenda do calendário: o que é pra hoje e o que ficou para trás
   for (const a of agenda.filter((x) => !x.exemplo)) {
     if (adiado(`cal-${a.id}`)) continue;
