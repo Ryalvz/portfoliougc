@@ -867,4 +867,8 @@ dialog.pro-cheia iframe { flex: 1; width: 100%; border: 0; background: #fff; }
   .pro-capa-numero { text-align: left; }
   .pro-palco { padding: 14px 10px; }
   .pro-botao-campos { grid-template-columns: 1fr; }
+  .pro-cartoes { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .pro-cartao { padding: 12px 12px 10px 16px; }
+  .pro-cartao strong { font-size: 24px; }
+  .pro-capa-numero strong { font-size: 36px; }
 }
