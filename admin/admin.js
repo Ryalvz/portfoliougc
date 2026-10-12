@@ -76,7 +76,7 @@ function traduzErro(e) {
 // Campos que o painel espera em cada tabela
 const ESQUEMA = {
   videos: ["id", "titulo", "link", "capa", "nicho", "formato", "marca", "destaque", "ordem", "visivel", "exemplo"],
-  marcas: ["id", "nome", "instagram", "email", "telefone", "situacao", "nicho", "obs", "ultimo_contato", "exemplo", "criado_em"],
+  marcas: ["id", "nome", "instagram", "email", "telefone", "situacao", "nicho", "favorita", "fixada", "obs", "ultimo_contato", "exemplo", "criado_em"],
   calendario: ["id", "titulo", "marca", "tipo", "data", "status", "exemplo"],
   campanhas: ["id", "campanha", "cliente", "tipo", "status", "qtd", "valor", "prazo", "pagamento", "ativa", "favorita", "exemplo"],
   comissoes_ttk: ["id", "data", "valor", "gmv", "itens", "obs"],
@@ -836,10 +836,12 @@ function desenharMarcas(el) {
   const contaNicho = {};
   S.marcas.forEach((m) => { const n = nichoPadrao(m.nicho) || "Sem nicho"; contaNicho[n] = (contaNicho[n] || 0) + 1; });
   const nichos = Object.entries(contaNicho).sort((a, b) => (a[0] === "Sem nicho") - (b[0] === "Sem nicho") || b[1] - a[1] || a[0].localeCompare(b[0], "pt"));
-  if (filtroMarcas.nicho && !contaNicho[filtroMarcas.nicho]) filtroMarcas.nicho = "";
+  if (filtroMarcas.nicho && filtroMarcas.nicho !== "★" && !contaNicho[filtroMarcas.nicho]) filtroMarcas.nicho = "";
+  if (filtroMarcas.nicho === "★" && !S.marcas.some((m) => m.favorita)) filtroMarcas.nicho = "";
   el.innerHTML = `
     <div class="abas-nicho" role="tablist" aria-label="Nichos">
       <button type="button" role="tab" class="aba-nicho" data-nicho="" aria-selected="${!filtroMarcas.nicho}">Todos <span>${qtd(S.marcas.length)}</span></button>
+      ${S.marcas.some((m) => m.favorita) ? `<button type="button" role="tab" class="aba-nicho aba-favoritas" data-nicho="★" aria-selected="${filtroMarcas.nicho === "★"}">${ic("estrela")}Favoritas <span>${qtd(S.marcas.filter((m) => m.favorita).length)}</span></button>` : ""}
       ${nichos.map(([n, q]) => `<button type="button" role="tab" class="aba-nicho" data-nicho="${esc(n)}" aria-selected="${filtroMarcas.nicho === n}">${esc(n)} <span>${qtd(q)}</span></button>`).join("")}
     </div>
     <div class="barra">
@@ -856,7 +858,7 @@ function desenharMarcas(el) {
     </div>
     <div class="tabela-caixa">
       <table>
-        <thead><tr><th>Marca</th><th>Nicho</th><th>Instagram</th><th>E-mail</th><th>Telefone</th><th>Situação</th><th>Observação</th><th>Último contato</th></tr></thead>
+        <thead><tr><th class="col-acoes-marca"><span class="sr">Favoritar e fixar</span></th><th>Marca</th><th>Nicho</th><th>Instagram</th><th>E-mail</th><th>Telefone</th><th>Situação</th><th>Observação</th><th>Último contato</th></tr></thead>
         <tbody id="lista-marcas"></tbody>
       </table>
     </div>
@@ -866,15 +868,20 @@ function desenharMarcas(el) {
     const q = filtroMarcas.busca.toLowerCase().replace(/^@/, "");
     const lista = S.marcas.filter((m) => {
       if (filtroMarcas.situacao && m.situacao !== filtroMarcas.situacao) return false;
-      if (filtroMarcas.nicho && (nichoPadrao(m.nicho) || "Sem nicho") !== filtroMarcas.nicho) return false;
+      if (filtroMarcas.nicho === "★") { if (!m.favorita) return false; }
+      else if (filtroMarcas.nicho && (nichoPadrao(m.nicho) || "Sem nicho") !== filtroMarcas.nicho) return false;
       if (!q) return true;
       return [m.nome, m.instagram, m.email].some((x) => String(x || "").toLowerCase().replace(/^@/, "").includes(q));
-    });
+    }).sort((a, b) => (b.fixada === true) - (a.fixada === true)); // fixadas sempre no topo
     $("#lista-marcas").innerHTML = lista.length === 0
-      ? `<tr><td colspan="8"><p class="vazio">${S.marcas.length ? "Nenhuma marca com esse filtro." : "Sua base está vazia. Quem mandar o formulário do site aparece aqui como Lead."}</p></td></tr>`
+      ? `<tr><td colspan="9"><p class="vazio">${S.marcas.length ? "Nenhuma marca com esse filtro." : "Sua base está vazia. Quem mandar o formulário do site aparece aqui como Lead."}</p></td></tr>`
       : lista.map((m) => {
           const ig = linkInstagram(m.instagram), wa = linkWhats(m.telefone);
-          return `<tr class="clicavel" data-id="${esc(m.id)}">
+          return `<tr class="clicavel ${m.fixada ? "fixada" : ""}" data-id="${esc(m.id)}">
+            <td class="acoes-marca">
+              <button class="icone-btn estrela ${m.favorita ? "on" : ""}" type="button" data-marca-fav aria-pressed="${!!m.favorita}" aria-label="${m.favorita ? "Tirar dos favoritos" : "Favoritar"} ${esc(m.nome)}" title="${m.favorita ? "Tirar dos favoritos" : "Favoritar"}">${ic("estrela")}</button>
+              <button class="icone-btn alfinete ${m.fixada ? "on" : ""}" type="button" data-marca-fixar aria-pressed="${!!m.fixada}" aria-label="${m.fixada ? "Desafixar" : "Fixar no topo"} ${esc(m.nome)}" title="${m.fixada ? "Desafixar" : "Fixar no topo"}">${ic("fixar")}</button>
+            </td>
             <td><b>${esc(m.nome)}</b>${m.exemplo ? '<span class="pilula p-exemplo">exemplo</span>' : ""}</td>
             <td>${m.nicho ? `<span class="etq">${esc(nichoPadrao(m.nicho))}</span>` : ""}</td>
             <td>${ig ? `<a href="${ig}" target="_blank" rel="noopener">${esc(m.instagram)}</a>` : esc(m.instagram || "")}</td>
@@ -899,7 +906,20 @@ function desenharMarcas(el) {
   $("#csv-marcas").addEventListener("click", () => baixarCSV("marcas",
     ["Marca", "Nicho", "Instagram", "E-mail", "Telefone", "Situação", "Observação", "Último contato"],
     S.marcas.map((m) => [m.nome, nichoPadrao(m.nicho), m.instagram, m.email, m.telefone, nomeSituacao(m.situacao), m.obs, dataBR(m.ultimo_contato)])));
-  $("#lista-marcas").addEventListener("click", (e) => {
+  $("#lista-marcas").addEventListener("click", async (e) => {
+    const marcar = e.target.closest("[data-marca-fav], [data-marca-fixar]");
+    if (marcar) {
+      if (!temCampo("marcas", "favorita")) { avisar("Falta rodar a parte 22 do banco.sql no Supabase.", true); return; }
+      const m = S.marcas.find((x) => String(x.id) === marcar.closest("tr").dataset.id);
+      const campo = marcar.hasAttribute("data-marca-fav") ? "favorita" : "fixada";
+      const novo = !m[campo];
+      if (await gravar("marcas", { [campo]: novo }, m.id)) {
+        m[campo] = novo;
+        avisar(campo === "favorita" ? (novo ? `${m.nome} entrou nos favoritos.` : `${m.nome} saiu dos favoritos.`) : (novo ? `${m.nome} fixada no topo.` : `${m.nome} desafixada.`));
+        desenhar();
+      }
+      return;
+    }
     if (e.target.closest("a, button")) return;
     const tr = e.target.closest("tr[data-id]");
     if (tr) formMarca(S.marcas.find((m) => String(m.id) === tr.dataset.id));

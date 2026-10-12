@@ -745,3 +745,14 @@ dialog:has(.importar) { width: min(860px, calc(100vw - 24px)); }
 .aba-nicho:hover { border-color: var(--cobalt); }
 .aba-nicho[aria-selected="true"] { background: var(--cobalt); border-color: var(--cobalt); color: #fff; }
 .aba-nicho[aria-selected="true"] span { background: rgba(255, 255, 255, .2); color: #fff; }
+
+/* Favoritar e fixar marcas */
+.acoes-marca { white-space: nowrap; width: 1%; padding-right: 0; }
+.acoes-marca .icone-btn { width: 28px; height: 28px; }
+.alfinete { color: var(--muted); }
+.alfinete.on { color: var(--cobalt); }
+.alfinete.on svg { fill: var(--cobalt); }
+tr.fixada td { background: var(--tint); }
+.aba-favoritas svg { width: 14px; height: 14px; }
+.aba-favoritas:not([aria-selected="true"]) svg { color: var(--olive); fill: var(--olive); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
