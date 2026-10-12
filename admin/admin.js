@@ -76,7 +76,7 @@ function traduzErro(e) {
 // Campos que o painel espera em cada tabela
 const ESQUEMA = {
   videos: ["id", "titulo", "link", "capa", "nicho", "formato", "marca", "destaque", "ordem", "visivel", "exemplo"],
-  marcas: ["id", "nome", "instagram", "email", "telefone", "situacao", "obs", "ultimo_contato", "exemplo", "criado_em"],
+  marcas: ["id", "nome", "instagram", "email", "telefone", "situacao", "nicho", "obs", "ultimo_contato", "exemplo", "criado_em"],
   calendario: ["id", "titulo", "marca", "tipo", "data", "status", "exemplo"],
   campanhas: ["id", "campanha", "cliente", "tipo", "status", "qtd", "valor", "prazo", "pagamento", "ativa", "favorita", "exemplo"],
   comissoes_ttk: ["id", "data", "valor", "gmv", "itens", "obs"],
@@ -193,7 +193,8 @@ function campoHTML(c, v) {
   let input;
   if (c.t === "select") input = `<select class="campo" style="width:100%" id="${id}" name="${c.n}">${c.op.map(([ov, ot]) => `<option value="${esc(ov)}" ${String(ov) === String(val) ? "selected" : ""}>${esc(ot)}</option>`).join("")}</select>`;
   else if (c.t === "textarea") input = `<textarea class="campo" id="${id}" name="${c.n}" rows="4" ${ph}>${esc(val)}</textarea>`;
-  else input = `<input class="campo" id="${id}" name="${c.n}" type="${c.t || "text"}" value="${esc(String(val).slice(0, c.t === "date" ? 10 : undefined))}" ${c.t === "number" ? 'step="any" min="0"' : ""} ${req} ${ph}>`;
+  else input = `<input class="campo" id="${id}" name="${c.n}" type="${c.t || "text"}" value="${esc(String(val).slice(0, c.t === "date" ? 10 : undefined))}" ${c.t === "number" ? 'step="any" min="0"' : ""} ${c.lista ? `list="${id}-lista" autocomplete="off"` : ""} ${req} ${ph}>`
+    + (c.lista ? `<datalist id="${id}-lista">${c.lista.map((o) => `<option value="${esc(o)}">`).join("")}</datalist>` : "");
   return `<div class="${cls}"><label for="${id}">${esc(c.r)}${c.req ? " *" : ""}</label>${input}${c.ajuda ? `<small class="ajuda">${esc(c.ajuda)}</small>` : ""}</div>`;
 }
 
@@ -624,7 +625,21 @@ function ligarArraste(corpo) {
    ============================================================= */
 const SITUACOES = [["lead", "Lead"], ["conversando", "Conversando"], ["cliente", "Cliente"], ["parada", "Parada"]];
 const nomeSituacao = (s) => (SITUACOES.find((x) => x[0] === s) || [s, s || ""])[1];
-const filtroMarcas = { busca: "", situacao: "" };
+const filtroMarcas = { busca: "", situacao: "", nicho: "" };
+// Nichos sugeridos (você pode escrever outro qualquer no cadastro)
+const NICHOS_MARCAS = ["Tech", "Casa e decoração", "Moda", "Beleza", "Alimentação", "Bebidas", "Fitness", "Saúde", "Pets", "Infantil", "Finanças", "Educação", "Viagem", "Games", "Automotivo", "Serviços"];
+// Junta "tech", "Tecnologia" e "TECH" no mesmo nicho
+function nichoPadrao(v) {
+  const t = String(v || "").trim();
+  if (!t) return "";
+  const k = semAcento(t);
+  const pistas = [["Tech", /^tech|tecnolog|eletronic|gadget|software|app/], ["Casa e decoração", /casa|decor|lar\b|moveis|cozinha|utilidade/], ["Moda", /moda|roupa|vestuario|calcad|acessori|fashion/],
+    ["Beleza", /beleza|cosmet|maquiag|skin|cabelo|perfum|beauty/], ["Alimentação", /aliment|comida|food|restaurante|snack/], ["Bebidas", /bebida|drink|cerveja|vinho|cafe/],
+    ["Fitness", /fitness|academia|suplement|esporte|treino/], ["Saúde", /saude|farmac|bem.?estar|wellness/], ["Pets", /pet|cachorro|gato|animal/], ["Infantil", /infantil|bebe|crianca|kids|brinquedo/],
+    ["Finanças", /financ|banco|fintech|investim|cripto/], ["Educação", /educa|curso|escola|ensino/], ["Viagem", /viage|turismo|hotel|travel/], ["Games", /game|jogo/], ["Automotivo", /auto|carro|moto/]];
+  const achou = pistas.find(([, re]) => re.test(k));
+  return achou ? achou[0] : t.charAt(0).toUpperCase() + t.slice(1);
+}
 
 function linkInstagram(handle) {
   if (!handle) return "";
@@ -644,9 +659,10 @@ function linkWhats(tel) {
    mostra uma prévia e sobe só as marcas que ainda não estão na base.
    O que não tem coluna própria (site, nicho, responsável) vai para a
    Observação, para nada se perder. */
-const CAMPOS_IMPORT = [["", "Ignorar"], ["nome", "Marca"], ["instagram", "Instagram"], ["email", "E-mail"], ["telefone", "Telefone"], ["situacao", "Situação"], ["ultimo_contato", "Último contato"], ["obs", "Observação"]];
+const CAMPOS_IMPORT = [["", "Ignorar"], ["nome", "Marca"], ["nicho", "Nicho"], ["instagram", "Instagram"], ["email", "E-mail"], ["telefone", "Telefone"], ["situacao", "Situação"], ["ultimo_contato", "Último contato"], ["obs", "Observação"]];
 const semAcento = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 const PISTAS_COLUNA = [
+  ["nicho", /nicho|segmento|categoria|setor|ramo|area de atuacao/],
   ["email", /e-?mail|correio/],
   ["instagram", /insta|^ig$|arroba|^@|perfil/],
   ["telefone", /telefone|whats|zap|celular|fone|phone|^tel/],
@@ -739,7 +755,7 @@ function montarMarcas(blocos, mapas) {
   const novas = [], vistas = new Set();
   let repetidas = 0, vazias = 0;
   blocos.forEach((b, ib) => b.dados.forEach((l) => {
-    const m = { nome: "", instagram: "", email: "", telefone: "", situacao: "lead", ultimo_contato: null, obs: [] };
+    const m = { nome: "", nicho: "", instagram: "", email: "", telefone: "", situacao: "lead", ultimo_contato: null, obs: [] };
     b.titulos.forEach((tit, j) => {
       const campo = mapas[ib][j], v = l[j];
       if (!campo || v == null || String(v).trim() === "") return;
@@ -750,13 +766,14 @@ function montarMarcas(blocos, mapas) {
       else if (campo === "situacao") m.situacao = situacaoDaPlanilha(v);
       else if (campo === "ultimo_contato") m.ultimo_contato = dataDe(v);
       else if (campo === "nome") m.nome = m.nome || String(v).trim();
+      else if (campo === "nicho") m.nicho = m.nicho || nichoPadrao(v);
     });
     if (!m.nome) m.nome = m.instagram ? m.instagram.replace(/^@/, "") : m.email ? (m.email.split("@")[1] || "").split(".")[0] : "";
     if (!m.nome) { vazias++; return; }
     const ks = [m.nome, m.email, m.instagram].map(chave).filter(Boolean);
     if (ks.some((k) => existentes.has(k) || vistas.has(k))) { repetidas++; return; }
     ks.forEach((k) => vistas.add(k));
-    novas.push({ nome: m.nome.slice(0, 150), instagram: m.instagram.slice(0, 100) || null, email: m.email.slice(0, 200) || null,
+    novas.push({ nome: m.nome.slice(0, 150), nicho: m.nicho.slice(0, 60) || null, instagram: m.instagram.slice(0, 100) || null, email: m.email.slice(0, 200) || null,
       telefone: m.telefone.slice(0, 40) || null, situacao: m.situacao, ultimo_contato: m.ultimo_contato,
       obs: m.obs.length ? ("Importado da planilha. " + m.obs.join(" | ")).slice(0, 3000) : "Importado da planilha." });
   }));
@@ -782,8 +799,8 @@ async function importarPlanilha(arq) {
         <p class="sub" style="margin:0 0 6px">Confira o que é cada coluna. Se eu errei alguma, é só trocar:</p>
         ${blocos.map((b, ib) => `<div class="importar-colunas">${blocos.length > 1 ? `<b class="sub">Aba ${esc(b.aba)}</b>` : ""}
           ${b.titulos.map((t, j) => `<label><span title="${esc(t)}">${esc(t)}</span><select class="campo" data-aba="${ib}" data-col="${j}">${CAMPOS_IMPORT.map(([v, r]) => `<option value="${v}" ${mapas[ib][j] === v ? "selected" : ""}>${r}</option>`).join("")}</select></label>`).join("")}</div>`).join("")}
-        ${novas.length ? `<div class="tabela-caixa importar-previa"><table><thead><tr><th>Marca</th><th>Instagram</th><th>E-mail</th><th>Telefone</th><th>Situação</th></tr></thead>
-          <tbody>${novas.slice(0, 8).map((m) => `<tr><td><b>${esc(m.nome)}</b></td><td>${esc(m.instagram || "")}</td><td>${esc(m.email || "")}</td><td>${esc(m.telefone || "")}</td><td>${esc(nomeSituacao(m.situacao))}</td></tr>`).join("")}</tbody></table></div>
+        ${novas.length ? `<div class="tabela-caixa importar-previa"><table><thead><tr><th>Marca</th><th>Nicho</th><th>Instagram</th><th>E-mail</th><th>Telefone</th><th>Situação</th></tr></thead>
+          <tbody>${novas.slice(0, 8).map((m) => `<tr><td><b>${esc(m.nome)}</b></td><td>${esc(m.nicho || "")}</td><td>${esc(m.instagram || "")}</td><td>${esc(m.email || "")}</td><td>${esc(m.telefone || "")}</td><td>${esc(nomeSituacao(m.situacao))}</td></tr>`).join("")}</tbody></table></div>
           ${novas.length > 8 ? `<p class="sub" style="margin:6px 0 0">e mais ${num(novas.length - 8)}...</p>` : ""}` : `<p class="vazio">Nenhuma marca nova para importar.</p>`}
       </div>
       <div class="janela-pe">
@@ -815,7 +832,16 @@ async function importarPlanilha(arq) {
 }
 
 function desenharMarcas(el) {
+  // Abas por nicho, com quantas marcas tem em cada uma (as maiores primeiro)
+  const contaNicho = {};
+  S.marcas.forEach((m) => { const n = nichoPadrao(m.nicho) || "Sem nicho"; contaNicho[n] = (contaNicho[n] || 0) + 1; });
+  const nichos = Object.entries(contaNicho).sort((a, b) => (a[0] === "Sem nicho") - (b[0] === "Sem nicho") || b[1] - a[1] || a[0].localeCompare(b[0], "pt"));
+  if (filtroMarcas.nicho && !contaNicho[filtroMarcas.nicho]) filtroMarcas.nicho = "";
   el.innerHTML = `
+    <div class="abas-nicho" role="tablist" aria-label="Nichos">
+      <button type="button" role="tab" class="aba-nicho" data-nicho="" aria-selected="${!filtroMarcas.nicho}">Todos <span>${qtd(S.marcas.length)}</span></button>
+      ${nichos.map(([n, q]) => `<button type="button" role="tab" class="aba-nicho" data-nicho="${esc(n)}" aria-selected="${filtroMarcas.nicho === n}">${esc(n)} <span>${qtd(q)}</span></button>`).join("")}
+    </div>
     <div class="barra">
       <div class="busca">${ic("busca")}<input type="search" id="busca-marcas" placeholder="Buscar por nome, @ ou e-mail" value="${esc(filtroMarcas.busca)}" aria-label="Buscar marcas"></div>
       <select class="campo" id="filtro-situacao" aria-label="Filtrar por situação">
@@ -830,7 +856,7 @@ function desenharMarcas(el) {
     </div>
     <div class="tabela-caixa">
       <table>
-        <thead><tr><th>Marca</th><th>Instagram</th><th>E-mail</th><th>Telefone</th><th>Situação</th><th>Observação</th><th>Último contato</th></tr></thead>
+        <thead><tr><th>Marca</th><th>Nicho</th><th>Instagram</th><th>E-mail</th><th>Telefone</th><th>Situação</th><th>Observação</th><th>Último contato</th></tr></thead>
         <tbody id="lista-marcas"></tbody>
       </table>
     </div>
@@ -840,15 +866,17 @@ function desenharMarcas(el) {
     const q = filtroMarcas.busca.toLowerCase().replace(/^@/, "");
     const lista = S.marcas.filter((m) => {
       if (filtroMarcas.situacao && m.situacao !== filtroMarcas.situacao) return false;
+      if (filtroMarcas.nicho && (nichoPadrao(m.nicho) || "Sem nicho") !== filtroMarcas.nicho) return false;
       if (!q) return true;
       return [m.nome, m.instagram, m.email].some((x) => String(x || "").toLowerCase().replace(/^@/, "").includes(q));
     });
     $("#lista-marcas").innerHTML = lista.length === 0
-      ? `<tr><td colspan="7"><p class="vazio">${S.marcas.length ? "Nenhuma marca com esse filtro." : "Sua base está vazia. Quem mandar o formulário do site aparece aqui como Lead."}</p></td></tr>`
+      ? `<tr><td colspan="8"><p class="vazio">${S.marcas.length ? "Nenhuma marca com esse filtro." : "Sua base está vazia. Quem mandar o formulário do site aparece aqui como Lead."}</p></td></tr>`
       : lista.map((m) => {
           const ig = linkInstagram(m.instagram), wa = linkWhats(m.telefone);
           return `<tr class="clicavel" data-id="${esc(m.id)}">
             <td><b>${esc(m.nome)}</b>${m.exemplo ? '<span class="pilula p-exemplo">exemplo</span>' : ""}</td>
+            <td>${m.nicho ? `<span class="etq">${esc(nichoPadrao(m.nicho))}</span>` : ""}</td>
             <td>${ig ? `<a href="${ig}" target="_blank" rel="noopener">${esc(m.instagram)}</a>` : esc(m.instagram || "")}</td>
             <td>${m.email ? `<a href="mailto:${esc(m.email)}">${esc(m.email)}</a>` : ""}</td>
             <td style="white-space:nowrap">${esc(m.telefone || "")} ${wa ? `<a class="icone-btn" href="${wa}" target="_blank" rel="noopener" title="Abrir no WhatsApp" aria-label="Abrir ${esc(m.nome)} no WhatsApp">${ic("whats")}</a>` : ""}</td>
@@ -863,13 +891,14 @@ function desenharMarcas(el) {
   pintar();
 
   $("#busca-marcas").addEventListener("input", (e) => { filtroMarcas.busca = e.target.value; pintar(); });
+  $$("[data-nicho]", el).forEach((b) => b.addEventListener("click", () => { filtroMarcas.nicho = b.dataset.nicho; desenhar(); }));
   $("#filtro-situacao").addEventListener("change", (e) => { filtroMarcas.situacao = e.target.value; pintar(); });
   $("#add-marca").addEventListener("click", () => formMarca());
   $("#importar-marcas").addEventListener("click", () => $("#arquivo-marcas").click());
   $("#arquivo-marcas").addEventListener("change", (e) => { const arq = e.target.files[0]; e.target.value = ""; if (arq) importarPlanilha(arq); });
   $("#csv-marcas").addEventListener("click", () => baixarCSV("marcas",
-    ["Marca", "Instagram", "E-mail", "Telefone", "Situação", "Observação", "Último contato"],
-    S.marcas.map((m) => [m.nome, m.instagram, m.email, m.telefone, nomeSituacao(m.situacao), m.obs, dataBR(m.ultimo_contato)])));
+    ["Marca", "Nicho", "Instagram", "E-mail", "Telefone", "Situação", "Observação", "Último contato"],
+    S.marcas.map((m) => [m.nome, nichoPadrao(m.nicho), m.instagram, m.email, m.telefone, nomeSituacao(m.situacao), m.obs, dataBR(m.ultimo_contato)])));
   $("#lista-marcas").addEventListener("click", (e) => {
     if (e.target.closest("a, button")) return;
     const tr = e.target.closest("tr[data-id]");
@@ -884,6 +913,7 @@ function formMarca(m, extra = {}) {
     valores: m || { situacao: "lead", ultimo_contato: hojeISO(), ...(extra.valores || {}) },
     campos: [
       { n: "nome", r: "Marca", req: true, inteiro: true },
+      { n: "nicho", r: "Nicho", ph: "Tech, Moda, Casa e decoração...", lista: [...new Set(NICHOS_MARCAS.concat(S.marcas.map((x) => nichoPadrao(x.nicho)).filter(Boolean)))] },
       { n: "instagram", r: "Instagram", ph: "@marca" },
       { n: "email", r: "E-mail", t: "email" },
       { n: "telefone", r: "Telefone", t: "tel", ph: "(11) 90000-0000" },
@@ -891,7 +921,7 @@ function formMarca(m, extra = {}) {
       { n: "ultimo_contato", r: "Último contato", t: "date" },
       { n: "obs", r: "Observação", t: "textarea" }
     ],
-    aoSalvar: async (d) => { const ok = await gravar("marcas", d, m ? m.id : null); if (ok) { recarregar("marcas"); if (extra.depois) extra.depois(); } return ok; },
+    aoSalvar: async (d) => { if ("nicho" in d) d.nicho = nichoPadrao(d.nicho) || null; const ok = await gravar("marcas", d, m ? m.id : null); if (ok) { recarregar("marcas"); if (extra.depois) extra.depois(); } return ok; },
     aoApagar: m ? async () => { const ok = await apagarLinha("marcas", m.id); if (ok) recarregar("marcas"); return ok; } : null
   });
 }

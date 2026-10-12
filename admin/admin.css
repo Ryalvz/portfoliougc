@@ -737,3 +737,11 @@ dialog:has(.importar) { width: min(860px, calc(100vw - 24px)); }
 .importar-colunas label { display: grid; gap: 3px; font-size: 12px; font-weight: 600; min-width: 0; }
 .importar-colunas label span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
 .importar-previa { max-height: 260px; overflow: auto; }
+
+/* Abas por nicho (Marcas) */
+.abas-nicho { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 12px; scrollbar-width: thin; }
+.aba-nicho { flex: none; display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--card); color: var(--text); border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.aba-nicho span { font-size: 11px; color: var(--muted); background: var(--tint); border-radius: 999px; padding: 1px 7px; }
+.aba-nicho:hover { border-color: var(--cobalt); }
+.aba-nicho[aria-selected="true"] { background: var(--cobalt); border-color: var(--cobalt); color: #fff; }
+.aba-nicho[aria-selected="true"] span { background: rgba(255, 255, 255, .2); color: #fff; }
