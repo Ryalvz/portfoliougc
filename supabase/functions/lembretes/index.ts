@@ -77,7 +77,8 @@ const NEGOCIACAO = ["Em negociação", "Assinatura de contrato"];
 const PRODUCAO = ["Aguardando briefing", "Roteiro em andamento", "Aguardando aprovação de roteiro", "Gravando", "Editando", "Enviado p/ aprovação"];
 const DINHEIRO = ["Entregue", "Nota fiscal enviada", "Aguardando pagamento", "Pago"];
 
-const TIPO_AGENDA: Record<string, string> = { gravar: "gravar", editar: "editar", postar: "postar" };
+const TIPO_AGENDA: Record<string, string> = { gravar: "gravar", editar: "editar", postar: "postar", reuniao: "reunião:", compromisso: "compromisso:" };
+const horaCurta = (h: unknown) => { if (!h) return ""; const [hh, mm] = String(h).split(":"); return `${Number(hh)}h${mm && mm !== "00" ? mm : ""}`; };
 
 type Lembrete = { tipo: string; texto: string; url?: string };
 async function calcularLembretes(hoje: string): Promise<Lembrete[]> {
@@ -85,7 +86,7 @@ async function calcularLembretes(hoje: string): Promise<Lembrete[]> {
     db.from("contratos").select("*").then((r) => r.data || []),
     db.from("comissoes_ttk").select("data,valor").then((r) => r.data || []),
     db.from("lembretes_adiados").select("chave,ate").then((r) => r.data || []),
-    db.from("calendario").select("id,titulo,marca,tipo,data,status,exemplo").gte("data", somaDias(hoje, -7)).lte("data", hoje).eq("status", "a fazer").then((r) => r.data || []),
+    db.from("calendario").select("*").gte("data", somaDias(hoje, -7)).lte("data", hoje).eq("status", "a fazer").order("hora", { nullsFirst: false }).then((r) => r.data || []),
     db.from("metas").select("ano,mes,valor").then((r) => r.data || []),
   ]);
   const adiado = (k: string) => adiados.some((a) => a.chave === k && a.ate >= hoje);
@@ -98,7 +99,7 @@ async function calcularLembretes(hoje: string): Promise<Lembrete[]> {
   // Agenda do calendário: o que é pra hoje e o que ficou para trás
   for (const a of agenda.filter((x) => !x.exemplo)) {
     if (adiado(`cal-${a.id}`)) continue;
-    const oque = `${TIPO_AGENDA[a.tipo] || a.tipo} ${a.titulo}${a.marca ? ` (${a.marca})` : ""}`;
+    const oque = `${a.hora ? horaCurta(a.hora) + " " : ""}${TIPO_AGENDA[a.tipo] || a.tipo} ${a.titulo}${a.marca ? ` (${a.marca})` : ""}`;
     L.push(a.data === hoje
       ? { tipo: "agenda", texto: `Hoje: ${oque}`, url: "./#calendario" }
       : { tipo: "agenda", texto: `Ficou pra trás (${br(a.data)}): ${oque}`, url: "./#calendario" });
@@ -332,7 +333,7 @@ const icsHora = (d: Date) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{
 async function montarAgenda() {
   const hoje = hojeSP(), desde = somaDias(hoje, -60);
   const [agenda, contratos, rapidos] = await Promise.all([
-    db.from("calendario").select("id,titulo,marca,tipo,data,status,exemplo").gte("data", desde).then((r) => r.data || []),
+    db.from("calendario").select("*").gte("data", desde).then((r) => r.data || []),
     db.from("contratos").select("id,cliente,descricao,status,prazo_entrega,data_nf,prazo_dias,valor,parcela1,parcela2").then((r) => r.data || []),
     db.from("lembretes_rapidos").select("id,texto,quando,feito").eq("feito", false).then((r) => r.data || []),
   ]);
@@ -341,10 +342,20 @@ async function montarAgenda() {
   const diaInteiro = (uid: string, dia: string, titulo: string, desc = "") => ev.push(
     "BEGIN:VEVENT", `UID:${uid}@painel-ryan`, `DTSTAMP:${agora}`, `DTSTART;VALUE=DATE:${icsDia(dia)}`, `DTEND;VALUE=DATE:${icsDia(somaDias(dia.slice(0, 10), 1))}`,
     `SUMMARY:${icsTexto(titulo)}`, ...(desc ? [`DESCRIPTION:${icsTexto(desc)}`] : []), "TRANSP:TRANSPARENT", "END:VEVENT");
-  const ICONE: Record<string, string> = { gravar: "🎥 Gravar", editar: "✂️ Editar", postar: "📲 Postar" };
+  const ICONE: Record<string, string> = { gravar: "🎥 Gravar", editar: "✂️ Editar", postar: "📲 Postar", reuniao: "🤝 Reunião", compromisso: "📌" };
+  // Horário de Brasília (sem horário de verão desde 2019): 16:00 em Brasília = 19:00 UTC
+  const instante = (dia: string, hora: string) => new Date(`${dia.slice(0, 10)}T${String(hora).slice(0, 5)}:00-03:00`);
   for (const a of agenda) {
     if (a.exemplo) continue;
-    diaInteiro(`cal-${a.id}`, a.data, `${a.status === "feito" ? "✓ " : ""}${ICONE[a.tipo] || a.tipo}: ${a.titulo}${a.marca ? ` (${a.marca})` : ""}`);
+    const titulo = `${a.status === "feito" ? "✓ " : ""}${ICONE[a.tipo] || a.tipo}${a.tipo === "compromisso" ? "" : ":"} ${a.titulo}${a.marca ? ` (${a.marca})` : ""}`;
+    if (!a.hora) { diaInteiro(`cal-${a.id}`, a.data, titulo, a.local || ""); continue; }
+    // Com horário: entra na hora certa, com aviso 30 minutos antes
+    const ini = instante(a.data, a.hora);
+    const fim = a.hora_fim ? instante(a.data, a.hora_fim) : new Date(ini.getTime() + 60 * 60000);
+    ev.push("BEGIN:VEVENT", `UID:cal-${a.id}@painel-ryan`, `DTSTAMP:${agora}`, `DTSTART:${icsHora(ini)}`, `DTEND:${icsHora(fim)}`,
+      `SUMMARY:${icsTexto(titulo)}`, ...(a.local ? [`LOCATION:${icsTexto(a.local)}`] : []),
+      ...(a.status === "feito" ? [] : ["BEGIN:VALARM", "ACTION:DISPLAY", `DESCRIPTION:${icsTexto(titulo)}`, "TRIGGER:-PT30M", "END:VALARM"]),
+      "END:VEVENT");
   }
   for (const c of contratos) {
     if (PRODUCAO.includes(c.status) && c.prazo_entrega && c.prazo_entrega >= desde) diaInteiro(`entrega-${c.id}`, c.prazo_entrega, `📦 Entrega: ${c.cliente}`, c.descricao || "");
