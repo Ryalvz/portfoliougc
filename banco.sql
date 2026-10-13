@@ -644,3 +644,17 @@ end $$;
 drop trigger if exists contato_site_avisa on public.contatos_site;
 create trigger contato_site_avisa after insert on public.contatos_site
   for each row execute function public.avisar_contato_site();
+
+
+-- -------------------------------------------------------------
+-- 24. CALENDÁRIO COM HORÁRIO E OUTROS COMPROMISSOS
+-- Além de gravar, editar e postar: reunião e compromisso.
+--   hora / hora_fim: horário (opcional). Sem hora = o dia todo.
+--   local: endereço ou link da reunião (Meet, Zoom...)
+-- -------------------------------------------------------------
+alter table public.calendario drop constraint if exists calendario_tipo_check;
+alter table public.calendario add constraint calendario_tipo_check
+  check (tipo in ('gravar', 'editar', 'postar', 'reuniao', 'compromisso'));
+alter table public.calendario add column if not exists hora time;
+alter table public.calendario add column if not exists hora_fim time;
+alter table public.calendario add column if not exists local text check (char_length(local) <= 300);
