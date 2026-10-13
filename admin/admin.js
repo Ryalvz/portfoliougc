@@ -1065,6 +1065,7 @@ function desenharCalendario(el) {
       <div class="chips" role="group" aria-label="Filtrar por tipo">
         ${[["todos", "Todos"], ...TIPOS_CAL, ["prazo", "Prazos"]].map(([v, t]) => `<button class="chip" type="button" data-filtro="${v}" aria-pressed="${cal.filtro === v}">${t}</button>`).join("")}
       </div>
+      <button class="btn" type="button" id="agenda-iphone">${ic("calendario")}Ver no iPhone</button>
       <button class="btn primario" type="button" id="add-cal">${ic("mais")}Adicionar</button>
     </div>
     <div class="cal">
@@ -1087,6 +1088,7 @@ function desenharCalendario(el) {
   $("#mes-hoje").onclick = () => { const h = new Date(); cal.mes = new Date(h.getFullYear(), h.getMonth(), 1); desenhar(); };
   $$("[data-filtro]", el).forEach((b) => b.onclick = () => { cal.filtro = b.dataset.filtro; desenhar(); });
   $("#add-cal").onclick = () => formCalendario(null, hoje);
+  $("#agenda-iphone").onclick = abrirAgendaIphone;
 
   $("#cal-grade").addEventListener("click", (e) => {
     const ev = e.target.closest("[data-ev]");
@@ -1553,6 +1555,7 @@ function desenharTranscricoes(el) {
     <form class="cartao add-trans" id="form-add-trans" novalidate>
       <label for="novo-link"><b>Nova ideia</b> <span class="sub">cole o link de uma referência (YouTube, Instagram ou TikTok) e a transcrição vem sozinha</span></label>
       <div class="barra" style="margin:6px 0 0">
+        <input class="campo" id="novo-titulo" type="text" maxlength="150" placeholder="Título: do que se trata? (ex.: Receita fit da Oliv)" style="flex:1 1 100%" aria-label="Título da ideia">
         <input class="campo" id="novo-link" type="url" placeholder="https://www.instagram.com/reel/..." style="flex:1 1 260px">
         <select class="campo" id="novo-cat" aria-label="Divisão">${CATEGORIAS.map(([v, t]) => `<option value="${v}" ${v === catPadrao ? "selected" : ""}>${t}</option>`).join("")}</select>
         <select class="campo" id="novo-etapa" aria-label="Etapa">${ETAPAS.map(([v, t]) => `<option value="${v}">${t}</option>`).join("")}</select>
@@ -1729,7 +1732,7 @@ async function adicionarIdeia(link) {
     plataforma: link ? info.plataforma : null,
     categoria: $("#novo-cat").value,
     status: $("#novo-etapa").value,
-    titulo: link ? `Vídeo do ${NOME_PLATAFORMA[info.plataforma] || "link"} de ${dataBR(hojeISO()).slice(0, 5)}` : "Nova ideia"
+    titulo: ($("#novo-titulo") && $("#novo-titulo").value.trim()) || (link ? `Vídeo do ${NOME_PLATAFORMA[info.plataforma] || "link"} de ${dataBR(hojeISO()).slice(0, 5)}` : "Nova ideia")
   };
   const limpo = {};
   Object.keys(dados).forEach((k) => { if (temCampo("transcricoes", k)) limpo[k] = dados[k]; });
@@ -1740,7 +1743,7 @@ async function adicionarIdeia(link) {
   await recarregar("transcricoes");
   const novo = S.transcricoes.find((x) => String(x.id) === String(data.id));
   if (novo && link) transcreverVideo(novo);
-  if (!link) { const tt = $("#t-titulo"); if (tt) { tt.focus(); tt.select(); } }
+  if (!link && dados.titulo === "Nova ideia") { const tt = $("#t-titulo"); if (tt) { tt.focus(); tt.select(); } }
 }
 
 async function adicionarTranscricao(e) {
@@ -1925,7 +1928,11 @@ function pintarDetalheTrans() {
     }
     return ok;
   };
-  $("#t-salvar").onclick = () => salvar();
+  // Salvar volta para o quadro de ideias (não fica parado na ideia)
+  $("#t-salvar").onclick = async () => {
+    if (!(await salvar())) return;
+    trans.sel = null; desenhar(); window.scrollTo({ top: 0 });
+  };
   $("#t-cat").addEventListener("change", () => salvar(false));
   $("#t-etapa").addEventListener("change", async () => { if (await salvar(false)) avisar(`Movida para ${nomeEtapa($("#t-etapa").value)}.`); });
   $("#t-voltar").onclick = async () => {
@@ -3178,8 +3185,8 @@ function desenharInicio(el) {
   // Ideias em andamento e contatos novos
   const ideias = S.transcricoes.filter((t) => ["agora", "fazendo"].includes(etapaDe(t)))
     .sort((a, b) => (etapaDe(a) === "fazendo" ? 0 : 1) - (etapaDe(b) === "fazendo" ? 0 : 1)).slice(0, 5);
-  const leads = S.marcas.filter((m) => m.situacao === "lead" && !m.exemplo)
-    .sort((a, b) => String(b.criado_em || "").localeCompare(String(a.criado_em || ""))).slice(0, 4);
+  // Quem entrou em contato pelo site (formulário ou mídia kit) nos últimos 30 dias
+  const contatosRecentes = S.contatos_site.filter((c) => Date.now() - Date.parse(c.criado_em) < 30 * 864e5).slice(0, 5);
 
   const pctMeta = meta ? Math.min(100, pct(fat, meta)) : 0;
   el.innerHTML = `
@@ -3189,7 +3196,6 @@ function desenharInicio(el) {
         <button class="btn" type="button" data-rapido="lembrete">${ic("sino")}Lembrete</button>
         <button class="btn" type="button" data-rapido="ideia">${ic("mais")}Ideia</button>
         <button class="btn" type="button" data-rapido="ttk">${ic("mais")}Repasse TikTok</button>
-        <button class="btn primario" type="button" data-rapido="contrato">${ic("mais")}Contrato</button>
       </div>
     </div>
 
@@ -3240,13 +3246,13 @@ function desenharInicio(el) {
             : `<p class="vazio">Nenhuma ideia em "Fazer agora" ou "Fazendo".</p>`}
         </div>
         <div class="cartao">
-          <div class="barra" style="margin-bottom:6px"><h2 style="margin:0">Contatos novos</h2><span class="espaco"></span><button type="button" class="link-btn" data-ir="marcas">ver marcas</button></div>
-          ${leads.length
-            ? `<div class="lista-dia">${leads.map((m) => `<button type="button" class="item-dia" data-ir="marcas">
-                <span class="pilula p-lead">Lead</span>
-                <span class="item-dia-texto"><b>${esc(m.nome || "")}</b><small>${esc(m.instagram || m.email || "")}${m.criado_em ? ` · ${dataBR(String(m.criado_em).slice(0, 10)).slice(0, 5)}` : ""}</small></span>
+          <div class="barra" style="margin-bottom:6px"><h2 style="margin:0">Clientes que entraram em contato</h2><span class="espaco"></span><button type="button" class="link-btn" data-ir="portfolio">ver todos</button></div>
+          ${contatosRecentes.length
+            ? `<div class="lista-dia">${contatosRecentes.map((c) => `<button type="button" class="item-dia" data-ir="portfolio">
+                <span class="pilula ${c.visto ? "p-conversando" : "p-pendente"}">${c.visto ? (c.tipo === "midia_kit" ? "Mídia kit" : "Formulário") : "Novo"}</span>
+                <span class="item-dia-texto"><b>${esc(c.marca || c.nome)}</b><small>${esc(c.marca ? c.nome : c.email)} · ${dataBR(String(c.criado_em).slice(0, 10)).slice(0, 5)}</small></span>
               </button>`).join("")}</div>`
-            : `<p class="vazio">Nenhum contato novo pelo site.</p>`}
+            : `<p class="vazio">Ninguém entrou em contato pelo site nos últimos 30 dias.</p>`}
         </div>
       </div>
     </div>`;
@@ -3348,7 +3354,8 @@ const GOOGLE_CLIENT_ID = "317757639743-datc7u3k3d7hauj06q6viqefstliqkle.apps.goo
 const EMAIL_PROPOSTAS = "heyryan.ugc@gmail.com";
 const ESCOPOS_GMAIL = "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send";
 const PALAVRAS_PROPOSTA = ["ugc", "\"user generated\"", "proposta", "parceria", "publi", "publicidade", "publipost", "campanha", "collab", "collaboration", "briefing", "orçamento", "orcamento", "\"mídia kit\"", "\"media kit\"", "midiakit", "influenciador", "influencer", "creator", "\"criador de conteúdo\"", "permuta", "cachê", "cache", "job", "contratar", "freela"];
-const BUSCA_PROPOSTAS = `in:inbox newer_than:90d -category:promotions -category:social -category:forums -category:updates (${PALAVRAS_PROPOSTA.join(" OR ")})`;
+// Lê a caixa de entrada E a de spam (às vezes o e-mail da marca cai lá)
+const BUSCA_PROPOSTAS = `{in:inbox in:spam} newer_than:90d -category:promotions -category:social -category:forums -category:updates (${PALAVRAS_PROPOSTA.join(" OR ")})`;
 const DOMINIOS_PESSOAIS = ["gmail", "hotmail", "outlook", "yahoo", "icloud", "live", "bol", "uol", "terra", "me"];
 // Remetentes que são robôs ou envio em massa (o começo do e-mail, antes do @)
 const REMETENTE_ROBO = /^(no-?reply|nao-?responda|naoresponda|donotreply|do-?not-?reply|notifica|notification|news|newsletter|marketing|mkt|comunicad|todomundo|support|suporte|faleconosco|fale-conosco|atendimento|info|noticias|alert|update|mailer|bounce|hello|team|time|equipe|contato-?noreply|campanhas|digest|community|comunidade|creators?|parcerias-?noreply|plataforma)/i;
@@ -3494,7 +3501,7 @@ async function lerPropostas() {
   if (abaAtual === "propostas") desenhar();
   try {
     const q = BUSCA_PROPOSTAS + (gm.busca ? " " + gm.busca : "");
-    const lista = await gmailApi("messages?maxResults=60&q=" + encodeURIComponent(q));
+    const lista = await gmailApi("messages?maxResults=60&includeSpamTrash=true&q=" + encodeURIComponent(q));
     const ids = (lista.messages || []).map((x) => x.id);
     const campos = ["From", "To", "Cc", "Subject", "Date", "List-Unsubscribe", "List-Id", "Precedence", "Auto-Submitted", "Feedback-ID", "X-Feedback-Id", "X-SES-Outgoing", "X-Mailer", "X-Spam-Flag", "X-Spam-Status"].map((h) => "&metadataHeaders=" + h).join("");
     const msgs = await Promise.all(ids.map((id) => gmailApi(`messages/${id}?format=metadata${campos}`).catch(() => null)));
@@ -3502,6 +3509,7 @@ async function lerPropostas() {
       const de = lerRemetente(cabecalho(m, "From"));
       return { id: m.id, thread: m.threadId, de, assunto: cabecalho(m, "Subject") || "(sem assunto)", trecho: semEntidades(m.snippet || ""),
         data: new Date(Number(m.internalDate) || Date.parse(cabecalho(m, "Date")) || Date.now()),
+        spam: (m.labelIds || []).includes("SPAM"),
         novo: (m.labelIds || []).includes("UNREAD") && !adiado("lido-" + m.id), automatico: motivoAutomatico(m, de),
         importante: /proposta|or[cç]amento|briefing|contrato|campanha|parceria|pagamento|valor|cach[eê]|budget|rate|paid|collab/i.test(cabecalho(m, "Subject") + " " + (m.snippet || "")) };
     }).filter((x) => x.de.email !== EMAIL_PROPOSTAS)
@@ -3714,7 +3722,7 @@ function cartaoEmail(x) {
     <div class="email-corpo">
       <button type="button" class="email-abrir" data-acao-email="abrir">
         <span class="email-topo"><b>${esc(x.de.nome)}</b><span class="sub">${esc(x.de.email)}</span><span class="espaco"></span><span class="sub">${x.data.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}</span></span>
-        <span class="email-assunto">${x.novo ? `<i class="ponto-novo" aria-label="não lido"></i>` : ""}${esc(x.assunto)}${x.importante && !x.automatico ? ` <span class="etq amarela">importante</span>` : ""}</span>
+        <span class="email-assunto">${x.novo ? `<i class="ponto-novo" aria-label="não lido"></i>` : ""}${esc(x.assunto)}${x.importante && !x.automatico ? ` <span class="etq amarela">importante</span>` : ""}${x.spam ? ` <span class="etq vermelha">estava no spam</span>` : ""}</span>
         <span class="email-trecho">${esc(x.trecho)}</span>
       </button>
       ${x.automatico ? `<p class="sub" style="margin:0">escondido: ${esc(x.automatico)}</p>` : `<div class="lembrete-acoes" style="justify-content:flex-start">
@@ -4046,15 +4054,17 @@ function quadrosEntrada() {
   } else if (!gm.emails) {
     emails = `<p class="vazio">${gm.carregando ? "Lendo o seu Gmail..." : "Abrindo as propostas..."}</p>`;
   } else {
-    const lista = propostasVisiveis().sort((a, b) => (b.importante === true) - (a.importante === true) || (b.novo === true) - (a.novo === true) || b.data - a.data).slice(0, 3);
-    const naoLidas = propostasVisiveis().filter((x) => x.novo).length;
+    // Só os e-mails novos (não lidos); os antigos ficam na aba Propostas
+    const novas = propostasVisiveis().filter((x) => x.novo);
+    const lista = novas.sort((a, b) => (b.importante === true) - (a.importante === true) || b.data - a.data).slice(0, 4);
+    const naoLidas = novas.length;
     emails = lista.length
       ? `<p class="sub" style="margin:0 0 6px">${naoLidas ? `<b>${plural(naoLidas, "proposta não lida", "propostas não lidas")}</b> de pessoas` : "nenhuma proposta não lida"}</p>
         <div class="lista-dia">${lista.map((x) => `<button type="button" class="item-dia" data-inicio-email="${esc(x.id)}">
-          <span class="pilula ${x.importante ? "p-pendente" : "p-conversando"}">${x.importante ? "Importante" : x.novo ? "Nova" : "Proposta"}</span>
+          <span class="pilula ${x.spam ? "p-parada" : x.importante ? "p-pendente" : "p-conversando"}">${x.spam ? "Estava no spam" : x.importante ? "Importante" : x.novo ? "Nova" : "Proposta"}</span>
           <span class="item-dia-texto"><b>${x.novo ? "● " : ""}${esc(x.assunto)}</b><small>${esc(x.de.nome)} · ${x.data.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}</small></span>
         </button>`).join("")}</div>`
-      : `<p class="vazio">Nenhuma proposta de pessoa nos últimos 90 dias.</p>`;
+      : `<p class="vazio">Nenhum e-mail novo de proposta. Os antigos estão na aba Propostas.</p>`;
   }
   // Instagram
   let insta;
@@ -4721,4 +4731,34 @@ function ligarContatosSite(el) {
       if (await apagarLinha("contatos_site", c.id)) { S.contatos_site = S.contatos_site.filter((x) => x.id !== c.id); desenhar(); }
     }
   });
+}
+
+
+/* =============================================================
+   AGENDA NO IPHONE
+   O ajudante "lembretes" monta um calendário chamado "Trabalhos Ryan"
+   (gravações, edições, posts, entregas, pagamentos previstos e
+   lembretes). O iPhone assina esse calendário uma vez e ele se
+   atualiza sozinho, aparecendo junto com os outros calendários.
+   ============================================================= */
+async function abrirAgendaIphone() {
+  const d = abrirJanelaSimples("Ver no iPhone", `<p class="vazio">Gerando o seu calendário...</p>`);
+  const { data, error } = await db.functions.invoke("lembretes", { body: { acao: "agenda-link" } });
+  if (error || !data || !data.url) { $(".janela-corpo", d).innerHTML = `<p>${esc((data && data.erro) || "Não consegui gerar agora. Tente de novo em instantes.")}</p>`; return; }
+  const https = data.url, webcal = https.replace(/^https:/, "webcal:");
+  $(".janela-corpo", d).innerHTML = `
+    <p>O calendário <b>Trabalhos Ryan</b> mostra no app Calendário do iPhone tudo o que está aqui: gravações, edições, posts, entregas, pagamentos previstos e os seus lembretes. Ele se atualiza sozinho.</p>
+    <a class="btn primario" href="${esc(webcal)}" style="width:100%;justify-content:center;margin:6px 0 12px">${ic("calendario")}Assinar no iPhone</a>
+    <p class="sub">Abra esta tela <b>no iPhone</b> e toque no botão acima. Ele pergunta se você quer assinar: toque em <b>Assinar</b> e depois em <b>Adicionar</b>.</p>
+    <details class="agenda-manual"><summary>Se o botão não funcionar</summary>
+      <ol class="passos">
+        <li>Toque em <b>Copiar endereço</b> aqui embaixo.</li>
+        <li>No iPhone, abra <b>Ajustes &gt; Apps &gt; Calendário &gt; Contas &gt; Adicionar Conta &gt; Outra &gt; Adicionar Calendário Assinado</b>.</li>
+        <li>Cole o endereço, toque em <b>Seguinte</b> e depois em <b>Salvar</b>.</li>
+      </ol>
+      <button class="btn" type="button" id="copiar-agenda">${ic("transcricao")}Copiar endereço</button>
+    </details>
+    <p class="sub" style="margin-top:12px">No app Calendário, em <b>Calendários</b>, dá para ligar e desligar o "Trabalhos Ryan" e escolher a cor. Para ele atualizar mais rápido: Ajustes &gt; Apps &gt; Calendário &gt; Contas &gt; Buscar &gt; A cada 15 minutos.</p>
+    <p class="sub">Esse endereço é só seu. Não compartilhe.</p>`;
+  $("#copiar-agenda", d).onclick = async () => { try { await navigator.clipboard.writeText(https); avisar("Endereço copiado."); } catch (_) { avisar("Não consegui copiar.", true); } };
 }
