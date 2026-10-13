@@ -77,7 +77,7 @@ function traduzErro(e) {
 const ESQUEMA = {
   videos: ["id", "titulo", "link", "capa", "nicho", "formato", "marca", "destaque", "ordem", "visivel", "exemplo"],
   marcas: ["id", "nome", "instagram", "email", "telefone", "situacao", "nicho", "favorita", "fixada", "selecionada", "email_enviado_em", "obs", "ultimo_contato", "exemplo", "criado_em"],
-  calendario: ["id", "titulo", "marca", "tipo", "data", "status", "exemplo"],
+  calendario: ["id", "titulo", "marca", "tipo", "data", "hora", "hora_fim", "local", "status", "exemplo"],
   campanhas: ["id", "campanha", "cliente", "tipo", "status", "qtd", "valor", "prazo", "pagamento", "ativa", "favorita", "exemplo"],
   comissoes_ttk: ["id", "data", "valor", "gmv", "itens", "obs"],
   metas: ["ano", "mes", "valor"],
@@ -1008,12 +1008,15 @@ function formMarca(m, extra = {}) {
 /* =============================================================
    ABA 3: CALENDÁRIO
    ============================================================= */
-const TIPOS_CAL = [["gravar", "Gravar"], ["editar", "Editar"], ["postar", "Postar"]];
+const TIPOS_CAL = [["gravar", "Gravar"], ["editar", "Editar"], ["postar", "Postar"], ["reuniao", "Reunião"], ["compromisso", "Compromisso"]];
+// "16:00:00" vira "16h", "16:30:00" vira "16h30"
+const horaCurta = (h) => { if (!h) return ""; const [hh, mm] = String(h).split(":"); return `${Number(hh)}h${mm && mm !== "00" ? mm : ""}`; };
 const cal = { mes: new Date(new Date().getFullYear(), new Date().getMonth(), 1), filtro: "todos" };
 
 function eventosCalendario() {
   const itens = S.calendario.filter((c) => c.data).map((c) => ({
     tipo: c.tipo || "gravar", titulo: c.titulo, marca: c.marca, data: String(c.data).slice(0, 10),
+    hora: c.hora ? String(c.hora).slice(0, 5) : "", horaFim: c.hora_fim ? String(c.hora_fim).slice(0, 5) : "", local: c.local || "",
     feito: c.status === "feito", origem: "calendario", ref: c
   }));
   // Prazos de entrega das campanhas (tabela contratos)
@@ -1021,7 +1024,8 @@ function eventosCalendario() {
     tipo: "prazo", titulo: "Entrega: " + c.cliente, marca: c.descricao, data: String(c.prazo_entrega).slice(0, 10),
     feito: c.status === "Entregue" || c.status === "Pago", origem: "campanha", ref: c
   }));
-  return itens.concat(prazos);
+  // No mesmo dia: primeiro o que tem horário (em ordem), depois o resto
+  return itens.concat(prazos).sort((a, b) => a.data.localeCompare(b.data) || (a.hora || "99").localeCompare(b.hora || "99"));
 }
 
 function desenharCalendario(el) {
@@ -1048,7 +1052,7 @@ function desenharCalendario(el) {
     celulas += `<div class="dia ${d.getMonth() !== mes ? "fora" : ""} ${iso === hoje ? "hoje" : ""}" data-data="${iso}">
       <span class="dia-num">${d.getDate()}</span>
       <button class="dia-mais" type="button" data-novo="${iso}" aria-label="Adicionar em ${dataBR(iso)}">${ic("mais")}</button>
-      ${lista.slice(0, 3).map((e, k) => `<button type="button" class="item-cal t-${e.tipo} ${e.feito ? "feito" : ""}" data-ev="${iso}|${k}" title="${esc(e.titulo)}">${esc(e.titulo)}</button>`).join("")}
+      ${lista.slice(0, 3).map((e, k) => `<button type="button" class="item-cal t-${e.tipo} ${e.feito ? "feito" : ""}" data-ev="${iso}|${k}" title="${esc((e.hora ? horaCurta(e.hora) + " " : "") + e.titulo)}">${e.hora ? `<b class="hora-cal">${horaCurta(e.hora)}</b> ` : ""}${esc(e.titulo)}</button>`).join("")}
       ${extra > 0 ? `<button type="button" class="mais-itens" data-dia="${iso}">+${extra} mais</button>` : ""}
     </div>`;
   }
@@ -1114,7 +1118,7 @@ function abrirEvento(e) { if (e.origem === "calendario") formCalendario(e.ref); 
 function abrirDia(iso, lista) {
   const d = abrirJanelaSimples(
     esc(deISO(iso).toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })),
-    `<div style="display:grid;gap:4px">${lista.map((e, k) => `<button type="button" class="item-cal t-${e.tipo} ${e.feito ? "feito" : ""}" data-k="${k}" style="font-size:13px;padding:6px 8px">${esc(nomeTipo(e.tipo))}: ${esc(e.titulo)}${e.marca ? " · " + esc(e.marca) : ""}</button>`).join("")}</div>`,
+    `<div style="display:grid;gap:4px">${lista.map((e, k) => `<button type="button" class="item-cal t-${e.tipo} ${e.feito ? "feito" : ""}" data-k="${k}" style="font-size:13px;padding:6px 8px">${e.hora ? `<b>${horaCurta(e.hora)}${e.horaFim ? " às " + horaCurta(e.horaFim) : ""}</b> · ` : ""}${esc(nomeTipo(e.tipo))}: ${esc(e.titulo)}${e.marca ? " · " + esc(e.marca) : ""}${e.local ? " · " + esc(e.local) : ""}</button>`).join("")}</div>`,
     `<button type="button" class="btn primario" data-novo>${ic("mais")}Adicionar neste dia</button>`
   );
   $$("[data-k]", d).forEach((b) => b.onclick = () => { d.close(); abrirEvento(lista[Number(b.dataset.k)]); });
@@ -1123,17 +1127,23 @@ function abrirDia(iso, lista) {
 
 function formCalendario(c, dataPadrao) {
   abrirForm({
-    titulo: c ? "Editar tarefa" : "Nova tarefa no calendário",
+    titulo: c ? "Editar compromisso" : "Novo compromisso no calendário",
     tabela: "calendario",
-    valores: c || { data: dataPadrao, tipo: cal.filtro !== "todos" && cal.filtro !== "prazo" ? cal.filtro : "gravar", status: "a fazer" },
+    valores: c ? { ...c, hora: c.hora ? String(c.hora).slice(0, 5) : "", hora_fim: c.hora_fim ? String(c.hora_fim).slice(0, 5) : "" }
+      : { data: dataPadrao, tipo: cal.filtro !== "todos" && cal.filtro !== "prazo" ? cal.filtro : "gravar", status: "a fazer" },
     campos: [
-      { n: "titulo", r: "O que fazer", req: true, inteiro: true },
-      { n: "marca", r: "Marca" },
+      { n: "titulo", r: "O que é", req: true, inteiro: true, ph: "Ex.: Reunião com a Canva" },
       { n: "tipo", r: "Tipo", t: "select", op: TIPOS_CAL },
+      { n: "marca", r: "Marca" },
       { n: "data", r: "Data", t: "date", req: true },
-      { n: "status", r: "Situação", t: "select", op: [["a fazer", "A fazer"], ["feito", "Feito"]] }
+      { n: "status", r: "Situação", t: "select", op: [["a fazer", "A fazer"], ["feito", "Feito"]] },
+      { n: "hora", r: "Começa às (opcional)", t: "time" },
+      { n: "hora_fim", r: "Termina às (opcional)", t: "time" },
+      { n: "local", r: "Local ou link (opcional)", inteiro: true, ph: "Endereço, Google Meet, Zoom..." }
     ],
-    aoSalvar: async (d) => { const ok = await gravar("calendario", d, c ? c.id : null); if (ok) recarregar("calendario"); return ok; },
+    aoSalvar: async (d) => {
+      if (d.hora_fim && !d.hora) { avisar("Coloque também a hora de começo.", true); return false; }
+      if (d.hora && d.hora_fim && d.hora_fim <= d.hora) { avisar("A hora de término precisa ser depois da hora de começo.", true); return false; } const ok = await gravar("calendario", d, c ? c.id : null); if (ok) recarregar("calendario"); return ok; },
     aoApagar: c ? async () => { const ok = await apagarLinha("calendario", c.id); if (ok) recarregar("calendario"); return ok; } : null
   });
 }
@@ -2928,7 +2938,7 @@ function calcularLembretes() {
     .forEach((a) => {
       const k = `cal-${a.id}`, data = String(a.data).slice(0, 10);
       if (adiado(k)) return;
-      const oque = `<b>${esc((TIPOS_CAL.find((t) => t[0] === a.tipo) || [0, a.tipo])[1])}: ${esc(a.titulo)}</b>${a.marca ? ` (${esc(a.marca)})` : ""}`;
+      const oque = `<b>${a.hora ? horaCurta(a.hora) + " · " : ""}${esc((TIPOS_CAL.find((t) => t[0] === a.tipo) || [0, a.tipo])[1])}: ${esc(a.titulo)}</b>${a.marca ? ` (${esc(a.marca)})` : ""}`;
       L.push({ aba: "calendario", ic: "calendario", nivel: data < hoje ? "alerta" : "",
         texto: data === hoje ? `Na sua agenda de hoje: ${oque}.` : `Ficou pra trás no dia ${dataBR(data).slice(0, 5)}: ${oque}.`,
         acoes: [["Já fiz", true, async () => { if (await gravar("calendario", { status: "feito" }, a.id)) { avisar("Marcado como feito."); recarregar("calendario"); } }],
@@ -3177,8 +3187,8 @@ function desenharInicio(el) {
   const deHoje = eventos.filter((e) => e.data === hoje);
   const proximos = eventos.filter((e) => e.data > hoje && e.data <= somaDiasISO(7)).sort((a, b) => a.data.localeCompare(b.data));
   const linhaEvento = (e, extra = "") => `<button type="button" class="item-dia" data-evento="${esc(e.origem)}:${esc(e.ref.id)}">
-      <span class="pilula ${e.tipo === "prazo" ? "p-pendente" : "p-conversando"}">${esc(nomeTipo(e.tipo))}</span>
-      <span class="item-dia-texto"><b>${esc(e.titulo || "")}</b>${e.marca ? `<small>${esc(e.marca)}</small>` : ""}</span>
+      <span class="pilula item-cal t-${esc(e.tipo)}" style="width:auto;margin:0">${e.hora ? horaCurta(e.hora) + " · " : ""}${esc(nomeTipo(e.tipo))}</span>
+      <span class="item-dia-texto"><b>${esc(e.titulo || "")}</b>${e.marca || e.local ? `<small>${esc([e.marca, e.local].filter(Boolean).join(" · "))}</small>` : ""}</span>
       ${extra}
     </button>`;
 
