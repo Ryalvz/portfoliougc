@@ -11,6 +11,9 @@
 //   Gmail ou o Instagram se desconectarem.
 //   acao "teste" (botão no painel, só com o login do Ryan)
 //   GET: devolve a chave pública que o celular usa para se inscrever
+//   GET ?agenda=CODIGO: o calendário "Trabalhos Ryan" para o iPhone assinar
+//     (gravações, edições, posts, entregas, pagamentos e lembretes)
+//   acao "agenda-link" (só com o login do Ryan): devolve o endereço desse calendário
 //
 // Nenhuma chave secreta fica aqui. A chave de assinatura das
 // notificações é criada na primeira vez e guardada na tabela
@@ -208,7 +211,7 @@ async function conferirConexoes(hoje: string): Promise<Lembrete[]> {
 const GOOGLE_CLIENT_ID = "317757639743-datc7u3k3d7hauj06q6viqefstliqkle.apps.googleusercontent.com";
 const EMAIL_PROPOSTAS = "heyryan.ugc@gmail.com";
 const PALAVRAS_PROPOSTA = ["ugc", "\"user generated\"", "proposta", "parceria", "publi", "publicidade", "publipost", "campanha", "collab", "collaboration", "briefing", "orçamento", "orcamento", "\"mídia kit\"", "\"media kit\"", "midiakit", "influenciador", "influencer", "creator", "\"criador de conteúdo\"", "permuta", "cachê", "cache", "job", "contratar", "freela"];
-const BUSCA_NOVAS = `in:inbox is:unread newer_than:1d -category:promotions -category:social -category:forums -category:updates (${PALAVRAS_PROPOSTA.join(" OR ")})`;
+const BUSCA_NOVAS = `{in:inbox in:spam} is:unread newer_than:1d -category:promotions -category:social -category:forums -category:updates (${PALAVRAS_PROPOSTA.join(" OR ")})`;
 // As mesmas regras do painel para separar gente de robô
 const REMETENTE_ROBO = /^(no-?reply|nao-?responda|naoresponda|donotreply|do-?not-?reply|notifica|notification|news|newsletter|marketing|mkt|comunicad|todomundo|support|suporte|faleconosco|fale-conosco|atendimento|info|noticias|alert|update|mailer|bounce|hello|team|time|equipe|contato-?noreply|campanhas|digest|community|comunidade|creators?|parcerias-?noreply|plataforma)/i;
 const ASSUNTO_ROBO = /\[#?\d{3,}\]|novo dispositivo|fez login|c[oó]digo de (verifica|acesso|seguran)|verify|verifica[cç][aã]o|redefinir senha|password|fatura|boleto|pix|pagamento (recebido|aprovado|confirmado)|recibo|seu pedido|pedido #|inscri[cç][oõ]es abertas|newsletter|webinar|edi[cç][aã]o #?\d|#\d{2,}\b|grupo do whatsapp/i;
@@ -234,7 +237,8 @@ async function propostasNovas() {
     if (!r.ok) throw new Error("Gmail " + r.status);
     return r.json();
   };
-  const lista = await api("messages?maxResults=20&q=" + encodeURIComponent(BUSCA_NOVAS));
+  // Lê também a caixa de spam (às vezes o e-mail da marca cai lá)
+  const lista = await api("messages?maxResults=20&includeSpamTrash=true&q=" + encodeURIComponent(BUSCA_NOVAS));
   const ids: string[] = (lista.messages || []).map((x: any) => x.id);
   if (!ids.length) return [];
   const [{ data: avisados }, { data: adiados }] = await Promise.all([
@@ -314,15 +318,76 @@ async function ehOAdmin(req: Request) {
   }
 }
 
+/* ---------- Calendário para o iPhone (formato .ics) ---------- */
+async function codigoDaAgenda(criar: boolean) {
+  const { data } = await db.from("config_privada").select("valor").eq("chave", "agenda_codigo").maybeSingle();
+  if (data?.valor || !criar) return data?.valor || "";
+  const novo = [...crypto.getRandomValues(new Uint8Array(24))].map((b) => b.toString(16).padStart(2, "0")).join("");
+  await db.from("config_privada").upsert({ chave: "agenda_codigo", valor: novo }, { onConflict: "chave" });
+  return novo;
+}
+const icsTexto = (t: string) => String(t || "").replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
+const icsDia = (iso: string) => iso.slice(0, 10).replace(/-/g, "");
+const icsHora = (d: Date) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+async function montarAgenda() {
+  const hoje = hojeSP(), desde = somaDias(hoje, -60);
+  const [agenda, contratos, rapidos] = await Promise.all([
+    db.from("calendario").select("id,titulo,marca,tipo,data,status,exemplo").gte("data", desde).then((r) => r.data || []),
+    db.from("contratos").select("id,cliente,descricao,status,prazo_entrega,data_nf,prazo_dias,valor,parcela1,parcela2").then((r) => r.data || []),
+    db.from("lembretes_rapidos").select("id,texto,quando,feito").eq("feito", false).then((r) => r.data || []),
+  ]);
+  const ev: string[] = [];
+  const agora = icsHora(new Date());
+  const diaInteiro = (uid: string, dia: string, titulo: string, desc = "") => ev.push(
+    "BEGIN:VEVENT", `UID:${uid}@painel-ryan`, `DTSTAMP:${agora}`, `DTSTART;VALUE=DATE:${icsDia(dia)}`, `DTEND;VALUE=DATE:${icsDia(somaDias(dia.slice(0, 10), 1))}`,
+    `SUMMARY:${icsTexto(titulo)}`, ...(desc ? [`DESCRIPTION:${icsTexto(desc)}`] : []), "TRANSP:TRANSPARENT", "END:VEVENT");
+  const ICONE: Record<string, string> = { gravar: "🎥 Gravar", editar: "✂️ Editar", postar: "📲 Postar" };
+  for (const a of agenda) {
+    if (a.exemplo) continue;
+    diaInteiro(`cal-${a.id}`, a.data, `${a.status === "feito" ? "✓ " : ""}${ICONE[a.tipo] || a.tipo}: ${a.titulo}${a.marca ? ` (${a.marca})` : ""}`);
+  }
+  for (const c of contratos) {
+    if (PRODUCAO.includes(c.status) && c.prazo_entrega && c.prazo_entrega >= desde) diaInteiro(`entrega-${c.id}`, c.prazo_entrega, `📦 Entrega: ${c.cliente}`, c.descricao || "");
+    const fechado = PRODUCAO.includes(c.status) || DINHEIRO.includes(c.status);
+    const saldo = fechado ? Math.max(0, n2(c.valor) - n2(c.parcela1) - n2(c.parcela2)) : 0;
+    if (fechado && c.status !== "Pago" && saldo > 0 && c.data_nf && c.prazo_dias != null) {
+      const prev = somaDias(String(c.data_nf).slice(0, 10), Number(c.prazo_dias));
+      if (prev >= desde) diaInteiro(`pagamento-${c.id}`, prev, `💰 Pagamento previsto: ${c.cliente}`);
+    }
+  }
+  for (const r of rapidos) {
+    const ini = new Date(r.quando), fim = new Date(ini.getTime() + 15 * 60000);
+    ev.push("BEGIN:VEVENT", `UID:lembrete-${r.id}@painel-ryan`, `DTSTAMP:${agora}`, `DTSTART:${icsHora(ini)}`, `DTEND:${icsHora(fim)}`, `SUMMARY:${icsTexto("🔔 " + r.texto)}`, "END:VEVENT");
+  }
+  return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Painel Ryan Alves//Agenda//PT", "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
+    "X-WR-CALNAME:Trabalhos Ryan", "X-WR-TIMEZONE:America/Sao_Paulo", "X-APPLE-CALENDAR-COLOR:#1F3FC3", "REFRESH-INTERVAL;VALUE=DURATION:PT1H", "X-PUBLISHED-TTL:PT1H",
+    ...ev, "END:VCALENDAR"].join("\r\n");
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   try {
-    if (req.method === "GET") return resposta({ chave_publica: await prepararChaves() });
+    if (req.method === "GET") {
+      const codigo = new URL(req.url).searchParams.get("agenda");
+      if (codigo !== null) {
+        const certo = await codigoDaAgenda(false);
+        if (!certo || codigo !== certo) return new Response("Calendário não encontrado.", { status: 404, headers: cors });
+        return new Response(await montarAgenda(), { headers: { ...cors, "Content-Type": "text/calendar; charset=utf-8", "Cache-Control": "no-cache" } });
+      }
+      return resposta({ chave_publica: await prepararChaves() });
+    }
     if (req.method !== "POST") return resposta({ erro: "Use GET ou POST." }, 405);
 
     let corpo: any = {};
     try { corpo = await req.json(); } catch (_) { /* corpo vazio */ }
     const hoje = hojeSP();
+
+    // Endereço do calendário "Trabalhos Ryan" (só para o dono do painel)
+    if (corpo.acao === "agenda-link") {
+      if (!(await ehOAdmin(req))) return resposta({ erro: "Só o dono do painel pode ver o endereço da agenda." }, 401);
+      const codigo = await codigoDaAgenda(true);
+      return resposta({ url: `${URL_BANCO}/functions/v1/lembretes?agenda=${codigo}` });
+    }
 
     // Botão "Mandar notificação de teste" do painel
     if (corpo.acao === "teste") {
