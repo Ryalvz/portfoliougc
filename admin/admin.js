@@ -86,7 +86,7 @@ const ESQUEMA = {
   lembretes_rapidos: ["id", "texto", "quando", "feito", "avisado", "criado_em"],
   contatos_site: ["id", "criado_em", "tipo", "nome", "marca", "email", "whats", "mensagem", "visto"],
   contratos: ["id", "cliente", "tipo", "descricao", "valor", "mes", "ano", "data_nf", "prazo_dias", "status", "parcela1", "data_p1", "parcela2", "data_p2", "obs", "qtd", "prazo_entrega", "favorita", "criado_em"],
-  transcricoes: ["id", "criado_em", "link", "plataforma", "categoria", "status", "titulo", "transcricao", "transcricao_original", "idioma_original", "minha_versao", "observacoes"],
+  transcricoes: ["id", "criado_em", "link", "plataforma", "categoria", "status", "titulo", "transcricao", "transcricao_original", "idioma_original", "minha_versao", "observacoes", "de_quem", "perfil", "tags", "legenda", "postado_em", "andamento", "erro"],
   marcados: ["chave", "marcado"],
   visitas: ["id", "data", "pagina", "origem"]
 };
@@ -1452,7 +1452,36 @@ const CATEGORIAS = [["tiktok_shop", "TikTok Shop"], ["organico", "Ideias orgâni
 const nomeCategoria = (c) => (CATEGORIAS.find((x) => x[0] === c) || [c, "Sem divisão"])[1];
 const NOME_PLATAFORMA = { youtube: "YouTube", instagram: "Instagram", tiktok: "TikTok", outro: "Link" };
 const NOME_IDIOMA = { en: "inglês", es: "espanhol", fr: "francês", it: "italiano", de: "alemão", ja: "japonês", ko: "coreano", zh: "chinês", ru: "russo", hi: "hindi", ar: "árabe", tr: "turco", nl: "holandês", pl: "polonês" };
-const trans = { categoria: "todas", busca: "", sel: null };
+const trans = { categoria: "todas", busca: "", sel: null, dequem: "todos", tag: "", aviso: "", saldo: null, saldoEm: 0 };
+const DE_QUEM = [["outra", "De outra"], ["minha", "Meu"]];
+const nomeDeQuem = (d) => d === "minha" ? "Meu" : "De outra";
+const tagsDe = (t) => Array.isArray(t.tags) ? t.tags.filter(Boolean) : [];
+
+// Limpa o link antes de mandar: /reels/ vira /reel/, e saem igsh, utm e outros rastreadores
+function limparLink(link) {
+  let u;
+  try { u = new URL(String(link || "").trim()); } catch (_) { return String(link || "").trim(); }
+  const h = u.hostname.replace(/^(www|m)\./, "");
+  if (/instagram\.com$/.test(h)) { u.pathname = u.pathname.replace(/\/reels\//, "/reel/"); u.search = ""; }
+  else if (/tiktok\.com$/.test(h)) u.search = "";
+  else if (/youtube\.com$|youtu\.be$/.test(h)) {
+    const v = u.searchParams.get("v");
+    u.search = v ? "?v=" + encodeURIComponent(v) : "";
+  } else [...u.searchParams.keys()].forEach((k) => { if (/^(utm_|igsh|si$|fbclid|gclid)/i.test(k)) u.searchParams.delete(k); });
+  u.hash = "";
+  return u.toString();
+}
+// O @ só aparece no link em instagram.com/<perfil>/reel/<id> e tiktok.com/@<perfil>/...
+function perfilDoLink(link) {
+  try {
+    const u = new URL(link);
+    const tk = u.pathname.match(/^\/@([^/]+)/);
+    if (/tiktok\.com$/.test(u.hostname) && tk) return "@" + tk[1];
+    const ig = u.pathname.match(/^\/([^/]+)\/(reel|reels|p|tv)\//);
+    if (/instagram\.com$/.test(u.hostname) && ig && !["reel", "reels", "p", "tv", "stories"].includes(ig[1])) return "@" + ig[1];
+  } catch (_) {}
+  return "";
+}
 
 // Descobre a plataforma e o endereço para mostrar o vídeo dentro do painel
 function videoDoLink(link) {
@@ -1564,34 +1593,44 @@ function desenharTranscricoes(el) {
   const caixa = $("#trans-conteudo");
   if (trans.sel) { caixa.innerHTML = `<div id="detalhe-trans"></div>`; pintarDetalheTrans(); return; }
 
+  const todasTags = [...new Set(S.transcricoes.flatMap(tagsDe))].sort((a, b) => a.localeCompare(b, "pt"));
   caixa.innerHTML = `
-    <form class="cartao add-trans" id="form-add-trans" novalidate>
-      <label for="novo-link"><b>Nova ideia</b> <span class="sub">cole o link de uma referência (YouTube, Instagram ou TikTok) e a transcrição vem sozinha</span></label>
-      <div class="barra" style="margin:6px 0 0">
-        <input class="campo" id="novo-titulo" type="text" maxlength="150" placeholder="Título: do que se trata? (ex.: Receita fit da Oliv)" style="flex:1 1 100%" aria-label="Título da ideia">
-        <input class="campo" id="novo-link" type="url" placeholder="https://www.instagram.com/reel/..." style="flex:1 1 260px">
+    <section class="cartao rot-topo">
+      <h2 class="rot-titulo">📜 Roteiros</h2>
+      <p class="rot-frase">Cole o link de um reel e eu transcrevo. Serve pros seus e pros das outras, com etiqueta pra você separar.</p>
+      <form id="form-add-trans" class="rot-linha" novalidate>
+        <input class="campo" id="novo-link" type="url" inputmode="url" autocomplete="off" placeholder="Cole aqui: instagram.com/reel/... · tiktok.com/... · youtube.com/..." aria-label="Link do vídeo">
+        <select class="campo" id="novo-dequem" aria-label="De quem é o vídeo"><option value="outra">De outra pessoa</option><option value="minha">Meu</option></select>
+        <button class="btn primario" type="submit">🎙️ Transcrever</button>
+        <button class="btn" type="button" id="ideia-sem-link">✍️ + Escrever na mão</button>
+      </form>
+      <div class="rot-linha rot-linha-extra">
+        <input class="campo" id="novo-titulo" type="text" maxlength="150" placeholder="Título (opcional): do que se trata?" aria-label="Título">
         <select class="campo" id="novo-cat" aria-label="Divisão">${CATEGORIAS.map(([v, t]) => `<option value="${v}" ${v === catPadrao ? "selected" : ""}>${t}</option>`).join("")}</select>
         <select class="campo" id="novo-etapa" aria-label="Etapa">${ETAPAS.map(([v, t]) => `<option value="${v}">${t}</option>`).join("")}</select>
-        <button class="btn primario" type="submit">${ic("mais")}Adicionar</button>
-        <button class="btn" type="button" id="ideia-sem-link">Nova ideia sem link</button>
       </div>
-    </form>
+      <div id="rot-aviso" class="rot-aviso" aria-live="polite">${trans.aviso || ""}</div>
+      <div class="rot-rodape"><span id="rot-saldo" class="sub"></span><span class="espaco"></span><button class="btn" type="button" id="rot-estudar">🧠 Estudar com o Claude</button></div>
+    </section>
     ${trans.categoria === "todas" ? "" : `<div id="painel-ideias"></div>`}
-    <div class="barra" style="margin:4px 0 10px">
-      <div class="busca" style="max-width:360px">${ic("busca")}<input type="search" id="busca-trans" placeholder="Buscar no título, roteiro ou observação" value="${esc(trans.busca)}" aria-label="Buscar ideias"></div>
-      <span class="sub">${trans.categoria === "todas" ? "todas as suas ideias. Clique numa para abrir, ou entre numa divisão para ver as etapas" : "arraste os cartões entre as colunas, ou troque a etapa no próprio cartão"}</span>
+    <div class="barra rot-filtros">
+      <div class="busca" style="max-width:340px">${ic("busca")}<input type="search" id="busca-trans" placeholder="Buscar na transcrição, perfil, título ou notas" value="${esc(trans.busca)}" aria-label="Buscar roteiros"></div>
+      <div class="chips" role="group" aria-label="Filtrar">
+        ${[["todos", "Todos"], ["minha", "Meus"], ["outra", "De outras"]].map(([v, t]) => `<button class="chip" type="button" data-dequem="${v}" aria-pressed="${trans.dequem === v && !trans.tag}">${t}</button>`).join("")}
+        ${todasTags.map((tg) => `<button class="chip" type="button" data-tag="${esc(tg)}" aria-pressed="${trans.tag === tg}">#${esc(tg)}</button>`).join("")}
+      </div>
     </div>
-    ${trans.categoria === "todas" ? `<div class="mural" id="mural"></div>` : `<div class="quadro" id="quadro"></div>`}`;
+    ${trans.categoria === "todas" ? `<div class="rot-biblioteca" id="mural"></div>` : `<p class="sub" style="margin:0 0 8px">Arraste os cartões entre as colunas, ou troque a etapa no próprio cartão.</p><div class="quadro" id="quadro"></div>`}`;
 
   $("#form-add-trans").addEventListener("submit", adicionarTranscricao);
   $("#ideia-sem-link").onclick = () => adicionarIdeia(null);
+  $("#rot-estudar").onclick = estudarComClaude;
+  $$("[data-dequem]", caixa).forEach((b) => b.onclick = () => { trans.dequem = b.dataset.dequem; trans.tag = ""; desenhar(); });
+  $$("[data-tag]", caixa).forEach((b) => b.onclick = () => { trans.tag = trans.tag === b.dataset.tag ? "" : b.dataset.tag; desenhar(); });
+  pintarSaldoSupadata();
   $("#busca-trans").addEventListener("input", (e) => { trans.busca = e.target.value; pintarListaTrans(); });
   if ($("#quadro")) ligarQuadro($("#quadro"));
-  if ($("#mural")) {
-    const mural = $("#mural");
-    mural.addEventListener("click", (e) => { const p = e.target.closest(".postit"); if (p) abrirIdeia(p.dataset.trans); });
-    mural.addEventListener("keydown", (e) => { const p = e.target.closest(".postit"); if (p && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); abrirIdeia(p.dataset.trans); } });
-  }
+  if ($("#mural")) ligarBiblioteca($("#mural"));
   pintarListaTrans();
 }
 
@@ -1599,7 +1638,9 @@ function filtrarTrans() {
   const q = trans.busca.toLowerCase();
   return S.transcricoes.filter((t) => {
     if (trans.categoria !== "todas" && t.categoria !== trans.categoria) return false;
-    return !q || [t.titulo, t.transcricao, t.minha_versao, t.observacoes, t.link].some((x) => String(x || "").toLowerCase().includes(q));
+    if (trans.dequem !== "todos" && (t.de_quem || "outra") !== trans.dequem) return false;
+    if (trans.tag && !tagsDe(t).includes(trans.tag)) return false;
+    return !q || [t.titulo, t.transcricao, t.minha_versao, t.observacoes, t.link, t.perfil, t.legenda, tagsDe(t).join(" ")].some((x) => String(x || "").toLowerCase().includes(q));
   });
 }
 
@@ -1609,8 +1650,8 @@ function pintarListaTrans() {
   const mural = $("#mural");
   if (mural) {
     const ideias = filtrarTrans();
-    mural.innerHTML = ideias.length ? ideias.map(postit).join("")
-      : `<p class="vazio" style="grid-column:1/-1">${S.transcricoes.length ? "Nenhuma ideia com essa busca." : "Seu mural está vazio. Cole o link de uma referência aqui em cima ou crie uma ideia sem link."}</p>`;
+    mural.innerHTML = ideias.length ? ideias.map(cartaoRoteiro).join("")
+      : `<p class="vazio">${S.transcricoes.length ? "Nenhum roteiro com esse filtro." : "Sua biblioteca está vazia. Cole o link de um reel aqui em cima ou escreva um roteiro na mão."}</p>`;
     return;
   }
   const quadro = $("#quadro");
@@ -1647,6 +1688,8 @@ function cartaoIdeia(t) {
     <div class="item-trans-topo">
       ${t.link ? `<span class="pilula p-plat-${esc(t.plataforma || "outro")}">${esc(NOME_PLATAFORMA[t.plataforma] || "Link")}</span>` : `<span class="pilula p-propria">Ideia própria</span>`}
       ${trans.categoria === "todas" ? `<span class="pilula p-cat">${esc(nomeCategoria(t.categoria))}</span>` : ""}
+      <span class="etq-dequem ${t.de_quem === "minha" ? "minha" : "outra"}">${nomeDeQuem(t.de_quem)}</span>
+      ${t.andamento === "processando" ? `<span class="pilula p-pendente">⏳ ouvindo</span>` : t.andamento === "falhou" ? `<span class="pilula p-parada">falhou</span>` : ""}
       ${t.minha_versao ? `<span class="pilula p-versao" title="Já tem a sua versão do roteiro">minha versão</span>` : ""}
     </div>
     <b>${esc(t.titulo || "Sem título")}</b>
@@ -1745,14 +1788,18 @@ async function adicionarIdeia(link) {
     plataforma: link ? info.plataforma : null,
     categoria: $("#novo-cat").value,
     status: $("#novo-etapa").value,
-    titulo: ($("#novo-titulo") && $("#novo-titulo").value.trim()) || (link ? `Vídeo do ${NOME_PLATAFORMA[info.plataforma] || "link"} de ${dataBR(hojeISO()).slice(0, 5)}` : "Nova ideia")
+    titulo: ($("#novo-titulo") && $("#novo-titulo").value.trim()) || (link ? null : "Nova ideia"),
+    de_quem: ($("#novo-dequem") && $("#novo-dequem").value) || "outra",
+    perfil: link ? perfilDoLink(link) || null : null,
+    andamento: link ? "processando" : "pronto"
   };
   const limpo = {};
   Object.keys(dados).forEach((k) => { if (temCampo("transcricoes", k)) limpo[k] = dados[k]; });
   const { data, error } = await db.from("transcricoes").insert(limpo).select("id").single();
   if (error) { avisar(traduzErro(error), true); return; }
   if (trans.categoria !== "todas" && trans.categoria !== dados.categoria) trans.categoria = dados.categoria;
-  trans.sel = String(data.id);
+  // Com link: fica na biblioteca acompanhando o andamento. Sem link: abre para escrever na mão.
+  if (!link) trans.sel = String(data.id);
   await recarregar("transcricoes");
   const novo = S.transcricoes.find((x) => String(x.id) === String(data.id));
   if (novo && link) transcreverVideo(novo);
@@ -1761,8 +1808,16 @@ async function adicionarIdeia(link) {
 
 async function adicionarTranscricao(e) {
   e.preventDefault();
-  const link = $("#novo-link").value.trim();
-  if (!/^https?:\/\//i.test(link)) { avisar("Cole um link completo, começando com https://. Para anotar sem link, use Nova ideia sem link.", true); $("#novo-link").focus(); return; }
+  const bruto = $("#novo-link").value.trim();
+  if (!bruto) { avisoRoteiro("📎 Cole o link do vídeo no campo aqui em cima. Para escrever um roteiro sem vídeo, use ✍️ + Escrever na mão.", "erro"); $("#novo-link").focus(); return; }
+  if (!/^https?:\/\//i.test(bruto) || videoDoLink(bruto).plataforma === "outro") {
+    avisoRoteiro("🤔 Esse link não parece de um vídeo do Instagram, TikTok ou YouTube. Copie o link pelo botão de compartilhar do vídeo e cole de novo.", "erro");
+    $("#novo-link").focus(); return;
+  }
+  const link = limparLink(bruto);
+  const igual = S.transcricoes.find((t) => t.link && limparLink(t.link) === link);
+  if (igual && !(await confirmar(`Esse vídeo já está na biblioteca ("${igual.titulo || "Sem título"}"). Transcrever de novo gasta mais um crédito. Quer mesmo?`, "Sim, transcrever de novo"))) { abrirIdeia(igual.id); return; }
+  $("#novo-link").value = "";
   adicionarIdeia(link);
 }
 
@@ -1796,40 +1851,225 @@ function botaoOriginal(t) {
     <div id="t-original-caixa" hidden><p class="sub" style="margin:10px 0 4px">Texto original, antes da tradução:</p><div class="original">${esc(t.transcricao_original)}</div></div>`;
 }
 
+// Mensagem do andamento e dos erros, logo abaixo do campo do link
+function avisoRoteiro(html, tipo = "") {
+  trans.aviso = html ? `<div class="rot-aviso-caixa ${tipo}">${html}</div>` : "";
+  const c = $("#rot-aviso");
+  if (c) c.innerHTML = trans.aviso;
+}
+async function chamarTranscrever(corpo) {
+  const { data, error } = await db.functions.invoke("transcrever", { body: corpo });
+  if (error) {
+    let j = null;
+    try { j = await error.context.json(); } catch (_) {}
+    return j && j.erro ? j : { tipo: "outro", erro: await mensagemDoErroDaFuncao(error) };
+  }
+  return data || { tipo: "outro", erro: "Não veio resposta. Tente de novo." };
+}
+const COMO_TER_CHAVE = "Crie uma conta grátis em <a href=\"https://supadata.ai\" target=\"_blank\" rel=\"noopener\">supadata.ai</a> (100 créditos por mês, sem cartão), copie a API key e cole no Supabase em Edge Functions &gt; Secrets, com o nome SUPADATA_API_KEY.";
+
+// Transcreve: pede à Supadata pelo ajudante e, se o vídeo for longo, pergunta a cada 5 segundos (até 6 minutos)
 async function transcreverVideo(item) {
   const id = String(item.id);
   if (transcrevendo.has(id)) return;
   transcrevendo.add(id);
+  if (item.andamento !== "processando") { item.andamento = "processando"; item.erro = null; gravar("transcricoes", { andamento: "processando", erro: null }, item.id); }
   pintarListaTrans();
-  mostrarTranscricaoNaTela(item, "Transcrevendo o vídeo... pode levar até 1 minuto.");
-  let aviso = "";
+  const inicio = Date.now();
+  const nome = item.titulo || item.perfil || "o vídeo";
+  const andamento = () => {
+    const s = Math.round((Date.now() - inicio) / 1000);
+    const tempo = s < 60 ? `${s}s` : `${Math.floor(s / 60)}min ${String(s % 60).padStart(2, "0")}s`;
+    const txt = `🎧 Ouvindo ${esc(nome)}... ${tempo}. Costuma levar de 3 a 4 minutos, pode deixar a aba aberta.`;
+    avisoRoteiro(`<span class="rot-relogio" aria-hidden="true"></span>${txt}`, "andando");
+    mostrarTranscricaoNaTela(item, `Ouvindo o vídeo... ${tempo}`);
+  };
+  andamento();
+  const relogio = setInterval(andamento, 1000);
+  let r;
   try {
-    const { data, error } = await db.functions.invoke("transcrever", { body: { link: item.link } });
-    if (error || !data || data.erro) {
-      aviso = error ? await mensagemDoErroDaFuncao(error) : (data && data.erro) || "Não deu para transcrever agora.";
-      avisar(aviso, true);
-      return;
+    r = await chamarTranscrever({ acao: "iniciar", link: item.link });
+    while (r && r.jobId) {
+      if (Date.now() - inicio > 6 * 60000) { r = { tipo: "demorou", erro: "Passou de 6 minutos e a transcrição não ficou pronta. Tente de novo daqui a pouco." }; break; }
+      await new Promise((ok) => setTimeout(ok, 5000));
+      const j = await chamarTranscrever({ acao: "job", jobId: r.jobId });
+      if (j && j.processando) continue;
+      r = j;
     }
-    let texto = String(data.texto || "").trim();
-    // Confere o idioma pelo próprio texto (mais seguro que confiar só no que o serviço diz)
-    let idioma = (await detectarIdioma(texto) || data.idioma || "").slice(0, 2);
-    const dados = { transcricao: texto, transcricao_original: null, idioma_original: null };
-    if (idioma && idioma !== "pt") {
-      let pt = null;
-      try { pt = await traduzirParaPortugues(texto, idioma, (t) => mostrarTranscricaoNaTela(item, t)); } catch (_) {}
-      if (pt) { dados.transcricao = pt.trim(); dados.transcricao_original = texto; dados.idioma_original = idioma; }
-      else aviso = `Veio em ${NOME_IDIOMA[idioma] || idioma} e o tradutor do Chrome não respondeu. Apague o texto e cole de novo para traduzir.`;
-    }
-    if (await gravar("transcricoes", dados, item.id)) {
-      Object.assign(item, dados);
-      if (!aviso) aviso = dados.idioma_original ? `Transcrito e traduzido do ${NOME_IDIOMA[dados.idioma_original] || dados.idioma_original}.` : "Transcrito.";
-      avisar(dados.idioma_original ? "Transcrição pronta e traduzida para português." : "Transcrição pronta.");
+  } catch (e) { r = { tipo: "outro", erro: "A conexão caiu no meio. Tente de novo." }; }
+  clearInterval(relogio);
+  try {
+    if (r && r.texto) {
+      let texto = String(r.texto).trim();
+      const dados = { transcricao: texto, transcricao_original: null, idioma_original: null, andamento: "pronto", erro: null };
+      // Garante português (a Supadata já recebe lang=pt; isto é só uma segunda checagem)
+      const idioma = (await detectarIdioma(texto) || r.idioma || "").slice(0, 2);
+      if (idioma && idioma !== "pt") {
+        let pt = null;
+        try { pt = await traduzirParaPortugues(texto, idioma, (t) => mostrarTranscricaoNaTela(item, t)); } catch (_) {}
+        if (pt) { dados.transcricao = pt.trim(); dados.transcricao_original = texto; dados.idioma_original = idioma; }
+      }
+      if (await gravar("transcricoes", dados, item.id)) {
+        Object.assign(item, dados);
+        avisoRoteiro("✅ Pronto. Revisa, dá um nome e salva.", "ok");
+        transcrevendo.delete(id);
+        trans.sel = id; desenhar(); window.scrollTo({ top: 0 });
+        setTimeout(() => { const tt = $("#t-titulo"); if (tt && !item.titulo) tt.focus(); }, 50);
+        return;
+      }
+    } else {
+      const erro = (r && r.erro) || "Não deu para transcrever agora.";
+      Object.assign(item, { andamento: "falhou", erro });
+      await gravar("transcricoes", { andamento: "falhou", erro }, item.id);
+      const extra = r && r.tipo === "sem-chave" ? `<br>${COMO_TER_CHAVE}` : "";
+      const botoes = r && r.tipo === "sem-fala"
+        ? `<button class="btn pequeno" type="button" data-guardar-assim="${esc(id)}">💾 Guardar assim mesmo</button>`
+        : r && ["ritmo", "outro", "demorou"].includes(r.tipo) ? `<button class="btn pequeno" type="button" data-tentar="${esc(id)}">🔁 Tentar de novo</button>` : "";
+      avisoRoteiro(`${r && r.tipo === "sem-fala" ? "🔇" : r && r.tipo === "cota" ? "💳" : r && r.tipo === "ritmo" ? "⏱️" : "⚠️"} ${esc(erro)}${extra} ${botoes}`, "erro");
+      mostrarTranscricaoNaTela(item, erro);
     }
   } finally {
     transcrevendo.delete(id);
     pintarListaTrans();
-    mostrarTranscricaoNaTela(item, aviso);
+    pintarSaldoSupadata(true);
   }
+}
+
+// "Guardar assim mesmo": fica com o link, sem transcrição, para escrever na mão
+async function guardarAssimMesmo(id) {
+  const t = S.transcricoes.find((x) => String(x.id) === String(id));
+  if (!t) return;
+  if (await gravar("transcricoes", { andamento: "pronto", erro: null }, t.id)) {
+    Object.assign(t, { andamento: "pronto", erro: null });
+    avisoRoteiro("✍️ Guardado. Escreva o texto na mão e salve.", "ok");
+    abrirIdeia(t.id);
+  }
+}
+
+/* ---------- Card da biblioteca ---------- */
+function cartaoRoteiro(t) {
+  const info = videoDoLink(t.link);
+  const rodando = transcrevendo.has(String(t.id));
+  const proc = t.andamento === "processando" || rodando;
+  const linhas = String(t.transcricao || t.minha_versao || "").trim();
+  const quando = t.postado_em ? dataBR(String(t.postado_em).slice(0, 10)) : t.criado_em ? dataBR(String(t.criado_em).slice(0, 10)) : "";
+  const fonte = t.link ? (NOME_PLATAFORMA[info.plataforma] || "Link") : "Escrito na mão";
+  return `<article class="rot-card ${proc ? "processando" : ""} ${t.andamento === "falhou" ? "falhou" : ""}" data-trans="${esc(t.id)}">
+    <div class="rot-capa fonte-${esc(t.link ? info.plataforma : "manual")}" data-capa="${esc(t.id)}">
+      ${proc ? `<span class="rot-relogio grande" aria-label="Processando"></span>`
+        : info.src ? `<button class="rot-play" type="button" data-video="${esc(t.id)}">▶ ver vídeo</button>`
+        : `<span class="rot-capa-icone">${t.link ? "🔗" : "✍️"}</span>`}
+      <span class="rot-fonte">${esc(fonte)}</span>
+    </div>
+    <div class="rot-info">
+      <div class="rot-cabeca">
+        <b class="rot-nome">${esc(t.titulo || "Sem título")}</b>
+        <span class="etq-dequem ${t.de_quem === "minha" ? "minha" : "outra"}">${t.de_quem === "minha" ? "⭐ Meu" : "👀 De outra"}</span>
+      </div>
+      <small class="rot-meta">${[t.perfil ? esc(t.perfil) : "", esc(fonte), quando, esc(nomeCategoria(t.categoria))].filter(Boolean).join(" · ")}</small>
+      ${tagsDe(t).length ? `<div class="rot-tags">${tagsDe(t).map((tg) => `<span>#${esc(tg)}</span>`).join("")}</div>` : ""}
+      ${proc ? `<p class="rot-estado">⏳ Ouvindo o vídeo...${rodando ? "" : ` <button class="btn pequeno" type="button" data-tentar="${esc(t.id)}">🔁 Tentar de novo</button>`}</p>`
+        : t.andamento === "falhou" ? `<p class="rot-estado erro">⚠️ ${esc(t.erro || "Não deu para transcrever.")} <button class="btn pequeno" type="button" data-abrir="${esc(t.id)}">Abrir mesmo assim</button> <button class="btn pequeno" type="button" data-tentar="${esc(t.id)}">🔁 Tentar de novo</button></p>`
+        : `<p class="rot-trecho">${linhas ? esc(linhas) : "<i>Sem texto ainda. Abra para escrever.</i>"}</p>`}
+      <div class="rot-acoes">
+        <button class="btn pequeno" type="button" data-copiar="${esc(t.id)}" ${linhas ? "" : "disabled"}>📋 Copiar transcrição</button>
+        <button class="btn pequeno" type="button" data-abrir="${esc(t.id)}">✏️ Editar</button>
+        <button class="btn pequeno perigo" type="button" data-apagar-rot="${esc(t.id)}">🗑️ Apagar</button>
+      </div>
+    </div>
+  </article>`;
+}
+
+function ligarBiblioteca(lista) {
+  lista.addEventListener("click", async (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    const pega = (k) => S.transcricoes.find((x) => String(x.id) === String(b.dataset[k]));
+    if (b.dataset.video) {
+      // O vídeo só carrega quando você pede (o do Instagram é pesado)
+      const t = pega("video"), info = videoDoLink(t.link), capa = b.closest(".rot-capa");
+      capa.classList.add("tocando");
+      capa.innerHTML = `<iframe src="${esc(info.src)}" title="Vídeo: ${esc(t.titulo || "roteiro")}" allow="autoplay; encrypted-media; picture-in-picture; clipboard-write" allowfullscreen></iframe>`;
+      return;
+    }
+    if (b.dataset.copiar) {
+      const t = pega("copiar");
+      try { await navigator.clipboard.writeText(t.transcricao || t.minha_versao || ""); b.textContent = "copiado ✓"; setTimeout(() => { b.textContent = "📋 Copiar transcrição"; }, 1800); }
+      catch (_) { avisar("Não consegui copiar. Abra o roteiro e copie o texto.", true); }
+      return;
+    }
+    if (b.dataset.abrir) { abrirIdeia(b.dataset.abrir); return; }
+    if (b.dataset.tentar) { const t = pega("tentar"); if (t) transcreverVideo(t); return; }
+    if (b.dataset.apagarRot) {
+      const t = pega("apagarRot");
+      if (!(await confirmar(`Apagar "${t.titulo || "este roteiro"}" da biblioteca? Não tem como desfazer.`))) return;
+      if (await apagarLinha("transcricoes", t.id)) { avisar("Apagado."); recarregar("transcricoes"); }
+    }
+  });
+}
+// Botões do aviso (guardar assim mesmo / tentar de novo)
+document.addEventListener("click", (e) => {
+  const g = e.target.closest("[data-guardar-assim]");
+  if (g) { guardarAssimMesmo(g.dataset.guardarAssim); return; }
+  const tn = e.target.closest("#rot-aviso [data-tentar]");
+  if (tn) { const t = S.transcricoes.find((x) => String(x.id) === tn.dataset.tentar); if (t) transcreverVideo(t); }
+});
+
+/* ---------- Saldo do mês na Supadata ---------- */
+async function pintarSaldoSupadata(forcar) {
+  const caixa = () => $("#rot-saldo");
+  const mostrar = () => {
+    const c = caixa(); if (!c) return;
+    const sd = trans.saldo;
+    if (!sd) { c.textContent = ""; return; }
+    if (sd.erro) { c.innerHTML = sd.tipo === "sem-chave" ? `🔑 Falta a chave da Supadata. ${COMO_TER_CHAVE}` : `💳 ${esc(sd.erro)}`; return; }
+    c.innerHTML = `💳 Supadata: <b>${num(sd.usados)} de ${num(sd.total)}</b> créditos usados este mês${sd.plano ? ` (plano ${esc(sd.plano)})` : ""}. 🔒 A chave fica guardada no cofre do Supabase.`;
+  };
+  mostrar();
+  if (!forcar && trans.saldo && Date.now() - trans.saldoEm < 5 * 60000) return;
+  const r = await chamarTranscrever({ acao: "saldo" });
+  trans.saldo = r; trans.saldoEm = Date.now();
+  mostrar();
+}
+
+/* ---------- 🧠 Estudar com o Claude ---------- */
+function estudarComClaude() {
+  const refs = S.transcricoes.filter((t) => (t.de_quem || "outra") === "outra" && String(t.transcricao || "").trim())
+    .sort((a, b) => String(b.criado_em || "").localeCompare(String(a.criado_em || ""))).slice(0, 10);
+  if (!refs.length) { avisoRoteiro("🧠 Ainda não tem roteiro \"De outra\" com transcrição. Transcreva alguns vídeos de outras creators primeiro.", "erro"); return; }
+  let assunto = "";
+  try { assunto = localStorage.getItem("roteiros-assunto") || ""; } catch (_) {}
+  if (!assunto) assunto = "UGC: vídeos com cara de cliente de verdade para marcas de tecnologia, apps e vida real";
+  const montar = (a) => `Você é meu estrategista de conteúdo para vídeos curtos (Reels, TikTok e Shorts).
+
+Abaixo estão ${refs.length} roteiros de vídeos de outras creators que eu salvei como referência, com o perfil e a transcrição de cada um.
+
+Quero que você analise e me entregue:
+
+1. Assuntos em alta: quais temas aparecem e por que estão funcionando.
+2. Expressões que estão prendendo: frases e palavras que seguram a atenção, copiadas do texto.
+3. Padrões de gancho: os tipos de abertura (os primeiros segundos), com um exemplo real tirado de cada roteiro.
+4. 5 roteiros novos sobre o MEU assunto: ${a}.
+   Reaproveite a ESTRUTURA (gancho, ritmo, virada, prova, chamada final), não o conteúdo.
+   Fale como gente de verdade, em português do Brasil, com frases curtas para falar olhando para a câmera. Nada robotizado, nada de cara de anúncio.
+   Para cada roteiro: gancho, desenvolvimento, chamada final, sugestão de cena e qual referência inspirou a estrutura.
+
+ROTEIROS DE REFERÊNCIA
+
+${refs.map((t, i) => `### ${i + 1}. ${t.perfil || "perfil não informado"} (${NOME_PLATAFORMA[t.plataforma] || "vídeo"})${t.titulo ? `: ${t.titulo}` : ""}
+${String(t.transcricao).trim().slice(0, 2500)}`).join("\n\n")}`;
+  const d = abrirJanelaSimples("🧠 Estudar com o Claude", `
+    <p class="sub" style="margin-top:0">Junta os últimos ${refs.length} roteiros marcados como "De outra" num pedido pronto. Copie e cole no Claude.</p>
+    <label class="pro-rotulo" for="est-assunto">O seu assunto</label>
+    <input class="campo" id="est-assunto" style="width:100%" value="${esc(assunto)}">
+    <label class="pro-rotulo" for="est-prompt">O pedido que vai ser copiado</label>
+    <textarea class="campo" id="est-prompt" rows="12" style="width:100%;font-size:12px" readonly>${esc(montar(assunto))}</textarea>`,
+    `<button type="button" class="btn" data-fechar>Fechar</button><button type="button" class="btn primario" id="est-copiar">📋 Copiar o pedido</button>`);
+  $("#est-assunto", d).addEventListener("input", (e) => { $("#est-prompt", d).value = montar(e.target.value.trim() || assunto); try { localStorage.setItem("roteiros-assunto", e.target.value.trim()); } catch (_) {} });
+  $("#est-copiar", d).onclick = async () => {
+    try { await navigator.clipboard.writeText($("#est-prompt", d).value); $("#est-copiar", d).textContent = "copiado ✓"; avisar("Pedido copiado. Agora é só colar no Claude."); }
+    catch (_) { $("#est-prompt", d).select(); avisar("Selecionei o texto: aperte Cmd + C para copiar.", true); }
+  };
 }
 
 function pintarDetalheTrans() {
@@ -1840,7 +2080,7 @@ function pintarDetalheTrans() {
 
   caixa.innerHTML = `
     <div class="barra">
-      <button class="btn" type="button" id="t-voltar">${ic("esq")}Voltar ao quadro</button>
+      <button class="btn" type="button" id="t-voltar">${ic("esq")}Voltar aos roteiros</button>
       <span class="espaco"></span>
       <span class="sub" id="t-salvo"></span>
     </div>
@@ -1850,6 +2090,14 @@ function pintarDetalheTrans() {
         <select class="campo" id="t-cat" aria-label="Divisão">${CATEGORIAS.map(([v, n]) => `<option value="${v}" ${v === t.categoria ? "selected" : ""}>${n}</option>`).join("")}</select>
         <select class="campo" id="t-etapa" aria-label="Etapa">${ETAPAS.map(([v, n]) => `<option value="${v}" ${v === etapaDe(t) ? "selected" : ""}>${n}</option>`).join("")}</select>
       </div>
+      <div class="rot-campos">
+        <label>De quem<select class="campo" id="t-dequem">${DE_QUEM.map(([v, n]) => `<option value="${v}" ${v === (t.de_quem || "outra") ? "selected" : ""}>${v === "minha" ? "⭐ Meu" : "👀 De outra"}</option>`).join("")}</select></label>
+        <label>Perfil<input class="campo" id="t-perfil" value="${esc(t.perfil || "")}" placeholder="@perfil"></label>
+        <label>Link<input class="campo" id="t-link" type="url" value="${esc(t.link || "")}" placeholder="https://..."></label>
+        <label>Postado em<input class="campo" id="t-postado" type="date" value="${esc(String(t.postado_em || "").slice(0, 10))}"></label>
+        <label class="largo">Tags (separadas por vírgula)<input class="campo" id="t-tags" value="${esc(tagsDe(t).join(", "))}" placeholder="gancho forte, humor, review"></label>
+      </div>
+      ${t.andamento === "falhou" ? `<p class="rot-estado erro" style="margin:8px 0 0">⚠️ ${esc(t.erro || "A transcrição não deu certo.")} Dá para escrever o texto na mão aqui embaixo.</p>` : ""}
       ${t.link ? `<p class="sub" style="margin:6px 0 0"><a href="${esc(t.link)}" target="_blank" rel="noopener">Abrir a referência original no ${esc(NOME_PLATAFORMA[info.plataforma] || "site")}</a></p>` : ""}
     </div>
     <div class="trans-trabalho ${t.link ? "" : "sem-video"}">
@@ -1873,6 +2121,10 @@ function pintarDetalheTrans() {
           <textarea class="campo" id="t-versao" rows="9" placeholder="${t.link ? "Escreva aqui a sua versão: o seu gancho, a sua fala, como você vai adaptar essa referência." : "Escreva aqui a sua ideia e o roteiro: gancho, desenvolvimento e chamada final."}">${esc(t.minha_versao || "")}</textarea>
         </div>
         <div class="cartao">
+          <h2>📝 Legenda do post</h2>
+          <textarea class="campo" id="t-legenda" rows="3" placeholder="A legenda que foi publicada junto com o vídeo">${esc(t.legenda || "")}</textarea>
+        </div>
+        <div class="cartao">
           <h2>Observações</h2>
           <textarea class="campo" id="t-obs" rows="4" placeholder="O que funcionou na referência? Gancho, corte, fala, o que dá para adaptar para a marca...">${esc(t.observacoes || "")}</textarea>
         </div>
@@ -1888,7 +2140,7 @@ function pintarDetalheTrans() {
   const status = (txt) => { const s = $("#t-status"); if (s) s.textContent = txt; };
   let originalPendente = null;
   let mudou = false;
-  $$("#t-titulo, #t-versao, #t-obs, #t-transcricao", caixa).forEach((el) => el.addEventListener("input", () => { mudou = true; }));
+  $$("#t-titulo, #t-versao, #t-obs, #t-transcricao, #t-perfil, #t-link, #t-postado, #t-tags, #t-legenda, #t-dequem", caixa).forEach((el) => el.addEventListener("input", () => { mudou = true; }));
 
   if (ta) {
     mostrarTranscricaoNaTela(t, transcrevendo.has(String(t.id)) ? "Transcrevendo o vídeo... pode levar até 1 minuto." : "");
@@ -1926,8 +2178,17 @@ function pintarDetalheTrans() {
       categoria: $("#t-cat").value,
       status: $("#t-etapa").value,
       minha_versao: $("#t-versao").value.trim() || null,
-      observacoes: $("#t-obs").value.trim() || null
+      observacoes: $("#t-obs").value.trim() || null,
+      de_quem: $("#t-dequem").value,
+      perfil: (() => { const p = $("#t-perfil").value.trim().replace(/^@*/, ""); return p ? "@" + p : null; })(),
+      postado_em: $("#t-postado").value || null,
+      tags: [...new Set($("#t-tags").value.split(",").map((x) => x.trim().replace(/^#/, "")).filter(Boolean))],
+      legenda: $("#t-legenda").value.trim() || null
     };
+    const novoLink = $("#t-link").value.trim();
+    if (novoLink && !/^https?:\/\//i.test(novoLink)) { avisar("O link precisa começar com https://", true); return false; }
+    if (novoLink !== (t.link || "")) { dados.link = novoLink ? limparLink(novoLink) : null; dados.plataforma = novoLink ? videoDoLink(novoLink).plataforma : null; }
+    if (t.andamento === "falhou" || t.andamento === "processando" && !transcrevendo.has(String(t.id))) { dados.andamento = "pronto"; dados.erro = null; }
     if (ta && !transcrevendo.has(String(t.id))) dados.transcricao = ta.value.trim() || null;
     if (originalPendente) { dados.transcricao_original = originalPendente.texto; dados.idioma_original = originalPendente.idioma; }
     const btn = $("#t-salvar"); btn.disabled = true; btn.textContent = "Salvando...";

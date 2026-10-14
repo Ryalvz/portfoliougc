@@ -904,3 +904,71 @@ dialog.pro-cheia iframe { flex: 1; width: 100%; border: 0; background: #fff; }
 .agenda-bloco h3 svg { width: 16px; height: 16px; }
 .agenda-bloco p { margin: 0 0 8px; font-size: 13px; line-height: 1.5; }
 .agenda-bloco .btn + .btn { margin-left: 6px; }
+
+/* =============================================================
+   📜 ROTEIROS
+   ============================================================= */
+.rot-topo { border-radius: 14px; padding: 18px; }
+.rot-titulo { margin: 0 0 2px; font-size: 20px; color: var(--cobalt); }
+.rot-frase { margin: 0 0 12px; color: var(--muted); }
+.rot-linha { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.rot-linha #novo-link { flex: 1 1 320px; }
+.rot-linha-extra { margin-top: 8px; }
+.rot-linha-extra #novo-titulo { flex: 1 1 260px; }
+.rot-aviso:empty { display: none; }
+.rot-aviso { margin-top: 10px; }
+.rot-aviso-caixa { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 10px; background: var(--tint); font-size: 13px; line-height: 1.5; }
+.rot-aviso-caixa.ok { background: var(--green-bg); color: var(--green); }
+.rot-aviso-caixa.erro { background: var(--amber-bg); color: var(--amber); }
+.rot-rodape { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+.rot-filtros { margin: 4px 0 12px; }
+.rot-relogio { display: inline-block; width: 16px; height: 16px; border-radius: 50%; border: 2px solid currentColor; position: relative; flex: none; }
+.rot-relogio::before, .rot-relogio::after { content: ""; position: absolute; left: 50%; top: 50%; width: 2px; background: currentColor; transform-origin: 50% 0; border-radius: 1px; }
+.rot-relogio::before { height: 5px; animation: rot-gira 1.2s linear infinite; }
+.rot-relogio::after { height: 4px; animation: rot-gira 9s linear infinite; }
+.rot-relogio.grande { width: 42px; height: 42px; border-width: 3px; color: #fff; }
+.rot-relogio.grande::before { height: 15px; width: 3px; }
+.rot-relogio.grande::after { height: 11px; width: 3px; }
+@keyframes rot-gira { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .rot-relogio::before, .rot-relogio::after { animation: none; } }
+
+.rot-biblioteca { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 14px; }
+.rot-card { display: grid; grid-template-columns: 150px minmax(0, 1fr); background: var(--card); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.rot-card.processando { border-color: var(--cobalt); box-shadow: 0 0 0 2px var(--tint-2); }
+.rot-card.falhou { border-color: #e5b45a; }
+.rot-capa { position: relative; aspect-ratio: 9 / 16; display: grid; place-items: center; color: #fff; background: linear-gradient(160deg, #1F3FC3, #142a8a); }
+.rot-capa.fonte-instagram { background: linear-gradient(160deg, #f58529, #dd2a7b 50%, #8134af); }
+.rot-capa.fonte-tiktok { background: linear-gradient(160deg, #111, #25f4ee 160%); }
+.rot-capa.fonte-youtube { background: linear-gradient(160deg, #ff3b30, #8f0b06); }
+.rot-capa.fonte-manual { background: linear-gradient(160deg, var(--olive), #5e5a3a); }
+.rot-capa.tocando { background: #000; }
+.rot-capa iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.rot-play { border: 0; border-radius: 999px; padding: 9px 14px; background: rgba(255, 255, 255, .94); color: #1a2240; font: inherit; font-weight: 700; font-size: 13px; cursor: pointer; box-shadow: 0 6px 16px rgba(0, 0, 0, .25); }
+.rot-capa-icone { font-size: 34px; }
+.rot-fonte { position: absolute; left: 8px; bottom: 8px; font-size: 10.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; background: rgba(0, 0, 0, .35); padding: 3px 7px; border-radius: 999px; }
+.rot-capa.tocando .rot-fonte { display: none; }
+.rot-info { display: flex; flex-direction: column; gap: 5px; padding: 12px 14px; min-width: 0; }
+.rot-cabeca { display: flex; align-items: flex-start; gap: 8px; }
+.rot-nome { flex: 1; font-size: 15px; line-height: 1.3; }
+.etq-dequem { flex: none; font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+.etq-dequem.minha { background: var(--cobalt); color: #fff; }
+.etq-dequem.outra { background: var(--olive-tint); color: #5e5a3a; }
+.rot-meta { color: var(--muted); font-size: 12px; }
+.rot-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.rot-tags span { font-size: 11px; font-weight: 600; color: var(--cobalt); background: var(--tint); padding: 2px 7px; border-radius: 999px; }
+.rot-trecho { margin: 2px 0; font-size: 13px; line-height: 1.5; color: var(--text); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-line; }
+.rot-estado { margin: 2px 0; font-size: 13px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.rot-estado.erro { color: var(--amber); }
+.rot-acoes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; padding-top: 6px; }
+.rot-campos { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+.rot-campos label { display: grid; gap: 3px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.rot-campos label.largo { grid-column: 1 / -1; }
+.rot-campos .campo { width: 100%; }
+
+@media (max-width: 700px) {
+  .rot-linha { flex-direction: column; align-items: stretch; }
+  .rot-linha > * { width: 100%; flex: none !important; }
+  .rot-biblioteca { grid-template-columns: minmax(0, 1fr); }
+  .rot-card { grid-template-columns: 110px minmax(0, 1fr); }
+  .rot-campos { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+}
