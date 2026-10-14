@@ -14,6 +14,8 @@
 //   GET ?agenda=CODIGO: o calendário "Trabalhos Ryan" para o iPhone assinar
 //     (gravações, edições, posts, entregas, pagamentos e lembretes)
 //   acao "agenda-link" (só com o login do Ryan): devolve o endereço desse calendário
+//   tipo "google" (a cada 5 minutos): calendário "Trabalhos" do Google Agenda
+//     nos dois sentidos (painel <-> Google <-> iPhone)
 //
 // Nenhuma chave secreta fica aqui. A chave de assinatura das
 // notificações é criada na primeira vez e guardada na tabela
@@ -217,17 +219,155 @@ const BUSCA_NOVAS = `{in:inbox in:spam} is:unread newer_than:1d -category:promot
 const REMETENTE_ROBO = /^(no-?reply|nao-?responda|naoresponda|donotreply|do-?not-?reply|notifica|notification|news|newsletter|marketing|mkt|comunicad|todomundo|support|suporte|faleconosco|fale-conosco|atendimento|info|noticias|alert|update|mailer|bounce|hello|team|time|equipe|contato-?noreply|campanhas|digest|community|comunidade|creators?|parcerias-?noreply|plataforma)/i;
 const ASSUNTO_ROBO = /\[#?\d{3,}\]|novo dispositivo|fez login|c[oó]digo de (verifica|acesso|seguran)|verify|verifica[cç][aã]o|redefinir senha|password|fatura|boleto|pix|pagamento (recebido|aprovado|confirmado)|recibo|seu pedido|pedido #|inscri[cç][oõ]es abertas|newsletter|webinar|edi[cç][aã]o #?\d|#\d{2,}\b|grupo do whatsapp/i;
 
-async function acessoGmail() {
+async function acessoGmail() { return (await acessoGoogle()).token; }
+// Acesso novo à conta do Google (Gmail e, se liberado, o Google Agenda)
+async function acessoGoogle(): Promise<{ token: string; escopo: string }> {
   const segredo = Deno.env.get("GOOGLE_CLIENT_SECRET");
   const { data } = await db.from("config_privada").select("valor").eq("chave", "gmail_refresh").maybeSingle();
-  if (!segredo || !data?.valor) return "";
+  if (!segredo || !data?.valor) return { token: "", escopo: "" };
   const r = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ refresh_token: data.valor, client_id: GOOGLE_CLIENT_ID, client_secret: segredo, grant_type: "refresh_token" }),
   });
   const j = await r.json().catch(() => ({}));
-  return r.ok ? String(j.access_token || "") : "";
+  return r.ok ? { token: String(j.access_token || ""), escopo: String(j.scope || "") } : { token: "", escopo: "" };
+}
+
+/* ---------- Google Agenda: calendário "Trabalhos" nos dois sentidos ----------
+   Painel -> Google: compromisso novo ou mudado no painel vira evento.
+   Google -> Painel: evento criado ou mudado no iPhone (no calendário
+   "Trabalhos") vira compromisso no painel. Apagou de um lado, apaga
+   do outro. Se os dois mudaram ao mesmo tempo, vale o do painel. */
+const GCAL = "https://www.googleapis.com/calendar/v3";
+const FUSO = "America/Sao_Paulo";
+const ROTULO_GCAL: [string, string][] = [["gravar", "🎥 Gravar"], ["editar", "✂️ Editar"], ["postar", "📲 Postar"], ["reuniao", "🤝 Reunião"], ["compromisso", "📌"]];
+const cfg = async (k: string) => (await db.from("config_privada").select("valor").eq("chave", k).maybeSingle()).data?.valor || "";
+const cfgSalvar = (k: string, v: string) => db.from("config_privada").upsert({ chave: k, valor: v }, { onConflict: "chave" });
+
+function horaSP(iso: string) {
+  const p = Object.fromEntries(new Intl.DateTimeFormat("en-CA", { timeZone: FUSO, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false })
+    .formatToParts(new Date(iso)).map((x) => [x.type, x.value]));
+  return { dia: `${p.year}-${p.month}-${p.day}`, hora: `${p.hour === "24" ? "00" : p.hour}:${p.minute}` };
+}
+function eventoParaLinha(ev: any, linha: any) {
+  let data = "", hora: string | null = null, hora_fim: string | null = null;
+  if (ev.start?.date) data = ev.start.date;
+  else {
+    const a = horaSP(ev.start.dateTime); data = a.dia; hora = a.hora;
+    if (ev.end?.dateTime) { const b = horaSP(ev.end.dateTime); if (b.dia === a.dia && b.hora > a.hora) hora_fim = b.hora; }
+  }
+  const priv = ev.extendedProperties?.private || {};
+  let resumo = String(ev.summary || "Compromisso").trim(), feito = false;
+  if (resumo.startsWith("✓")) { feito = true; resumo = resumo.slice(1).trim(); }
+  let tipo = linha?.tipo || priv.tipo || "";
+  for (const [t, rot] of ROTULO_GCAL) if (resumo.startsWith(rot)) { tipo = t; resumo = resumo.slice(rot.length).replace(/^:?\s*/, ""); break; }
+  if (!tipo) tipo = /reuni|call|meet/i.test(resumo) ? "reuniao" : /grava/i.test(resumo) ? "gravar" : /edi[cç]/i.test(resumo) ? "editar" : /post/i.test(resumo) ? "postar" : "compromisso";
+  const marca = linha ? linha.marca : (priv.marca || null);
+  if (marca && resumo.endsWith(` (${marca})`)) resumo = resumo.slice(0, -(marca.length + 3));
+  return { titulo: resumo.slice(0, 200) || "Compromisso", tipo, marca: marca || null, data, hora, hora_fim, local: ev.location ? String(ev.location).slice(0, 300) : null, status: feito ? "feito" : "a fazer" };
+}
+function linhaParaEvento(l: any) {
+  const rot = (ROTULO_GCAL.find((x) => x[0] === l.tipo) || ["", ""])[1];
+  const hora = l.hora ? String(l.hora).slice(0, 5) : "";
+  let fim = l.hora_fim ? String(l.hora_fim).slice(0, 5) : "";
+  if (hora && !fim) { const [h, m] = hora.split(":").map(Number); fim = h >= 23 ? "23:59" : `${String(h + 1).padStart(2, "0")}:${String(m).padStart(2, "0")}`; }
+  const dia = String(l.data).slice(0, 10);
+  return {
+    summary: `${l.status === "feito" ? "✓ " : ""}${rot ? rot + (l.tipo === "compromisso" ? " " : ": ") : ""}${l.titulo}${l.marca ? ` (${l.marca})` : ""}`,
+    location: l.local || "",
+    start: hora ? { dateTime: `${dia}T${hora}:00`, timeZone: FUSO } : { date: dia },
+    end: hora ? { dateTime: `${dia}T${fim}:00`, timeZone: FUSO } : { date: somaDias(dia, 1) },
+    extendedProperties: { private: { painelId: String(l.id), tipo: l.tipo, marca: l.marca || "" } },
+    reminders: { useDefault: false, overrides: hora && l.status !== "feito" ? [{ method: "popup", minutes: 30 }] : [] },
+  };
+}
+const mesmo = (a: any, b: any) => ["titulo", "tipo", "data", "local", "status"].every((k) => String(a[k] ?? "") === String(b[k] ?? ""))
+  && String(a.hora ?? "").slice(0, 5) === String(b.hora ?? "").slice(0, 5) && String(a.hora_fim ?? "").slice(0, 5) === String(b.hora_fim ?? "").slice(0, 5);
+
+async function sincronizarGoogle() {
+  const { token, escopo } = await acessoGoogle();
+  if (!token) return { pulado: "Google desconectado" };
+  if (!escopo.includes("calendar")) return { pulado: "sem permissão do Google Agenda", semPermissao: true };
+  // Trava: duas conversas ao mesmo tempo duplicariam eventos
+  const trava = await cfg("gcal_trava");
+  if (trava && Date.now() - Date.parse(trava) < 120000) return { pulado: "já sincronizando" };
+  await cfgSalvar("gcal_trava", new Date().toISOString());
+  const g = async (metodo: string, caminho: string, corpo?: unknown) => {
+    const r = await fetch(GCAL + caminho, { method: metodo, headers: { Authorization: `Bearer ${token}`, ...(corpo ? { "Content-Type": "application/json" } : {}) }, body: corpo ? JSON.stringify(corpo) : undefined });
+    if (r.status === 204) return {};
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { const e: any = new Error(j?.error?.message || `Google ${r.status}`); e.status = r.status; throw e; }
+    return j;
+  };
+  const res = { trouxe: 0, mudou: 0, apagou: 0, enviou: 0, apagouNoGoogle: 0 };
+  try {
+    // 1. O calendário "Trabalhos" (cria na primeira vez)
+    let cid = await cfg("gcal_id");
+    if (cid) { try { await g("GET", `/calendars/${encodeURIComponent(cid)}`); } catch (e: any) { if (e.status === 404 || e.status === 410) cid = ""; else throw e; } }
+    if (!cid) {
+      const c = await g("POST", "/calendars", { summary: "Trabalhos", description: "Compromissos de trabalho do painel do Ryan (gravações, reuniões, posts).", timeZone: FUSO });
+      cid = c.id; await cfgSalvar("gcal_id", cid); await cfgSalvar("gcal_sync", "");
+      await db.from("calendario").update({ gcal_id: null }).not("gcal_id", "is", null);
+    }
+    const base = `/calendars/${encodeURIComponent(cid)}/events`;
+    const agoraIso = () => new Date().toISOString();
+    const { data: linhas } = await db.from("calendario").select("*");
+    const porId = new Map((linhas || []).map((l: any) => [String(l.id), l]));
+    const porGcal = new Map((linhas || []).filter((l: any) => l.gcal_id).map((l: any) => [l.gcal_id, l]));
+    const pendente = (l: any) => !l.gcal_id || !l.sinc_em || Date.parse(l.atualizado_em) > Date.parse(l.sinc_em) + 1000;
+
+    // 2. Google -> Painel (só o que mudou desde a última vez)
+    let syncTok = await cfg("gcal_sync"), pagina = "", proximoSync = "";
+    const eventos: any[] = [];
+    for (let volta = 0; volta < 20; volta++) {
+      const q = new URLSearchParams(syncTok ? { syncToken: syncTok } : { showDeleted: "true", maxResults: "250" });
+      if (pagina) q.set("pageToken", pagina);
+      let j: any;
+      try { j = await g("GET", `${base}?${q}`); }
+      catch (e: any) { if (e.status === 410 && syncTok) { syncTok = ""; pagina = ""; eventos.length = 0; continue; } throw e; }
+      eventos.push(...(j.items || []));
+      pagina = j.nextPageToken || "";
+      if (j.nextSyncToken) proximoSync = j.nextSyncToken;
+      if (!pagina) break;
+    }
+    for (const ev of eventos) {
+      const linha = porId.get(String(ev.extendedProperties?.private?.painelId || "")) || porGcal.get(ev.id);
+      if (ev.status === "cancelled") {
+        if (linha && linha.gcal_id === ev.id) { await db.from("calendario").delete().eq("id", linha.id); await db.from("calendario_apagados").delete().eq("gcal_id", ev.id); res.apagou++; }
+        continue;
+      }
+      if (!ev.start) continue;
+      const dados = eventoParaLinha(ev, linha);
+      if (linha) {
+        if (pendente(linha) || mesmo(linha, dados)) continue;
+        await db.from("calendario").update({ ...dados, gcal_id: ev.id, sinc_em: agoraIso() }).eq("id", linha.id); res.mudou++;
+      } else {
+        await db.from("calendario").insert({ ...dados, gcal_id: ev.id, sinc_em: agoraIso() }); res.trouxe++;
+      }
+    }
+
+    // 3. Apagados no painel -> apaga no Google
+    const { data: apagados } = await db.from("calendario_apagados").select("gcal_id");
+    for (const a of apagados || []) {
+      try { await g("DELETE", `${base}/${encodeURIComponent(a.gcal_id)}`); res.apagouNoGoogle++; } catch (e: any) { if (![404, 410].includes(e.status)) continue; }
+      await db.from("calendario_apagados").delete().eq("gcal_id", a.gcal_id);
+    }
+
+    // 4. Painel -> Google (novo ou mudado no painel)
+    const { data: atuais } = await db.from("calendario").select("*");
+    for (const l of (atuais || []).filter((x: any) => !x.exemplo && pendente(x))) {
+      const corpo = linhaParaEvento(l);
+      let ev: any = null;
+      if (l.gcal_id) { try { ev = await g("PATCH", `${base}/${encodeURIComponent(l.gcal_id)}`, corpo); } catch (e: any) { if (![404, 410].includes(e.status)) throw e; } }
+      if (!ev) ev = await g("POST", base, corpo);
+      await db.from("calendario").update({ gcal_id: ev.id, sinc_em: agoraIso() }).eq("id", l.id); res.enviou++;
+    }
+    if (proximoSync) await cfgSalvar("gcal_sync", proximoSync);
+    return res;
+  } finally {
+    await db.from("config_privada").delete().eq("chave", "gcal_trava");
+  }
 }
 
 async function propostasNovas() {
@@ -339,6 +479,8 @@ async function montarAgenda() {
   ]);
   const ev: string[] = [];
   const agora = icsHora(new Date());
+  // Com o Google Agenda ligado, os compromissos já estão no calendário "Trabalhos": aqui fica só o automático
+  const comGoogle = !!(await cfg("gcal_id"));
   const diaInteiro = (uid: string, dia: string, titulo: string, desc = "") => ev.push(
     "BEGIN:VEVENT", `UID:${uid}@painel-ryan`, `DTSTAMP:${agora}`, `DTSTART;VALUE=DATE:${icsDia(dia)}`, `DTEND;VALUE=DATE:${icsDia(somaDias(dia.slice(0, 10), 1))}`,
     `SUMMARY:${icsTexto(titulo)}`, ...(desc ? [`DESCRIPTION:${icsTexto(desc)}`] : []), "TRANSP:TRANSPARENT", "END:VEVENT");
@@ -346,7 +488,7 @@ async function montarAgenda() {
   // Horário de Brasília (sem horário de verão desde 2019): 16:00 em Brasília = 19:00 UTC
   const instante = (dia: string, hora: string) => new Date(`${dia.slice(0, 10)}T${String(hora).slice(0, 5)}:00-03:00`);
   for (const a of agenda) {
-    if (a.exemplo) continue;
+    if (a.exemplo || comGoogle) continue;
     const titulo = `${a.status === "feito" ? "✓ " : ""}${ICONE[a.tipo] || a.tipo}${a.tipo === "compromisso" ? "" : ":"} ${a.titulo}${a.marca ? ` (${a.marca})` : ""}`;
     if (!a.hora) { diaInteiro(`cal-${a.id}`, a.data, titulo, a.local || ""); continue; }
     // Com horário: entra na hora certa, com aviso 30 minutos antes
@@ -392,6 +534,9 @@ Deno.serve(async (req) => {
     let corpo: any = {};
     try { corpo = await req.json(); } catch (_) { /* corpo vazio */ }
     const hoje = hojeSP();
+
+    // Conversa com o Google Agenda (relógio de 5 em 5 minutos, ou o painel pedindo na hora)
+    if (corpo.tipo === "google") return resposta(await sincronizarGoogle());
 
     // Endereço do calendário "Trabalhos Ryan" (só para o dono do painel)
     if (corpo.acao === "agenda-link") {
