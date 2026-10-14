@@ -4775,7 +4775,8 @@ async function abrirAgendaIphone() {
             <li>No app Calendário, toque em <b>Calendários</b> e confira que <b>Trabalhos</b> está marcado.</li>
             <li>Para criar pelo iPhone: novo evento &gt; <b>Calendário: Trabalhos</b>. Em até 5 minutos ele aparece aqui.</li>
           </ol>
-          <button class="btn" type="button" id="agenda-sinc-agora">${ic("relogio")}Sincronizar agora</button>`
+          <button class="btn" type="button" id="agenda-sinc-agora">${ic("relogio")}Sincronizar agora</button>
+          <a class="btn" href="https://calendar.google.com/calendar/u/0/r?authuser=${encodeURIComponent(EMAIL_PROPOSTAS)}" target="_blank" rel="noopener">${ic("link")}Abrir o Google Agenda</a>`
         : `<p>Para ligar, o Google precisa da sua autorização para o Calendário (é a mesma conta do Gmail do painel). Ele vai mostrar uma tela pedindo permissão. Se aparecer <b>"o Google não verificou este app"</b>, toque em <b>Avançado</b> e depois em <b>Acessar Painel Ryan</b>: o app é seu.</p>
            <button class="btn primario" type="button" id="agenda-ligar" style="width:100%;justify-content:center">${ic("calendario")}Ligar o Google Agenda</button>`}
       </div>
