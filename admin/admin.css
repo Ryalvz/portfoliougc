@@ -972,3 +972,8 @@ dialog.pro-cheia iframe { flex: 1; width: 100%; border: 0; background: #fff; }
   .rot-card { grid-template-columns: 110px minmax(0, 1fr); }
   .rot-campos { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 }
+
+.rot-card { cursor: pointer; transition: box-shadow .2s, border-color .2s; }
+.rot-card:hover { border-color: var(--cobalt); box-shadow: 0 6px 18px rgba(31, 63, 195, .1); }
+.rot-etapas { margin: 0 0 12px; }
+.rot-etapa-sel { padding: 4px 8px; font-size: 12px; height: auto; }

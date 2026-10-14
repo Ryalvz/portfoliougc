@@ -1452,7 +1452,7 @@ const CATEGORIAS = [["tiktok_shop", "TikTok Shop"], ["organico", "Ideias orgâni
 const nomeCategoria = (c) => (CATEGORIAS.find((x) => x[0] === c) || [c, "Sem divisão"])[1];
 const NOME_PLATAFORMA = { youtube: "YouTube", instagram: "Instagram", tiktok: "TikTok", outro: "Link" };
 const NOME_IDIOMA = { en: "inglês", es: "espanhol", fr: "francês", it: "italiano", de: "alemão", ja: "japonês", ko: "coreano", zh: "chinês", ru: "russo", hi: "hindi", ar: "árabe", tr: "turco", nl: "holandês", pl: "polonês" };
-const trans = { categoria: "todas", busca: "", sel: null, dequem: "todos", tag: "", aviso: "", saldo: null, saldoEm: 0 };
+const trans = { categoria: "todas", busca: "", sel: null, dequem: "todos", tag: "", etapa: "", aviso: "", saldo: null, saldoEm: 0, tiktokConsertado: false };
 const DE_QUEM = [["outra", "De outra"], ["minha", "Meu"]];
 const nomeDeQuem = (d) => d === "minha" ? "Meu" : "De outra";
 const tagsDe = (t) => Array.isArray(t.tags) ? t.tags.filter(Boolean) : [];
@@ -1588,7 +1588,7 @@ function desenharTranscricoes(el) {
     </div>
     <div id="trans-conteudo"></div>`;
 
-  $$("[data-cat]", el).forEach((b) => b.onclick = () => { trans.categoria = b.dataset.cat; trans.sel = null; desenhar(); });
+  $$("[data-cat]", el).forEach((b) => b.onclick = () => { trans.categoria = b.dataset.cat; trans.etapa = ""; trans.sel = null; desenhar(); });
 
   const caixa = $("#trans-conteudo");
   if (trans.sel) { caixa.innerHTML = `<div id="detalhe-trans"></div>`; pintarDetalheTrans(); return; }
@@ -1620,16 +1620,21 @@ function desenharTranscricoes(el) {
         ${todasTags.map((tg) => `<button class="chip" type="button" data-tag="${esc(tg)}" aria-pressed="${trans.tag === tg}">#${esc(tg)}</button>`).join("")}
       </div>
     </div>
-    ${trans.categoria === "todas" ? `<div class="rot-biblioteca" id="mural"></div>` : `<p class="sub" style="margin:0 0 8px">Arraste os cartões entre as colunas, ou troque a etapa no próprio cartão.</p><div class="quadro" id="quadro"></div>`}`;
+    ${trans.categoria === "todas" ? "" : `<div class="chips rot-etapas" role="group" aria-label="Etapa">
+      ${[["", "Todas as etapas"], ...ETAPAS.map(([v, n]) => [v, n])].map(([v, n]) => `<button class="chip" type="button" data-etapa-filtro="${v}" aria-pressed="${trans.etapa === v}">${esc(n)}</button>`).join("")}
+    </div>`}
+    <div class="rot-biblioteca" id="mural"></div>`;
 
   $("#form-add-trans").addEventListener("submit", adicionarTranscricao);
   $("#ideia-sem-link").onclick = () => adicionarIdeia(null);
   $("#rot-estudar").onclick = estudarComClaude;
   $$("[data-dequem]", caixa).forEach((b) => b.onclick = () => { trans.dequem = b.dataset.dequem; trans.tag = ""; desenhar(); });
   $$("[data-tag]", caixa).forEach((b) => b.onclick = () => { trans.tag = trans.tag === b.dataset.tag ? "" : b.dataset.tag; desenhar(); });
+  $$("[data-etapa-filtro]", caixa).forEach((b) => b.onclick = () => { trans.etapa = b.dataset.etapaFiltro; desenhar(); });
+  consertarLinksTiktok();
   pintarSaldoSupadata();
   $("#busca-trans").addEventListener("input", (e) => { trans.busca = e.target.value; pintarListaTrans(); });
-  if ($("#quadro")) ligarQuadro($("#quadro"));
+
   if ($("#mural")) ligarBiblioteca($("#mural"));
   pintarListaTrans();
 }
@@ -1640,6 +1645,7 @@ function filtrarTrans() {
     if (trans.categoria !== "todas" && t.categoria !== trans.categoria) return false;
     if (trans.dequem !== "todos" && (t.de_quem || "outra") !== trans.dequem) return false;
     if (trans.tag && !tagsDe(t).includes(trans.tag)) return false;
+    if (trans.etapa && etapaDe(t) !== trans.etapa) return false;
     return !q || [t.titulo, t.transcricao, t.minha_versao, t.observacoes, t.link, t.perfil, t.legenda, tagsDe(t).join(" ")].some((x) => String(x || "").toLowerCase().includes(q));
   });
 }
@@ -1814,8 +1820,16 @@ async function adicionarTranscricao(e) {
     avisoRoteiro("🤔 Esse link não parece de um vídeo do Instagram, TikTok ou YouTube. Copie o link pelo botão de compartilhar do vídeo e cole de novo.", "erro");
     $("#novo-link").focus(); return;
   }
-  const link = limparLink(bruto);
-  const igual = S.transcricoes.find((t) => t.link && limparLink(t.link) === link);
+  let link = limparLink(bruto);
+  let igual = S.transcricoes.find((t) => t.link && limparLink(t.link) === link);
+  // Link curto do TikTok: descobre o link completo antes (precisa dele para mostrar o vídeo)
+  if (/(vm|vt)\.tiktok\.com\//i.test(link)) {
+    avisoRoteiro("🔎 Abrindo o link do TikTok...", "andando");
+    const r = await chamarTranscrever({ acao: "resolver", link });
+    if (r && r.link && r.link !== link) link = limparLink(r.link);
+    avisoRoteiro("");
+    igual = igual || S.transcricoes.find((t) => t.link && limparLink(t.link) === link);
+  }
   if (igual && !(await confirmar(`Esse vídeo já está na biblioteca ("${igual.titulo || "Sem título"}"). Transcrever de novo gasta mais um crédito. Quer mesmo?`, "Sim, transcrever de novo"))) { abrirIdeia(igual.id); return; }
   $("#novo-link").value = "";
   adicionarIdeia(link);
@@ -1972,6 +1986,7 @@ function cartaoRoteiro(t) {
         : t.andamento === "falhou" ? `<p class="rot-estado erro">⚠️ ${esc(t.erro || "Não deu para transcrever.")} <button class="btn pequeno" type="button" data-abrir="${esc(t.id)}">Abrir mesmo assim</button> <button class="btn pequeno" type="button" data-tentar="${esc(t.id)}">🔁 Tentar de novo</button></p>`
         : `<p class="rot-trecho">${linhas ? esc(linhas) : "<i>Sem texto ainda. Abra para escrever.</i>"}</p>`}
       <div class="rot-acoes">
+        <select class="campo rot-etapa-sel" data-mover="${esc(t.id)}" aria-label="Etapa de ${esc(t.titulo || "roteiro")}">${ETAPAS.map(([v, n]) => `<option value="${v}" ${v === etapaDe(t) ? "selected" : ""}>${esc(n)}</option>`).join("")}</select>
         <button class="btn pequeno" type="button" data-copiar="${esc(t.id)}" ${linhas ? "" : "disabled"}>📋 Copiar transcrição</button>
         <button class="btn pequeno" type="button" data-abrir="${esc(t.id)}">✏️ Editar</button>
         <button class="btn pequeno perigo" type="button" data-apagar-rot="${esc(t.id)}">🗑️ Apagar</button>
@@ -1981,9 +1996,16 @@ function cartaoRoteiro(t) {
 }
 
 function ligarBiblioteca(lista) {
+  lista.addEventListener("change", (e) => { const s = e.target.closest("[data-mover]"); if (s) moverIdeia(s.dataset.mover, s.value); });
   lista.addEventListener("click", async (e) => {
     const b = e.target.closest("button");
-    if (!b) return;
+    // Clicar em qualquer parte do card (fora dos botões) abre o roteiro
+    if (!b) {
+      if (e.target.closest("select, iframe, a")) return;
+      const card = e.target.closest(".rot-card");
+      if (card) abrirIdeia(card.dataset.trans);
+      return;
+    }
     const pega = (k) => S.transcricoes.find((x) => String(x.id) === String(b.dataset[k]));
     if (b.dataset.video) {
       // O vídeo só carrega quando você pede (o do Instagram é pesado)
@@ -5091,4 +5113,21 @@ async function sincronizarAgendaGoogle(recarregarDepois) {
     } else if (recarregarDepois && abaAtual === "calendario") desenhar();
   } catch (_) { /* tenta de novo no relógio de 5 minutos */ }
   agendaG.rodando = false;
+}
+
+
+// Roteiros antigos salvos com link curto do TikTok: troca pelo link completo (uma vez por sessão)
+async function consertarLinksTiktok() {
+  if (trans.tiktokConsertado) return;
+  trans.tiktokConsertado = true;
+  const curtos = S.transcricoes.filter((t) => t.link && /tiktok\.com/i.test(t.link) && !/\/video\/\d+/.test(t.link));
+  let mudou = false;
+  for (const t of curtos) {
+    const r = await chamarTranscrever({ acao: "resolver", link: t.link });
+    if (!r || !r.link || !/\/video\/\d+/.test(r.link)) continue;
+    const dados = { link: limparLink(r.link) };
+    if (!t.perfil) { const p = perfilDoLink(r.link); if (p) dados.perfil = p; }
+    if (await gravar("transcricoes", dados, t.id)) { Object.assign(t, dados); mudou = true; }
+  }
+  if (mudou && abaAtual === "transcricoes" && !trans.sel) pintarListaTrans();
 }
