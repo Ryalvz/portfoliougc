@@ -1069,7 +1069,7 @@ function desenharCalendario(el) {
       <div class="chips" role="group" aria-label="Filtrar por tipo">
         ${[["todos", "Todos"], ...TIPOS_CAL, ["prazo", "Prazos"]].map(([v, t]) => `<button class="chip" type="button" data-filtro="${v}" aria-pressed="${cal.filtro === v}">${t}</button>`).join("")}
       </div>
-      <button class="btn" type="button" id="agenda-iphone">${ic("calendario")}Ver no iPhone</button>
+      <button class="btn" type="button" id="agenda-iphone">${ic("calendario")}${temAgendaGoogle() ? "iPhone e Google" : "Ver no iPhone"}</button>
       <button class="btn primario" type="button" id="add-cal">${ic("mais")}Adicionar</button>
     </div>
     <div class="cal">
@@ -1093,6 +1093,8 @@ function desenharCalendario(el) {
   $$("[data-filtro]", el).forEach((b) => b.onclick = () => { cal.filtro = b.dataset.filtro; desenhar(); });
   $("#add-cal").onclick = () => formCalendario(null, hoje);
   $("#agenda-iphone").onclick = abrirAgendaIphone;
+  // Ao abrir o Calendário, busca no Google o que você criou no iPhone
+  if (!agendaG.abriu) { agendaG.abriu = true; sincronizarAgendaGoogle(true); }
 
   $("#cal-grade").addEventListener("click", (e) => {
     const ev = e.target.closest("[data-ev]");
@@ -1107,7 +1109,7 @@ function desenharCalendario(el) {
 
   $$("[data-atraso]", el).forEach((b) => b.onclick = async () => {
     const e = atrasados[Number(b.dataset.atraso)];
-    if (e.origem === "calendario") { if (await gravar("calendario", { status: "feito" }, e.ref.id)) { avisar("Marcado como feito."); recarregar("calendario"); } }
+    if (e.origem === "calendario") { if (await gravar("calendario", { status: "feito" }, e.ref.id)) { avisar("Marcado como feito."); recarregar("calendario"); sincronizarAgendaGoogle(); } }
     else formContrato(e.ref);
   });
 }
@@ -1143,8 +1145,9 @@ function formCalendario(c, dataPadrao) {
     ],
     aoSalvar: async (d) => {
       if (d.hora_fim && !d.hora) { avisar("Coloque também a hora de começo.", true); return false; }
-      if (d.hora && d.hora_fim && d.hora_fim <= d.hora) { avisar("A hora de término precisa ser depois da hora de começo.", true); return false; } const ok = await gravar("calendario", d, c ? c.id : null); if (ok) recarregar("calendario"); return ok; },
-    aoApagar: c ? async () => { const ok = await apagarLinha("calendario", c.id); if (ok) recarregar("calendario"); return ok; } : null
+      if (d.hora && d.hora_fim && d.hora_fim <= d.hora) { avisar("A hora de término precisa ser depois da hora de começo.", true); return false; }
+      const ok = await gravar("calendario", d, c ? c.id : null); if (ok) { recarregar("calendario"); sincronizarAgendaGoogle(); } return ok; },
+    aoApagar: c ? async () => { const ok = await apagarLinha("calendario", c.id); if (ok) { recarregar("calendario"); sincronizarAgendaGoogle(); } return ok; } : null
   });
 }
 
@@ -3362,7 +3365,9 @@ function ligarCabecalho() {
    ============================================================= */
 const GOOGLE_CLIENT_ID = "317757639743-datc7u3k3d7hauj06q6viqefstliqkle.apps.googleusercontent.com";
 const EMAIL_PROPOSTAS = "heyryan.ugc@gmail.com";
-const ESCOPOS_GMAIL = "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send";
+// Gmail (ler e responder) + Google Agenda (só os calendários criados pelo painel, como o "Trabalhos")
+const ESCOPOS_GMAIL = "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/calendar.app.created";
+const temAgendaGoogle = () => gm.escopo.includes("calendar");
 const PALAVRAS_PROPOSTA = ["ugc", "\"user generated\"", "proposta", "parceria", "publi", "publicidade", "publipost", "campanha", "collab", "collaboration", "briefing", "orçamento", "orcamento", "\"mídia kit\"", "\"media kit\"", "midiakit", "influenciador", "influencer", "creator", "\"criador de conteúdo\"", "permuta", "cachê", "cache", "job", "contratar", "freela"];
 // Lê a caixa de entrada E a de spam (às vezes o e-mail da marca cai lá)
 const BUSCA_PROPOSTAS = `{in:inbox in:spam} newer_than:90d -category:promotions -category:social -category:forums -category:updates (${PALAVRAS_PROPOSTA.join(" OR ")})`;
@@ -4752,23 +4757,76 @@ function ligarContatosSite(el) {
    atualiza sozinho, aparecendo junto com os outros calendários.
    ============================================================= */
 async function abrirAgendaIphone() {
-  const d = abrirJanelaSimples("Ver no iPhone", `<p class="vazio">Gerando o seu calendário...</p>`);
-  const { data, error } = await db.functions.invoke("lembretes", { body: { acao: "agenda-link" } });
-  if (error || !data || !data.url) { $(".janela-corpo", d).innerHTML = `<p>${esc((data && data.erro) || "Não consegui gerar agora. Tente de novo em instantes.")}</p>`; return; }
-  const https = data.url, webcal = https.replace(/^https:/, "webcal:");
-  $(".janela-corpo", d).innerHTML = `
-    <p>O calendário <b>Trabalhos Ryan</b> mostra no app Calendário do iPhone tudo o que está aqui: gravações, edições, posts, entregas, pagamentos previstos e os seus lembretes. Ele se atualiza sozinho.</p>
-    <a class="btn primario" href="${esc(webcal)}" style="width:100%;justify-content:center;margin:6px 0 12px">${ic("calendario")}Assinar no iPhone</a>
-    <p class="sub">Abra esta tela <b>no iPhone</b> e toque no botão acima. Ele pergunta se você quer assinar: toque em <b>Assinar</b> e depois em <b>Adicionar</b>.</p>
-    <details class="agenda-manual"><summary>Se o botão não funcionar</summary>
-      <ol class="passos">
-        <li>Toque em <b>Copiar endereço</b> aqui embaixo.</li>
-        <li>No iPhone, abra <b>Ajustes &gt; Apps &gt; Calendário &gt; Contas &gt; Adicionar Conta &gt; Outra &gt; Adicionar Calendário Assinado</b>.</li>
-        <li>Cole o endereço, toque em <b>Seguinte</b> e depois em <b>Salvar</b>.</li>
-      </ol>
+  const d = abrirJanelaSimples("Calendário no iPhone", `<p class="vazio">Abrindo...</p>`);
+  const corpo = $(".janela-corpo", d);
+  const pintar = async () => {
+    const google = temAgendaGoogle();
+    const r = agendaG.ultimo;
+    corpo.innerHTML = `
+      <div class="agenda-bloco ${google ? "ligado" : ""}">
+        <h3>${ic("calendario")} Google Agenda: "Trabalhos" <span class="pilula ${google ? "p-cliente" : "p-pendente"}">${google ? "ligado" : "desligado"}</span></h3>
+        <p>Funciona <b>nos dois sentidos</b>: o que você cria aqui aparece no iPhone, e o que você cria no iPhone, no calendário <b>Trabalhos</b>, aparece aqui. Atualiza a cada 5 minutos (e na hora quando você salva no painel).</p>
+        ${google ? `
+          ${r && !r.pulado ? `<p class="sub">Última conversa com o Google: ${plural((r.trouxe || 0) + (r.mudou || 0), "mudança trazida", "mudanças trazidas")}, ${plural(r.enviou || 0, "enviada", "enviadas")}.</p>` : ""}
+          <p><b>No iPhone, uma vez só:</b></p>
+          <ol class="passos">
+            <li>Abra <b>Ajustes &gt; Apps &gt; Calendário &gt; Contas &gt; Adicionar Conta &gt; Google</b>.</li>
+            <li>Entre com <b>${esc(EMAIL_PROPOSTAS)}</b> e deixe <b>Calendários</b> ligado.</li>
+            <li>No app Calendário, toque em <b>Calendários</b> e confira que <b>Trabalhos</b> está marcado.</li>
+            <li>Para criar pelo iPhone: novo evento &gt; <b>Calendário: Trabalhos</b>. Em até 5 minutos ele aparece aqui.</li>
+          </ol>
+          <button class="btn" type="button" id="agenda-sinc-agora">${ic("relogio")}Sincronizar agora</button>`
+        : `<p>Para ligar, o Google precisa da sua autorização para o Calendário (é a mesma conta do Gmail do painel). Ele vai mostrar uma tela pedindo permissão. Se aparecer <b>"o Google não verificou este app"</b>, toque em <b>Avançado</b> e depois em <b>Acessar Painel Ryan</b>: o app é seu.</p>
+           <button class="btn primario" type="button" id="agenda-ligar" style="width:100%;justify-content:center">${ic("calendario")}Ligar o Google Agenda</button>`}
+      </div>
+      <div class="agenda-bloco">
+        <h3>${ic("relogio")} Automático: "Trabalhos Ryan" <span class="pilula p-conversando">só leitura</span></h3>
+        <p class="sub">Entregas das campanhas, pagamentos previstos e os seus lembretes, que o painel calcula sozinho.${google ? " Os seus compromissos ficam no calendário Trabalhos, aqui em cima." : " Enquanto o Google Agenda estiver desligado, os compromissos também aparecem aqui."}</p>
+        <div id="agenda-assinar"><p class="vazio">Gerando o endereço...</p></div>
+      </div>`;
+    const ligar = $("#agenda-ligar", corpo);
+    if (ligar) ligar.onclick = async () => {
+      ligar.disabled = true; ligar.textContent = "Esperando o Google...";
+      try { await conectarGmail(); } catch (e) { avisar(e.message, true); pintar(); return; }
+      if (!temAgendaGoogle()) { avisar("O Google não liberou o Calendário. Tente de novo e marque a caixinha do Google Agenda.", true); pintar(); return; }
+      avisar("Google Agenda ligado! Criando o calendário Trabalhos...");
+      await sincronizarAgendaGoogle(true);
+      pintar();
+    };
+    const agora = $("#agenda-sinc-agora", corpo);
+    if (agora) agora.onclick = async () => { agora.disabled = true; agora.textContent = "Sincronizando..."; await sincronizarAgendaGoogle(true); avisar("Calendário sincronizado com o Google."); pintar(); };
+    const { data, error } = await db.functions.invoke("lembretes", { body: { acao: "agenda-link" } });
+    const caixa = $("#agenda-assinar", corpo);
+    if (!caixa) return;
+    if (error || !data || !data.url) { caixa.innerHTML = `<p class="sub">Não consegui gerar o endereço agora.</p>`; return; }
+    const https = data.url, webcal = https.replace(/^https:/, "webcal:");
+    caixa.innerHTML = `<a class="btn" href="${esc(webcal)}">${ic("calendario")}Assinar no iPhone</a>
       <button class="btn" type="button" id="copiar-agenda">${ic("transcricao")}Copiar endereço</button>
-    </details>
-    <p class="sub" style="margin-top:12px">No app Calendário, em <b>Calendários</b>, dá para ligar e desligar o "Trabalhos Ryan" e escolher a cor. Para ele atualizar mais rápido: Ajustes &gt; Apps &gt; Calendário &gt; Contas &gt; Buscar &gt; A cada 15 minutos.</p>
-    <p class="sub">Esse endereço é só seu. Não compartilhe.</p>`;
-  $("#copiar-agenda", d).onclick = async () => { try { await navigator.clipboard.writeText(https); avisar("Endereço copiado."); } catch (_) { avisar("Não consegui copiar.", true); } };
+      <p class="sub" style="margin-top:6px">Abra esta tela no iPhone e toque em Assinar. Ou cole o endereço em Ajustes &gt; Apps &gt; Calendário &gt; Contas &gt; Adicionar Conta &gt; Outra &gt; Adicionar Calendário Assinado. Esse endereço é só seu.</p>`;
+    $("#copiar-agenda", caixa).onclick = async () => { try { await navigator.clipboard.writeText(https); avisar("Endereço copiado."); } catch (_) { avisar("Não consegui copiar.", true); } };
+  };
+  pintar();
+}
+
+
+/* =============================================================
+   GOOGLE AGENDA NOS DOIS SENTIDOS
+   O ajudante "lembretes" (tipo "google") conversa com o calendário
+   "Trabalhos" do Google a cada 5 minutos. Aqui o painel pede essa
+   conversa na hora: ao abrir o Calendário e ao salvar ou apagar.
+   ============================================================= */
+const agendaG = { abriu: false, rodando: false, ultimo: null };
+async function sincronizarAgendaGoogle(recarregarDepois) {
+  if (agendaG.rodando) return;
+  agendaG.rodando = true;
+  try {
+    const { data } = await db.functions.invoke("lembretes", { body: { tipo: "google" } });
+    agendaG.ultimo = data || null;
+    if (data && (data.trouxe || data.mudou || data.apagou)) {
+      await recarregar("calendario");
+      const n = (data.trouxe || 0) + (data.mudou || 0) + (data.apagou || 0);
+      avisar(`${plural(n, "compromisso atualizado", "compromissos atualizados")} pelo Google Agenda.`);
+    } else if (recarregarDepois && abaAtual === "calendario") desenhar();
+  } catch (_) { /* tenta de novo no relógio de 5 minutos */ }
+  agendaG.rodando = false;
 }

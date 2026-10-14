@@ -896,3 +896,11 @@ dialog.pro-cheia iframe { flex: 1; width: 100%; border: 0; background: #fff; }
 .contato-topo { display: flex; align-items: center; gap: 6px; }
 .contato-msg { margin: 4px 0 0; font-size: 13px; line-height: 1.5; white-space: pre-wrap; max-height: 7.5em; overflow: auto; }
 .contato-acoes { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
+
+/* Calendário no iPhone / Google Agenda */
+.agenda-bloco { border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+.agenda-bloco.ligado { border-color: var(--green); background: var(--green-bg); }
+.agenda-bloco h3 { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 0 0 6px; font-size: 14px; }
+.agenda-bloco h3 svg { width: 16px; height: 16px; }
+.agenda-bloco p { margin: 0 0 8px; font-size: 13px; line-height: 1.5; }
+.agenda-bloco .btn + .btn { margin-left: 6px; }
