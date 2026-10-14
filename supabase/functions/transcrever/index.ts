@@ -13,6 +13,7 @@
 //   Quem espera e repete a cada 5 segundos é o painel (até 6 minutos),
 //   assim o ajudante nunca estoura o tempo do Supabase.
 // acao "saldo": créditos usados no mês ({ plano, usados, total }).
+// acao "resolver" { link }: link curto do TikTok vira o link completo.
 // Erros voltam como { erro, tipo }:
 //   sem-chave, chave-errada, cota (créditos do mês acabaram),
 //   ritmo (muitas chamadas seguidas), sem-fala, nao-achou, link, outro
@@ -85,6 +86,23 @@ Deno.serve(async (req) => {
   let corpo: any = {};
   try { corpo = await req.json(); } catch (_) { /* corpo vazio */ }
   const acao = corpo.acao || (corpo.link ? "iniciar" : "");
+
+  // Link curto do TikTok (vt.tiktok.com/...): descobre o link completo, que tem o número do vídeo
+  if (acao === "resolver") {
+    let atual = String(corpo.link || "").trim();
+    if (!/^https:\/\/(vm|vt|www|m)\.tiktok\.com\//i.test(atual) || /\/video\/\d+/.test(atual)) return resposta({ link: atual });
+    try {
+      for (let i = 0; i < 5; i++) {
+        const r = await fetch(atual, { redirect: "manual", headers: { "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)" } });
+        const destino = r.headers.get("location");
+        await r.body?.cancel();
+        if (!destino) break;
+        atual = new URL(destino, atual).toString();
+        if (/\/video\/\d+/.test(atual)) break;
+      }
+    } catch (_) { /* fica com o link que deu */ }
+    return resposta({ link: atual });
+  }
 
   const chave = Deno.env.get("SUPADATA_API_KEY");
   if (!chave) return resposta({ tipo: "sem-chave", erro: "Falta a chave da Supadata. Crie uma conta grátis em supadata.ai (100 créditos por mês, sem cartão), copie a API key e cole no Supabase em Edge Functions > Secrets, com o nome SUPADATA_API_KEY." });
