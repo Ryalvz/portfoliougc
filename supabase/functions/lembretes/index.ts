@@ -535,6 +535,12 @@ Deno.serve(async (req) => {
     try { corpo = await req.json(); } catch (_) { /* corpo vazio */ }
     const hoje = hojeSP();
 
+    // Qual é o calendário "Trabalhos" no Google (só para o dono do painel)
+    if (corpo.acao === "google-info") {
+      if (!(await ehOAdmin(req))) return resposta({ erro: "Só o dono do painel." }, 401);
+      return resposta({ calendario: await cfg("gcal_id") });
+    }
+
     // Conversa com o Google Agenda (relógio de 5 em 5 minutos, ou o painel pedindo na hora)
     if (corpo.tipo === "google") return resposta(await sincronizarGoogle());
 
