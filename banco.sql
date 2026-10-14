@@ -658,3 +658,62 @@ alter table public.calendario add constraint calendario_tipo_check
 alter table public.calendario add column if not exists hora time;
 alter table public.calendario add column if not exists hora_fim time;
 alter table public.calendario add column if not exists local text check (char_length(local) <= 300);
+
+
+-- -------------------------------------------------------------
+-- 25. SINCRONIZAÇÃO COM O GOOGLE AGENDA (calendário "Trabalhos")
+-- O que você cria no painel vai para o Google (e para o iPhone),
+-- e o que você cria no iPhone, no calendário "Trabalhos", volta
+-- para o painel. O ajudante "lembretes" faz essa conversa a cada
+-- 5 minutos (e na hora, quando você salva algo no painel).
+--   gcal_id:       o número do compromisso no Google
+--   sinc_em:       quando foi a última conversa com o Google
+--   atualizado_em: quando mudou pela última vez (preenche sozinho)
+-- calendario_apagados: o que você apagou no painel, para apagar
+--   também no Google (só o ajudante lê).
+-- -------------------------------------------------------------
+alter table public.calendario add column if not exists gcal_id text;
+alter table public.calendario add column if not exists sinc_em timestamptz;
+alter table public.calendario add column if not exists atualizado_em timestamptz not null default now();
+create unique index if not exists calendario_gcal_id on public.calendario (gcal_id) where gcal_id is not null;
+
+-- Marca a hora de cada mudança. Quando a mudança veio do Google
+-- (o ajudante grava sinc_em), não conta como mudança nova.
+create or replace function public.calendario_marcar_mudanca() returns trigger
+language plpgsql set search_path = public as $$
+begin
+  if new.sinc_em is not null and (tg_op = 'INSERT' or new.sinc_em is distinct from old.sinc_em) then
+    new.atualizado_em := new.sinc_em;
+  else
+    new.atualizado_em := now();
+  end if;
+  return new;
+end $$;
+drop trigger if exists calendario_mudanca on public.calendario;
+create trigger calendario_mudanca before insert or update on public.calendario
+  for each row execute function public.calendario_marcar_mudanca();
+
+create table if not exists public.calendario_apagados (
+  gcal_id   text primary key,
+  criado_em timestamptz not null default now()
+);
+alter table public.calendario_apagados enable row level security;   -- sem regra: só o ajudante lê
+
+create or replace function public.calendario_guardar_apagado() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if old.gcal_id is not null then
+    insert into public.calendario_apagados (gcal_id) values (old.gcal_id) on conflict do nothing;
+  end if;
+  return old;
+end $$;
+drop trigger if exists calendario_apagado on public.calendario;
+create trigger calendario_apagado after delete on public.calendario
+  for each row execute function public.calendario_guardar_apagado();
+
+select cron.schedule('agenda-google', '*/5 * * * *', $$
+  select net.http_post(
+    url := 'https://jlehawiwklvyvrzbfuiu.supabase.co/functions/v1/lembretes',
+    headers := '{"Content-Type": "application/json", "apikey": "sb_publishable_oZdhIWRB1gBabQH4xRJ2Xg__F8Lq0V0"}'::jsonb,
+    body := '{"tipo": "google"}'::jsonb)
+$$);
