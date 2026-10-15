@@ -5537,7 +5537,8 @@ function desenharReelsSemana(el) {
   // O que se repete nos que mais bombaram
   const top10 = lista.slice(0, 10);
   const comDur = top10.filter((x) => n2(x.duracao));
-  const durMedia = comDur.length ? Math.round(media(comDur, (x) => n2(x.duracao))) : 0;
+  const durs = comDur.map((x) => n2(x.duracao)).sort((a, b) => a - b);
+  const durMedia = durs.length ? Math.round(durs.length % 2 ? durs[(durs.length - 1) / 2] : (durs[durs.length / 2 - 1] + durs[durs.length / 2]) / 2) : 0;
   const perfis = {}; lista.forEach((x) => { if (x.perfil) perfis[x.perfil] = (perfis[x.perfil] || 0) + 1; });
   const perfisTop = Object.entries(perfis).sort((a, b) => b[1] - a[1]).filter(([, n]) => n > 1).slice(0, 4);
   const tags = {}; lista.forEach((x) => (String(x.legenda || "").match(/#[\p{L}\d_]+/gu) || []).forEach((t) => { t = t.toLowerCase(); tags[t] = (tags[t] || 0) + 1; }));
@@ -5570,7 +5571,7 @@ function desenharReelsSemana(el) {
     ${p.rodando ? `<div class="rot-aviso-caixa">⏳ O Apify está vasculhando ${esc((cfg.hashtags || []).map((h) => "#" + h).join(", "))}. Leva de 2 a 5 minutos. Pode sair desta tela, a lista fica guardada.</div>` : ""}
     ${lista.length ? `
       <div class="grade-fin tres ig-padroes">
-        <div class="cartao"><h3 class="pro-titulo">Duração que mais rende</h3><p class="ig-num-grande">${durMedia ? durMedia + " s" : "?"}</p><p class="sub">média dos 10 reels com mais views</p></div>
+        <div class="cartao"><h3 class="pro-titulo">Duração que mais rende</h3><p class="ig-num-grande">${durMedia ? durMedia + " s" : "?"}</p><p class="sub">a duração do meio entre os 10 reels com mais views</p></div>
         <div class="cartao"><h3 class="pro-titulo">Hashtags que se repetem</h3><p>${tagsTop.map(([t, n]) => `<span class="pilula">${esc(t)} <span class="sub">${n}</span></span>`).join(" ") || '<span class="sub">poucas hashtags nas legendas</span>'}</p></div>
         <div class="cartao"><h3 class="pro-titulo">Perfis para acompanhar</h3><p>${perfisTop.map(([pf, n]) => `<a class="pilula" href="https://www.instagram.com/${esc(pf.slice(1))}/" target="_blank" rel="noopener">${esc(pf)} <span class="sub">${n} reels</span></a>`).join(" ") || '<span class="sub">nenhum perfil apareceu mais de uma vez</span>'}</p></div>
       </div>
