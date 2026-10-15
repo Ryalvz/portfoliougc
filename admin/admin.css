@@ -999,3 +999,67 @@ dialog.pro-cheia iframe { flex: 1; width: 100%; border: 0; background: #fff; }
 .ctr-assinaturas small { color: #555; }
 .ctr-editor { width: 100%; min-height: 60vh; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; line-height: 1.55; }
 @media (max-width: 700px) { .ctr-campos { grid-template-columns: minmax(0, 1fr); } .ctr-papel { padding: 20px 16px; } }
+
+/* Instagram: partes (Métricas, Reels da semana, Plano, Carrossel) */
+.ig-subs { margin-bottom: 14px; flex-wrap: wrap; }
+.ig-estr-topo { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px; border-radius: 14px; }
+.ig-estr-topo > div:first-child { flex: 1 1 320px; min-width: 0; }
+.ig-estr-acoes { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.ig-uso { display: grid; gap: 4px; max-width: 420px; margin-top: 10px; font-size: 12.5px; color: var(--muted); }
+.ig-uso .lb-trilho { display: block; height: 6px; border-radius: 3px; background: var(--tint); overflow: hidden; }
+.ig-uso .lb-trilho i { display: block; height: 100%; background: var(--cobalt); border-radius: 3px; }
+.ig-passos a { color: var(--cobalt); }
+.ig-num-grande { font-family: Anton, Archivo, sans-serif; font-size: 40px; line-height: 1; margin: 4px 0; color: var(--cobalt); }
+.ig-padroes .pilula { display: inline-flex; gap: 4px; margin: 0 4px 6px 0; text-decoration: none; }
+.ig-reels { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px; }
+.ig-reel { display: grid; grid-template-rows: auto 1fr; background: var(--card); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; min-width: 0; }
+.ig-reel-capa { position: relative; display: block; aspect-ratio: 9 / 14; background: linear-gradient(160deg, var(--cobalt), #13287f); overflow: hidden; }
+.ig-reel-capa img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ig-reel-pos { position: absolute; top: 8px; left: 8px; min-width: 28px; height: 28px; padding: 0 8px; border-radius: 14px; background: var(--parchment); color: var(--cobalt); font: 400 16px/28px Anton, Archivo, sans-serif; text-align: center; }
+.ig-reel-views { position: absolute; left: 8px; bottom: 8px; padding: 4px 10px; border-radius: 14px; background: rgba(10, 16, 40, .72); color: #fff; font-size: 13px; font-weight: 700; }
+.ig-reel-info { display: grid; gap: 4px; padding: 10px 12px 12px; align-content: start; min-width: 0; }
+.ig-reel-info b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ig-reel-info .ig-legenda { margin: 2px 0 4px; font-size: 12.5px; line-height: 1.4; color: var(--text); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.ig-reel-acoes { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.pl-dias { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; margin-bottom: 14px; }
+.pl-dia { display: grid; gap: 6px; align-content: start; padding: 14px; border-radius: 14px; background: var(--card); border: 1px solid var(--line); min-width: 0; }
+.pl-dia.hoje { border-color: var(--cobalt); box-shadow: 0 0 0 2px var(--tint); }
+.pl-dia header { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pl-dia header .pilula { margin-left: auto; }
+.pl-dia h3 { margin: 0; font-size: 15px; line-height: 1.35; color: var(--text); }
+.pl-dia p { margin: 0; font-size: 13px; line-height: 1.45; }
+.pl-gancho { font-style: italic; color: var(--cobalt); }
+.pl-acoes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.pilula.p-azul { background: var(--tint); color: var(--cobalt); }
+.pilula.p-oliva { background: var(--olive-tint); color: #5d5a3c; }
+.pl-completo summary, .car-guia summary { cursor: pointer; }
+.pl-texto { margin-top: 10px; font-size: 13.5px; line-height: 1.55; max-height: 60vh; overflow: auto; }
+.pl-passos a { color: var(--cobalt); }
+
+.car-guia-grade { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; margin-top: 12px; }
+.car-cores { display: grid; gap: 8px; }
+.car-cores div { display: grid; grid-template-columns: 34px 1fr; column-gap: 10px; align-items: center; }
+.car-cores span { grid-row: span 2; width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--line); }
+.car-cores small { color: var(--muted); font-size: 11.5px; }
+.car-fonte-titulo { font-family: Anton, sans-serif; font-size: 26px; color: var(--cobalt); margin: 0 0 6px; letter-spacing: .5px; }
+.car-fonte-texto { margin: 0; font-size: 14px; }
+.car-barra { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.car-barra #car-titulo { flex: 1 1 220px; min-width: 0; font-weight: 600; }
+.car-barra #car-abrir { max-width: 240px; }
+.car-grade { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 16px; align-items: start; }
+.car-slides { display: grid; gap: 10px; }
+.car-slide { display: grid; gap: 8px; margin: 0; padding: 12px; }
+.car-slide-topo { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.car-slide .campo { width: 100%; }
+.car-slide-topo .campo { width: auto; }
+.car-dica { margin: 0; font-size: 12px; }
+.car-muito { color: var(--amber); }
+.car-previa { position: sticky; top: 16px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; max-height: calc(100vh - 32px); overflow: auto; padding: 12px; border-radius: 16px; background: #e4e1da; }
+.car-tela { width: 100%; height: auto; aspect-ratio: 4 / 5; border-radius: 8px; box-shadow: 0 8px 22px rgba(20, 24, 43, .14); background: var(--parchment); }
+@media (max-width: 900px) {
+  .car-grade { grid-template-columns: minmax(0, 1fr); }
+  .car-previa { position: static; max-height: none; grid-auto-flow: column; grid-auto-columns: 72%; grid-template-columns: none; overflow-x: auto; scroll-snap-type: x mandatory; }
+  .car-tela { scroll-snap-align: start; }
+}
+@media (max-width: 520px) { .ig-reels { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } .ig-reel-acoes .btn { padding: 4px 8px; } }

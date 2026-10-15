@@ -334,6 +334,8 @@ function desenhar() {
 // "#campanha-12" abre o financeiro já com a campanha 12 aberta (é o que a notificação do celular manda)
 function irParaEndereco() {
   const alvo = (location.hash || "").slice(1) || "inicio";
+  const parte = alvo.match(/^instagram-(metricas|reels|plano|carrossel)$/);
+  if (parte) { igx.sub = parte[1]; irPara("instagram"); return; }
   const m = alvo.match(/^campanha-(\d+)$/);
   if (!m) { irPara(DESENHOS[alvo] ? alvo : "inicio"); return; }
   irPara("financeiro");
@@ -4149,7 +4151,7 @@ async function carregarInstagram() {
   if (["instagram", "inicio"].includes(abaAtual)) desenhar();
 }
 
-function desenharInstagram(el) {
+function desenharMetricasInstagram(el) {
   if (ig.conectado === null && !ig.carregando) { carregarInstagram(); }
   if (ig.carregando && !ig.dados) { el.innerHTML = `<p class="vazio">Buscando as métricas do Instagram...</p>`; return; }
   if (!ig.conectado) { desenharConectarInstagram(el); return; }
@@ -5456,3 +5458,639 @@ function desenharEditorModelo(el) {
     ctr.modelo.texto = texto; ctr.editando = false; avisar("Modelo salvo."); desenhar();
   };
 }
+
+/* =============================================================
+   INSTAGRAM: ESTRATÉGIA
+   A aba Instagram ganhou 4 partes:
+     📊 Métricas        (o que já existia)
+     🔥 Reels da semana  os 30 reels com mais views do seu nicho (Apify, grátis)
+     🧭 Plano da semana  pesquisa de mercado + o que postar (pedido pronto para o Claude)
+     🎨 Carrossel        o seu sistema visual e o gerador de imagens
+   ============================================================= */
+const igx = { sub: "metricas", pesq: null, reels: null, buscando: false, timer: null, planos: null, semanaVista: "", carrosseis: null, car: null };
+try { igx.sub = localStorage.getItem("ig-sub") || "metricas"; } catch (_) {}
+const SUBS_IG = [["metricas", "📊 Métricas"], ["reels", "🔥 Reels da semana"], ["plano", "🧭 Plano da semana"], ["carrossel", "🎨 Carrossel"]];
+
+function segundaISO(base) {
+  const d = base ? deISO(base) : new Date();
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return isoLocal(d);
+}
+
+function desenharInstagram(el) {
+  if (!SUBS_IG.some(([k]) => k === igx.sub)) igx.sub = "metricas";
+  el.innerHTML = `<div class="chips ig-subs" role="tablist" aria-label="Partes do Instagram">${SUBS_IG.map(([k, n]) => `<button class="chip" type="button" role="tab" data-ig-sub="${k}" aria-pressed="${igx.sub === k}">${n}</button>`).join("")}</div><div id="ig-corpo"></div>`;
+  $$("[data-ig-sub]", el).forEach((b) => b.onclick = () => {
+    igx.sub = b.dataset.igSub;
+    try { localStorage.setItem("ig-sub", igx.sub); } catch (_) {}
+    desenhar();
+  });
+  const corpo = $("#ig-corpo", el);
+  if (igx.sub !== "reels" && igx.timer) { clearTimeout(igx.timer); igx.timer = null; }
+  if (igx.sub === "reels") return desenharReelsSemana(corpo);
+  if (igx.sub === "plano") return desenharPlanoSemana(corpo);
+  if (igx.sub === "carrossel") return desenharCarrossel(corpo);
+  return desenharMetricasInstagram(corpo);
+}
+
+/* ---------- 🔥 Reels da semana ---------- */
+async function chamarTendencias(corpo) {
+  const { data, error } = await db.functions.invoke("tendencias", { body: corpo });
+  if (error) {
+    const st = error.context && error.context.status;
+    throw new Error(st === 404 ? "O ajudante \"tendencias\" ainda não foi publicado no Supabase." : "O ajudante de tendências não respondeu. Tente de novo em instantes.");
+  }
+  return data || {};
+}
+async function carregarReels() {
+  const { data, error } = await db.from("ig_reels").select("*").order("semana", { ascending: false }).order("views", { ascending: false }).limit(300);
+  if (error) { igx.reels = []; igx.faltaBanco = true; return; }
+  igx.faltaBanco = false;
+  igx.reels = data || [];
+}
+async function atualizarPesquisa(acao) {
+  try {
+    const r = await chamarTendencias({ acao: acao || "status" });
+    igx.pesq = r;
+    if (r.guardados) { await carregarReels(); avisar(`Pronto! ${r.guardados} reels guardados.`); }
+    if (acao === "buscar" && r.erro && !r.semChave) avisar(r.erro, true);
+  } catch (e) { igx.pesq = { erro: e.message }; }
+  if (abaAtual === "instagram" && igx.sub === "reels") desenhar();
+  // Enquanto o Apify trabalha, confere de 15 em 15 segundos
+  clearTimeout(igx.timer); igx.timer = null;
+  if (igx.pesq && igx.pesq.rodando && abaAtual === "instagram" && igx.sub === "reels") igx.timer = setTimeout(() => atualizarPesquisa(), 15000);
+}
+
+function desenharReelsSemana(el) {
+  if (igx.reels === null) { el.innerHTML = `<p class="vazio">Abrindo os reels da semana...</p>`; carregarReels().then(() => { if (!igx.pesq) atualizarPesquisa(); else desenhar(); }); return; }
+  if (igx.faltaBanco) { el.innerHTML = `<div class="aviso-falta">Falta rodar a parte 27 do banco.sql no Supabase.</div>`; return; }
+  const p = igx.pesq || {};
+  const cfg = p.config || {};
+  const semanas = [...new Set(igx.reels.map((r) => r.semana))];
+  if (!igx.semanaVista || !semanas.includes(igx.semanaVista)) igx.semanaVista = semanas[0] || "";
+  const lista = igx.reels.filter((r) => r.semana === igx.semanaVista).sort((a, b) => n2(b.views) - n2(a.views));
+  const u = p.uso;
+  const usoHtml = u ? `<div class="ig-uso" title="Plano grátis do Apify: quando acaba, ele bloqueia até o mês seguinte, sem cobrar nada.">
+      <span>Crédito grátis do mês: <b>US$ ${u.usado.toFixed(2).replace(".", ",")}</b> de US$ ${u.total.toFixed(2).replace(".", ",")} usados</span>
+      <span class="lb-trilho"><i style="width:${Math.min(100, (u.usado / (u.total || 5)) * 100)}%"></i></span></div>` : "";
+
+  // O que se repete nos que mais bombaram
+  const top10 = lista.slice(0, 10);
+  const comDur = top10.filter((x) => n2(x.duracao));
+  const durMedia = comDur.length ? Math.round(media(comDur, (x) => n2(x.duracao))) : 0;
+  const perfis = {}; lista.forEach((x) => { if (x.perfil) perfis[x.perfil] = (perfis[x.perfil] || 0) + 1; });
+  const perfisTop = Object.entries(perfis).sort((a, b) => b[1] - a[1]).filter(([, n]) => n > 1).slice(0, 4);
+  const tags = {}; lista.forEach((x) => (String(x.legenda || "").match(/#[\p{L}\d_]+/gu) || []).forEach((t) => { t = t.toLowerCase(); tags[t] = (tags[t] || 0) + 1; }));
+  const tagsTop = Object.entries(tags).sort((a, b) => b[1] - a[1]).slice(0, 8);
+
+  el.innerHTML = `
+    <section class="cartao ig-estr-topo">
+      <div><h2 class="rot-titulo">🔥 Reels da semana</h2>
+        <p class="rot-frase">Os ${QUANTOS_REELS} reels com mais views nas hashtags do seu nicho. Toda segunda de manhã a lista se atualiza sozinha e chega uma notificação no celular.</p>
+        ${usoHtml}</div>
+      <div class="ig-estr-acoes">
+        ${semanas.length > 1 ? `<select class="campo" id="ig-semana" aria-label="Semana">${semanas.map((s) => `<option value="${s}" ${s === igx.semanaVista ? "selected" : ""}>Semana de ${dataBR(s).slice(0, 5)}</option>`).join("")}</select>` : ""}
+        <button class="btn" type="button" id="ig-hashtags">⚙️ Hashtags</button>
+        <button class="btn primario" type="button" id="ig-buscar" ${p.rodando || p.semChave ? "disabled" : ""}>${p.rodando ? "Buscando..." : "🔎 Buscar agora"}</button>
+      </div>
+    </section>
+    ${p.semChave ? `<div class="cartao ig-passos">
+      <h3 class="pro-titulo">Falta só ligar o Apify (grátis, sem cartão)</h3>
+      <ol class="passos">
+        <li>Crie uma conta em <a href="https://console.apify.com/sign-up" target="_blank" rel="noopener"><b>apify.com</b></a>. Pode entrar com o Google. Não pede cartão.</li>
+        <li>No Apify, abra <b>Settings</b> e depois <b>API &amp; Integrations</b>. Copie o <b>Personal API token</b>.</li>
+        <li>No <a href="https://supabase.com/dashboard/project/jlehawiwklvyvrzbfuiu/functions/secrets" target="_blank" rel="noopener"><b>Supabase</b></a>, em <b>Edge Functions</b> e depois <b>Secrets</b>, crie um segredo com o nome <code>APIFY_TOKEN</code> e cole o token como valor.</li>
+        <li>Volte aqui e toque em <b>Buscar agora</b>.</li>
+      </ol>
+      <p class="sub">O plano grátis dá US$ 5 por mês e cada busca semanal gasta uns US$ 0,40. Quando o crédito acaba, o Apify só para até o mês seguinte: não cobra nada. A chave fica só no cofre do Supabase.</p>
+      <button class="btn" type="button" id="ig-conferir">Já colei, conferir</button>
+    </div>` : ""}
+    ${p.erro && !p.semChave ? `<div class="aviso-falta">${esc(p.erro)}</div>` : ""}
+    ${cfg.erro ? `<div class="aviso-falta">${esc(cfg.erro)}</div>` : ""}
+    ${p.rodando ? `<div class="rot-aviso-caixa">⏳ O Apify está vasculhando ${esc((cfg.hashtags || []).map((h) => "#" + h).join(", "))}. Leva de 2 a 5 minutos. Pode sair desta tela, a lista fica guardada.</div>` : ""}
+    ${lista.length ? `
+      <div class="grade-fin tres ig-padroes">
+        <div class="cartao"><h3 class="pro-titulo">Duração que mais rende</h3><p class="ig-num-grande">${durMedia ? durMedia + " s" : "?"}</p><p class="sub">média dos 10 reels com mais views</p></div>
+        <div class="cartao"><h3 class="pro-titulo">Hashtags que se repetem</h3><p>${tagsTop.map(([t, n]) => `<span class="pilula">${esc(t)} <span class="sub">${n}</span></span>`).join(" ") || '<span class="sub">poucas hashtags nas legendas</span>'}</p></div>
+        <div class="cartao"><h3 class="pro-titulo">Perfis para acompanhar</h3><p>${perfisTop.map(([pf, n]) => `<a class="pilula" href="https://www.instagram.com/${esc(pf.slice(1))}/" target="_blank" rel="noopener">${esc(pf)} <span class="sub">${n} reels</span></a>`).join(" ") || '<span class="sub">nenhum perfil apareceu mais de uma vez</span>'}</p></div>
+      </div>
+      <div class="ig-reels">${lista.map((r, i) => `
+        <article class="ig-reel">
+          <a class="ig-reel-capa" href="${esc(r.url)}" target="_blank" rel="noopener" aria-label="Assistir no Instagram">
+            ${r.capa ? `<img src="${esc(r.capa)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}
+            <span class="ig-reel-pos">${i + 1}</span>
+            <span class="ig-reel-views">▶ ${compacto(r.views)}</span>
+          </a>
+          <div class="ig-reel-info">
+            <b>${esc(r.perfil || "")}</b>
+            <small class="sub">${r.postado_em ? new Date(r.postado_em).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) : ""}${n2(r.duracao) ? " · " + Math.round(r.duracao) + " s" : ""} · ❤ ${compacto(r.curtidas)} · 💬 ${compacto(r.comentarios)}</small>
+            <p class="ig-legenda">${esc(String(r.legenda || "Sem legenda").slice(0, 140))}</p>
+            <div class="ig-reel-acoes">
+              <a class="btn pequeno" href="${esc(r.url)}" target="_blank" rel="noopener">▶ Assistir</a>
+              <button class="btn pequeno" type="button" data-reel-rot="${esc(r.id)}" ${S.transcricoes.some((t) => t.link && String(t.link).split("?")[0] === r.url) ? "disabled" : ""}>${S.transcricoes.some((t) => t.link && String(t.link).split("?")[0] === r.url) ? "✓ Nos Roteiros" : "📜 Roteiros"}</button>
+            </div>
+          </div>
+        </article>`).join("")}</div>
+      <p class="sub" style="margin-top:12px">Guardado em ${dataBR(igx.semanaVista)}${cfg.coletado_em && igx.semanaVista === semanas[0] ? ` às ${new Date(cfg.coletado_em).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}` : ""}. As capas vêm do Instagram e podem sumir depois de alguns dias, o link continua funcionando.</p>`
+    : !p.semChave && !p.rodando ? `<p class="vazio">Ainda não tem reels guardados. Toque em <b>Buscar agora</b>.</p>` : ""}`;
+
+  const sem = $("#ig-semana"); if (sem) sem.onchange = (e) => { igx.semanaVista = e.target.value; desenhar(); };
+  const conf = $("#ig-conferir"); if (conf) conf.onclick = () => { igx.pesq = null; el.innerHTML = `<p class="vazio">Conferindo...</p>`; atualizarPesquisa(); };
+  $("#ig-buscar").onclick = async (e) => {
+    e.target.disabled = true; e.target.textContent = "Começando...";
+    await atualizarPesquisa("buscar");
+  };
+  $("#ig-hashtags").onclick = () => formHashtags(cfg);
+  $$("[data-reel-rot]", el).forEach((b) => b.onclick = async () => {
+    const r = lista.find((x) => String(x.id) === b.dataset.reelRot);
+    if (!r) return;
+    b.disabled = true; b.textContent = "Salvando...";
+    const dados = { link: r.url, plataforma: "instagram", categoria: "organico", status: "ideia", titulo: String(r.legenda || "").split("\n")[0].replace(/#\S+/g, "").trim().slice(0, 70) || `Reel de ${r.perfil || "referência"}`,
+      de_quem: "outra", perfil: r.perfil, legenda: r.legenda, postado_em: r.postado_em ? String(r.postado_em).slice(0, 10) : null, tags: ["reels-da-semana"], andamento: "processando" };
+    const limpo = {}; Object.keys(dados).forEach((k) => { if (temCampo("transcricoes", k)) limpo[k] = dados[k]; });
+    const { data, error } = await db.from("transcricoes").insert(limpo).select("id").single();
+    if (error) { avisar(traduzErro(error), true); b.disabled = false; b.textContent = "📜 Roteiros"; return; }
+    await recarregar("transcricoes");
+    const novo = S.transcricoes.find((x) => String(x.id) === String(data.id));
+    if (novo) transcreverVideo(novo);
+    avisar("Salvo nos Roteiros. A transcrição chega em instantes (usa 1 crédito da Supadata).");
+  });
+}
+const QUANTOS_REELS = 30;
+
+function formHashtags(cfg) {
+  const d = abrirJanelaSimples("⚙️ Hashtags vasculhadas", `
+    <p class="sub" style="margin-top:0">Uma por linha, sem o #. Misture as do seu nicho (UGC) com as de tech, beleza, moda e fitness. Até 12.</p>
+    <textarea class="campo" id="hx-lista" rows="8" style="width:100%">${esc((cfg.hashtags || []).join("\n"))}</textarea>
+    <label class="pro-rotulo" for="hx-por">Reels por hashtag</label>
+    <input class="campo" id="hx-por" type="number" min="5" max="60" value="${esc(cfg.por_hashtag || 25)}">
+    <p class="sub" id="hx-custo"></p>`,
+    `<button type="button" class="btn primario" data-salvar>Salvar</button>`);
+  const custo = () => {
+    const n = $("#hx-lista", d).value.split(/\s|,/).filter(Boolean).length, por = Number($("#hx-por", d).value) || 25;
+    const us = (n * por * 2.6) / 1000;
+    $("#hx-custo", d).textContent = `Cada busca: até ${n * por} reels, uns US$ ${us.toFixed(2).replace(".", ",")}. Uma por semana dá uns US$ ${(us * 4.3).toFixed(2).replace(".", ",")} no mês (o grátis é US$ 5).`;
+  };
+  custo();
+  $("#hx-lista", d).oninput = custo; $("#hx-por", d).oninput = custo;
+  $("[data-salvar]", d).onclick = async () => {
+    const lista = $("#hx-lista", d).value.split(/[\s,]+/).map((x) => x.replace(/^#/, "")).filter(Boolean);
+    try {
+      const r = await chamarTendencias({ acao: "hashtags", hashtags: lista, por_hashtag: Number($("#hx-por", d).value) || 25 });
+      if (r.erro) { avisar(r.erro, true); return; }
+      d.close(); avisar("Hashtags salvas. Valem a partir da próxima busca.");
+      if (igx.pesq) igx.pesq.config = { ...(igx.pesq.config || {}), hashtags: r.hashtags, por_hashtag: r.por_hashtag };
+      desenhar();
+    } catch (e) { avisar(e.message, true); }
+  };
+}
+
+/* ---------- 🧭 Plano da semana ---------- */
+const DIAS_PLANO = [["SEG", 0, "Segunda"], ["TER", 1, "Terça"], ["QUA", 2, "Quarta"], ["QUI", 3, "Quinta"], ["SEX", 4, "Sexta"], ["SAB", 5, "Sábado"], ["DOM", 6, "Domingo"]];
+const NICHO_PADRAO = "Sou o Ryan (@ryalvz), creator UGC no Brasil. Meu Instagram mistura duas coisas: bastidores de UGC (como fechar com marcas, quanto cobrar, rotina, gravação, edição) e conteúdo de produtos na vida real (tech e apps, beleza, moda e fitness). Quero crescer, atrair marcas e ter constância.";
+
+async function carregarPlanos() {
+  const [a, b] = await Promise.all([
+    db.from("ig_planos").select("*").order("semana", { ascending: false }).limit(20),
+    igx.reels === null ? carregarReels() : Promise.resolve()
+  ]);
+  igx.planos = a.error ? [] : a.data || [];
+  igx.faltaPlanos = !!a.error;
+}
+
+// Lê a resposta do Claude: linhas "SEG | Reels | tema | gancho | por quê" e blocos "CARROSSEL: título"
+function lerPlano(texto) {
+  const itens = [], carrosseis = [];
+  let car = null;
+  String(texto || "").split("\n").forEach((bruta) => {
+    const l = bruta.replace(/^[\s>*•-]+/, "").replace(/\*\*/g, "").replace(/^\|/, "").replace(/\|\s*$/, "").trim();
+    const mc = l.match(/^CARROSSEL\s*:\s*(.+)$/i);
+    if (mc) { car = { titulo: mc[1].trim(), slides: [] }; carrosseis.push(car); return; }
+    const md = l.match(/^(SEG|TER|QUA|QUI|SEX|S[AÁ]B|DOM)[A-Za-zçÇáÁ-]*\s*\|\s*(.+)$/i);
+    if (md) {
+      const p = md[2].split("|").map((x) => x.trim());
+      const sigla = md[1].toUpperCase().replace("Á", "A");
+      itens.push({ dia: sigla, formato: p[0] || "", tema: p[1] || "", gancho: p[2] || "", porque: p[3] || "" });
+      car = null; return;
+    }
+    const ms = l.match(/^(\d{1,2})[.)]?\s*(capa|texto|lista|comparacao|comparação|frase|final)\s*\|\s*(.*)$/i);
+    if (ms && car) {
+      const p = ms[3].split("|").map((x) => x.trim());
+      const modelo = ms[2].toLowerCase().replace("comparação", "comparacao");
+      car.slides.push({ modelo, titulo: p[0] || "", texto: (p[1] || "").replace(/\s*;\s*/g, modelo === "lista" ? "\n" : "; ").replace(/\\n/g, "\n"), texto2: p[2] || "" });
+    }
+  });
+  return { itens, carrosseis: carrosseis.filter((c) => c.slides.length) };
+}
+
+function pedidoPlano(nicho) {
+  const d = ig.dados;
+  let meus = "";
+  if (d && (d.posts || []).length) {
+    const posts = d.posts.filter((x) => n2(x.reach));
+    const top = [...posts].sort((a, b) => n2(b.reach) - n2(a.reach)).slice(0, 6);
+    const fraco = [...posts].sort((a, b) => n2(a.reach) - n2(b.reach)).slice(0, 3);
+    const linha = (x) => `- ${NOME_FORMATO[x.tipo] || x.tipo}, ${new Date(x.data).toLocaleDateString("pt-BR")} (${DIAS_SEMANA[new Date(x.data).getDay()]}): alcance ${num(x.reach)}, ${num(x.saved)} salvos, ${num(x.shares)} compartilhamentos. "${String(x.legenda || "sem legenda").replace(/\s+/g, " ").slice(0, 160)}"`;
+    meus = `MEUS NÚMEROS (Instagram @${d.perfil.username}, ${num(d.perfil.followers_count)} seguidores, últimos ${d.dias} dias: alcance ${num((d.atual || {}).reach)})
+Meus posts com MAIS alcance:
+${top.map(linha).join("\n")}
+Meus posts com MENOS alcance:
+${fraco.map(linha).join("\n")}
+`;
+  }
+  const semana = (igx.reels || []).filter((r) => r.semana === (igx.reels[0] || {}).semana).slice(0, 30);
+  const refs = semana.length ? `OS ${semana.length} REELS COM MAIS VIEWS DESTA SEMANA NO MEU NICHO (por hashtag)
+${semana.map((r, i) => `${i + 1}. ${r.perfil || ""} · ${num(r.views)} views${n2(r.duracao) ? ` · ${Math.round(r.duracao)} s` : ""}: "${String(r.legenda || "").replace(/\s+/g, " ").slice(0, 220)}"`).join("\n")}
+` : "";
+  const seg = segundaISO();
+  return `Você é meu estrategista de conteúdo para Instagram.
+
+QUEM SOU EU
+${nicho}
+
+${meus}
+${refs}
+O QUE EU PRECISO (pesquise na internet o que está em alta no Brasil nesta semana, ${dataBR(seg)} a ${dataBR(somaDiasISO(6, seg))}):
+
+1. TENDÊNCIAS DA SEMANA: 5 temas, formatos ou áudios em alta no meu nicho e por que estão funcionando.
+2. O QUE O MEU PÚBLICO QUER SABER: 8 perguntas reais que as pessoas estão fazendo sobre esses assuntos.
+3. PADRÕES DOS REELS QUE BOMBARAM: o que os reels da lista acima têm em comum (gancho, duração, estilo, tema). Se não tiver lista, use o que você achou na pesquisa.
+4. O QUE FUNCIONA PARA MIM: o que os meus números mostram (o que repetir e o que parar de fazer).
+5. PLANO DA SEMANA: de 5 a 7 posts, misturando bastidores de UGC e produtos na vida real, com pelo menos 2 carrosséis e 3 reels.
+   Escreva CADA post numa linha, EXATAMENTE neste formato, separado por | :
+   SEG | Reels | tema | gancho (a primeira frase do vídeo ou a capa) | por que vai funcionar
+   Use só SEG, TER, QUA, QUI, SEX, SAB, DOM no começo. Formatos: Reels, Carrossel, Stories ou Foto.
+6. CARROSSÉIS PRONTOS: para cada carrossel do plano, escreva os slides neste formato (de 5 a 8 slides, no máximo 30 palavras por slide):
+   CARROSSEL: título do carrossel
+   1 capa | título forte (até 8 palavras) | subtítulo curto
+   2 texto | título | texto do slide
+   3 lista | título | item um; item dois; item três
+   4 comparacao | título | ERRADO: como a maioria faz | CERTO: como fazer
+   5 frase | a frase de impacto | de onde ela vem (opcional)
+   6 final | chamada final (ex.: salva pra não esquecer) | o que a pessoa ganha me seguindo
+   Os modelos possíveis são: capa, texto, lista, comparacao, frase, final. Comece sempre com capa e termine com final.
+
+Fale como gente de verdade, em português do Brasil, sem cara de anúncio. Não use travessão em nenhum texto.`;
+}
+
+function desenharPlanoSemana(el) {
+  if (igx.planos === null) { el.innerHTML = `<p class="vazio">Abrindo o seu plano...</p>`; carregarPlanos().then(desenhar); return; }
+  if (igx.faltaPlanos) { el.innerHTML = `<div class="aviso-falta">Falta rodar a parte 27 do banco.sql no Supabase.</div>`; return; }
+  const seg = segundaISO();
+  if (!igx.semanaPlano) igx.semanaPlano = (igx.planos.find((p) => p.semana === seg) || igx.planos[0] || { semana: seg }).semana;
+  const plano = igx.planos.find((p) => p.semana === igx.semanaPlano);
+  let nicho = NICHO_PADRAO;
+  try { nicho = localStorage.getItem("ig-nicho") || NICHO_PADRAO; } catch (_) {}
+  const temReels = (igx.reels || []).length;
+  const itens = plano ? (plano.itens || {}).itens || [] : [];
+  const carrosseisPlano = plano ? (plano.itens || {}).carrosseis || [] : [];
+  const dataDoDia = (sigla) => somaDiasISO((DIAS_PLANO.find((x) => x[0] === sigla) || [0, 0])[1], plano ? plano.semana : seg);
+  const carDoItem = (it) => {
+    if (!/carross/i.test(it.formato)) return -1;
+    const ordem = itens.filter((x) => /carross/i.test(x.formato)).indexOf(it);
+    const porNome = carrosseisPlano.findIndex((c) => semAcento(c.titulo).includes(semAcento(it.tema).slice(0, 18)) || semAcento(it.tema).includes(semAcento(c.titulo).slice(0, 18)));
+    return porNome >= 0 ? porNome : ordem < carrosseisPlano.length ? ordem : -1;
+  };
+
+  el.innerHTML = `
+    <section class="cartao ig-estr-topo">
+      <div><h2 class="rot-titulo">🧭 Plano da semana</h2>
+        <p class="rot-frase">Pesquisa de mercado e o que postar de segunda a domingo, com os seus números e os reels que bombaram. Sem custo: o Claude faz a pesquisa e você cola a resposta aqui.</p></div>
+      ${igx.planos.length > 1 ? `<select class="campo" id="pl-semana" aria-label="Semana">${[...new Set([seg, ...igx.planos.map((p) => p.semana)])].map((s) => `<option value="${s}" ${s === igx.semanaPlano ? "selected" : ""}>Semana de ${dataBR(s).slice(0, 5)}</option>`).join("")}</select>` : ""}
+    </section>
+
+    ${itens.length ? `
+      <div class="pl-dias">${itens.map((it, i) => { const ci = carDoItem(it); const data = dataDoDia(it.dia); return `
+        <article class="pl-dia ${data === hojeISO() ? "hoje" : ""}">
+          <header><b>${esc((DIAS_PLANO.find((x) => x[0] === it.dia) || [0, 0, it.dia])[2])}</b><span class="sub">${dataBR(data).slice(0, 5)}</span><span class="pilula ${/reel/i.test(it.formato) ? "p-azul" : /carross/i.test(it.formato) ? "p-oliva" : ""}">${esc(it.formato)}</span></header>
+          <h3>${esc(it.tema)}</h3>
+          ${it.gancho ? `<p class="pl-gancho">“${esc(it.gancho)}”</p>` : ""}
+          ${it.porque ? `<p class="sub">${esc(it.porque)}</p>` : ""}
+          <div class="pl-acoes">
+            ${ci >= 0 ? `<button class="btn pequeno primario" type="button" data-pl-car="${ci}">🎨 Abrir carrossel</button>` : ""}
+            <button class="btn pequeno" type="button" data-pl-agenda="${i}">📅 Agenda</button>
+            ${it.gancho ? `<button class="btn pequeno" type="button" data-pl-copiar="${i}">📋 Gancho</button>` : ""}
+          </div>
+        </article>`; }).join("")}</div>
+      <details class="cartao pl-completo"><summary><b>Ver a pesquisa completa</b> (tendências, perguntas do público e padrões)</summary><div class="pl-texto">${esc(plano.resposta).replace(/\n/g, "<br>")}</div></details>`
+    : plano ? `<div class="cartao"><p>Você colou uma resposta, mas não achei as linhas do plano no formato <code>SEG | Reels | tema | gancho | por quê</code>. Peça para o Claude: <i>"reescreva o item 5 exatamente no formato pedido"</i> e cole de novo.</p><details><summary>Ver o que foi colado</summary><div class="pl-texto">${esc(plano.resposta).replace(/\n/g, "<br>")}</div></details></div>` : ""}
+
+    <div class="cartao pl-passos">
+      <h3 class="pro-titulo">${itens.length ? "Refazer o plano desta semana" : "Montar o plano desta semana (2 minutos)"}</h3>
+      <ol class="passos">
+        <li>${temReels ? `O pedido já leva os ${Math.min(30, temReels)} reels que mais bombaram${ig.dados ? " e os seus números do Instagram" : ""}.` : `Dica: busque antes os <button type="button" class="link-btn" id="pl-ir-reels">🔥 Reels da semana</button> para o pedido ir com dados reais.`}</li>
+        <li>Toque em <b>Copiar pedido</b> e cole no <a href="https://claude.ai/new" target="_blank" rel="noopener"><b>Claude</b></a> (com a pesquisa na web ligada).</li>
+        <li>Copie a resposta inteira do Claude, cole aqui embaixo e toque em <b>Salvar plano</b>.</li>
+      </ol>
+      <details><summary>Sobre o seu nicho (o Claude lê isso)</summary>
+        <textarea class="campo" id="pl-nicho" rows="4" style="width:100%;margin-top:8px">${esc(nicho)}</textarea></details>
+      <div class="pro-acoes" style="margin:10px 0">
+        <button class="btn primario" type="button" id="pl-copiar">📋 Copiar pedido</button>
+        <a class="btn" href="https://claude.ai/new" target="_blank" rel="noopener">Abrir o Claude ↗</a>
+      </div>
+      <textarea class="campo" id="pl-resposta" rows="7" style="width:100%" placeholder="Cole aqui a resposta do Claude"></textarea>
+      <div class="pro-acoes" style="margin-top:10px"><button class="btn primario" type="button" id="pl-salvar">💾 Salvar plano</button></div>
+    </div>`;
+
+  const sel = $("#pl-semana"); if (sel) sel.onchange = (e) => { igx.semanaPlano = e.target.value; desenhar(); };
+  const irReels = $("#pl-ir-reels"); if (irReels) irReels.onclick = () => { igx.sub = "reels"; desenhar(); };
+  $("#pl-nicho").onchange = (e) => { try { localStorage.setItem("ig-nicho", e.target.value.trim() || NICHO_PADRAO); } catch (_) {} };
+  $("#pl-copiar").onclick = async () => {
+    const texto = pedidoPlano($("#pl-nicho").value.trim() || NICHO_PADRAO);
+    try { await navigator.clipboard.writeText(texto); avisar("Pedido copiado. Cole no Claude."); }
+    catch (_) { abrirJanelaSimples("Copie o pedido", `<textarea class="campo" rows="14" style="width:100%" readonly>${esc(texto)}</textarea>`, ""); }
+  };
+  $("#pl-salvar").onclick = async () => {
+    const resposta = $("#pl-resposta").value.trim();
+    if (!resposta) { avisar("Cole a resposta do Claude primeiro.", true); return; }
+    const lido = lerPlano(resposta);
+    const semana = segundaISO();
+    const { error } = await db.from("ig_planos").upsert({ semana, resposta, itens: lido }, { onConflict: "semana" });
+    if (error) { avisar(traduzErro(error), true); return; }
+    await carregarPlanos(); igx.semanaPlano = semana;
+    avisar(lido.itens.length ? `Plano salvo: ${plural(lido.itens.length, "post", "posts")}${lido.carrosseis.length ? ` e ${plural(lido.carrosseis.length, "carrossel pronto", "carrosséis prontos")}` : ""}.` : "Salvei, mas não achei as linhas do plano. Veja o aviso.", !lido.itens.length);
+    desenhar();
+  };
+  $$("[data-pl-car]", el).forEach((b) => b.onclick = () => {
+    const c = carrosseisPlano[Number(b.dataset.plCar)];
+    if (!c) return;
+    igx.car = { titulo: c.titulo, slides: c.slides.map((s) => ({ ...s })) };
+    igx.sub = "carrossel"; try { localStorage.setItem("ig-sub", "carrossel"); } catch (_) {}
+    desenhar(); window.scrollTo({ top: 0 });
+  });
+  $$("[data-pl-copiar]", el).forEach((b) => b.onclick = async () => {
+    try { await navigator.clipboard.writeText(itens[Number(b.dataset.plCopiar)].gancho); avisar("Gancho copiado."); } catch (_) { avisar("Não deu para copiar.", true); }
+  });
+  $$("[data-pl-agenda]", el).forEach((b) => b.onclick = async () => {
+    const it = itens[Number(b.dataset.plAgenda)];
+    const titulo = `${it.formato}: ${it.tema}`.slice(0, 200);
+    if (S.calendario.some((a) => a.titulo === titulo)) { avisar("Esse post já está na agenda."); return; }
+    if (await gravar("calendario", { titulo, tipo: "postar", data: dataDoDia(it.dia), status: "a fazer" })) { avisar(`Na agenda: ${(DIAS_PLANO.find((x) => x[0] === it.dia) || [0, 0, it.dia])[2]}.`); recarregar("calendario"); }
+  });
+}
+
+/* ---------- 🎨 Carrossel: sistema visual + gerador ---------- */
+const VISUAL = {
+  azul: "#1F3FC3", bege: "#F0EEEA", oliva: "#8A855E", tinta: "#14182B", olivaClaro: "#E4E1D3",
+  titulo: "Anton", texto: "Archivo", arroba: "@ryalvz", L: 1080, A: 1350, M: 96
+};
+const MODELOS_SLIDE = [
+  ["capa", "Capa", "Fundo azul, título grande. A promessa do carrossel."],
+  ["texto", "Texto", "Fundo bege, um título e um parágrafo curto."],
+  ["lista", "Lista", "Passos ou itens numerados (um por linha)."],
+  ["comparacao", "Comparação", "Errado x certo, antes x depois."],
+  ["frase", "Frase", "Fundo azul, uma frase de impacto."],
+  ["final", "Final", "Chamada para salvar, compartilhar e seguir."]
+];
+const CARROSSEL_EXEMPLO = {
+  titulo: "Como fechei minha primeira marca",
+  slides: [
+    { modelo: "capa", titulo: "Como fechei minha primeira marca sem seguidores", texto: "o passo a passo que ninguém conta" },
+    { modelo: "texto", titulo: "Marca não compra seguidor", texto: "Marca compra vídeo que vende. No UGC, o que importa é o seu portfólio, não o tamanho do seu perfil." },
+    { modelo: "lista", titulo: "O que eu fiz", texto: "Gravei 3 vídeos de produtos que eu já tinha\nMontei um portfólio simples\nMandei 10 e-mails por dia\nFiz follow-up depois de 3 dias" },
+    { modelo: "comparacao", titulo: "O e-mail que funciona", texto: "ERRADO: Oi, quer fazer parceria?", texto2: "CERTO: Gravei um vídeo do seu produto, posso te mandar?" },
+    { modelo: "frase", titulo: "Constância vence talento quando o talento não aparece", texto: "" },
+    { modelo: "final", titulo: "Salva pra fazer depois", texto: "Toda semana eu conto os bastidores de UGC por aqui" }
+  ]
+};
+let fontesCarrossel = null;
+function carregarFontesCarrossel() {
+  if (!fontesCarrossel) fontesCarrossel = Promise.all(["400 80px Anton", "400 40px Archivo", "600 40px Archivo", "700 40px Archivo"].map((f) => document.fonts.load(f).catch(() => null))).then(() => document.fonts.ready);
+  return fontesCarrossel;
+}
+
+// Quebra o texto em linhas que cabem na largura (respeita os "enter")
+function quebrarLinhas(ctx, texto, largura) {
+  const linhas = [];
+  String(texto || "").split("\n").forEach((par) => {
+    const palavras = par.split(/\s+/).filter(Boolean);
+    if (!palavras.length) { linhas.push(""); return; }
+    let atual = "";
+    palavras.forEach((p) => {
+      const teste = atual ? atual + " " + p : p;
+      if (ctx.measureText(teste).width <= largura || !atual) atual = teste; else { linhas.push(atual); atual = p; }
+    });
+    linhas.push(atual);
+  });
+  return linhas;
+}
+// Acha o maior tamanho de letra em que o texto cabe na caixa
+function caber(ctx, texto, { fonte, peso = 400, max, min, largura, altura, entre = 1.1, maiusculas }) {
+  const t = maiusculas ? String(texto || "").toUpperCase() : String(texto || "");
+  for (let tam = max; tam >= min; tam -= 4) {
+    ctx.font = `${peso} ${tam}px ${fonte}`;
+    const linhas = quebrarLinhas(ctx, t, largura);
+    if (linhas.length * tam * entre <= altura) return { tam, linhas, entre };
+  }
+  ctx.font = `${peso} ${min}px ${fonte}`;
+  return { tam: min, linhas: quebrarLinhas(ctx, t, largura), entre };
+}
+function escrever(ctx, bloco, x, y, cor, alinhar = "left") {
+  ctx.fillStyle = cor; ctx.textAlign = alinhar; ctx.textBaseline = "top";
+  bloco.linhas.forEach((l, i) => ctx.fillText(l, x, y + i * bloco.tam * bloco.entre));
+  return y + bloco.linhas.length * bloco.tam * bloco.entre;
+}
+function retanguloRedondo(ctx, x, y, w, h, r, cor) {
+  ctx.fillStyle = cor; ctx.beginPath();
+  ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath(); ctx.fill();
+}
+// Separa "ERRADO: texto" em rótulo e texto
+const rotuloDe = (t, padrao) => { const m = String(t || "").match(/^\s*([^:\n]{2,18}):\s*([\s\S]*)$/); return m ? [m[1].trim().toUpperCase(), m[2].trim()] : [padrao, String(t || "").trim()]; };
+
+function pintarSlide(cv, s, i, total) {
+  const V = VISUAL, ctx = cv.getContext("2d"), W = V.L, H = V.A, M = V.M, LW = W - M * 2;
+  cv.width = W; cv.height = H;
+  const escuro = s.modelo === "capa" || s.modelo === "frase";
+  const fundo = escuro ? V.azul : V.bege, frente = escuro ? V.bege : V.azul, corpo = escuro ? V.bege : V.tinta;
+  ctx.fillStyle = fundo; ctx.fillRect(0, 0, W, H);
+  // Rodapé: @ e número da página (igual em todos)
+  ctx.font = `600 30px ${V.texto}`; ctx.fillStyle = escuro ? "rgba(240,238,234,.8)" : V.oliva; ctx.textBaseline = "alphabetic"; ctx.textAlign = "left";
+  ctx.fillText(V.arroba, M, H - 64);
+  ctx.textAlign = "right"; ctx.fillText(`${i + 1}/${total}`, W - M, H - 64);
+  // Detalhe de cor no topo
+  ctx.fillStyle = V.oliva; ctx.fillRect(M, M, 120, 12);
+  const topo = M + 60, base = H - 150;
+
+  if (s.modelo === "capa") {
+    const sub = s.texto ? caber(ctx, s.texto, { fonte: V.texto, peso: 500, max: 46, min: 32, largura: LW, altura: 200, entre: 1.3 }) : null;
+    const altSub = sub ? sub.linhas.length * sub.tam * sub.entre + 40 : 0;
+    const t = caber(ctx, s.titulo, { fonte: V.titulo, max: 170, min: 80, largura: LW, altura: base - topo - altSub - 120, entre: 1.02, maiusculas: true });
+    const alt = t.linhas.length * t.tam * t.entre + altSub;
+    let y = Math.max(topo + 40, (H - alt) / 2 - 40);
+    ctx.font = `400 ${t.tam}px ${V.titulo}`; y = escrever(ctx, t, M, y, frente);
+    if (sub) { ctx.font = `500 ${sub.tam}px ${V.texto}`; escrever(ctx, sub, M, y + 40, "rgba(240,238,234,.88)"); }
+    // "arrasta"
+    ctx.font = `700 30px ${V.texto}`; const tx = "ARRASTA  →", lw = ctx.measureText(tx).width + 56;
+    retanguloRedondo(ctx, W - M - lw, H - 140, lw, 64, 32, V.bege);
+    ctx.fillStyle = V.azul; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(tx, W - M - lw / 2, H - 108);
+  } else if (s.modelo === "texto") {
+    const t = caber(ctx, s.titulo, { fonte: V.titulo, max: 110, min: 64, largura: LW, altura: 420, entre: 1.05, maiusculas: true });
+    ctx.font = `400 ${t.tam}px ${V.titulo}`; let y = escrever(ctx, t, M, topo, frente);
+    const b = caber(ctx, s.texto, { fonte: V.texto, peso: 500, max: 50, min: 32, largura: LW, altura: base - y - 60, entre: 1.42 });
+    ctx.font = `500 ${b.tam}px ${V.texto}`; escrever(ctx, b, M, y + 50, corpo);
+  } else if (s.modelo === "lista") {
+    const t = caber(ctx, s.titulo, { fonte: V.titulo, max: 100, min: 60, largura: LW, altura: 300, entre: 1.05, maiusculas: true });
+    ctx.font = `400 ${t.tam}px ${V.titulo}`; let y = escrever(ctx, t, M, topo, frente) + 50;
+    const itens = String(s.texto || "").split("\n").map((x) => x.trim()).filter(Boolean).slice(0, 7);
+    const espaco = (base - y) / Math.max(1, itens.length);
+    const tamItem = Math.min(46, Math.max(30, espaco * 0.34));
+    itens.forEach((it, k) => {
+      const cy = y + k * espaco;
+      ctx.fillStyle = V.azul; ctx.beginPath(); ctx.arc(M + 34, cy + 34, 34, 0, Math.PI * 2); ctx.fill();
+      ctx.font = `400 38px ${V.titulo}`; ctx.fillStyle = V.bege; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(String(k + 1), M + 34, cy + 36);
+      ctx.font = `500 ${tamItem}px ${V.texto}`;
+      const b = { tam: tamItem, entre: 1.3, linhas: quebrarLinhas(ctx, it, LW - 110).slice(0, 3) };
+      escrever(ctx, b, M + 100, cy + 34 - Math.min(b.linhas.length, 2) * tamItem * 0.65 + 4, corpo);
+    });
+  } else if (s.modelo === "comparacao") {
+    const t = caber(ctx, s.titulo, { fonte: V.titulo, max: 96, min: 60, largura: LW, altura: 240, entre: 1.05, maiusculas: true });
+    ctx.font = `400 ${t.tam}px ${V.titulo}`; let y = escrever(ctx, t, M, topo, frente) + 44;
+    const altCaixa = (base - y - 30) / 2;
+    [[s.texto, "ANTES", V.olivaClaro, V.oliva, V.tinta], [s.texto2, "DEPOIS", V.azul, V.bege, V.bege]].forEach(([txt, padrao, cf, cr, ct], k) => {
+      const [rot, conteudo] = rotuloDe(txt, padrao);
+      const cy = y + k * (altCaixa + 30);
+      retanguloRedondo(ctx, M, cy, LW, altCaixa, 28, cf);
+      ctx.font = `700 30px ${V.texto}`; ctx.fillStyle = cr; ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.fillText(rot, M + 48, cy + 44);
+      const b = caber(ctx, conteudo, { fonte: V.texto, peso: 600, max: 50, min: 30, largura: LW - 96, altura: altCaixa - 130, entre: 1.32 });
+      ctx.font = `600 ${b.tam}px ${V.texto}`; escrever(ctx, b, M + 48, cy + 100, ct);
+    });
+  } else if (s.modelo === "frase") {
+    ctx.font = `400 300px ${V.titulo}`; ctx.fillStyle = V.oliva; ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.fillText("“", M - 10, topo - 20);
+    const autor = s.texto ? s.texto : "";
+    const t = caber(ctx, s.titulo, { fonte: V.titulo, max: 120, min: 60, largura: LW, altura: base - topo - 360, entre: 1.08, maiusculas: true });
+    ctx.font = `400 ${t.tam}px ${V.titulo}`; let y = escrever(ctx, t, M, topo + 300, frente);
+    if (autor) { ctx.font = `500 38px ${V.texto}`; ctx.fillStyle = "rgba(240,238,234,.8)"; ctx.textBaseline = "top"; ctx.textAlign = "left"; ctx.fillText(autor, M, y + 40); }
+  } else { // final
+    const t = caber(ctx, s.titulo || "Salva pra não esquecer", { fonte: V.titulo, max: 140, min: 70, largura: LW, altura: 460, entre: 1.03, maiusculas: true });
+    ctx.font = `400 ${t.tam}px ${V.titulo}`; let y = escrever(ctx, t, M, topo + 40, frente);
+    if (s.texto) { const b = caber(ctx, s.texto, { fonte: V.texto, peso: 500, max: 46, min: 32, largura: LW, altura: 220, entre: 1.35 }); ctx.font = `500 ${b.tam}px ${V.texto}`; y = escrever(ctx, b, M, y + 40, corpo); }
+    const by = Math.max(y + 70, base - 300);
+    retanguloRedondo(ctx, M, by, LW, 130, 65, V.azul);
+    ctx.font = `400 60px ${V.titulo}`; ctx.fillStyle = V.bege; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(`SIGA ${V.arroba.toUpperCase()}`, W / 2, by + 68);
+    ctx.font = `600 34px ${V.texto}`; ctx.fillStyle = V.oliva; ctx.textBaseline = "top";
+    ctx.fillText("salve  ·  compartilhe  ·  comente", W / 2, by + 170);
+  }
+}
+
+async function carregarCarrosseis() {
+  const { data, error } = await db.from("carrosseis").select("*").order("atualizado_em", { ascending: false }).limit(60);
+  igx.carrosseis = error ? [] : data || [];
+  igx.faltaCarrosseis = !!error;
+}
+
+function desenharCarrossel(el) {
+  if (igx.carrosseis === null) { el.innerHTML = `<p class="vazio">Abrindo o gerador...</p>`; Promise.all([carregarCarrosseis(), carregarFontesCarrossel()]).then(desenhar); return; }
+  if (igx.faltaCarrosseis) { el.innerHTML = `<div class="aviso-falta">Falta rodar a parte 27 do banco.sql no Supabase.</div>`; return; }
+  if (!igx.car) igx.car = JSON.parse(JSON.stringify(CARROSSEL_EXEMPLO));
+  const car = igx.car;
+  let guiaAberto = false; try { guiaAberto = localStorage.getItem("ig-guia") === "1"; } catch (_) {}
+
+  el.innerHTML = `
+    <details class="cartao car-guia" id="car-guia" ${guiaAberto ? "open" : ""}>
+      <summary><b>🎨 O seu sistema visual</b> <span class="sub">as regras para todo carrossel ter a sua cara</span></summary>
+      <div class="car-guia-grade">
+        <div><h3 class="pro-titulo">Cores</h3>
+          <div class="car-cores">${[["Azul cobalto", VISUAL.azul, "capa, frase, destaques"], ["Bege", VISUAL.bege, "fundo dos slides de conteúdo"], ["Oliva", VISUAL.oliva, "detalhes e rótulos"], ["Tinta", VISUAL.tinta, "texto corrido"]].map(([n, c, u]) => `<div><span style="background:${c}"></span><b>${n}</b><small>${c} · ${u}</small></div>`).join("")}</div></div>
+        <div><h3 class="pro-titulo">Letras</h3>
+          <p class="car-fonte-titulo">ANTON PARA TÍTULOS</p><p class="car-fonte-texto">Archivo para o texto corrido, legível até no celular.</p></div>
+        <div><h3 class="pro-titulo">Regras de ouro</h3>
+          <ul class="passos"><li>1 ideia por slide, no máximo 30 palavras.</li><li>Capa = promessa clara em até 8 palavras.</li><li>De 5 a 8 slides. Sempre começa na capa e termina no final.</li><li>Alterne fundo azul e bege só na capa e na frase. O resto é bege.</li><li>Todo slide leva @ryalvz e o número da página.</li><li>Legenda: repita o gancho na primeira linha e peça para salvar.</li></ul></div>
+        <div><h3 class="pro-titulo">Ritmo da semana</h3>
+          <ul class="passos"><li><b>Seg:</b> Reels de bastidor de UGC.</li><li><b>Qua:</b> Carrossel educativo (o que salva).</li><li><b>Sex:</b> Reels de produto na vida real.</li><li><b>Dom:</b> Carrossel de opinião ou resultado.</li><li>Stories todo dia, mostrando o processo.</li></ul></div>
+      </div>
+    </details>
+
+    <section class="cartao car-barra">
+      <input class="campo" id="car-titulo" value="${esc(car.titulo)}" aria-label="Nome do carrossel" placeholder="Nome do carrossel">
+      <span class="espaco"></span>
+      <select class="campo" id="car-abrir" aria-label="Abrir carrossel salvo"><option value="">📂 Abrir salvo (${igx.carrosseis.length})</option>${igx.carrosseis.map((c) => `<option value="${esc(c.id)}">${esc(c.titulo)} · ${dataBR(String(c.atualizado_em).slice(0, 10)).slice(0, 5)}</option>`).join("")}</select>
+      <button class="btn" type="button" id="car-novo">Novo</button>
+      <button class="btn" type="button" id="car-salvar">💾 Salvar</button>
+      <button class="btn primario" type="button" id="car-baixar">⬇️ Baixar imagens</button>
+    </section>
+
+    <div class="car-grade">
+      <div class="car-slides" id="car-slides">${car.slides.map((s, i) => `
+        <div class="cartao car-slide" data-i="${i}">
+          <div class="car-slide-topo"><b>Slide ${i + 1}</b>
+            <select class="campo" data-k="modelo" aria-label="Modelo do slide ${i + 1}">${MODELOS_SLIDE.map(([v, n]) => `<option value="${v}" ${s.modelo === v ? "selected" : ""}>${n}</option>`).join("")}</select>
+            <span class="espaco"></span>
+            <button class="btn pequeno" type="button" data-mover="-1" ${i === 0 ? "disabled" : ""} aria-label="Subir">↑</button>
+            <button class="btn pequeno" type="button" data-mover="1" ${i === car.slides.length - 1 ? "disabled" : ""} aria-label="Descer">↓</button>
+            <button class="btn pequeno" type="button" data-tirar aria-label="Tirar slide">✕</button></div>
+          <input class="campo" data-k="titulo" value="${esc(s.titulo || "")}" placeholder="${s.modelo === "frase" ? "A frase" : "Título"}">
+          <textarea class="campo" data-k="texto" rows="${s.modelo === "lista" ? 4 : 2}" placeholder="${{ capa: "Subtítulo (opcional)", texto: "Texto do slide", lista: "Um item por linha", comparacao: "ERRADO: como a maioria faz", frase: "De onde vem a frase (opcional)", final: "O que a pessoa ganha te seguindo" }[s.modelo] || "Texto"}">${esc(s.texto || "")}</textarea>
+          ${s.modelo === "comparacao" ? `<textarea class="campo" data-k="texto2" rows="2" placeholder="CERTO: como fazer">${esc(s.texto2 || "")}</textarea>` : ""}
+          <p class="sub car-dica">${esc((MODELOS_SLIDE.find((m) => m[0] === s.modelo) || [0, 0, ""])[2])} ${palavrasDe(s) > 30 ? `<b class="car-muito">${palavrasDe(s)} palavras: tente deixar em 30.</b>` : ""}</p>
+        </div>`).join("")}
+        <button class="btn" type="button" id="car-mais" ${car.slides.length >= 10 ? "disabled" : ""}>${ic("mais")}Slide</button>
+      </div>
+      <div class="car-previa" id="car-previa">${car.slides.map((_, i) => `<canvas class="car-tela" data-tela="${i}" width="1080" height="1350" aria-label="Prévia do slide ${i + 1}"></canvas>`).join("")}</div>
+    </div>`;
+
+  const pintarTudo = () => $$("[data-tela]", el).forEach((cv) => { const i = Number(cv.dataset.tela); if (car.slides[i]) pintarSlide(cv, car.slides[i], i, car.slides.length); });
+  carregarFontesCarrossel().then(pintarTudo);
+  pintarTudo();
+
+  $("#car-guia").addEventListener("toggle", (e) => { try { localStorage.setItem("ig-guia", e.target.open ? "1" : "0"); } catch (_) {} });
+  $("#car-titulo").oninput = (e) => { car.titulo = e.target.value; };
+  let espera = null;
+  $("#car-slides").addEventListener("input", (e) => {
+    const box = e.target.closest(".car-slide"), k = e.target.dataset.k;
+    if (!box || !k || k === "modelo") return;
+    const i = Number(box.dataset.i);
+    car.slides[i][k] = e.target.value;
+    clearTimeout(espera);
+    espera = setTimeout(() => { const cv = $(`[data-tela="${i}"]`, el); if (cv) pintarSlide(cv, car.slides[i], i, car.slides.length); }, 120);
+  });
+  $("#car-slides").addEventListener("change", (e) => {
+    const box = e.target.closest(".car-slide");
+    if (!box || e.target.dataset.k !== "modelo") return;
+    car.slides[Number(box.dataset.i)].modelo = e.target.value; desenhar();
+  });
+  $("#car-slides").addEventListener("click", (e) => {
+    const box = e.target.closest(".car-slide"); if (!box) return;
+    const i = Number(box.dataset.i);
+    const mv = e.target.closest("[data-mover]");
+    if (mv) { const j = i + Number(mv.dataset.mover); [car.slides[i], car.slides[j]] = [car.slides[j], car.slides[i]]; desenhar(); return; }
+    if (e.target.closest("[data-tirar]")) { if (car.slides.length <= 1) { avisar("O carrossel precisa de pelo menos 1 slide.", true); return; } car.slides.splice(i, 1); desenhar(); }
+  });
+  $("#car-mais").onclick = () => { const fim = car.slides[car.slides.length - 1]; const novo = { modelo: "texto", titulo: "", texto: "" }; if (fim && fim.modelo === "final") car.slides.splice(car.slides.length - 1, 0, novo); else car.slides.push(novo); desenhar(); };
+  $("#car-novo").onclick = () => { igx.car = { titulo: "Novo carrossel", slides: [{ modelo: "capa", titulo: "", texto: "" }, { modelo: "texto", titulo: "", texto: "" }, { modelo: "final", titulo: "Salva pra não esquecer", texto: "" }] }; desenhar(); };
+  $("#car-abrir").onchange = (e) => { const c = igx.carrosseis.find((x) => String(x.id) === e.target.value); if (c) { igx.car = { id: c.id, titulo: c.titulo, slides: JSON.parse(JSON.stringify(c.slides || [])) }; desenhar(); } };
+  $("#car-salvar").onclick = async () => {
+    const dados = { titulo: (car.titulo || "Carrossel").slice(0, 200), slides: car.slides, atualizado_em: new Date().toISOString() };
+    const q = car.id ? db.from("carrosseis").update(dados).eq("id", car.id).select().single() : db.from("carrosseis").insert(dados).select().single();
+    const { data, error } = await q;
+    if (error) { avisar(traduzErro(error), true); return; }
+    car.id = data.id; await carregarCarrosseis(); avisar("Carrossel salvo."); desenhar();
+  };
+  $("#car-baixar").onclick = async (e) => {
+    const b = e.target; b.disabled = true; b.textContent = "Preparando...";
+    try {
+      await carregarFontesCarrossel();
+      const nome = (car.titulo || "carrossel").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^\w]+/g, "-").replace(/^-|-$/g, "").toLowerCase().slice(0, 40) || "carrossel";
+      const arquivos = [];
+      for (let i = 0; i < car.slides.length; i++) {
+        const cv = document.createElement("canvas");
+        pintarSlide(cv, car.slides[i], i, car.slides.length);
+        const blob = await new Promise((ok) => cv.toBlob(ok, "image/png"));
+        arquivos.push(new File([blob], `${nome}-${String(i + 1).padStart(2, "0")}.png`, { type: "image/png" }));
+      }
+      // No celular: abre o "compartilhar" para salvar tudo nas Fotos de uma vez
+      if (navigator.canShare && navigator.canShare({ files: arquivos }) && /iPhone|iPad|Android/i.test(navigator.userAgent)) {
+        await navigator.share({ files: arquivos, title: car.titulo }).catch(() => {});
+      } else {
+        for (const f of arquivos) {
+          const a = document.createElement("a"); a.href = URL.createObjectURL(f); a.download = f.name; document.body.appendChild(a); a.click(); a.remove();
+          setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+          await new Promise((ok) => setTimeout(ok, 350));
+        }
+        avisar(`${plural(arquivos.length, "imagem", "imagens")} na pasta Downloads (1080 x 1350, o tamanho certo do Instagram).`);
+      }
+    } catch (erro) { avisar("Não deu para gerar as imagens: " + (erro.message || erro), true); }
+    b.disabled = false; b.textContent = "⬇️ Baixar imagens";
+  };
+}
+const palavrasDe = (s) => [s.titulo, s.texto, s.texto2].join(" ").split(/\s+/).filter(Boolean).length;
