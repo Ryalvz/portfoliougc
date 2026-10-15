@@ -331,6 +331,16 @@ function desenhar() {
   }
 }
 
+// "#campanha-12" abre o financeiro já com a campanha 12 aberta (é o que a notificação do celular manda)
+function irParaEndereco() {
+  const alvo = (location.hash || "").slice(1) || "inicio";
+  const m = alvo.match(/^campanha-(\d+)$/);
+  if (!m) { irPara(DESENHOS[alvo] ? alvo : "inicio"); return; }
+  irPara("financeiro");
+  const c = S.contratos.find((x) => String(x.id) === m[1]);
+  if (c) setTimeout(() => formContrato(c), 50); else avisar("Não achei essa campanha. Ela pode ter sido apagada.", true);
+}
+
 function fecharMenu() {
   $("#menu").classList.remove("aberto");
   $("#fundo-menu").classList.remove("aberto");
@@ -355,7 +365,7 @@ async function iniciar(sessao) {
   ligarCabecalho();
   $("#aba-inicio").innerHTML = '<p class="vazio">Carregando seus dados...</p>';
   await carregarTudo();
-  irPara((location.hash || "").slice(1) || "inicio");
+  irParaEndereco();
   // A cada minuto o sino confere se algum lembrete rápido chegou na hora
   setInterval(() => { try { pintarLembretes(); } catch (_) {} }, 60000);
   // A cada 2 minutos confere se chegou contato novo pelo site
@@ -365,7 +375,7 @@ async function iniciar(sessao) {
     if (S.contatos_site.length !== antes) { if (abaAtual === "portfolio" || abaAtual === "inicio") desenhar(); else pintarLembretes(); }
   }, 120000);
   // Tocar numa notificação com o painel já aberto troca de aba
-  window.addEventListener("hashchange", () => { const aba = (location.hash || "").slice(1); if (aba && aba !== abaAtual) irPara(aba); });
+  window.addEventListener("hashchange", () => { const aba = (location.hash || "").slice(1); if (aba && aba !== abaAtual) irParaEndereco(); });
   sincronizarGmail();
 }
 
@@ -3191,33 +3201,33 @@ function calcularLembretes() {
       const k = `vencido-${c.id}`;
       if (!adiado(k)) L.push({ aba: "financeiro", ic: "relogio", nivel: "alerta",
         texto: `${nome} venceu há ${plural(diasEntre(prev, hoje), "dia", "dias")} (${real(sal)}). A marca já pagou?`,
-        acoes: [["Sim, recebi", true, () => formRecebi(c)], ["Ainda não, vou cobrar", false, () => adiarLembrete(k, somaDiasISO(2), "Combinado. Pergunto de novo em 3 dias.")]] });
+        acoes: [["Sim, recebi", true, () => formRecebi(c)], ["Ainda não, vou cobrar", false, () => adiarLembrete(k, somaDiasISO(2), "Combinado. Pergunto de novo em 3 dias.")], ["Abrir campanha", false, () => formContrato(c)]] });
       return;
     }
     if (aberto && prev && prev >= hoje && prev <= somaDiasISO(2)) {
       const k = `vence-${c.id}-${prev}`;
       if (!adiado(k)) L.push({ aba: "financeiro", ic: "calendario", nivel: "",
         texto: `${nome} deve pagar ${prev === hoje ? "hoje" : "até " + dataBR(prev).slice(0, 5)} (${real(sal)}). O dinheiro já caiu?`,
-        acoes: [["Sim, recebi", true, () => formRecebi(c)], ["Ainda não", false, () => adiarLembrete(k, prev, "Certo. Se não cair até o prazo, eu aviso que venceu.")]] });
+        acoes: [["Sim, recebi", true, () => formRecebi(c)], ["Ainda não", false, () => adiarLembrete(k, prev, "Certo. Se não cair até o prazo, eu aviso que venceu.")], ["Abrir campanha", false, () => formContrato(c)]] });
     }
     if (c.status === "Entregue" && !c.data_nf && sal > 0) {
       const k = `nota-${c.id}`;
       if (!adiado(k)) L.push({ aba: "financeiro", ic: "transcricao", nivel: "",
         texto: `${nome} foi entregue e está <b>sem nota fiscal</b>. Sem nota, o prazo de pagamento não começa a contar.`,
-        acoes: [["Enviei a nota hoje", true, () => mudarEtapa(c, "Nota fiscal enviada")], ["Lembrar amanhã", false, () => adiarLembrete(k, hoje)]] });
+        acoes: [["Enviei a nota hoje", true, () => mudarEtapa(c, "Nota fiscal enviada")], ["Já foi paga", false, () => formRecebi(c)], ["Abrir campanha", false, () => formContrato(c)], ["Lembrar amanhã", false, () => adiarLembrete(k, hoje)]] });
     }
     if (grupoDe(c.status) === "producao" && c.prazo_entrega && c.prazo_entrega <= somaDiasISO(1)) {
       const k = `entrega-${c.id}-${c.prazo_entrega}`;
       const d = diasEntre(hoje, c.prazo_entrega);
       if (!adiado(k)) L.push({ aba: "campanhas", ic: "campanhas", nivel: d < 0 ? "alerta" : "",
         texto: `${nome}: ${d < 0 ? `a entrega está <b>atrasada há ${plural(-d, "dia", "dias")}</b>` : d === 0 ? "a entrega é <b>hoje</b>" : "a entrega é <b>amanhã</b>"} (${esc(c.status.toLowerCase())}).`,
-        acoes: [["Já entreguei", true, () => mudarEtapa(c, "Entregue")], ["Lembrar amanhã", false, () => adiarLembrete(k, hoje)]] });
+        acoes: [["Já entreguei", true, () => mudarEtapa(c, "Entregue")], ["Abrir campanha", false, () => formContrato(c)], ["Lembrar amanhã", false, () => adiarLembrete(k, hoje)]] });
     }
     if (grupoDe(c.status) === "negociacao" && c.criado_em && diasEntre(String(c.criado_em).slice(0, 10), hoje) >= 5) {
       const k = `negocia-${c.id}`;
       if (!adiado(k)) L.push({ aba: "campanhas", ic: "marcas", nivel: "",
         texto: `${nome} está em negociação há ${plural(diasEntre(String(c.criado_em).slice(0, 10), hoje), "dia", "dias")}${n2(c.valor) ? ` (${real(c.valor)})` : ""}. Já fez follow-up?`,
-        acoes: [["Fechou!", true, () => mudarEtapa(c, "Aguardando briefing")], ["Não fechou", false, () => mudarEtapa(c, "Perdida")], ["Lembrar em 3 dias", false, () => adiarLembrete(k, somaDiasISO(2))]] });
+        acoes: [["Fechou!", true, () => mudarEtapa(c, "Aguardando briefing")], ["Não fechou", false, () => mudarEtapa(c, "Perdida")], ["Abrir campanha", false, () => formContrato(c)], ["Lembrar em 3 dias", false, () => adiarLembrete(k, somaDiasISO(2))]] });
     }
   });
   // Agenda do calendário: o que é pra hoje e o que ficou pra trás (até 7 dias)
