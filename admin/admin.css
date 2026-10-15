@@ -1063,3 +1063,21 @@ dialog.pro-cheia iframe { flex: 1; width: 100%; border: 0; background: #fff; }
   .car-tela { scroll-snap-align: start; }
 }
 @media (max-width: 520px) { .ig-reels { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } .ig-reel-acoes .btn { padding: 4px 8px; } }
+
+/* Carrossel: estilo editorial */
+.car-tons { display: flex; gap: 8px; margin-bottom: 6px; }
+.car-amostra { display: inline-flex; align-items: baseline; gap: 4px; padding: 14px 16px; border-radius: 10px; border: 1px solid var(--line); font-family: "Playfair Display", serif; font-size: 26px; }
+.car-amostra i { font-weight: 700; }
+.car-f-serifa { font-family: "Playfair Display", serif; font-size: 24px; margin: 0 0 4px; }
+.car-f-bastao { font-family: Montserrat, sans-serif; font-weight: 800; font-size: 18px; margin: 0 0 4px; }
+.car-f-mao { font-family: Allura, cursive; font-size: 32px; margin: 0; }
+.car-ajuda { margin: -4px 0 12px; }
+.car-foto { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.car-foto img, .car-foto-vazia { width: 54px; height: 68px; border-radius: 6px; object-fit: cover; background: var(--tint); display: grid; place-items: center; font-size: 22px; }
+.car-foto label.btn { cursor: pointer; }
+.car-foto select.campo { width: auto; }
+.car-foto small { flex-basis: 100%; }
+.car-campo-curto { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.car-campo-curto .campo { width: auto; }
+.car-mais { display: flex; gap: 8px; flex-wrap: wrap; }
+.car-mais .campo { width: auto; flex: 1 1 160px; }

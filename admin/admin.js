@@ -5658,6 +5658,7 @@ async function carregarPlanos() {
   igx.faltaPlanos = !!a.error;
 }
 
+const ORDEM_CAMPOS_PLANO = { capa: ["titulo", "texto", "destaque"], texto: ["titulo", "texto"], lista: ["titulo", "texto"], numero: ["texto2", "titulo", "texto"], moldura: ["texto2", "titulo"], notas: ["titulo", "texto2"], polaroid: ["titulo"], colagem: ["titulo", "texto"], cartao: ["titulo", "texto", "texto2"], frase: ["titulo"], final: ["titulo", "texto", "destaque", "texto2"] };
 // Lê a resposta do Claude: linhas "SEG | Reels | tema | gancho | por quê" e blocos "CARROSSEL: título"
 function lerPlano(texto) {
   const itens = [], carrosseis = [];
@@ -5673,11 +5674,18 @@ function lerPlano(texto) {
       itens.push({ dia: sigla, formato: p[0] || "", tema: p[1] || "", gancho: p[2] || "", porque: p[3] || "" });
       car = null; return;
     }
-    const ms = l.match(/^(\d{1,2})[.)]?\s*(capa|texto|lista|comparacao|comparação|frase|final)\s*\|\s*(.*)$/i);
+    const ms = l.match(/^(\d{1,2})[.)]?\s*(capa|texto|lista|numero|número|moldura|notas|polaroid|colagem|cartao|cartão|frase|final|comparacao|comparação)\s*\|\s*(.*)$/i);
     if (ms && car) {
-      const p = ms[3].split("|").map((x) => x.trim());
-      const modelo = ms[2].toLowerCase().replace("comparação", "comparacao");
-      car.slides.push({ modelo, titulo: p[0] || "", texto: (p[1] || "").replace(/\s*;\s*/g, modelo === "lista" ? "\n" : "; ").replace(/\\n/g, "\n"), texto2: p[2] || "" });
+      const modelo = ms[2].toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace("comparacao", "cartao");
+      const partes = ms[3].split("|").map((x) => x.trim());
+      const slide = { modelo };
+      const dica = partes.findIndex((x) => /^foto\s*:/i.test(x));
+      if (dica >= 0) { slide.dicaFoto = partes[dica].replace(/^foto\s*:\s*/i, ""); partes.splice(dica, 1); }
+      (ORDEM_CAMPOS_PLANO[modelo] || ["titulo", "texto"]).forEach((c, k) => { if (partes[k]) slide[c] = partes[k]; });
+      if (modelo === "lista" && slide.texto) slide.texto = slide.texto.split(/\s*;\s*/).join("\n");
+      if (modelo === "final") { slide.tom = "escuro"; slide.texto2 = slide.texto2 || "Link na bio"; }
+      if (modelo === "texto") slide.tom = car.slides.filter((x) => x.modelo === "texto").length % 2 ? "forte" : "escuro";
+      car.slides.push(slide);
     }
   });
   return { itens, carrosseis: carrosseis.filter((c) => c.slides.length) };
@@ -5720,15 +5728,20 @@ O QUE EU PRECISO (pesquise na internet o que está em alta no Brasil nesta seman
    Escreva CADA post numa linha, EXATAMENTE neste formato, separado por | :
    SEG | Reels | tema | gancho (a primeira frase do vídeo ou a capa) | por que vai funcionar
    Use só SEG, TER, QUA, QUI, SEX, SAB, DOM no começo. Formatos: Reels, Carrossel, Stories ou Foto.
-6. CARROSSÉIS PRONTOS: para cada carrossel do plano, escreva os slides neste formato (de 5 a 8 slides, no máximo 30 palavras por slide):
+6. CARROSSÉIS PRONTOS: para cada carrossel do plano, escreva os slides neste formato (de 5 a 8 slides, no máximo 30 palavras por slide). Num título, *palavra* fica em itálico colorido e **palavra** em negrito (use 1 destaque por título, no máximo).
    CARROSSEL: título do carrossel
-   1 capa | título forte (até 8 palavras) | subtítulo curto
-   2 texto | título | texto do slide
+   1 capa | título forte (até 10 palavras) | linha pequena em cima (opcional) | etiqueta curta (opcional) | foto: que foto minha usar
+   2 texto | título com *uma palavra* destacada | texto do slide
    3 lista | título | item um; item dois; item três
-   4 comparacao | título | ERRADO: como a maioria faz | CERTO: como fazer
-   5 frase | a frase de impacto | de onde ela vem (opcional)
-   6 final | chamada final (ex.: salva pra não esquecer) | o que a pessoa ganha me seguindo
-   Os modelos possíveis são: capa, texto, lista, comparacao, frase, final. Comece sempre com capa e termine com final.
+   4 numero | linha pequena (ex.: HOJE) | o número (ex.: +40 MARCAS.) | linha de baixo
+   5 moldura | nota pequena | frase (ex.: sem experiência. **sem marca.** sem cliente.) | foto: que foto ou print usar
+   6 notas | frase forte do card | balão curtinho (ex.: *panic*) | foto: fundo
+   7 polaroid | legenda curta | foto: que foto usar
+   8 colagem | título | texto com **final em negrito** | foto: quais 2 fotos
+   9 cartao | título do card | texto do card | bilhete curto | foto: fundo
+   10 frase | frase de impacto | foto: fundo
+   11 final | frase de cima | frase de baixo | caixa de destaque (ex.: Salva esse post) | letra de mão (ex.: Link na bio)
+   Modelos possíveis: capa, texto, lista, numero, moldura, notas, polaroid, colagem, cartao, frase, final. Comece sempre com capa e termine com final. Alterne slides com foto e slides de texto.
 
 Fale como gente de verdade, em português do Brasil, sem cara de anúncio. Não use travessão em nenhum texto.`;
 }
@@ -5831,147 +5844,401 @@ function desenharPlanoSemana(el) {
   });
 }
 
-/* ---------- 🎨 Carrossel: sistema visual + gerador ---------- */
-const VISUAL = {
-  azul: "#1F3FC3", bege: "#F0EEEA", oliva: "#8A855E", tinta: "#14182B", olivaClaro: "#E4E1D3",
-  titulo: "Anton", texto: "Archivo", arroba: "@ryalvz", L: 1080, A: 1350, M: 96
+/* ---------- 🎨 Carrossel: sistema visual + gerador ----------
+   Estilo editorial (inspirado nos seus fixados e nas referências):
+   foto sua no centro, serifada elegante + bastão grossa, objetos de
+   papel (etiqueta, Notas, polaroid, clipe, fita, estrela).
+   No texto: *palavra* = itálico colorido, **palavra** = negrito.
+   ----------------------------------------------------------------- */
+const FONTE_SERIFA = "'Playfair Display'", FONTE_BASTAO = "Montserrat", FONTE_MAO = "Allura";
+const TEMAS_CARROSSEL = {
+  ryan: { nome: "Ryan (creme e dourado)", acento: "#1F3FC3",
+    claro: { fundo: "#F5F1EA", titulo: "#2B241C", texto: "#3A3128", destaque: "#7A6322" },
+    escuro: { fundo: "#2B241C", titulo: "#F5F1EA", texto: "#E9E1D3", destaque: "#D9C48A" },
+    forte: { fundo: "#7A6322", titulo: "#FFF8EA", texto: "#F5ECD9", destaque: "#F3E2A6" } },
+  roxo: { nome: "Roxo e lima", acento: "#7B3FB0",
+    claro: { fundo: "#F3EEE3", titulo: "#3A0E46", texto: "#3A0E46", destaque: "#7B2C8F" },
+    escuro: { fundo: "#3A0E46", titulo: "#FBF6E8", texto: "#EDE3F0", destaque: "#E4F04B" },
+    forte: { fundo: "#D8F04A", titulo: "#3A0E46", texto: "#2B2B2B", destaque: "#3A0E46" } },
+  cafe: { nome: "Café e verde", acento: "#1F4D3A",
+    claro: { fundo: "#ECE7E0", titulo: "#4A3428", texto: "#4A3428", destaque: "#1F4D3A" },
+    escuro: { fundo: "#1F3A2E", titulo: "#F3EEE6", texto: "#E8E2D6", destaque: "#E3C987" },
+    forte: { fundo: "#4A3428", titulo: "#F3EEE6", texto: "#EDE5DA", destaque: "#E3C987" } },
+  cobalto: { nome: "Cobalto (cores do site)", acento: "#1F3FC3",
+    claro: { fundo: "#F0EEEA", titulo: "#1F3FC3", texto: "#14182B", destaque: "#8A855E" },
+    escuro: { fundo: "#1F3FC3", titulo: "#F0EEEA", texto: "#E8EAF6", destaque: "#F2E66B" },
+    forte: { fundo: "#14182B", titulo: "#F0EEEA", texto: "#D9DCE8", destaque: "#F2E66B" } }
 };
+const ASSINATURA = { nome: "RYAN ALVES", cargo: "UGC CREATOR", arroba: "@ryalvz" };
+const W_CAR = 1080, H_CAR = 1350, M_CAR = 90;
+
+// Modelos: [chave, nome, para que serve, campos (na ordem do editor)]
 const MODELOS_SLIDE = [
-  ["capa", "Capa", "Fundo azul, título grande. A promessa do carrossel."],
-  ["texto", "Texto", "Fundo bege, um título e um parágrafo curto."],
-  ["lista", "Lista", "Passos ou itens numerados (um por linha)."],
-  ["comparacao", "Comparação", "Errado x certo, antes x depois."],
-  ["frase", "Frase", "Fundo azul, uma frase de impacto."],
-  ["final", "Final", "Chamada para salvar, compartilhar e seguir."]
+  ["capa", "Capa com foto", "Sua foto em tela cheia e a promessa do carrossel.", ["foto", "texto", "titulo", "destaque"]],
+  ["texto", "Texto editorial", "01. Título elegante e um parágrafo. Fundo de cor chapada.", ["tom", "titulo", "texto"]],
+  ["lista", "Lista", "Passos ou itens, um por linha.", ["tom", "titulo", "texto"]],
+  ["numero", "Número grande", "Um número que impressiona (ex.: +40 MARCAS).", ["tom", "texto2", "titulo", "texto"]],
+  ["moldura", "Foto emoldurada", "Foto ou print no meio, frase embaixo.", ["tom", "foto", "texto2", "titulo"]],
+  ["notas", "Card do Notas", "Frase forte num card do app Notas, com balão.", ["foto", "titulo", "texto2"]],
+  ["polaroid", "Polaroid", "Uma foto em polaroid com legenda.", ["tom", "foto", "titulo"]],
+  ["colagem", "Colagem (2 fotos)", "Título, duas fotos tortas com clipe e um texto.", ["tom", "titulo", "foto", "foto2", "texto"]],
+  ["cartao", "Card sobre a foto", "Card de papel e um bilhete por cima da sua foto.", ["foto", "titulo", "texto", "texto2"]],
+  ["frase", "Frase sobre a foto", "Uma frase centralizada em cima da sua foto.", ["foto", "titulo"]],
+  ["final", "Final com chamada", "Chamada para seguir, salvar ou ir no link.", ["tom", "titulo", "foto", "texto", "destaque", "texto2"]]
 ];
+const ROTULOS_CAMPO = {
+  capa: { texto: "Linha pequena em cima (opcional)", titulo: "Título (*itálico* **negrito**)", destaque: "Etiqueta torta (opcional)" },
+  texto: { titulo: "Título (*palavra* fica colorida)", texto: "Texto do slide" },
+  lista: { titulo: "Título", texto: "Um item por linha" },
+  numero: { texto2: "Linha pequena em cima (ex.: HOJE)", titulo: "O número (ex.: +40 MARCAS.)", texto: "Embaixo (ex.: Moda · Tecnologia · Lifestyle)" },
+  moldura: { texto2: "Nota pequena no canto (opcional)", titulo: "Frase (ex.: sem experiência. **sem marca.**)" },
+  notas: { titulo: "Texto do card", texto2: "Balão azul (ex.: *panic*)" },
+  polaroid: { titulo: "Legenda da polaroid" },
+  colagem: { titulo: "Título", texto: "Texto embaixo (**negrito** no final)" },
+  cartao: { titulo: "Título do card (itálico)", texto: "Texto do card", texto2: "Bilhete por cima (opcional)" },
+  frase: { titulo: "A frase" },
+  final: { titulo: "Frase de cima", texto: "Frase de baixo", destaque: "Caixa de destaque (ex.: Salva esse post)", texto2: "Letra de mão (ex.: Link na bio)" }
+};
 const CARROSSEL_EXEMPLO = {
-  titulo: "Como fechei minha primeira marca",
+  titulo: "Há 1 ano eu não tinha nenhuma marca", tema: "ryan",
   slides: [
-    { modelo: "capa", titulo: "Como fechei minha primeira marca sem seguidores", texto: "o passo a passo que ninguém conta" },
-    { modelo: "texto", titulo: "Marca não compra seguidor", texto: "Marca compra vídeo que vende. No UGC, o que importa é o seu portfólio, não o tamanho do seu perfil." },
-    { modelo: "lista", titulo: "O que eu fiz", texto: "Gravei 3 vídeos de produtos que eu já tinha\nMontei um portfólio simples\nMandei 10 e-mails por dia\nFiz follow-up depois de 3 dias" },
-    { modelo: "comparacao", titulo: "O e-mail que funciona", texto: "ERRADO: Oi, quer fazer parceria?", texto2: "CERTO: Gravei um vídeo do seu produto, posso te mandar?" },
-    { modelo: "frase", titulo: "Constância vence talento quando o talento não aparece", texto: "" },
-    { modelo: "final", titulo: "Salva pra fazer depois", texto: "Toda semana eu conto os bastidores de UGC por aqui" }
+    { modelo: "capa", titulo: "Há 1 ano eu não tinha *nenhuma marca* no portfólio.", texto: "", destaque: "" },
+    { modelo: "moldura", tom: "claro", texto2: "Meu primeiro vídeo para portfólio", titulo: "sem experiência. **sem marca.** sem cliente." },
+    { modelo: "texto", tom: "escuro", titulo: "O que *ninguém* te conta.", texto: "Meu primeiro trabalho veio 3 meses depois. Teve mês sem fechar nada. E eu pensei várias vezes que aquilo não ia funcionar para mim. Mas continuei criando e melhorando o portfólio." },
+    { modelo: "numero", tom: "claro", texto2: "HOJE", titulo: "+40 MARCAS.", texto: "Moda · Tecnologia · Lifestyle · Grooming" },
+    { modelo: "notas", titulo: "Constância vence talento quando o talento não aparece.", texto2: "*anota*" },
+    { modelo: "frase", titulo: "A única coisa que me separa de quem eu era há 1 ano é que eu não parei." },
+    { modelo: "final", tom: "escuro", titulo: "Se você quer começar no UGC,", texto: "me segue que eu conto os bastidores por aqui.", destaque: "Salva esse post", texto2: "@ryalvz" }
   ]
 };
+
 let fontesCarrossel = null;
 function carregarFontesCarrossel() {
-  if (!fontesCarrossel) fontesCarrossel = Promise.all(["400 80px Anton", "400 40px Archivo", "600 40px Archivo", "700 40px Archivo"].map((f) => document.fonts.load(f).catch(() => null))).then(() => document.fonts.ready);
+  if (!fontesCarrossel) fontesCarrossel = Promise.all([
+    `400 60px ${FONTE_SERIFA}`, `700 60px ${FONTE_SERIFA}`, `italic 400 60px ${FONTE_SERIFA}`, `italic 700 60px ${FONTE_SERIFA}`,
+    `500 40px ${FONTE_BASTAO}`, `600 40px ${FONTE_BASTAO}`, `700 40px ${FONTE_BASTAO}`, `800 40px ${FONTE_BASTAO}`, `400 60px ${FONTE_MAO}`
+  ].map((f) => document.fonts.load(f).catch(() => null))).then(() => document.fonts.ready);
   return fontesCarrossel;
 }
 
-// Quebra o texto em linhas que cabem na largura (respeita os "enter")
-function quebrarLinhas(ctx, texto, largura) {
+/* ---------- Fotos: guardadas no Storage, carregadas sem "sujar" o canvas ---------- */
+const fotosCarrossel = new Map();
+function fotoCarrossel(url, aoCarregar) {
+  if (!url) return null;
+  const f = fotosCarrossel.get(url);
+  if (f) return f.pronta ? f.img : null;
+  const img = new Image(); img.crossOrigin = "anonymous";
+  const reg = { img, pronta: false, promessa: null };
+  reg.promessa = new Promise((ok) => { img.onload = () => { reg.pronta = true; ok(img); if (aoCarregar) aoCarregar(); }; img.onerror = () => ok(null); });
+  img.src = url;
+  fotosCarrossel.set(url, reg);
+  return null;
+}
+const esperarFotos = (slides) => Promise.all(slides.flatMap((s) => [s.foto, s.foto2]).filter(Boolean).map((u) => { fotoCarrossel(u); return fotosCarrossel.get(u).promessa; }));
+async function prepararFoto(arquivo) {
+  const url = URL.createObjectURL(arquivo);
+  const img = await new Promise((ok, falha) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => falha(new Error("Não consegui abrir essa imagem. Use JPG, PNG ou HEIC convertido.")); i.src = url; });
+  const escala = Math.min(1, 1700 / Math.max(img.width, img.height));
+  const cv = document.createElement("canvas"); cv.width = Math.round(img.width * escala); cv.height = Math.round(img.height * escala);
+  cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
+  URL.revokeObjectURL(url);
+  const blob = await new Promise((ok) => cv.toBlob(ok, "image/jpeg", 0.88));
+  return new File([blob], "foto.jpg", { type: "image/jpeg" });
+}
+
+/* ---------- Texto rico: *itálico colorido* e **negrito** ---------- */
+function pedacosRicos(texto) {
+  const r = [], re = /(\*\*[^*]+\*\*|\*[^*]+\*)/g;
+  let ultimo = 0, m;
+  const s = String(texto || "");
+  while ((m = re.exec(s))) {
+    if (m.index > ultimo) r.push({ t: s.slice(ultimo, m.index), e: "n" });
+    r.push(m[0].startsWith("**") ? { t: m[0].slice(2, -2), e: "b" } : { t: m[0].slice(1, -1), e: "a" });
+    ultimo = m.index + m[0].length;
+  }
+  if (ultimo < s.length) r.push({ t: s.slice(ultimo), e: "n" });
+  return r;
+}
+// fontes(tam) => { n, a, b }: a fonte de cada estilo naquele tamanho
+function linhasRicas(ctx, texto, fontes, largura, maiusc) {
   const linhas = [];
   String(texto || "").split("\n").forEach((par) => {
-    const palavras = par.split(/\s+/).filter(Boolean);
-    if (!palavras.length) { linhas.push(""); return; }
-    let atual = "";
+    const palavras = [];
+    pedacosRicos(maiusc ? par.toUpperCase() : par).forEach((p) => p.t.split(/(\s+)/).forEach((w) => { if (w && !/^\s+$/.test(w)) palavras.push({ t: w, e: p.e }); else if (w && palavras.length) palavras[palavras.length - 1].espaco = true; }));
+    if (!palavras.length) { linhas.push({ itens: [], fim: true }); return; }
+    let atual = [], larg = 0;
     palavras.forEach((p) => {
-      const teste = atual ? atual + " " + p : p;
-      if (ctx.measureText(teste).width <= largura || !atual) atual = teste; else { linhas.push(atual); atual = p; }
+      ctx.font = fontes[p.e]; const w = ctx.measureText(p.t).width;
+      ctx.font = fontes.n; const esp = atual.length ? ctx.measureText(" ").width : 0;
+      if (atual.length && larg + esp + w > largura) { linhas.push({ itens: atual, fim: false }); atual = []; larg = 0; }
+      atual.push({ ...p, w }); larg += (atual.length > 1 ? esp : 0) + w;
     });
-    linhas.push(atual);
+    linhas.push({ itens: atual, fim: true });
   });
   return linhas;
 }
-// Acha o maior tamanho de letra em que o texto cabe na caixa
-function caber(ctx, texto, { fonte, peso = 400, max, min, largura, altura, entre = 1.1, maiusculas }) {
-  const t = maiusculas ? String(texto || "").toUpperCase() : String(texto || "");
-  for (let tam = max; tam >= min; tam -= 4) {
-    ctx.font = `${peso} ${tam}px ${fonte}`;
-    const linhas = quebrarLinhas(ctx, t, largura);
-    if (linhas.length * tam * entre <= altura) return { tam, linhas, entre };
+function caberRico(ctx, texto, { fontes, max, min, largura, altura, entre = 1.15, maiusc = false, passo = 2 }) {
+  for (let tam = max; tam >= min; tam -= passo) {
+    const f = fontes(tam), linhas = linhasRicas(ctx, texto, f, largura, maiusc);
+    if (linhas.length * tam * entre <= altura) return { tam, linhas, entre, f };
   }
-  ctx.font = `${peso} ${min}px ${fonte}`;
-  return { tam: min, linhas: quebrarLinhas(ctx, t, largura), entre };
+  const f = fontes(min);
+  return { tam: min, linhas: linhasRicas(ctx, texto, f, largura, maiusc), entre, f };
 }
-function escrever(ctx, bloco, x, y, cor, alinhar = "left") {
-  ctx.fillStyle = cor; ctx.textAlign = alinhar; ctx.textBaseline = "top";
-  bloco.linhas.forEach((l, i) => ctx.fillText(l, x, y + i * bloco.tam * bloco.entre));
+// alinhar: "left" | "center" | "right" | "justify"
+function escreverRico(ctx, bloco, x, y, cores, alinhar = "left", largura = 0, extra = {}) {
+  ctx.textBaseline = "alphabetic"; ctx.textAlign = "left";
+  bloco.linhas.forEach((l, i) => {
+    const base = y + i * bloco.tam * bloco.entre + bloco.tam * 0.86;
+    ctx.font = bloco.f.n; const esp = ctx.measureText(" ").width;
+    const total = l.itens.reduce((s, p) => s + p.w, 0) + Math.max(0, l.itens.length - 1) * esp;
+    let cx = alinhar === "center" ? x - total / 2 : alinhar === "right" ? x - total : x;
+    const gap = alinhar === "justify" && !l.fim && l.itens.length > 1 ? (largura - (total - (l.itens.length - 1) * esp)) / (l.itens.length - 1) : esp;
+    l.itens.forEach((p) => {
+      ctx.font = bloco.f[p.e]; ctx.fillStyle = cores[p.e] || cores.n;
+      ctx.fillText(p.t, cx, base);
+      if (extra.sublinhado) { ctx.fillRect(cx, base + bloco.tam * 0.12, p.w + (p === l.itens[l.itens.length - 1] ? 0 : gap), Math.max(2, bloco.tam * 0.06)); }
+      cx += p.w + gap;
+    });
+  });
   return y + bloco.linhas.length * bloco.tam * bloco.entre;
 }
+const serifa = (estilo = "") => (t) => ({ n: `${estilo} 400 ${t}px ${FONTE_SERIFA}`.trim(), a: `italic 700 ${t}px ${FONTE_SERIFA}`, b: `${estilo} 700 ${t}px ${FONTE_SERIFA}`.trim() });
+const serifaItalica = (t) => ({ n: `italic 700 ${t}px ${FONTE_SERIFA}`, a: `italic 700 ${t}px ${FONTE_SERIFA}`, b: `italic 700 ${t}px ${FONTE_SERIFA}` });
+const bastao = (peso = 500) => (t) => ({ n: `${peso} ${t}px ${FONTE_BASTAO}`, a: `italic 700 ${t * 1.08}px ${FONTE_SERIFA}`, b: `800 ${t}px ${FONTE_BASTAO}` });
+
+/* ---------- Objetos de papel ---------- */
 function retanguloRedondo(ctx, x, y, w, h, r, cor) {
   ctx.fillStyle = cor; ctx.beginPath();
   ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r);
   ctx.closePath(); ctx.fill();
 }
-// Separa "ERRADO: texto" em rótulo e texto
-const rotuloDe = (t, padrao) => { const m = String(t || "").match(/^\s*([^:\n]{2,18}):\s*([\s\S]*)$/); return m ? [m[1].trim().toUpperCase(), m[2].trim()] : [padrao, String(t || "").trim()]; };
+let granulado = null;
+function texturaPapel(ctx, forca = 0.07) {
+  if (!granulado) {
+    granulado = document.createElement("canvas"); granulado.width = granulado.height = 240;
+    const g = granulado.getContext("2d"), d = g.createImageData(240, 240);
+    for (let i = 0; i < d.data.length; i += 4) { const v = Math.random() * 255; d.data[i] = d.data[i + 1] = d.data[i + 2] = v; d.data[i + 3] = 255; }
+    g.putImageData(d, 0, 0);
+  }
+  ctx.save(); ctx.globalAlpha = forca; ctx.globalCompositeOperation = "overlay";
+  ctx.fillStyle = ctx.createPattern(granulado, "repeat"); ctx.fillRect(0, 0, W_CAR, H_CAR); ctx.restore();
+}
+function caixaPapel(ctx, x, y, w, h, r, cor, sombra) {
+  ctx.save();
+  if (sombra) { ctx.shadowColor = "rgba(0,0,0,.22)"; ctx.shadowBlur = 36; ctx.shadowOffsetY = 14; }
+  retanguloRedondo(ctx, x, y, w, h, r, cor); ctx.restore();
+}
+function girar(ctx, cx, cy, graus, desenho) { ctx.save(); ctx.translate(cx, cy); ctx.rotate((graus * Math.PI) / 180); desenho(); ctx.restore(); }
+function fotoCobre(ctx, img, x, y, w, h, foco = 0.35) {
+  if (!img) {
+    const g = ctx.createLinearGradient(x, y, x + w, y + h); g.addColorStop(0, "#5b5248"); g.addColorStop(1, "#2b241c");
+    ctx.fillStyle = g; ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = "rgba(255,255,255,.55)"; ctx.font = `600 ${Math.max(22, Math.min(40, w / 16))}px ${FONTE_BASTAO}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("📷 sua foto aqui", x + w / 2, y + h / 2); return;
+  }
+  const esc = Math.max(w / img.width, h / img.height), iw = img.width * esc, ih = img.height * esc;
+  ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+  ctx.drawImage(img, x + (w - iw) / 2, y + (h - ih) * foco, iw, ih); ctx.restore();
+}
+function fotoRedonda(ctx, img, x, y, w, h, r, foco) { ctx.save(); ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); ctx.clip(); fotoCobre(ctx, img, x, y, w, h, foco); ctx.restore(); }
+function estrelaPapel(ctx, cx, cy, raio, cor, pontas = 12) {
+  ctx.fillStyle = cor; ctx.beginPath();
+  for (let i = 0; i < pontas * 2; i++) { const r = i % 2 ? raio * 0.55 : raio, a = (Math.PI * i) / pontas; ctx[i ? "lineTo" : "moveTo"](cx + r * Math.cos(a), cy + r * Math.sin(a)); }
+  ctx.closePath(); ctx.fill();
+}
+function fita(ctx, cx, cy, graus) { girar(ctx, cx, cy, graus, () => { ctx.fillStyle = "rgba(226,210,174,.82)"; ctx.fillRect(-80, -26, 160, 52); ctx.fillStyle = "rgba(255,255,255,.18)"; ctx.fillRect(-80, -26, 160, 10); }); }
+function clipe(ctx, cx, cy, graus) {
+  girar(ctx, cx, cy, graus, () => {
+    ctx.strokeStyle = "#a9a9a9"; ctx.lineWidth = 7; ctx.lineCap = "round";
+    const laco = (w, h, x0) => { ctx.beginPath(); ctx.moveTo(x0, h / 2); ctx.lineTo(x0, -h / 2 + w / 2); ctx.arc(x0 + w / 2, -h / 2 + w / 2, w / 2, Math.PI, 0); ctx.lineTo(x0 + w, h / 2 - 10); ctx.stroke(); };
+    laco(46, 150, -23); laco(30, 110, -15);
+  });
+}
+function espacado(ctx, texto, x, y, espaco, alinhar = "center") {
+  const letras = [...texto]; const ws = letras.map((c) => ctx.measureText(c).width);
+  const total = ws.reduce((a, b) => a + b, 0) + espaco * (letras.length - 1);
+  let cx = alinhar === "center" ? x - total / 2 : alinhar === "right" ? x - total : x;
+  ctx.textAlign = "left"; letras.forEach((c, i) => { ctx.fillText(c, cx, y); cx += ws[i] + espaco; });
+}
+function cabecalhoSlide(ctx, cor, i, total) {
+  ctx.save(); ctx.fillStyle = cor; ctx.globalAlpha = 0.6; ctx.textBaseline = "alphabetic";
+  ctx.font = `600 22px ${FONTE_BASTAO}`; espacado(ctx, `${ASSINATURA.nome}  |  ${ASSINATURA.cargo}`, W_CAR / 2, 74, 3);
+  ctx.font = `500 22px ${FONTE_BASTAO}`; ctx.textAlign = "left"; ctx.fillText(ASSINATURA.arroba, M_CAR, H_CAR - 52);
+  ctx.textAlign = "right"; ctx.fillText(`${i + 1}/${total}`, W_CAR - M_CAR, H_CAR - 52);
+  ctx.restore();
+}
+function marcaDagua(ctx, cor) { ctx.save(); ctx.globalAlpha = 0.2; ctx.fillStyle = cor; ctx.font = `400 104px ${FONTE_SERIFA}`; ctx.textBaseline = "alphabetic"; espacado(ctx, "UGC Creator", W_CAR / 2, H_CAR - 26, 34); ctx.restore(); }
+function arraste(ctx, cx, cy, cor) {
+  ctx.save(); ctx.font = `italic 400 30px ${FONTE_SERIFA}`; const w = ctx.measureText("Arraste a tela").width + 50;
+  ctx.strokeStyle = cor; ctx.lineWidth = 2; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(cx - w / 2 - 20, cy - 24, w, 48, 24) : ctx.rect(cx - w / 2 - 20, cy - 24, w, 48); ctx.stroke();
+  ctx.fillStyle = cor; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("Arraste a tela", cx - 20, cy + 1);
+  ctx.beginPath(); ctx.moveTo(cx + w / 2 - 14, cy); ctx.lineTo(cx + w / 2 + 34, cy); ctx.lineTo(cx + w / 2 + 24, cy - 8); ctx.moveTo(cx + w / 2 + 34, cy); ctx.lineTo(cx + w / 2 + 24, cy + 8); ctx.stroke();
+  ctx.restore();
+}
+function etiqueta(ctx, texto, cx, cy, graus, fundo, cor, tam = 40) {
+  girar(ctx, cx, cy, graus, () => {
+    ctx.font = `800 ${tam}px ${FONTE_BASTAO}`; const w = ctx.measureText(texto).width + tam * 1.1, h = tam * 1.6;
+    ctx.fillStyle = fundo; ctx.fillRect(-w / 2, -h / 2, w, h);
+    ctx.fillStyle = cor; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(texto, 0, 2);
+  });
+}
 
-function pintarSlide(cv, s, i, total) {
-  const V = VISUAL, ctx = cv.getContext("2d"), W = V.L, H = V.A, M = V.M, LW = W - M * 2;
+/* ---------- Desenha um slide ---------- */
+function pintarSlide(cv, s, i, total, temaChave, aoCarregar) {
+  const T = TEMAS_CARROSSEL[temaChave] || TEMAS_CARROSSEL.ryan;
+  const ctx = cv.getContext("2d"), W = W_CAR, H = H_CAR, M = M_CAR, LW = W - M * 2;
   cv.width = W; cv.height = H;
-  const escuro = s.modelo === "capa" || s.modelo === "frase";
-  const fundo = escuro ? V.azul : V.bege, frente = escuro ? V.bege : V.azul, corpo = escuro ? V.bege : V.tinta;
-  ctx.fillStyle = fundo; ctx.fillRect(0, 0, W, H);
-  // Rodapé: @ e número da página (igual em todos)
-  ctx.font = `600 30px ${V.texto}`; ctx.fillStyle = escuro ? "rgba(240,238,234,.8)" : V.oliva; ctx.textBaseline = "alphabetic"; ctx.textAlign = "left";
-  ctx.fillText(V.arroba, M, H - 64);
-  ctx.textAlign = "right"; ctx.fillText(`${i + 1}/${total}`, W - M, H - 64);
-  // Detalhe de cor no topo
-  ctx.fillStyle = V.oliva; ctx.fillRect(M, M, 120, 12);
-  const topo = M + 60, base = H - 150;
+  const tom = T[s.tom] || T[{ texto: "escuro", lista: "claro", numero: "claro", moldura: "claro", polaroid: "claro", colagem: "claro", final: "escuro" }[s.modelo] || "claro"];
+  const foco = { topo: 0.15, meio: 0.45, baixo: 0.8 }[s.enquadrar] ?? 0.3;
+  const f1 = fotoCarrossel(s.foto, aoCarregar), f2 = fotoCarrossel(s.foto2, aoCarregar);
+  const fundoTom = () => { ctx.fillStyle = tom.fundo; ctx.fillRect(0, 0, W, H); texturaPapel(ctx); };
+  const cores = (c) => ({ n: c.titulo, a: c.destaque, b: c.titulo });
 
-  if (s.modelo === "capa") {
-    const sub = s.texto ? caber(ctx, s.texto, { fonte: V.texto, peso: 500, max: 46, min: 32, largura: LW, altura: 200, entre: 1.3 }) : null;
-    const altSub = sub ? sub.linhas.length * sub.tam * sub.entre + 40 : 0;
-    const t = caber(ctx, s.titulo, { fonte: V.titulo, max: 170, min: 80, largura: LW, altura: base - topo - altSub - 120, entre: 1.02, maiusculas: true });
-    const alt = t.linhas.length * t.tam * t.entre + altSub;
-    let y = Math.max(topo + 40, (H - alt) / 2 - 40);
-    ctx.font = `400 ${t.tam}px ${V.titulo}`; y = escrever(ctx, t, M, y, frente);
-    if (sub) { ctx.font = `500 ${sub.tam}px ${V.texto}`; escrever(ctx, sub, M, y + 40, "rgba(240,238,234,.88)"); }
-    // "arrasta"
-    ctx.font = `700 30px ${V.texto}`; const tx = "ARRASTA  →", lw = ctx.measureText(tx).width + 56;
-    retanguloRedondo(ctx, W - M - lw, H - 200, lw, 64, 32, V.bege);
-    ctx.fillStyle = V.azul; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(tx, W - M - lw / 2, H - 168);
-  } else if (s.modelo === "texto") {
-    const t = caber(ctx, s.titulo, { fonte: V.titulo, max: 110, min: 64, largura: LW, altura: 420, entre: 1.05, maiusculas: true });
-    ctx.font = `400 ${t.tam}px ${V.titulo}`; let y = escrever(ctx, t, M, topo, frente);
-    const b = caber(ctx, s.texto, { fonte: V.texto, peso: 500, max: 62, min: 34, largura: LW, altura: base - y - 60, entre: 1.4 });
-    ctx.font = `500 ${b.tam}px ${V.texto}`; escrever(ctx, b, M, y + 50, corpo);
-  } else if (s.modelo === "lista") {
-    const t = caber(ctx, s.titulo, { fonte: V.titulo, max: 100, min: 60, largura: LW, altura: 300, entre: 1.05, maiusculas: true });
-    ctx.font = `400 ${t.tam}px ${V.titulo}`; let y = escrever(ctx, t, M, topo, frente) + 50;
-    const itens = String(s.texto || "").split("\n").map((x) => x.trim()).filter(Boolean).slice(0, 7);
-    const espaco = Math.min(210, (base - y) / Math.max(1, itens.length));
-    const tamItem = Math.min(54, Math.max(32, espaco * 0.3));
-    itens.forEach((it, k) => {
-      const cy = y + k * espaco;
-      ctx.fillStyle = V.azul; ctx.beginPath(); ctx.arc(M + 34, cy + 34, 34, 0, Math.PI * 2); ctx.fill();
-      ctx.font = `400 38px ${V.titulo}`; ctx.fillStyle = V.bege; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(String(k + 1), M + 34, cy + 36);
-      ctx.font = `500 ${tamItem}px ${V.texto}`;
-      const b = { tam: tamItem, entre: 1.3, linhas: quebrarLinhas(ctx, it, LW - 110).slice(0, 3) };
-      escrever(ctx, b, M + 100, cy + 34 - Math.min(b.linhas.length, 2) * tamItem * 0.65 + 4, corpo);
-    });
-  } else if (s.modelo === "comparacao") {
-    const t = caber(ctx, s.titulo, { fonte: V.titulo, max: 96, min: 60, largura: LW, altura: 240, entre: 1.05, maiusculas: true });
-    ctx.font = `400 ${t.tam}px ${V.titulo}`; let y = escrever(ctx, t, M, topo, frente) + 44;
-    const altCaixa = (base - y - 30) / 2;
-    [[s.texto, "ANTES", V.olivaClaro, V.oliva, V.tinta], [s.texto2, "DEPOIS", V.azul, V.bege, V.bege]].forEach(([txt, padrao, cf, cr, ct], k) => {
-      const [rot, conteudo] = rotuloDe(txt, padrao);
-      const cy = y + k * (altCaixa + 30);
-      retanguloRedondo(ctx, M, cy, LW, altCaixa, 28, cf);
-      ctx.font = `700 30px ${V.texto}`; ctx.fillStyle = cr; ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.fillText(rot, M + 48, cy + 44);
-      const b = caber(ctx, conteudo, { fonte: V.texto, peso: 600, max: 60, min: 30, largura: LW - 96, altura: altCaixa - 130, entre: 1.3 });
-      ctx.font = `600 ${b.tam}px ${V.texto}`; escrever(ctx, b, M + 48, cy + 100, ct);
-    });
-  } else if (s.modelo === "frase") {
-    ctx.font = `400 300px ${V.titulo}`; ctx.fillStyle = V.oliva; ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.fillText("“", M - 10, topo - 20);
-    const autor = s.texto ? s.texto : "";
-    const t = caber(ctx, s.titulo, { fonte: V.titulo, max: 120, min: 60, largura: LW, altura: base - topo - 360, entre: 1.08, maiusculas: true });
-    ctx.font = `400 ${t.tam}px ${V.titulo}`; let y = escrever(ctx, t, M, topo + 300, frente);
-    if (autor) { ctx.font = `500 38px ${V.texto}`; ctx.fillStyle = "rgba(240,238,234,.8)"; ctx.textBaseline = "top"; ctx.textAlign = "left"; ctx.fillText(autor, M, y + 40); }
-  } else { // final
-    const t = caber(ctx, s.titulo || "Salva pra não esquecer", { fonte: V.titulo, max: 140, min: 70, largura: LW, altura: 460, entre: 1.03, maiusculas: true });
-    ctx.font = `400 ${t.tam}px ${V.titulo}`; let y = escrever(ctx, t, M, topo + 40, frente);
-    if (s.texto) { const b = caber(ctx, s.texto, { fonte: V.texto, peso: 500, max: 46, min: 32, largura: LW, altura: 220, entre: 1.35 }); ctx.font = `500 ${b.tam}px ${V.texto}`; y = escrever(ctx, b, M, y + 40, corpo); }
-    const by = Math.max(y + 70, base - 300);
-    retanguloRedondo(ctx, M, by, LW, 130, 65, V.azul);
-    ctx.font = `400 60px ${V.titulo}`; ctx.fillStyle = V.bege; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(`SIGA ${V.arroba.toUpperCase()}`, W / 2, by + 68);
-    ctx.font = `600 34px ${V.texto}`; ctx.fillStyle = V.oliva; ctx.textBaseline = "top";
-    ctx.fillText("salve  ·  compartilhe  ·  comente", W / 2, by + 170);
+  switch (s.modelo) {
+    case "capa": {
+      fotoCobre(ctx, f1, 0, 0, W, H, foco);
+      const g = ctx.createLinearGradient(0, H * 0.35, 0, H); g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(1, "rgba(0,0,0,.72)");
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); texturaPapel(ctx, 0.05);
+      const t = caberRico(ctx, s.titulo, { fontes: serifa(), max: 104, min: 56, largura: LW, altura: 420, entre: 1.06 });
+      const altT = t.linhas.length * t.tam * t.entre;
+      let y = H - 250 - altT;
+      if (s.texto) { const p = caberRico(ctx, s.texto, { fontes: bastao(700), max: 40, min: 28, largura: LW, altura: 120, entre: 1.2 }); y -= p.linhas.length * p.tam * p.entre + 16; escreverRico(ctx, p, W / 2, y, { n: "#fff", a: "#fff", b: "#fff" }, "center"); y += p.linhas.length * p.tam * p.entre + 16; }
+      escreverRico(ctx, t, W / 2, y, { n: "#FFFFFF", a: "#FFFFFF", b: "#FFFFFF" }, "center");
+      if (s.destaque) etiqueta(ctx, s.destaque, W - M - 200, H - 250 + 10, -5, T.forte.fundo, T.forte.titulo, 36);
+      arraste(ctx, W / 2, H - 175, "rgba(255,255,255,.9)");
+      marcaDagua(ctx, "#FFFFFF");
+      return;
+    }
+    case "texto": case "lista": {
+      fundoTom(); cabecalhoSlide(ctx, tom.titulo, i, total);
+      const X = 170, LX = W - X - 120;
+      ctx.fillStyle = tom.titulo; ctx.font = `500 40px ${FONTE_BASTAO}`; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+      ctx.fillText(String(i + 1).padStart(2, "0") + ".", X - 40, 300);
+      const t = caberRico(ctx, s.titulo, { fontes: serifaItalica, max: 110, min: 60, largura: LX, altura: 400, entre: 1.02 });
+      let y = escreverRico(ctx, t, X, 330, cores(tom)) + 46;
+      if (s.modelo === "texto") {
+        const b = caberRico(ctx, s.texto, { fontes: bastao(500), max: 46, min: 28, largura: LX, altura: H - 160 - y, entre: 1.32 });
+        escreverRico(ctx, b, X, y, { n: tom.texto, a: tom.destaque, b: tom.texto }, "justify", LX);
+      } else {
+        const itens = String(s.texto || "").split("\n").map((x) => x.trim()).filter(Boolean).slice(0, 7);
+        const esp = Math.min(190, (H - 170 - y) / Math.max(1, itens.length));
+        itens.forEach((it, k) => {
+          const yy = y + k * esp;
+          ctx.fillStyle = tom.destaque; ctx.font = `italic 700 54px ${FONTE_SERIFA}`; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+          ctx.fillText(String(k + 1).padStart(2, "0"), X - 40, yy + 46);
+          const b = caberRico(ctx, it, { fontes: bastao(500), max: 42, min: 28, largura: LX - 60, altura: esp - 20, entre: 1.25 });
+          escreverRico(ctx, b, X + 50, yy + 4, { n: tom.texto, a: tom.destaque, b: tom.texto });
+        });
+      }
+      return;
+    }
+    case "numero": {
+      fundoTom(); cabecalhoSlide(ctx, tom.titulo, i, total);
+      let y = 420;
+      if (s.texto2) { ctx.fillStyle = tom.titulo; ctx.font = `700 46px ${FONTE_BASTAO}`; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic"; ctx.fillText(String(s.texto2).toUpperCase(), M, y); y += 20; }
+      const t = caberRico(ctx, s.titulo, { fontes: (n) => ({ n: `800 ${n}px ${FONTE_BASTAO}`, a: `italic 700 ${n}px ${FONTE_SERIFA}`, b: `800 ${n}px ${FONTE_BASTAO}` }), max: 180, min: 80, largura: LW, altura: 520, entre: 0.98, maiusc: true });
+      y = escreverRico(ctx, t, M, y, { n: tom.destaque, a: tom.titulo, b: tom.destaque }) + 50;
+      if (s.texto) { ctx.fillStyle = tom.texto; ctx.font = `600 32px ${FONTE_BASTAO}`; ctx.textBaseline = "alphabetic"; espacado(ctx, String(s.texto).toUpperCase(), M, y + 30, 4, "left"); }
+      return;
+    }
+    case "moldura": {
+      fundoTom(); cabecalhoSlide(ctx, tom.titulo, i, total);
+      if (s.texto2) { const n = caberRico(ctx, s.texto2, { fontes: serifa(), max: 38, min: 26, largura: 300, altura: 200, entre: 1.15 }); escreverRico(ctx, n, W - M, 130, { n: tom.destaque, a: tom.destaque, b: tom.destaque }, "right"); }
+      caixaPapel(ctx, W / 2 - 250, 200, 500, 640, 26, "#000", true);
+      fotoRedonda(ctx, f1, W / 2 - 250, 200, 500, 640, 26, foco);
+      const t = caberRico(ctx, String(s.titulo || "").replace(/\.\s+/g, ".\n"), { fontes: serifa(), max: 86, min: 46, largura: LW, altura: H - 900 - 100, entre: 1.05 });
+      escreverRico(ctx, t, M, 900, { n: tom.destaque, a: tom.destaque, b: tom.destaque });
+      return;
+    }
+    case "notas": {
+      fotoCobre(ctx, f1, 0, 0, W, H, foco); ctx.fillStyle = "rgba(0,0,0,.12)"; ctx.fillRect(0, 0, W, H);
+      const cw = 880, cx = (W - cw) / 2;
+      const t = caberRico(ctx, s.titulo, { fontes: (n) => ({ n: `800 ${n}px ${FONTE_BASTAO}`, a: `800 ${n}px ${FONTE_BASTAO}`, b: `800 ${n}px ${FONTE_BASTAO}` }), max: 66, min: 38, largura: cw - 120, altura: 420, entre: 1.18, maiusc: true });
+      const ch = Math.max(420, t.linhas.length * t.tam * t.entre + 260), cy = (H - ch) / 2 - 20;
+      caixaPapel(ctx, cx, cy, cw, ch, 40, "#FFFFFF", true);
+      ctx.fillStyle = "#E0A100"; ctx.font = `500 40px ${FONTE_BASTAO}`; ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillText("‹ Notas", cx + 40, cy + 64);
+      [0, 1, 2, 3].forEach((k) => { ctx.strokeStyle = k === 1 ? "#c8c8c8" : "#E0A100"; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(cx + cw - 250 + k * 66, cy + 64, 22, 0, Math.PI * 2); ctx.stroke(); });
+      escreverRico(ctx, t, cx + 60, cy + 160, { n: "#3A2A1E", a: "#3A2A1E", b: "#3A2A1E" }, "left", 0, { sublinhado: true });
+      if (s.texto2) girar(ctx, cx + cw - 120, cy + ch - 10, -8, () => {
+        ctx.font = `500 46px ${FONTE_BASTAO}`; const tx = String(s.texto2), w = ctx.measureText(tx).width + 70;
+        retanguloRedondo(ctx, -w / 2, -42, w, 84, 42, "#FFFFFF"); retanguloRedondo(ctx, -w / 2 + 6, -36, w - 12, 72, 36, "#1E7CF2");
+        ctx.fillStyle = "#1E7CF2"; ctx.beginPath(); ctx.moveTo(w / 2 - 40, 30); ctx.lineTo(w / 2 + 6, 44); ctx.lineTo(w / 2 - 20, 14); ctx.fill();
+        ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(tx, 0, 2);
+      });
+      return;
+    }
+    case "polaroid": {
+      fundoTom(); cabecalhoSlide(ctx, tom.titulo, i, total);
+      girar(ctx, W / 2, H / 2 + 10, -2.5, () => {
+        const pw = 820, ph = 1020;
+        caixaPapel(ctx, -pw / 2, -ph / 2, pw, ph, 6, "#FFFFFF", true);
+        fotoCobre(ctx, f1, -pw / 2 + 44, -ph / 2 + 44, pw - 88, pw - 88, foco);
+        const t = caberRico(ctx, s.titulo, { fontes: (n) => ({ n: `800 ${n}px ${FONTE_BASTAO}`, a: `800 ${n}px ${FONTE_BASTAO}`, b: `800 ${n}px ${FONTE_BASTAO}` }), max: 52, min: 30, largura: pw - 120, altura: ph - pw - 60, entre: 1.15, maiusc: true });
+        escreverRico(ctx, t, 0, -ph / 2 + pw + 10, { n: T.claro.destaque, a: T.claro.destaque, b: T.claro.destaque }, "center", 0, { sublinhado: true });
+      });
+      estrelaPapel(ctx, W - 200, 230, 80, T.acento);
+      fita(ctx, 220, 200, -28);
+      return;
+    }
+    case "colagem": {
+      fundoTom();
+      ctx.fillStyle = tom.titulo; ctx.globalAlpha = 0.75; ctx.font = `600 24px ${FONTE_BASTAO}`; ctx.textBaseline = "alphabetic"; ctx.textAlign = "left"; ctx.fillText("‹ " + ASSINATURA.nome, M + 150, 80);
+      [0, 1, 2, 3].forEach((k) => { ctx.strokeStyle = tom.titulo; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(W - M - 230 + k * 30, 72, 10, 0, Math.PI * 2); ctx.stroke(); });
+      ctx.globalAlpha = 1;
+      const t = caberRico(ctx, s.titulo, { fontes: serifa(), max: 84, min: 50, largura: LW - 60, altura: 300, entre: 1.05 });
+      const yT = escreverRico(ctx, t, W / 2, 130, cores(tom), "center");
+      const yF = yT + 30, hF = 470;
+      girar(ctx, 330, yF + hF / 2, -4, () => { caixaPapel(ctx, -230, -hF / 2, 460, hF, 4, "#FFFFFF", true); fotoCobre(ctx, f1, -216, -hF / 2 + 14, 432, hF - 28, foco); });
+      girar(ctx, 760, yF + hF / 2 + 30, 5, () => { caixaPapel(ctx, -220, -hF / 2, 440, hF, 4, "#FFFFFF", true); fotoCobre(ctx, f2 || null, -206, -hF / 2 + 14, 412, hF - 28, foco); });
+      clipe(ctx, 210, yF + 10, -12); clipe(ctx, 860, yF + 40, 18);
+      const b = caberRico(ctx, s.texto, { fontes: bastao(500), max: 42, min: 28, largura: LW - 40, altura: H - (yF + hF + 70) - 60, entre: 1.3 });
+      escreverRico(ctx, b, W / 2, yF + hF + 80, { n: tom.texto, a: tom.destaque, b: tom.texto }, "center");
+      return;
+    }
+    case "cartao": {
+      fotoCobre(ctx, f1, 0, 0, W, H, foco); ctx.fillStyle = "rgba(0,0,0,.1)"; ctx.fillRect(0, 0, W, H);
+      const cw = 660, X = M + 10;
+      const t = caberRico(ctx, s.titulo, { fontes: serifaItalica, max: 74, min: 44, largura: cw - 90, altura: 320, entre: 1.04 });
+      const b = s.texto ? caberRico(ctx, s.texto, { fontes: bastao(500), max: 38, min: 26, largura: cw - 90, altura: 240, entre: 1.3 }) : null;
+      const ch = 90 + t.linhas.length * t.tam * t.entre + (b ? 30 + b.linhas.length * b.tam * b.entre : 0);
+      const Y = 360;
+      caixaPapel(ctx, X, Y, cw, ch, 4, "#F7F4EE", true); ctx.save(); ctx.beginPath(); ctx.rect(X, Y, cw, ch); ctx.clip(); texturaPapel(ctx, 0.08); ctx.restore();
+      let y = escreverRico(ctx, t, X + 45, Y + 45, { n: T.escuro.fundo, a: T.claro.destaque, b: T.escuro.fundo });
+      if (b) escreverRico(ctx, b, X + 45, y + 30, { n: "#3A3128", a: T.claro.destaque, b: "#2B241C" });
+      if (s.texto2) {
+        const nb = caberRico(ctx, s.texto2, { fontes: bastao(600), max: 40, min: 26, largura: 360, altura: 260, entre: 1.25 });
+        const nh = nb.linhas.length * nb.tam * nb.entre + 90, nx = W - M - 220, ny = Y + ch - 40 + nh / 2;
+        girar(ctx, nx, ny, 5, () => { caixaPapel(ctx, -210, -nh / 2, 420, nh, 2, T.acento, true); escreverRico(ctx, nb, 0, -nh / 2 + 45, { n: "#fff", a: "#fff", b: "#fff" }, "center"); });
+        clipe(ctx, nx + 170, ny - nh / 2 + 10, 20);
+      }
+      return;
+    }
+    case "frase": {
+      fotoCobre(ctx, f1, 0, 0, W, H, foco); ctx.fillStyle = "rgba(0,0,0,.28)"; ctx.fillRect(0, 0, W, H);
+      const t = caberRico(ctx, s.titulo, { fontes: serifa(), max: 68, min: 40, largura: 620, altura: 700, entre: 1.25 });
+      escreverRico(ctx, t, W / 2, (H - t.linhas.length * t.tam * t.entre) / 2, { n: "#fff", a: "#fff", b: "#fff" }, "center");
+      ctx.fillStyle = "rgba(255,255,255,.75)"; ctx.font = `500 22px ${FONTE_BASTAO}`; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic"; ctx.fillText(ASSINATURA.arroba, M, H - 52);
+      ctx.textAlign = "right"; ctx.fillText(`${i + 1}/${total}`, W - M, H - 52);
+      return;
+    }
+    default: { // final
+      fundoTom();
+      const temFoto = !!s.foto;
+      const t = caberRico(ctx, s.titulo, { fontes: bastao(700), max: 56, min: 34, largura: LW, altura: 200, entre: 1.15 });
+      let y = escreverRico(ctx, t, W / 2, 110, { n: tom.destaque, a: tom.destaque, b: tom.destaque }, "center") + 40;
+      if (temFoto) { caixaPapel(ctx, W / 2 - 300, y, 600, 470, 2, "#F7F4EE", true); fotoCobre(ctx, f1, W / 2 - 280, y + 20, 560, 430, foco); y += 470 + 50; }
+      else y += 120;
+      if (s.texto) { const b = caberRico(ctx, s.texto, { fontes: bastao(700), max: 54, min: 32, largura: LW, altura: 200, entre: 1.15 }); y = escreverRico(ctx, b, W / 2, y, { n: tom.titulo, a: tom.destaque, b: tom.titulo }, "center") + 24; }
+      if (s.destaque) {
+        const d = caberRico(ctx, s.destaque, { fontes: bastao(800), max: 44, min: 28, largura: LW - 120, altura: 120, entre: 1.15 });
+        const dw = Math.max(...d.linhas.map((l) => l.itens.reduce((a, p) => a + p.w, 0))) + 120, dh = d.linhas.length * d.tam * d.entre + 40;
+        ctx.fillStyle = tom.destaque; ctx.fillRect(W / 2 - dw / 2, y, dw, dh);
+        escreverRico(ctx, d, W / 2, y + 20, { n: tom.fundo, a: tom.fundo, b: tom.fundo }, "center"); y += dh;
+      }
+      if (s.texto2) { ctx.fillStyle = tom.titulo; ctx.font = `400 110px ${FONTE_MAO}`; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic"; ctx.fillText(s.texto2, W / 2 + 120, Math.min(H - 90, y + 110)); }
+      return;
+    }
   }
 }
 
@@ -5980,105 +6247,150 @@ async function carregarCarrosseis() {
   igx.carrosseis = error ? [] : data || [];
   igx.faltaCarrosseis = !!error;
 }
+const novoSlide = (modelo) => ({ modelo, titulo: "", texto: "" });
 
 function desenharCarrossel(el) {
   if (igx.carrosseis === null) { el.innerHTML = `<p class="vazio">Abrindo o gerador...</p>`; Promise.all([carregarCarrosseis(), carregarFontesCarrossel()]).then(desenhar); return; }
   if (igx.faltaCarrosseis) { el.innerHTML = `<div class="aviso-falta">Falta rodar a parte 27 do banco.sql no Supabase.</div>`; return; }
   if (!igx.car) igx.car = JSON.parse(JSON.stringify(CARROSSEL_EXEMPLO));
   const car = igx.car;
+  car.slides.forEach((s) => { if (!MODELOS_SLIDE.some((m) => m[0] === s.modelo)) s.modelo = s.modelo === "comparacao" ? "cartao" : "texto"; });
+  if (!TEMAS_CARROSSEL[car.tema]) car.tema = "ryan";
+  const T = TEMAS_CARROSSEL[car.tema];
   let guiaAberto = false; try { guiaAberto = localStorage.getItem("ig-guia") === "1"; } catch (_) {}
+  const amostra = (k) => `<span class="car-amostra" style="background:${T[k].fundo};color:${T[k].titulo}"><b>Aa</b><i style="color:${T[k].destaque}">Aa</i></span>`;
+
+  const campoHtml = (s, i, c) => {
+    const rot = (ROTULOS_CAMPO[s.modelo] || {})[c] || c;
+    if (c === "tom") return `<label class="car-campo-curto">Fundo <select class="campo" data-k="tom">${[["claro", "Claro"], ["escuro", "Escuro"], ["forte", "Cor forte"]].map(([v, n]) => `<option value="${v}" ${(s.tom || "") === v ? "selected" : ""}>${n}</option>`).join("")}<option value="" ${!s.tom ? "selected" : ""}>Padrão</option></select></label>`;
+    if (c === "foto" || c === "foto2") return `<div class="car-foto">
+        ${s[c] ? `<img src="${esc(s[c])}" alt="" crossorigin="anonymous">` : `<span class="car-foto-vazia">📷</span>`}
+        <label class="btn pequeno">${s[c] ? "Trocar foto" : c === "foto2" ? "Segunda foto" : "Subir foto"}<input type="file" accept="image/*" data-foto="${c}" hidden></label>
+        ${s[c] ? `<button class="btn pequeno" type="button" data-tirar-foto="${c}">Tirar</button>` : ""}
+        ${c === "foto" && s.foto ? `<select class="campo" data-k="enquadrar" aria-label="Enquadrar">${[["", "Enquadrar: auto"], ["topo", "Mostrar o topo"], ["meio", "Centro"], ["baixo", "Mostrar embaixo"]].map(([v, n]) => `<option value="${v}" ${(s.enquadrar || "") === v ? "selected" : ""}>${n}</option>`).join("")}</select>` : ""}
+        ${s.dicaFoto && c === "foto" ? `<small class="sub">Sugestão: ${esc(s.dicaFoto)}</small>` : ""}
+      </div>`;
+    const longo = c === "texto" || (c === "titulo" && ["notas", "frase", "moldura"].includes(s.modelo));
+    return longo ? `<textarea class="campo" data-k="${c}" rows="${s.modelo === "lista" && c === "texto" ? 4 : 2}" placeholder="${esc(rot)}">${esc(s[c] || "")}</textarea>`
+      : `<input class="campo" data-k="${c}" value="${esc(s[c] || "")}" placeholder="${esc(rot)}">`;
+  };
 
   el.innerHTML = `
     <details class="cartao car-guia" id="car-guia" ${guiaAberto ? "open" : ""}>
-      <summary><b>🎨 O seu sistema visual</b> <span class="sub">as regras para todo carrossel ter a sua cara</span></summary>
+      <summary><b>🎨 O seu sistema visual</b> <span class="sub">o jeito Ryan de fazer carrossel</span></summary>
       <div class="car-guia-grade">
-        <div><h3 class="pro-titulo">Cores</h3>
-          <div class="car-cores">${[["Azul cobalto", VISUAL.azul, "capa, frase, destaques"], ["Bege", VISUAL.bege, "fundo dos slides de conteúdo"], ["Oliva", VISUAL.oliva, "detalhes e rótulos"], ["Tinta", VISUAL.tinta, "texto corrido"]].map(([n, c, u]) => `<div><span style="background:${c}"></span><b>${n}</b><small>${c} · ${u}</small></div>`).join("")}</div></div>
+        <div><h3 class="pro-titulo">Paleta: ${esc(T.nome)}</h3>
+          <div class="car-tons">${amostra("claro")}${amostra("escuro")}${amostra("forte")}</div>
+          <p class="sub">Use sempre a mesma paleta. Troque só se for uma série especial.</p></div>
         <div><h3 class="pro-titulo">Letras</h3>
-          <p class="car-fonte-titulo">ANTON PARA TÍTULOS</p><p class="car-fonte-texto">Archivo para o texto corrido, legível até no celular.</p></div>
+          <p class="car-f-serifa">Playfair Display <i>itálica</i></p>
+          <p class="car-f-bastao">MONTSERRAT GROSSA</p>
+          <p class="car-f-mao">Allura, a letra de mão</p></div>
+        <div><h3 class="pro-titulo">Sua assinatura</h3>
+          <ul class="passos"><li>Foto sua na capa, sempre. Rosto aparece, carrossel rende.</li><li>"Arraste a tela →" e a marca d'água UGC Creator na capa.</li><li>RYAN ALVES | UGC CREATOR no topo dos slides de texto.</li><li>Uma palavra em *itálico colorido* por título, não mais.</li></ul></div>
         <div><h3 class="pro-titulo">Regras de ouro</h3>
-          <ul class="passos"><li>1 ideia por slide, no máximo 30 palavras.</li><li>Capa = promessa clara em até 8 palavras.</li><li>De 5 a 8 slides. Sempre começa na capa e termina no final.</li><li>Alterne fundo azul e bege só na capa e na frase. O resto é bege.</li><li>Todo slide leva @ryalvz e o número da página.</li><li>Legenda: repita o gancho na primeira linha e peça para salvar.</li></ul></div>
-        <div><h3 class="pro-titulo">Ritmo da semana</h3>
-          <ul class="passos"><li><b>Seg:</b> Reels de bastidor de UGC.</li><li><b>Qua:</b> Carrossel educativo (o que salva).</li><li><b>Sex:</b> Reels de produto na vida real.</li><li><b>Dom:</b> Carrossel de opinião ou resultado.</li><li>Stories todo dia, mostrando o processo.</li></ul></div>
+          <ul class="passos"><li>1 ideia por slide, no máximo 30 palavras.</li><li>Capa: promessa clara em até 10 palavras.</li><li>De 5 a 8 slides. Alterne foto e texto.</li><li>Último slide: chamada (salvar, seguir ou link na bio).</li><li>Legenda: repita o gancho na primeira linha.</li></ul></div>
       </div>
     </details>
 
     <section class="cartao car-barra">
       <input class="campo" id="car-titulo" value="${esc(car.titulo)}" aria-label="Nome do carrossel" placeholder="Nome do carrossel">
+      <select class="campo" id="car-tema" aria-label="Paleta">${Object.entries(TEMAS_CARROSSEL).map(([k, t]) => `<option value="${k}" ${car.tema === k ? "selected" : ""}>🎨 ${esc(t.nome)}</option>`).join("")}</select>
       <span class="espaco"></span>
       <select class="campo" id="car-abrir" aria-label="Abrir carrossel salvo"><option value="">📂 Abrir salvo (${igx.carrosseis.length})</option>${igx.carrosseis.map((c) => `<option value="${esc(c.id)}">${esc(c.titulo)} · ${dataBR(String(c.atualizado_em).slice(0, 10)).slice(0, 5)}</option>`).join("")}</select>
       <button class="btn" type="button" id="car-novo">Novo</button>
       <button class="btn" type="button" id="car-salvar">💾 Salvar</button>
       <button class="btn primario" type="button" id="car-baixar">⬇️ Baixar imagens</button>
     </section>
+    <p class="sub car-ajuda">Dica: <code>*palavra*</code> fica em itálico colorido e <code>**palavra**</code> fica em negrito.</p>
 
     <div class="car-grade">
-      <div class="car-slides" id="car-slides">${car.slides.map((s, i) => `
-        <div class="cartao car-slide" data-i="${i}">
-          <div class="car-slide-topo"><b>Slide ${i + 1}</b>
+      <div class="car-slides" id="car-slides">${car.slides.map((s, i) => {
+        const mod = MODELOS_SLIDE.find((m) => m[0] === s.modelo) || MODELOS_SLIDE[1];
+        return `<div class="cartao car-slide" data-i="${i}">
+          <div class="car-slide-topo"><b>${i + 1}</b>
             <select class="campo" data-k="modelo" aria-label="Modelo do slide ${i + 1}">${MODELOS_SLIDE.map(([v, n]) => `<option value="${v}" ${s.modelo === v ? "selected" : ""}>${n}</option>`).join("")}</select>
             <span class="espaco"></span>
             <button class="btn pequeno" type="button" data-mover="-1" ${i === 0 ? "disabled" : ""} aria-label="Subir">↑</button>
             <button class="btn pequeno" type="button" data-mover="1" ${i === car.slides.length - 1 ? "disabled" : ""} aria-label="Descer">↓</button>
+            <button class="btn pequeno" type="button" data-copiar-slide aria-label="Duplicar slide">⧉</button>
             <button class="btn pequeno" type="button" data-tirar aria-label="Tirar slide">✕</button></div>
-          <input class="campo" data-k="titulo" value="${esc(s.titulo || "")}" placeholder="${s.modelo === "frase" ? "A frase" : "Título"}">
-          <textarea class="campo" data-k="texto" rows="${s.modelo === "lista" ? 4 : 2}" placeholder="${{ capa: "Subtítulo (opcional)", texto: "Texto do slide", lista: "Um item por linha", comparacao: "ERRADO: como a maioria faz", frase: "De onde vem a frase (opcional)", final: "O que a pessoa ganha te seguindo" }[s.modelo] || "Texto"}">${esc(s.texto || "")}</textarea>
-          ${s.modelo === "comparacao" ? `<textarea class="campo" data-k="texto2" rows="2" placeholder="CERTO: como fazer">${esc(s.texto2 || "")}</textarea>` : ""}
-          <p class="sub car-dica">${esc((MODELOS_SLIDE.find((m) => m[0] === s.modelo) || [0, 0, ""])[2])} ${palavrasDe(s) > 30 ? `<b class="car-muito">${palavrasDe(s)} palavras: tente deixar em 30.</b>` : ""}</p>
-        </div>`).join("")}
-        <button class="btn" type="button" id="car-mais" ${car.slides.length >= 10 ? "disabled" : ""}>${ic("mais")}Slide</button>
+          ${mod[3].map((c) => campoHtml(s, i, c)).join("")}
+          <p class="sub car-dica">${esc(mod[2])} ${palavrasDe(s) > 30 ? `<b class="car-muito">${palavrasDe(s)} palavras: tente deixar em 30.</b>` : ""}</p>
+        </div>`; }).join("")}
+        <div class="car-mais">
+          <select class="campo" id="car-modelo-novo" aria-label="Modelo do slide novo">${MODELOS_SLIDE.map(([v, n]) => `<option value="${v}">${n}</option>`).join("")}</select>
+          <button class="btn" type="button" id="car-mais" ${car.slides.length >= 10 ? "disabled" : ""}>${ic("mais")}Slide</button>
+        </div>
       </div>
       <div class="car-previa" id="car-previa">${car.slides.map((_, i) => `<canvas class="car-tela" data-tela="${i}" width="1080" height="1350" aria-label="Prévia do slide ${i + 1}"></canvas>`).join("")}</div>
     </div>`;
 
-  const pintarTudo = () => $$("[data-tela]", el).forEach((cv) => { const i = Number(cv.dataset.tela); if (car.slides[i]) pintarSlide(cv, car.slides[i], i, car.slides.length); });
-  carregarFontesCarrossel().then(pintarTudo);
+  const pintarUm = (i) => { const cv = $(`[data-tela="${i}"]`, el); if (cv && car.slides[i]) pintarSlide(cv, car.slides[i], i, car.slides.length, car.tema, () => pintarUm(i)); };
+  const pintarTudo = () => car.slides.forEach((_, i) => pintarUm(i));
   pintarTudo();
+  carregarFontesCarrossel().then(pintarTudo);
 
   $("#car-guia").addEventListener("toggle", (e) => { try { localStorage.setItem("ig-guia", e.target.open ? "1" : "0"); } catch (_) {} });
   $("#car-titulo").oninput = (e) => { car.titulo = e.target.value; };
+  $("#car-tema").onchange = (e) => { car.tema = e.target.value; desenhar(); };
   let espera = null;
   $("#car-slides").addEventListener("input", (e) => {
     const box = e.target.closest(".car-slide"), k = e.target.dataset.k;
-    if (!box || !k || k === "modelo") return;
+    if (!box || !k || k === "modelo" || e.target.tagName === "SELECT") return;
     const i = Number(box.dataset.i);
     car.slides[i][k] = e.target.value;
-    clearTimeout(espera);
-    espera = setTimeout(() => { const cv = $(`[data-tela="${i}"]`, el); if (cv) pintarSlide(cv, car.slides[i], i, car.slides.length); }, 120);
+    clearTimeout(espera); espera = setTimeout(() => pintarUm(i), 120);
   });
-  $("#car-slides").addEventListener("change", (e) => {
-    const box = e.target.closest(".car-slide");
-    if (!box || e.target.dataset.k !== "modelo") return;
-    car.slides[Number(box.dataset.i)].modelo = e.target.value; desenhar();
+  $("#car-slides").addEventListener("change", async (e) => {
+    const box = e.target.closest(".car-slide"); if (!box) return;
+    const i = Number(box.dataset.i), s = car.slides[i];
+    if (e.target.dataset.k === "modelo") { s.modelo = e.target.value; desenhar(); return; }
+    if (e.target.tagName === "SELECT" && e.target.dataset.k) { s[e.target.dataset.k] = e.target.value; pintarUm(i); return; }
+    const campoFoto = e.target.dataset.foto;
+    if (campoFoto && e.target.files && e.target.files[0]) {
+      const rotulo = e.target.closest("label"); rotulo.firstChild.textContent = "Enviando...";
+      try {
+        const arq = await prepararFoto(e.target.files[0]);
+        const url = await enviarArquivo(arq, "carrosseis", "foto.jpg");
+        if (url) { s[campoFoto] = url; desenhar(); avisar("Foto no slide."); }
+        else rotulo.firstChild.textContent = "Subir foto";
+      } catch (erro) { avisar(erro.message || "Não deu para usar essa foto.", true); rotulo.firstChild.textContent = "Subir foto"; }
+    }
   });
   $("#car-slides").addEventListener("click", (e) => {
     const box = e.target.closest(".car-slide"); if (!box) return;
     const i = Number(box.dataset.i);
     const mv = e.target.closest("[data-mover]");
     if (mv) { const j = i + Number(mv.dataset.mover); [car.slides[i], car.slides[j]] = [car.slides[j], car.slides[i]]; desenhar(); return; }
+    if (e.target.closest("[data-copiar-slide]")) { if (car.slides.length >= 10) { avisar("No máximo 10 slides.", true); return; } car.slides.splice(i + 1, 0, JSON.parse(JSON.stringify(car.slides[i]))); desenhar(); return; }
+    const tf = e.target.closest("[data-tirar-foto]"); if (tf) { delete car.slides[i][tf.dataset.tirarFoto]; desenhar(); return; }
     if (e.target.closest("[data-tirar]")) { if (car.slides.length <= 1) { avisar("O carrossel precisa de pelo menos 1 slide.", true); return; } car.slides.splice(i, 1); desenhar(); }
   });
-  $("#car-mais").onclick = () => { const fim = car.slides[car.slides.length - 1]; const novo = { modelo: "texto", titulo: "", texto: "" }; if (fim && fim.modelo === "final") car.slides.splice(car.slides.length - 1, 0, novo); else car.slides.push(novo); desenhar(); };
-  $("#car-novo").onclick = () => { igx.car = { titulo: "Novo carrossel", slides: [{ modelo: "capa", titulo: "", texto: "" }, { modelo: "texto", titulo: "", texto: "" }, { modelo: "final", titulo: "Salva pra não esquecer", texto: "" }] }; desenhar(); };
-  $("#car-abrir").onchange = (e) => { const c = igx.carrosseis.find((x) => String(x.id) === e.target.value); if (c) { igx.car = { id: c.id, titulo: c.titulo, slides: JSON.parse(JSON.stringify(c.slides || [])) }; desenhar(); } };
+  $("#car-mais").onclick = () => { const novo = novoSlide($("#car-modelo-novo").value); const fim = car.slides[car.slides.length - 1]; if (fim && fim.modelo === "final") car.slides.splice(car.slides.length - 1, 0, novo); else car.slides.push(novo); desenhar(); };
+  $("#car-novo").onclick = () => { igx.car = { titulo: "Novo carrossel", tema: car.tema, slides: [novoSlide("capa"), { ...novoSlide("texto"), tom: "escuro" }, { ...novoSlide("final"), tom: "escuro", destaque: "Salva esse post", texto2: "Link na bio" }] }; desenhar(); };
+  $("#car-abrir").onchange = (e) => {
+    const c = igx.carrosseis.find((x) => String(x.id) === e.target.value); if (!c) return;
+    const dados = Array.isArray(c.slides) ? { slides: c.slides } : c.slides || {};
+    igx.car = { id: c.id, titulo: c.titulo, tema: dados.tema || "ryan", slides: JSON.parse(JSON.stringify(dados.slides || [])) }; desenhar();
+  };
   $("#car-salvar").onclick = async () => {
-    const dados = { titulo: (car.titulo || "Carrossel").slice(0, 200), slides: car.slides, atualizado_em: new Date().toISOString() };
-    const q = car.id ? db.from("carrosseis").update(dados).eq("id", car.id).select().single() : db.from("carrosseis").insert(dados).select().single();
-    const { data, error } = await q;
+    const dados = { titulo: (car.titulo || "Carrossel").slice(0, 200), slides: { tema: car.tema, slides: car.slides }, atualizado_em: new Date().toISOString() };
+    const { data, error } = await (car.id ? db.from("carrosseis").update(dados).eq("id", car.id).select().single() : db.from("carrosseis").insert(dados).select().single());
     if (error) { avisar(traduzErro(error), true); return; }
     car.id = data.id; await carregarCarrosseis(); avisar("Carrossel salvo."); desenhar();
   };
   $("#car-baixar").onclick = async (e) => {
     const b = e.target; b.disabled = true; b.textContent = "Preparando...";
     try {
-      await carregarFontesCarrossel();
+      await carregarFontesCarrossel(); await esperarFotos(car.slides);
       const nome = (car.titulo || "carrossel").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^\w]+/g, "-").replace(/^-|-$/g, "").toLowerCase().slice(0, 40) || "carrossel";
       const arquivos = [];
       for (let i = 0; i < car.slides.length; i++) {
         const cv = document.createElement("canvas");
-        pintarSlide(cv, car.slides[i], i, car.slides.length);
-        const blob = await new Promise((ok) => cv.toBlob(ok, "image/png"));
-        arquivos.push(new File([blob], `${nome}-${String(i + 1).padStart(2, "0")}.png`, { type: "image/png" }));
+        pintarSlide(cv, car.slides[i], i, car.slides.length, car.tema);
+        const blob = await new Promise((ok) => cv.toBlob(ok, "image/jpeg", 0.93));
+        arquivos.push(new File([blob], `${nome}-${String(i + 1).padStart(2, "0")}.jpg`, { type: "image/jpeg" }));
       }
       // No celular: abre o "compartilhar" para salvar tudo nas Fotos de uma vez
       if (navigator.canShare && navigator.canShare({ files: arquivos }) && /iPhone|iPad|Android/i.test(navigator.userAgent)) {
@@ -6095,4 +6407,4 @@ function desenharCarrossel(el) {
     b.disabled = false; b.textContent = "⬇️ Baixar imagens";
   };
 }
-const palavrasDe = (s) => [s.titulo, s.texto, s.texto2].join(" ").split(/\s+/).filter(Boolean).length;
+const palavrasDe = (s) => [s.titulo, s.texto, s.texto2, s.destaque].join(" ").replace(/\*/g, "").split(/\s+/).filter(Boolean).length;
