@@ -836,3 +836,18 @@ select cron.schedule('reels-semana', '*/10 10-13 * * 1', $$
     headers := '{"Content-Type": "application/json", "apikey": "sb_publishable_oZdhIWRB1gBabQH4xRJ2Xg__F8Lq0V0"}'::jsonb,
     body := '{"tipo": "semanal"}'::jsonb)
 $$);
+
+
+-- -------------------------------------------------------------
+-- 28. PREFERÊNCIAS DO PAINEL (ex.: o seu guia de voz para roteiros)
+-- Uma linha por preferência: chave e valor. Só o seu login lê e grava.
+-- -------------------------------------------------------------
+create table if not exists public.preferencias (
+  chave         text primary key check (char_length(chave) <= 60),
+  valor         text not null default '',
+  atualizado_em timestamptz not null default now()
+);
+alter table public.preferencias enable row level security;
+drop policy if exists "dono faz tudo" on public.preferencias;
+create policy "dono faz tudo" on public.preferencias
+  for all to authenticated using (public.eh_admin()) with check (public.eh_admin());
