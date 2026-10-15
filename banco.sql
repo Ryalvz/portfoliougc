@@ -766,7 +766,7 @@ create policy "dono faz tudo" on public.contratos_gerados
 -- -------------------------------------------------------------
 create table if not exists public.ig_pesquisa (
   id           int primary key default 1 check (id = 1),
-  hashtags     text[] not null default array['ugcbrasil', 'creatorugc', 'ugccreator', 'conteudougc', 'dicasdetecnologia', 'tecnologia'],
+  hashtags     text[] not null default array['ugcbrasil', 'creatorugc', 'conteudougc', 'criadordeconteudo', 'achadinhos', 'dicasdetecnologia', 'dicasdeiphone'],
   por_hashtag  int not null default 25 check (por_hashtag between 5 and 60),
   run_id       text,
   iniciado_em  timestamptz,
