@@ -5795,7 +5795,9 @@ function desenharPlanoSemana(el) {
   const sel = $("#pl-semana"); if (sel) sel.onchange = (e) => { igx.semanaPlano = e.target.value; desenhar(); };
   const irReels = $("#pl-ir-reels"); if (irReels) irReels.onclick = () => { igx.sub = "reels"; desenhar(); };
   $("#pl-nicho").onchange = (e) => { try { localStorage.setItem("ig-nicho", e.target.value.trim() || NICHO_PADRAO); } catch (_) {} };
-  $("#pl-copiar").onclick = async () => {
+  $("#pl-copiar").onclick = async (e) => {
+    // Garante que os seus números do Instagram vão junto
+    if (!ig.dados && ig.conectado !== false) { e.target.textContent = "Juntando seus números..."; await chamarInstagram({ acao: "dados", dias: 30 }).then((r) => { if (r.perfil) { ig.dados = r; ig.conectado = true; } }).catch(() => {}); e.target.textContent = "📋 Copiar pedido"; }
     const texto = pedidoPlano($("#pl-nicho").value.trim() || NICHO_PADRAO);
     try { await navigator.clipboard.writeText(texto); avisar("Pedido copiado. Cole no Claude."); }
     catch (_) { abrirJanelaSimples("Copie o pedido", `<textarea class="campo" rows="14" style="width:100%" readonly>${esc(texto)}</textarea>`, ""); }
@@ -5922,19 +5924,19 @@ function pintarSlide(cv, s, i, total) {
     if (sub) { ctx.font = `500 ${sub.tam}px ${V.texto}`; escrever(ctx, sub, M, y + 40, "rgba(240,238,234,.88)"); }
     // "arrasta"
     ctx.font = `700 30px ${V.texto}`; const tx = "ARRASTA  →", lw = ctx.measureText(tx).width + 56;
-    retanguloRedondo(ctx, W - M - lw, H - 140, lw, 64, 32, V.bege);
-    ctx.fillStyle = V.azul; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(tx, W - M - lw / 2, H - 108);
+    retanguloRedondo(ctx, W - M - lw, H - 200, lw, 64, 32, V.bege);
+    ctx.fillStyle = V.azul; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(tx, W - M - lw / 2, H - 168);
   } else if (s.modelo === "texto") {
     const t = caber(ctx, s.titulo, { fonte: V.titulo, max: 110, min: 64, largura: LW, altura: 420, entre: 1.05, maiusculas: true });
     ctx.font = `400 ${t.tam}px ${V.titulo}`; let y = escrever(ctx, t, M, topo, frente);
-    const b = caber(ctx, s.texto, { fonte: V.texto, peso: 500, max: 50, min: 32, largura: LW, altura: base - y - 60, entre: 1.42 });
+    const b = caber(ctx, s.texto, { fonte: V.texto, peso: 500, max: 62, min: 34, largura: LW, altura: base - y - 60, entre: 1.4 });
     ctx.font = `500 ${b.tam}px ${V.texto}`; escrever(ctx, b, M, y + 50, corpo);
   } else if (s.modelo === "lista") {
     const t = caber(ctx, s.titulo, { fonte: V.titulo, max: 100, min: 60, largura: LW, altura: 300, entre: 1.05, maiusculas: true });
     ctx.font = `400 ${t.tam}px ${V.titulo}`; let y = escrever(ctx, t, M, topo, frente) + 50;
     const itens = String(s.texto || "").split("\n").map((x) => x.trim()).filter(Boolean).slice(0, 7);
-    const espaco = (base - y) / Math.max(1, itens.length);
-    const tamItem = Math.min(46, Math.max(30, espaco * 0.34));
+    const espaco = Math.min(210, (base - y) / Math.max(1, itens.length));
+    const tamItem = Math.min(54, Math.max(32, espaco * 0.3));
     itens.forEach((it, k) => {
       const cy = y + k * espaco;
       ctx.fillStyle = V.azul; ctx.beginPath(); ctx.arc(M + 34, cy + 34, 34, 0, Math.PI * 2); ctx.fill();
@@ -5952,7 +5954,7 @@ function pintarSlide(cv, s, i, total) {
       const cy = y + k * (altCaixa + 30);
       retanguloRedondo(ctx, M, cy, LW, altCaixa, 28, cf);
       ctx.font = `700 30px ${V.texto}`; ctx.fillStyle = cr; ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.fillText(rot, M + 48, cy + 44);
-      const b = caber(ctx, conteudo, { fonte: V.texto, peso: 600, max: 50, min: 30, largura: LW - 96, altura: altCaixa - 130, entre: 1.32 });
+      const b = caber(ctx, conteudo, { fonte: V.texto, peso: 600, max: 60, min: 30, largura: LW - 96, altura: altCaixa - 130, entre: 1.3 });
       ctx.font = `600 ${b.tam}px ${V.texto}`; escrever(ctx, b, M + 48, cy + 100, ct);
     });
   } else if (s.modelo === "frase") {
