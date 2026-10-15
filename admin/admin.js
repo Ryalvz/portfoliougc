@@ -6042,7 +6042,7 @@ function fotoCobre(ctx, img, x, y, w, h, foco = 0.35) {
     const g = ctx.createLinearGradient(x, y, x + w, y + h); g.addColorStop(0, "#5b5248"); g.addColorStop(1, "#2b241c");
     ctx.fillStyle = g; ctx.fillRect(x, y, w, h);
     ctx.fillStyle = "rgba(255,255,255,.55)"; ctx.font = `600 ${Math.max(22, Math.min(40, w / 16))}px ${FONTE_BASTAO}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.fillText("📷 sua foto aqui", x + w / 2, y + h / 2); return;
+    ctx.fillText("sua foto aqui", x + w / 2, y + h / 2); return;
   }
   const esc = Math.max(w / img.width, h / img.height), iw = img.width * esc, ih = img.height * esc;
   ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
@@ -6126,7 +6126,7 @@ function pintarSlide(cv, s, i, total, temaChave, aoCarregar) {
       let y = escreverRico(ctx, t, X, 330, cores(tom)) + 46;
       if (s.modelo === "texto") {
         const b = caberRico(ctx, s.texto, { fontes: bastao(500), max: 46, min: 28, largura: LX, altura: H - 160 - y, entre: 1.32 });
-        escreverRico(ctx, b, X, y, { n: tom.texto, a: tom.destaque, b: tom.texto }, "justify", LX);
+        escreverRico(ctx, b, X, y, { n: tom.texto, a: tom.destaque, b: tom.texto }, "left", LX);
       } else {
         const itens = String(s.texto || "").split("\n").map((x) => x.trim()).filter(Boolean).slice(0, 7);
         const esp = Math.min(190, (H - 170 - y) / Math.max(1, itens.length));
@@ -6277,7 +6277,7 @@ function desenharCarrossel(el) {
         ${c === "foto" && s.foto ? `<select class="campo" data-k="enquadrar" aria-label="Enquadrar">${[["", "Enquadrar: auto"], ["topo", "Mostrar o topo"], ["meio", "Centro"], ["baixo", "Mostrar embaixo"]].map(([v, n]) => `<option value="${v}" ${(s.enquadrar || "") === v ? "selected" : ""}>${n}</option>`).join("")}</select>` : ""}
         ${s.dicaFoto && c === "foto" ? `<small class="sub">Sugestão: ${esc(s.dicaFoto)}</small>` : ""}
       </div>`;
-    const longo = c === "texto" || (c === "titulo" && ["notas", "frase", "moldura"].includes(s.modelo));
+    const longo = (c === "texto" && ["texto", "lista", "colagem", "cartao"].includes(s.modelo)) || (c === "titulo" && ["notas", "frase", "moldura"].includes(s.modelo));
     return longo ? `<textarea class="campo" data-k="${c}" rows="${s.modelo === "lista" && c === "texto" ? 4 : 2}" placeholder="${esc(rot)}">${esc(s[c] || "")}</textarea>`
       : `<input class="campo" data-k="${c}" value="${esc(s[c] || "")}" placeholder="${esc(rot)}">`;
   };
@@ -6294,7 +6294,7 @@ function desenharCarrossel(el) {
           <p class="car-f-bastao">MONTSERRAT GROSSA</p>
           <p class="car-f-mao">Allura, a letra de mão</p></div>
         <div><h3 class="pro-titulo">Sua assinatura</h3>
-          <ul class="passos"><li>Foto sua na capa, sempre. Rosto aparece, carrossel rende.</li><li>"Arraste a tela →" e a marca d'água UGC Creator na capa.</li><li>RYAN ALVES | UGC CREATOR no topo dos slides de texto.</li><li>Uma palavra em *itálico colorido* por título, não mais.</li></ul></div>
+          <ul class="passos"><li>Foto sua na capa, sempre. Rosto aparece, carrossel rende.</li><li>"Arraste a tela →" e a marca d'água UGC Creator na capa.</li><li>RYAN ALVES | UGC CREATOR no topo dos slides de texto.</li><li>Só uma palavra destacada por título.</li></ul></div>
         <div><h3 class="pro-titulo">Regras de ouro</h3>
           <ul class="passos"><li>1 ideia por slide, no máximo 30 palavras.</li><li>Capa: promessa clara em até 10 palavras.</li><li>De 5 a 8 slides. Alterne foto e texto.</li><li>Último slide: chamada (salvar, seguir ou link na bio).</li><li>Legenda: repita o gancho na primeira linha.</li></ul></div>
       </div>
@@ -6309,7 +6309,7 @@ function desenharCarrossel(el) {
       <button class="btn" type="button" id="car-salvar">💾 Salvar</button>
       <button class="btn primario" type="button" id="car-baixar">⬇️ Baixar imagens</button>
     </section>
-    <p class="sub car-ajuda">Dica: <code>*palavra*</code> fica em itálico colorido e <code>**palavra**</code> fica em negrito.</p>
+    <p class="sub car-ajuda">Dica: escreva <b>*palavra*</b> para itálico colorido e <b>**palavra**</b> para negrito.</p>
 
     <div class="car-grade">
       <div class="car-slides" id="car-slides">${car.slides.map((s, i) => {
