@@ -717,3 +717,38 @@ select cron.schedule('agenda-google', '*/5 * * * *', $$
     headers := '{"Content-Type": "application/json", "apikey": "sb_publishable_oZdhIWRB1gBabQH4xRJ2Xg__F8Lq0V0"}'::jsonb,
     body := '{"tipo": "google"}'::jsonb)
 $$);
+
+
+-- -------------------------------------------------------------
+-- 26. CONTRATO PADRÃO EM PDF
+-- modelos_contrato: o texto do seu contrato com os lugares que
+--   mudam marcados como {{campo}} (ex.: {{razao_social}}, {{valor}}).
+--   Fica no banco (e não nos arquivos do site, que são públicos)
+--   porque tem o seu CNPJ e os seus dados bancários.
+-- contratos_gerados: cada contrato que você gerou, com os dados
+--   preenchidos, para baixar o PDF de novo quando quiser.
+-- -------------------------------------------------------------
+create table if not exists public.modelos_contrato (
+  id            bigint generated always as identity primary key,
+  nome          text not null default 'Contrato padrão',
+  texto         text not null,
+  campos        jsonb not null default '[]',
+  atualizado_em timestamptz not null default now()
+);
+alter table public.modelos_contrato enable row level security;
+drop policy if exists "dono faz tudo" on public.modelos_contrato;
+create policy "dono faz tudo" on public.modelos_contrato
+  for all to authenticated using (public.eh_admin()) with check (public.eh_admin());
+
+create table if not exists public.contratos_gerados (
+  id          bigint generated always as identity primary key,
+  criado_em   timestamptz not null default now(),
+  modelo_id   bigint references public.modelos_contrato (id) on delete set null,
+  contrato_id bigint,
+  marca       text,
+  dados       jsonb not null default '{}'
+);
+alter table public.contratos_gerados enable row level security;
+drop policy if exists "dono faz tudo" on public.contratos_gerados;
+create policy "dono faz tudo" on public.contratos_gerados
+  for all to authenticated using (public.eh_admin()) with check (public.eh_admin());
