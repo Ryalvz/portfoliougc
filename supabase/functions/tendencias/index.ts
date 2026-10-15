@@ -92,6 +92,11 @@ async function comecar(chave: string, cfg: any) {
   return runId;
 }
 
+// Legenda em português? (o nicho é Brasil: reels gringos não entram)
+const MARCAS_PT = /[ãõç]|\b(você|voce|vc|não|nao|isso|também|tambem|muito|fazer|pra|meu|minha|seu|sua|quem|agora|aqui|então|entao|porque|dicas?|marca|vídeo|video|conteúdo|conteudo|em|com|essa|esse|mais|ainda|gente|sempre|nunca|olha|vem|tá)\b/i;
+const MARCAS_FORA = /[\u0400-\u04FF]|\b(the|and|this|your|with|und|der|die|das|che|della|para ti|está|cómo|también|usted|aquí)\b/i;
+const ehPortugues = (t: string) => { const x = String(t || ""); return MARCAS_PT.test(x) && !(MARCAS_FORA.test(x) && !/[ãõ]|\b(você|voce|não|nao)\b/i.test(x)); };
+
 const numero = (...v: any[]) => { for (const x of v) { const n = Number(x); if (Number.isFinite(n) && n > 0) return Math.round(n); } return 0; };
 
 // Confere a busca que está rodando; se terminou, guarda os 30 melhores
@@ -121,7 +126,8 @@ async function conferir(chave: string, cfg: any) {
       hashtag: String(x.inputUrl || x.queryTag || x.hashtag || "").replace(/^.*\/tags\//, "").replace(/\/.*$/, "") || null,
       capa: x.displayUrl || null,
     }))
-    .filter((x) => !vistos.has(x.url) && vistos.add(x.url));
+    .filter((x) => !vistos.has(x.url) && vistos.add(x.url))
+    .filter((x) => ehPortugues(x.legenda));
   // Primeiro os das últimas 2 semanas (mais views antes); se faltar, completa com os mais antigos
   const limiteData = Date.now() - 14 * 864e5;
   const recentes = reels.filter((x) => x.postado_em && Date.parse(x.postado_em) >= limiteData).sort((a, b) => b.views - a.views);
