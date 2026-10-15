@@ -120,21 +120,21 @@ async function calcularLembretes(hoje: string): Promise<Lembrete[]> {
     const aberto = fechado && c.status !== "Pago" && saldo > 0;
 
     if (aberto && prev && prev < hoje) {
-      if (!adiado(`vencido-${c.id}`)) L.push({ tipo: "vencido", texto: `${c.cliente}: venceu há ${diasEntre(prev, hoje)} dias (${real(saldo)}). Já pagou?` });
+      if (!adiado(`vencido-${c.id}`)) L.push({ tipo: "vencido", texto: `${c.cliente}: venceu há ${diasEntre(prev, hoje)} dias (${real(saldo)}). Já pagou?`, url: `./#campanha-${c.id}` });
       continue;
     }
     if (aberto && prev && prev >= hoje && prev <= somaDias(hoje, 2) && !adiado(`vence-${c.id}-${prev}`)) {
-      L.push({ tipo: "vence", texto: `${c.cliente}: paga ${prev === hoje ? "hoje" : "até " + br(prev)} (${real(saldo)})` });
+      L.push({ tipo: "vence", texto: `${c.cliente}: paga ${prev === hoje ? "hoje" : "até " + br(prev)} (${real(saldo)})`, url: `./#campanha-${c.id}` });
     }
     if (c.status === "Entregue" && !c.data_nf && saldo > 0 && !adiado(`nota-${c.id}`)) {
-      L.push({ tipo: "nota", texto: `${c.cliente}: entregue e sem nota fiscal` });
+      L.push({ tipo: "nota", texto: `${c.cliente}: entregue e sem nota fiscal`, url: `./#campanha-${c.id}` });
     }
     if (PRODUCAO.includes(c.status) && c.prazo_entrega && c.prazo_entrega <= somaDias(hoje, 1) && !adiado(`entrega-${c.id}-${c.prazo_entrega}`)) {
       const d = diasEntre(hoje, c.prazo_entrega);
-      L.push({ tipo: "entrega", texto: `${c.cliente}: ${d < 0 ? `entrega atrasada há ${-d} dias` : d === 0 ? "entrega hoje" : "entrega amanhã"}` });
+      L.push({ tipo: "entrega", texto: `${c.cliente}: ${d < 0 ? `entrega atrasada há ${-d} dias` : d === 0 ? "entrega hoje" : "entrega amanhã"}`, url: `./#campanha-${c.id}` });
     }
     if (NEGOCIACAO.includes(c.status) && c.criado_em && diasEntre(String(c.criado_em).slice(0, 10), hoje) >= 5 && !adiado(`negocia-${c.id}`)) {
-      L.push({ tipo: "negocia", texto: `${c.cliente}: em negociação há ${diasEntre(String(c.criado_em).slice(0, 10), hoje)} dias. Fez follow-up?` });
+      L.push({ tipo: "negocia", texto: `${c.cliente}: em negociação há ${diasEntre(String(c.criado_em).slice(0, 10), hoje)} dias. Fez follow-up?`, url: `./#campanha-${c.id}` });
     }
   }
   // Meta do mês: a partir do dia 20, se ainda não bateu
