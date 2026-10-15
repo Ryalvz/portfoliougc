@@ -5964,14 +5964,19 @@ function linhasRicas(ctx, texto, fontes, largura, maiusc) {
   const linhas = [];
   String(texto || "").split("\n").forEach((par) => {
     const palavras = [];
-    pedacosRicos(maiusc ? par.toUpperCase() : par).forEach((p) => p.t.split(/(\s+)/).forEach((w) => { if (w && !/^\s+$/.test(w)) palavras.push({ t: w, e: p.e }); else if (w && palavras.length) palavras[palavras.length - 1].espaco = true; }));
+    let antesEspaco = true;
+    pedacosRicos(maiusc ? par.toUpperCase() : par).forEach((p) => p.t.split(/(\s+)/).forEach((w) => {
+      if (!w) return;
+      if (/^\s+$/.test(w)) { antesEspaco = true; return; }
+      palavras.push({ t: w, e: p.e, cola: !antesEspaco && palavras.length > 0 }); antesEspaco = false;
+    }));
     if (!palavras.length) { linhas.push({ itens: [], fim: true }); return; }
     let atual = [], larg = 0;
     palavras.forEach((p) => {
       ctx.font = fontes[p.e]; const w = ctx.measureText(p.t).width;
-      ctx.font = fontes.n; const esp = atual.length ? ctx.measureText(" ").width : 0;
-      if (atual.length && larg + esp + w > largura) { linhas.push({ itens: atual, fim: false }); atual = []; larg = 0; }
-      atual.push({ ...p, w }); larg += (atual.length > 1 ? esp : 0) + w;
+      ctx.font = fontes.n; const esp = atual.length && !p.cola ? ctx.measureText(" ").width : 0;
+      if (atual.length && !p.cola && larg + esp + w > largura) { linhas.push({ itens: atual, fim: false }); atual = []; larg = 0; }
+      atual.push({ ...p, cola: p.cola && atual.length > 0, w }); larg += (atual.length > 1 ? esp : 0) + w;
     });
     linhas.push({ itens: atual, fim: true });
   });
@@ -5991,14 +5996,16 @@ function escreverRico(ctx, bloco, x, y, cores, alinhar = "left", largura = 0, ex
   bloco.linhas.forEach((l, i) => {
     const base = y + i * bloco.tam * bloco.entre + bloco.tam * 0.86;
     ctx.font = bloco.f.n; const esp = ctx.measureText(" ").width;
-    const total = l.itens.reduce((s, p) => s + p.w, 0) + Math.max(0, l.itens.length - 1) * esp;
+    const vaos = l.itens.filter((p, k) => k > 0 && !p.cola).length;
+    const total = l.itens.reduce((s, p) => s + p.w, 0) + vaos * esp;
     let cx = alinhar === "center" ? x - total / 2 : alinhar === "right" ? x - total : x;
-    const gap = alinhar === "justify" && !l.fim && l.itens.length > 1 ? (largura - (total - (l.itens.length - 1) * esp)) / (l.itens.length - 1) : esp;
-    l.itens.forEach((p) => {
+    const gap = alinhar === "justify" && !l.fim && vaos > 0 ? (largura - (total - vaos * esp)) / vaos : esp;
+    l.itens.forEach((p, k) => {
+      if (k > 0 && !p.cola) { if (extra.sublinhado) { ctx.fillStyle = cores.n; ctx.fillRect(cx, base + bloco.tam * 0.12, gap, Math.max(2, bloco.tam * 0.06)); } cx += gap; }
       ctx.font = bloco.f[p.e]; ctx.fillStyle = cores[p.e] || cores.n;
       ctx.fillText(p.t, cx, base);
-      if (extra.sublinhado) { ctx.fillRect(cx, base + bloco.tam * 0.12, p.w + (p === l.itens[l.itens.length - 1] ? 0 : gap), Math.max(2, bloco.tam * 0.06)); }
-      cx += p.w + gap;
+      if (extra.sublinhado) ctx.fillRect(cx, base + bloco.tam * 0.12, p.w, Math.max(2, bloco.tam * 0.06));
+      cx += p.w;
     });
   });
   return y + bloco.linhas.length * bloco.tam * bloco.entre;
@@ -6147,7 +6154,7 @@ function pintarSlide(cv, s, i, total, temaChave, aoCarregar) {
       if (s.texto2) { const n = caberRico(ctx, s.texto2, { fontes: serifa(), max: 38, min: 26, largura: 300, altura: 200, entre: 1.15 }); escreverRico(ctx, n, W - M, 130, { n: tom.destaque, a: tom.destaque, b: tom.destaque }, "right"); }
       caixaPapel(ctx, W / 2 - 250, 200, 500, 640, 26, "#000", true);
       fotoRedonda(ctx, f1, W / 2 - 250, 200, 500, 640, 26, foco);
-      const t = caberRico(ctx, String(s.titulo || "").replace(/\.\s+/g, ".\n"), { fontes: serifa(), max: 86, min: 46, largura: LW, altura: H - 900 - 100, entre: 1.05 });
+      const t = caberRico(ctx, String(s.titulo || "").replace(/\.(\*\*)?\s+/g, ".$1\n"), { fontes: serifa(), max: 86, min: 46, largura: LW, altura: H - 900 - 100, entre: 1.05 });
       escreverRico(ctx, t, M, 900, { n: tom.destaque, a: tom.destaque, b: tom.destaque });
       return;
     }
@@ -6228,7 +6235,7 @@ function pintarSlide(cv, s, i, total, temaChave, aoCarregar) {
       const t = caberRico(ctx, s.titulo, { fontes: bastao(700), max: 56, min: 34, largura: LW, altura: 200, entre: 1.15 });
       let y = escreverRico(ctx, t, W / 2, 110, { n: tom.destaque, a: tom.destaque, b: tom.destaque }, "center") + 40;
       if (temFoto) { caixaPapel(ctx, W / 2 - 300, y, 600, 470, 2, "#F7F4EE", true); fotoCobre(ctx, f1, W / 2 - 280, y + 20, 560, 430, foco); y += 470 + 50; }
-      else y += 120;
+      else y = 360;
       if (s.texto) { const b = caberRico(ctx, s.texto, { fontes: bastao(700), max: 54, min: 32, largura: LW, altura: 200, entre: 1.15 }); y = escreverRico(ctx, b, W / 2, y, { n: tom.titulo, a: tom.destaque, b: tom.titulo }, "center") + 24; }
       if (s.destaque) {
         const d = caberRico(ctx, s.destaque, { fontes: bastao(800), max: 44, min: 28, largura: LW - 120, altura: 120, entre: 1.15 });
