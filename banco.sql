@@ -752,3 +752,87 @@ alter table public.contratos_gerados enable row level security;
 drop policy if exists "dono faz tudo" on public.contratos_gerados;
 create policy "dono faz tudo" on public.contratos_gerados
   for all to authenticated using (public.eh_admin()) with check (public.eh_admin());
+
+
+-- -------------------------------------------------------------
+-- 27. INSTAGRAM: REELS DA SEMANA, PLANO DA SEMANA E CARROSSÉIS
+-- ig_pesquisa: as hashtags que o painel vasculha toda segunda e
+--   o andamento da busca (uma linha só). A chave do Apify NÃO fica
+--   aqui: ela fica no cofre do Supabase (Edge Functions > Secrets >
+--   APIFY_TOKEN).
+-- ig_reels:    os 30 reels com mais views da semana, por hashtag.
+-- ig_planos:   o plano da semana que você colou da resposta do Claude.
+-- carrosseis:  os carrosséis que você montou no gerador.
+-- -------------------------------------------------------------
+create table if not exists public.ig_pesquisa (
+  id           int primary key default 1 check (id = 1),
+  hashtags     text[] not null default array['ugcbrasil', 'creatorugc', 'ugccreator', 'conteudougc', 'dicasdetecnologia', 'tecnologia'],
+  por_hashtag  int not null default 25 check (por_hashtag between 5 and 60),
+  run_id       text,
+  iniciado_em  timestamptz,
+  coletado_em  timestamptz,
+  erro         text,
+  avisado      boolean not null default true
+);
+insert into public.ig_pesquisa (id) values (1) on conflict (id) do nothing;
+alter table public.ig_pesquisa enable row level security;
+drop policy if exists "dono faz tudo" on public.ig_pesquisa;
+create policy "dono faz tudo" on public.ig_pesquisa
+  for all to authenticated using (public.eh_admin()) with check (public.eh_admin());
+
+create table if not exists public.ig_reels (
+  id          bigint generated always as identity primary key,
+  semana      date not null,
+  url         text not null,
+  perfil      text,
+  legenda     text,
+  views       bigint,
+  curtidas    bigint,
+  comentarios bigint,
+  duracao     numeric,
+  postado_em  timestamptz,
+  hashtag     text,
+  capa        text,
+  criado_em   timestamptz not null default now(),
+  unique (semana, url)
+);
+create index if not exists ig_reels_semana on public.ig_reels (semana desc, views desc);
+alter table public.ig_reels enable row level security;
+drop policy if exists "dono faz tudo" on public.ig_reels;
+create policy "dono faz tudo" on public.ig_reels
+  for all to authenticated using (public.eh_admin()) with check (public.eh_admin());
+
+create table if not exists public.ig_planos (
+  id        bigint generated always as identity primary key,
+  semana    date not null unique,
+  resposta  text not null default '',
+  itens     jsonb not null default '[]',
+  criado_em timestamptz not null default now()
+);
+alter table public.ig_planos enable row level security;
+drop policy if exists "dono faz tudo" on public.ig_planos;
+create policy "dono faz tudo" on public.ig_planos
+  for all to authenticated using (public.eh_admin()) with check (public.eh_admin());
+
+create table if not exists public.carrosseis (
+  id            bigint generated always as identity primary key,
+  titulo        text not null default 'Carrossel',
+  slides        jsonb not null default '[]',
+  criado_em     timestamptz not null default now(),
+  atualizado_em timestamptz not null default now()
+);
+alter table public.carrosseis enable row level security;
+drop policy if exists "dono faz tudo" on public.carrosseis;
+create policy "dono faz tudo" on public.carrosseis
+  for all to authenticated using (public.eh_admin()) with check (public.eh_admin());
+
+-- Toda segunda, das 7h às 10h50 (Brasília), de 10 em 10 minutos: começa a busca
+-- da semana e, quando o Apify termina, guarda os 30 reels. Pode chamar à vontade:
+-- o ajudante só faz uma busca por semana.
+select cron.unschedule('reels-semana') where exists (select 1 from cron.job where jobname = 'reels-semana');
+select cron.schedule('reels-semana', '*/10 10-13 * * 1', $$
+  select net.http_post(
+    url := 'https://jlehawiwklvyvrzbfuiu.supabase.co/functions/v1/tendencias',
+    headers := '{"Content-Type": "application/json", "apikey": "sb_publishable_oZdhIWRB1gBabQH4xRJ2Xg__F8Lq0V0"}'::jsonb,
+    body := '{"tipo": "semanal"}'::jsonb)
+$$);
