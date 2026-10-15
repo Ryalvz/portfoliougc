@@ -94,7 +94,7 @@ async function comecar(chave: string, cfg: any) {
 
 // Legenda em português? (o nicho é Brasil: reels gringos não entram)
 const MARCAS_PT = /[ãõç]|\b(você|voce|vc|não|nao|isso|também|tambem|muito|fazer|pra|meu|minha|seu|sua|quem|agora|aqui|então|entao|porque|dicas?|marca|vídeo|video|conteúdo|conteudo|em|com|essa|esse|mais|ainda|gente|sempre|nunca|olha|vem|tá)\b/i;
-const MARCAS_FORA = /[\u0400-\u04FF¿¡ñ]|\b(the|and|this|your|with|und|der|die|das|che|della|para ti|está|cómo|también|usted|aquí)\b/i;
+const MARCAS_FORA = /[\u0400-\u04FF¿¡ñ]|\b(the|and|this|your|with|und|der|die|das|che|della|para ti|está|cómo|también|usted|aquí|día|con|del|los|las|avec|nous|pour|les|une|vous|est)\b/i;
 const ehPortugues = (t: string) => { const x = String(t || ""); return MARCAS_PT.test(x) && !(MARCAS_FORA.test(x) && !/[ãõ]|\b(você|voce|não|nao)\b/i.test(x)); };
 
 const numero = (...v: any[]) => { for (const x of v) { const n = Number(x); if (Number.isFinite(n) && n > 0) return Math.round(n); } return 0; };
