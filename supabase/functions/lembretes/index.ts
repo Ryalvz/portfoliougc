@@ -575,7 +575,16 @@ Deno.serve(async (req) => {
       return resposta({ contatos: novos.length });
     }
 
-        // Relógio de cada minuto: lembrete rápido que chegou na hora
+    // Os 30 reels da semana chegaram (quem chama é o ajudante "tendencias")
+    if (corpo.tipo === "reels") {
+      const { data: p } = await db.from("ig_pesquisa").select("avisado").eq("id", 1).maybeSingle();
+      if (!p || p.avisado) return resposta({ pulado: "nada novo" });
+      await db.from("ig_pesquisa").update({ avisado: true }).eq("id", 1);
+      await enviar({ titulo: "🔥 Os reels da semana chegaram", corpo: "Veja o que está bombando no seu nicho e monte o plano da semana em 2 minutos.", url: "./#instagram-reels", tag: "reels-semana" });
+      return resposta({ avisado: true });
+    }
+
+    // Relógio de cada minuto: lembrete rápido que chegou na hora
     if (corpo.tipo === "rapidos") {
       const { data: naHora } = await db.from("lembretes_rapidos").select("id,texto")
         .eq("feito", false).eq("avisado", false).lte("quando", new Date().toISOString()).limit(10);
