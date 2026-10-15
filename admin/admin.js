@@ -5711,6 +5711,13 @@ ${fraco.map(linha).join("\n")}
   const refs = semana.length ? `OS ${semana.length} REELS COM MAIS VIEWS DESTA SEMANA NO MEU NICHO (por hashtag)
 ${semana.map((r, i) => `${i + 1}. ${r.perfil || ""} · ${num(r.views)} views${n2(r.duracao) ? ` · ${Math.round(r.duracao)} s` : ""}: "${String(r.legenda || "").replace(/\s+/g, " ").slice(0, 220)}"`).join("\n")}
 ` : "";
+  // Suas ideias de roteiro que ainda não foram pro ar (as "Fazer agora" primeiro)
+  const ordemEtapa = { agora: 0, fazendo: 1, ideia: 2 };
+  const ideias = (S.transcricoes || []).filter((t) => t.status !== "feito" && (t.titulo || t.minha_versao || t.transcricao))
+    .sort((a, b) => (ordemEtapa[a.status] ?? 3) - (ordemEtapa[b.status] ?? 3)).slice(0, 30);
+  const minhasIdeias = ideias.length ? `MINHAS IDEIAS DE ROTEIRO JÁ ANOTADAS (#número para você citar)
+${ideias.map((t) => `#${t.id} [${(CATEGORIAS.find((c) => c[0] === t.categoria) || [0, t.categoria || ""])[1]}${t.status === "agora" ? ", fazer agora" : ""}] ${t.titulo || "sem título"}${(t.minha_versao || t.transcricao) ? `: ${String(t.minha_versao || t.transcricao).replace(/\s+/g, " ").slice(0, 160)}` : ""}`).join("\n")}
+` : "";
   const seg = segundaISO();
   return `Você é meu estrategista de conteúdo para Instagram.
 
@@ -5719,6 +5726,7 @@ ${nicho}
 
 ${meus}
 ${refs}
+${minhasIdeias}
 O QUE EU PRECISO (pesquise na internet o que está em alta no Brasil nesta semana, ${dataBR(seg)} a ${dataBR(somaDiasISO(6, seg))}):
 
 1. TENDÊNCIAS DA SEMANA: 5 temas, formatos ou áudios em alta no meu nicho e por que estão funcionando.
@@ -5726,6 +5734,7 @@ O QUE EU PRECISO (pesquise na internet o que está em alta no Brasil nesta seman
 3. PADRÕES DOS REELS QUE BOMBARAM: o que os reels da lista acima têm em comum (gancho, duração, estilo, tema). Se não tiver lista, use o que você achou na pesquisa.
 4. O QUE FUNCIONA PARA MIM: o que os meus números mostram (o que repetir e o que parar de fazer).
 5. PLANO DA SEMANA: de 5 a 7 posts, misturando bastidores de UGC e produtos na vida real, com pelo menos 2 carrosséis e 3 reels.
+   PRIORIZE as minhas ideias já anotadas que combinam com o que está em alta e com o que funciona para mim. Quando usar uma, coloque o número dela no tema (ex.: "#34 Memória cheia do iPhone"). Só invente tema novo se faltar.
    Escreva CADA post numa linha, EXATAMENTE neste formato, separado por | :
    SEG | Reels | tema | gancho (a primeira frase do vídeo ou a capa) | por que vai funcionar
    Use só SEG, TER, QUA, QUI, SEX, SAB, DOM no começo. Formatos: Reels, Carrossel, Stories ou Foto.
