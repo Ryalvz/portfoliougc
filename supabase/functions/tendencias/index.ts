@@ -137,6 +137,7 @@ async function conferir(chave: string, cfg: any) {
   if (top.length) {
     await db.from("ig_reels").delete().eq("semana", semana);
     await db.from("ig_reels").insert(top.map((x) => ({ ...x, semana })));
+    await guardarCapas(semana);
   }
   await db.from("ig_pesquisa").update({ run_id: null, coletado_em: new Date().toISOString(), erro: top.length ? null : "O Apify não achou reels nessas hashtags. Troque as hashtags e tente de novo.", avisado: !top.length }).eq("id", 1);
   // Avisa no celular (o ajudante de lembretes manda a notificação)
@@ -148,6 +149,30 @@ async function conferir(chave: string, cfg: any) {
     }).catch(() => null);
   }
   return { rodando: false, guardados: top.length, recentes: recentes.length };
+}
+
+// O Instagram não deixa as capas aparecerem em outros sites: guarda uma cópia no Storage
+async function guardarCapas(semana: string) {
+  const { data: linhas } = await db.from("ig_reels").select("id,capa").eq("semana", semana);
+  await Promise.all((linhas || []).filter((x) => x.capa && !String(x.capa).includes("/storage/v1/")).map(async (x) => {
+    try {
+      const r = await fetch(x.capa, { headers: { "User-Agent": "Mozilla/5.0" } });
+      const tipo = r.headers.get("content-type") || "";
+      if (!r.ok || !tipo.startsWith("image/")) return;
+      const caminho = `reels/${semana}/${x.id}.jpg`;
+      const { error } = await db.storage.from("portfolio").upload(caminho, await r.arrayBuffer(), { contentType: "image/jpeg", upsert: true, cacheControl: "31536000" });
+      if (!error) await db.from("ig_reels").update({ capa: db.storage.from("portfolio").getPublicUrl(caminho).data.publicUrl }).eq("id", x.id);
+    } catch (_) { /* fica sem capa */ }
+  }));
+  // Apaga as capas com mais de 4 semanas
+  try {
+    const { data: pastas } = await db.storage.from("portfolio").list("reels", { limit: 100 });
+    const limite = new Date(Date.now() - 28 * 864e5).toISOString().slice(0, 10);
+    for (const p of (pastas || []).filter((x) => /^\d{4}-\d{2}-\d{2}$/.test(x.name) && x.name < limite)) {
+      const { data: arqs } = await db.storage.from("portfolio").list(`reels/${p.name}`, { limit: 200 });
+      if (arqs?.length) await db.storage.from("portfolio").remove(arqs.map((a) => `reels/${p.name}/${a.name}`));
+    }
+  } catch (_) { /* segue */ }
 }
 
 async function uso(chave: string) {
@@ -178,6 +203,8 @@ Deno.serve(async (req) => {
     }
 
     if (!(await ehOAdmin(req))) return resposta({ erro: "Só o dono do painel pode usar. Saia e entre de novo." }, 401);
+
+    if (corpo.acao === "capas") { await guardarCapas(String(corpo.semana || segundaDaSemana())); return resposta({ ok: true }); }
 
     if (corpo.acao === "hashtags") {
       const lista = (Array.isArray(corpo.hashtags) ? corpo.hashtags : []).map((h: string) => String(h).replace(/^#/, "").replace(/\s+/g, "").toLowerCase()).filter(Boolean).slice(0, 12);
