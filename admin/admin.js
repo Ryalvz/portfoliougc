@@ -6111,8 +6111,8 @@ function pintarSlide(cv, s, i, total, temaChave, aoCarregar) {
       const altT = t.linhas.length * t.tam * t.entre;
       let y = H - 250 - altT;
       if (s.texto) { const p = caberRico(ctx, s.texto, { fontes: bastao(700), max: 40, min: 28, largura: LW, altura: 120, entre: 1.2 }); y -= p.linhas.length * p.tam * p.entre + 16; escreverRico(ctx, p, W / 2, y, { n: "#fff", a: "#fff", b: "#fff" }, "center"); y += p.linhas.length * p.tam * p.entre + 16; }
-      escreverRico(ctx, t, W / 2, y, { n: "#FFFFFF", a: "#FFFFFF", b: "#FFFFFF" }, "center");
-      if (s.destaque) etiqueta(ctx, s.destaque, W - M - 200, H - 250 + 10, -5, T.forte.fundo, T.forte.titulo, 36);
+      if (s.destaque) etiqueta(ctx, s.destaque, W - M - 170, y - 34, -5, T.forte.fundo, T.forte.titulo, 34);
+      escreverRico(ctx, t, W / 2, y + (s.destaque ? 14 : 0), { n: "#FFFFFF", a: "#FFFFFF", b: "#FFFFFF" }, "center");
       arraste(ctx, W / 2, H - 175, "rgba(255,255,255,.9)");
       marcaDagua(ctx, "#FFFFFF");
       return;
