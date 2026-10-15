@@ -1623,7 +1623,7 @@ function desenharTranscricoes(el) {
         <select class="campo" id="novo-etapa" aria-label="Etapa">${ETAPAS.map(([v, t]) => `<option value="${v}">${t}</option>`).join("")}</select>
       </div>
       <div id="rot-aviso" class="rot-aviso" aria-live="polite">${trans.aviso || ""}</div>
-      <div class="rot-rodape"><span id="rot-saldo" class="sub"></span><span class="espaco"></span><button class="btn" type="button" id="rot-estudar">🧠 Estudar com o Claude</button></div>
+      <div class="rot-rodape"><span id="rot-saldo" class="sub"></span><span class="espaco"></span><button class="btn" type="button" id="rot-voz">🗣️ Minha voz</button><button class="btn" type="button" id="rot-estudar">🧠 Estudar com o Claude</button></div>
     </section>
     ${trans.categoria === "todas" ? "" : `<div id="painel-ideias"></div>`}
     <div class="barra rot-filtros">
@@ -1641,6 +1641,7 @@ function desenharTranscricoes(el) {
   $("#form-add-trans").addEventListener("submit", adicionarTranscricao);
   $("#ideia-sem-link").onclick = () => adicionarIdeia(null);
   $("#rot-estudar").onclick = estudarComClaude;
+  $("#rot-voz").onclick = abrirMinhaVoz;
   $$("[data-dequem]", caixa).forEach((b) => b.onclick = () => { trans.dequem = b.dataset.dequem; trans.tag = ""; desenhar(); });
   $$("[data-tag]", caixa).forEach((b) => b.onclick = () => { trans.tag = trans.tag === b.dataset.tag ? "" : b.dataset.tag; desenhar(); });
   $$("[data-etapa-filtro]", caixa).forEach((b) => b.onclick = () => { trans.etapa = b.dataset.etapaFiltro; desenhar(); });
@@ -2152,7 +2153,7 @@ function pintarDetalheTrans() {
           </div>
         </div>` : ""}
         <div class="cartao destaque-versao">
-          <h2>Minha versão (meu roteiro)</h2>
+          <div class="barra" style="margin-bottom:6px"><h2 style="margin:0">Minha versão (meu roteiro)</h2><span class="espaco"></span><button class="btn pequeno primario" type="button" id="t-roteiro-voz">✍️ Roteiro na minha voz</button></div>
           <textarea class="campo" id="t-versao" rows="9" placeholder="${t.link ? "Escreva aqui a sua versão: o seu gancho, a sua fala, como você vai adaptar essa referência." : "Escreva aqui a sua ideia e o roteiro: gancho, desenvolvimento e chamada final."}">${esc(t.minha_versao || "")}</textarea>
         </div>
         <div class="cartao">
@@ -2171,6 +2172,7 @@ function pintarDetalheTrans() {
       </div>
     </div>`;
 
+  $("#t-roteiro-voz").onclick = () => roteiroNaMinhaVoz({ ...t, titulo: $("#t-titulo").value.trim(), categoria: $("#t-cat").value, minha_versao: $("#t-versao").value.trim(), observacoes: $("#t-obs").value.trim(), transcricao: $("#t-transcricao") ? $("#t-transcricao").value.trim() : t.transcricao });
   const ta = $("#t-transcricao");
   const status = (txt) => { const s = $("#t-status"); if (s) s.textContent = txt; };
   let originalPendente = null;
@@ -5713,9 +5715,9 @@ ${semana.map((r, i) => `${i + 1}. ${r.perfil || ""} · ${num(r.views)} views${n2
 ` : "";
   // Suas ideias de roteiro que ainda não foram pro ar (as "Fazer agora" primeiro)
   const ordemEtapa = { agora: 0, fazendo: 1, ideia: 2 };
-  const ideias = (S.transcricoes || []).filter((t) => t.status !== "feito" && (t.titulo || t.minha_versao || t.transcricao))
+  const ideias = (S.transcricoes || []).filter((t) => t.status !== "feito" && t.categoria === "organico" && (t.titulo || t.minha_versao || t.transcricao))
     .sort((a, b) => (ordemEtapa[a.status] ?? 3) - (ordemEtapa[b.status] ?? 3)).slice(0, 30);
-  const minhasIdeias = ideias.length ? `MINHAS IDEIAS DE ROTEIRO JÁ ANOTADAS (#número para você citar)
+  const minhasIdeias = ideias.length ? `MINHAS IDEIAS DE ROTEIRO PARA O INSTAGRAM JÁ ANOTADAS (#número para você citar)
 ${ideias.map((t) => `#${t.id} [${(CATEGORIAS.find((c) => c[0] === t.categoria) || [0, t.categoria || ""])[1]}${t.status === "agora" ? ", fazer agora" : ""}] ${t.titulo || "sem título"}${(t.minha_versao || t.transcricao) ? `: ${String(t.minha_versao || t.transcricao).replace(/\s+/g, " ").slice(0, 160)}` : ""}`).join("\n")}
 ` : "";
   const seg = segundaISO();
@@ -5734,6 +5736,7 @@ O QUE EU PRECISO (pesquise na internet o que está em alta no Brasil nesta seman
 3. PADRÕES DOS REELS QUE BOMBARAM: o que os reels da lista acima têm em comum (gancho, duração, estilo, tema). Se não tiver lista, use o que você achou na pesquisa.
 4. O QUE FUNCIONA PARA MIM: o que os meus números mostram (o que repetir e o que parar de fazer).
 5. PLANO DA SEMANA: de 5 a 7 posts, misturando bastidores de UGC e produtos na vida real, com pelo menos 2 carrosséis e 3 reels.
+   Este plano é SÓ para o Instagram. Não coloque nada de TikTok Shop (vídeo de venda de produto com carrinho), isso é outra estratégia.
    PRIORIZE as minhas ideias já anotadas que combinam com o que está em alta e com o que funciona para mim. Quando usar uma, coloque o número dela no tema (ex.: "#34 Memória cheia do iPhone"). Só invente tema novo se faltar.
    Escreva CADA post numa linha, EXATAMENTE neste formato, separado por | :
    SEG | Reels | tema | gancho (a primeira frase do vídeo ou a capa) | por que vai funcionar
@@ -6425,3 +6428,127 @@ function desenharCarrossel(el) {
   };
 }
 const palavrasDe = (s) => [s.titulo, s.texto, s.texto2, s.destaque].join(" ").replace(/\*/g, "").split(/\s+/).filter(Boolean).length;
+
+/* =============================================================
+   🗣️ MINHA VOZ: roteiros prontos para gravar, do seu jeito
+   O guia de voz fica no banco (preferencias, chave "guia_voz").
+   Cada ideia tem o botão "✍️ Roteiro na minha voz", que junta o
+   guia, a ideia, a referência e o formato certo num pedido pronto
+   para colar no Claude.
+   ============================================================= */
+const VOZ_PADRAO = `QUEM EU SOU
+Ryan Alves (@ryalvz), creator UGC de Tech & Lifestyle. 12 anos em vendas B2B antes do UGC. Mais de 40 marcas no portfólio. Uma campanha passou de 2 milhões de alcance.
+
+MEU TOM
+Próximo, de amigo contando uma coisa que descobriu. Confiante sem ser arrogante. Humor leve e autoironia ("e quem nunca...?", "quem é você da dupla?").
+
+COMO EU ESCREVO E FALO
+Frases curtas, uma ideia por frase. Muitas vezes uma frase por linha, criando ritmo: "Eu não tinha nenhuma marca. Nenhum cliente. Só a vontade de tentar."
+Português do dia a dia: pra, tá, né, gente. Sem gíria forçada.
+Uso números reais e a minha própria experiência como prova (3 meses, 40 marcas, 2 milhões).
+
+COMO EU ABRO
+Pergunta direta em que a pessoa se reconhece: "Você também achava que o Hollyland servia só pra gravar áudio?"
+Ou uma confissão que puxa história: "Há 1 ano eu gravava esse vídeo para criar meu primeiro portfólio."
+
+COMO EU FECHO
+Chamada simples e natural: "salva pra não esquecer", "me conta nos comentários", "segue que tem parte 2".
+
+O QUE FUNCIONA COMIGO
+Dica prática de iPhone, equipamento e app (é o que mais salvam e compartilham).
+Série com episódios (EP. 1, EP. 2), como o Diário de Mudança.
+Bastidores de creator e história pessoal com virada.
+
+O QUE EVITAR
+Cara de anúncio e palavra de vendedor ("imperdível", "revolucionário").
+Textão. Travessão. Emoji demais (1 a 3 por legenda).`;
+let vozGuia = null, vozFalta = false;
+async function carregarVoz() {
+  if (vozGuia !== null) return vozGuia;
+  const { data, error } = await db.from("preferencias").select("valor").eq("chave", "guia_voz").maybeSingle();
+  vozFalta = !!error;
+  vozGuia = (data && data.valor) || VOZ_PADRAO;
+  return vozGuia;
+}
+
+const FORMATO_ROTEIRO = {
+  organico: `FORMATO: Reels orgânico para o MEU Instagram (Tech & Lifestyle e bastidores de UGC).
+De 30 a 60 segundos de fala (uns 80 a 150 palavras). O objetivo é alcance, salvamento e seguidores novos, NÃO vender produto.
+Gancho nos 3 primeiros segundos, ritmo rápido, uma virada ou revelação perto do fim.`,
+  tiktok_shop: `FORMATO: vídeo de venda para o TikTok Shop (afiliado).
+De 15 a 40 segundos. Estrutura: dor ou situação real, produto em uso na mão, 2 ou 3 benefícios concretos que dá para ver na tela, prova (antes e depois, teste, detalhe), chamada para o carrinho laranja.
+Fale do preço ou da oferta só se fizer sentido. Nada de promessa exagerada ou proibida.`,
+  publi: `FORMATO: vídeo UGC para uma marca (publi).
+De 20 a 45 segundos, com cara de cliente de verdade, não de anúncio. Siga o briefing das observações, se tiver.
+Estrutura: gancho, dor, produto em uso, benefício principal com prova, chamada da marca.`
+};
+
+function roteiroNaMinhaVoz(t) {
+  carregarVoz().then((voz) => {
+    const cat = FORMATO_ROTEIRO[t.categoria] ? t.categoria : "organico";
+    const montar = () => `Você vai escrever um roteiro pronto para eu gravar, do MEU jeito de falar.
+
+MEU GUIA DE VOZ (siga à risca)
+${voz}
+
+${FORMATO_ROTEIRO[cat]}
+
+A IDEIA
+Título: ${t.titulo || "sem título"}
+${t.minha_versao ? `O que eu já anotei:\n${t.minha_versao}\n` : ""}${t.observacoes ? `Observações:\n${t.observacoes}\n` : ""}${t.transcricao ? `Referência (vídeo de ${t.perfil || "outra pessoa"}): use só a ESTRUTURA, nunca copie as frases.\n${String(t.transcricao).slice(0, 2500)}\n` : ""}
+ME ENTREGUE ASSIM
+1. GANCHOS: 3 opções diferentes de primeira frase (pergunta, confissão e afirmação polêmica).
+2. ROTEIRO: fala por fala, uma frase por linha, do jeito que eu falaria olhando pra câmera. Entre colchetes, o que aparece na tela: [CENA: ...] e [TEXTO NA TELA: ...].
+3. CHAMADA FINAL.
+4. ${cat === "tiktok_shop" ? "TEXTO DO POST para o TikTok, curto, com 3 a 5 hashtags." : cat === "publi" ? "LEGENDA sugerida para a marca." : "LEGENDA para o Instagram: repita o gancho na primeira linha, 1 a 3 emojis, 3 a 5 hashtags."}
+5. DICAS DE GRAVAÇÃO: enquadramento, cenas de apoio e duração estimada.
+
+Português do Brasil, natural, sem cara de anúncio. Não use travessão em nenhum texto.`;
+    const d = abrirJanelaSimples("✍️ Roteiro na minha voz", `
+      <p class="sub" style="margin-top:0">O pedido já leva o seu guia de voz, a ideia${t.transcricao ? ", a referência" : ""} e o formato de <b>${esc((CATEGORIAS.find((c) => c[0] === cat) || [0, ""])[1])}</b>.</p>
+      <ol class="passos"><li>Toque em <b>Copiar o pedido</b> e cole no Claude.</li><li>Ajuste o que quiser conversando com ele.</li><li>Cole o roteiro final em <b>Minha versão</b> e salve. Pronto pra gravar.</li></ol>
+      ${vozGuia === VOZ_PADRAO ? `<p class="sub">Dica: em <b>🗣️ Minha voz</b> (embaixo da lista de roteiros) dá para deixar o guia ainda mais com a sua cara.</p>` : ""}
+      <textarea class="campo" id="rv-prompt" rows="10" style="width:100%;font-size:12px" readonly>${esc(montar())}</textarea>`,
+      `<a class="btn" href="https://claude.ai/new" target="_blank" rel="noopener">Abrir o Claude ↗</a><button type="button" class="btn primario" id="rv-copiar">📋 Copiar o pedido</button>`);
+    $("#rv-copiar", d).onclick = async () => {
+      try { await navigator.clipboard.writeText($("#rv-prompt", d).value); $("#rv-copiar", d).textContent = "copiado ✓"; avisar("Pedido copiado. Cole no Claude."); }
+      catch (_) { $("#rv-prompt", d).select(); avisar("Selecionei o texto: aperte Cmd + C para copiar.", true); }
+    };
+  });
+}
+
+async function abrirMinhaVoz() {
+  const voz = await carregarVoz();
+  // Material para o Claude entender o seu jeito: seus roteiros e suas legendas
+  const meus = S.transcricoes.filter((t) => t.de_quem === "minha" && (t.minha_versao || t.transcricao || t.legenda)).slice(0, 12);
+  let legendas = [];
+  if (ig.dados && ig.dados.posts) legendas = ig.dados.posts.filter((x) => x.legenda && n2(x.reach)).sort((a, b) => n2(b.reach) - n2(a.reach)).slice(0, 15);
+  const pedidoGuia = () => `Leia os meus textos abaixo (roteiros e legendas que eu mesmo escrevi) e monte o meu GUIA DE VOZ para roteiros, no mesmo formato do guia atual: QUEM EU SOU, MEU TOM, COMO EU ESCREVO E FALO, COMO EU ABRO, COMO EU FECHO, O QUE FUNCIONA COMIGO, O QUE EVITAR.
+Use exemplos reais tirados dos meus textos. Seja específico (palavras que eu repito, tamanho das frases, tipo de humor). Não use travessão. Me devolva só o guia, pronto para colar.
+
+GUIA ATUAL
+${voz}
+
+MEUS ROTEIROS
+${meus.map((t) => `### ${t.titulo || "sem título"}\n${String(t.minha_versao || t.transcricao || t.legenda).slice(0, 1500)}`).join("\n\n") || "(ainda não tenho roteiros meus salvos)"}
+
+MINHAS LEGENDAS COM MAIS ALCANCE
+${legendas.map((x) => `- (${num(x.reach)} de alcance) ${String(x.legenda).replace(/\s+/g, " ").slice(0, 600)}`).join("\n") || "(abra a aba Instagram antes para eu juntar as legendas)"}`;
+  const d = abrirJanelaSimples("🗣️ Minha voz", `
+    <p class="sub" style="margin-top:0">É o jeito como você fala. Todo "✍️ Roteiro na minha voz" usa este guia. Quanto mais parecido com você, menos você precisa mexer antes de gravar.</p>
+    ${vozFalta ? `<div class="aviso-falta">Falta rodar a parte 28 do banco.sql no Supabase para o guia ficar salvo.</div>` : ""}
+    <textarea class="campo" id="vz-texto" rows="14" style="width:100%;font-size:13px">${esc(voz)}</textarea>
+    <details style="margin-top:10px"><summary><b>Deixar o guia mais a minha cara com o Claude</b></summary>
+      <ol class="passos" style="margin-top:8px"><li>Copie o pedido: ele junta ${plural(meus.length, "roteiro seu", "roteiros seus")} e ${plural(legendas.length, "legenda", "legendas")} dos seus posts.</li><li>Cole no Claude e copie o guia que ele devolver.</li><li>Cole aqui em cima no lugar do texto e salve.</li></ol>
+      <button type="button" class="btn" id="vz-pedido">📋 Copiar o pedido</button>
+    </details>`,
+    `<button type="button" class="btn" data-fechar>Fechar</button><button type="button" class="btn primario" id="vz-salvar">💾 Salvar</button>`);
+  $("#vz-pedido", d).onclick = async () => { try { await navigator.clipboard.writeText(pedidoGuia()); avisar("Pedido copiado. Cole no Claude."); } catch (_) { avisar("Não deu para copiar.", true); } };
+  $("#vz-salvar", d).onclick = async () => {
+    const valor = $("#vz-texto", d).value.trim();
+    if (!valor) { avisar("O guia não pode ficar vazio.", true); return; }
+    const { error } = await db.from("preferencias").upsert({ chave: "guia_voz", valor, atualizado_em: new Date().toISOString() }, { onConflict: "chave" });
+    if (error) { avisar("Falta rodar a parte 28 do banco.sql no Supabase.", true); return; }
+    vozGuia = valor; vozFalta = false; d.close(); avisar("Guia de voz salvo. Os próximos roteiros já saem assim.");
+  };
+}
