@@ -262,6 +262,7 @@
   .filter[aria-pressed="true"] { background: var(--fg); border-color: var(--fg); color: var(--bg-ctx); }
 
   .row { margin-top: 36px; }
+  [hidden] { display: none !important; }
   .row[hidden] { display: none; }
   .row-title { font-family: var(--body); font-weight: 700; font-size: 22px; text-transform: none; letter-spacing: 0; margin-bottom: 12px; display: flex; align-items: baseline; gap: 12px; }
   .row-title small { color: var(--muted); font-size: 14px; font-weight: 500; }
@@ -386,6 +387,8 @@
   .testimonial figcaption { display: flex; align-items: center; gap: 12px; }
   .testimonial figcaption .avatar { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--cobalt); color: var(--parchment); font-family: var(--head); font-size: 18px; flex: none; }
   .testimonial figcaption b { display: block; }
+  .testimonial .estrelas { color: #E3B341; letter-spacing: 3px; font-size: 18px; margin-bottom: 6px; }
+  .testi-fonte { margin: 16px 0 0; font-size: 14px; opacity: .8; }
   .testimonial figcaption span { color: var(--muted); font-size: 14px; }
   @media (max-width: 899px) { .metrics { grid-template-columns: repeat(2, 1fr); } .results { grid-template-columns: 1fr; } }
   @media (max-width: 699px) { .testimonials { grid-template-columns: 1fr; } }
@@ -619,10 +622,11 @@
       </div>
       <!-- Métricas: array METRICS. Resultados: array RESULTS. Depoimentos: array TESTIMONIALS. -->
       <div class="metrics" id="metrics"></div>
-      <h3 class="sub-title reveal">Resultados de campanha</h3>
+      <h3 class="sub-title reveal" id="results-title">Resultados de campanha</h3>
       <div class="results" id="results"></div>
       <h3 class="sub-title reveal">Quem já trabalhou comigo</h3>
       <div class="testimonials" id="testimonials"></div>
+      <p class="testi-fonte reveal">Avaliações reais de marcas na plataforma SeuInfluencer, todas com nota 5.</p>
     </div>
   </section>
 
@@ -751,22 +755,20 @@
 // Números da capa. "valor" é o número, "sufixo" vem depois dele.
 // TROQUE os 0 pelos seus números reais.
 const HERO_STATS = [
-  { valor: 0, sufixo: "+", rotulo: "vídeos entregues" },   // placeholder
-  { valor: 5, sufixo: "", rotulo: "marcas atendidas" },
-  { valor: 0, sufixo: "M", rotulo: "views somadas" }        // placeholder
+  { valor: 40, sufixo: "+", rotulo: "marcas atendidas" },
+  { valor: 34, sufixo: "", rotulo: "vídeos no portfólio" },
+  { valor: 2, sufixo: "M+", rotulo: "de alcance em uma campanha" }
 ];
 
 // Marcas da faixa da capa
-const BRANDS = ["Veja", "Omo", "Skala", "Picnic", "Jean Paul Gaultier"];
+const BRANDS = ["Zapay", "Canva", "Mercado Livre", "BIC", "Hellmann's", "Omo", "Veja", "Skala", "Picnic", "Haag", "Lojas Torra", "Mezul", "Frooty", "Ateliê", "Iracema", "Di Santinni", "Jean Paul Gaultier"];
 
 // Três vídeos de destaque.
 // link: cole aqui o link do vídeo (Reels, TikTok, YouTube, Drive...)
 // capa: caminho da imagem vertical 9:16 (ex: "capas/video1.jpg"). Deixe "" para usar o degradê.
-const HIGHLIGHTS = [
-  { link: "#", capa: "", numero: "+0,0M", rotulo: "views no reels",   titulo: "Título do vídeo 01", contexto: "Marca 01 · uma linha sobre a campanha" },
-  { link: "#", capa: "", numero: "+0%",   rotulo: "de engajamento",   titulo: "Título do vídeo 02", contexto: "Marca 02 · uma linha sobre a campanha" },
-  { link: "#", capa: "", numero: "+0",    rotulo: "vendas no anúncio", titulo: "Título do vídeo 03", contexto: "Marca 03 · uma linha sobre a campanha" }
-];
+// Vazio = a seção "Conteúdos de destaque" fica escondida. Para mostrar, coloque os
+// 3 vídeos com os números REAIS de cada um (views, engajamento ou vendas).
+const HIGHLIGHTS = [];
 
 // Nichos que aparecem nos filtros (a "chave" precisa bater com o campo "nicho" dos trabalhos)
 const NICHES = [
@@ -796,25 +798,26 @@ const SERVICES = [
 
 // Quatro métricas da seção de números. TROQUE os 0 pelos seus números reais.
 const METRICS = [
-  { valor: 0, prefixo: "+", sufixo: "",  rotulo: "vídeos entregues" },  // placeholder
-  { valor: 5, prefixo: "",  sufixo: "",  rotulo: "marcas atendidas" },
-  { valor: 0, prefixo: "+", sufixo: "M", rotulo: "views somadas" },     // placeholder
-  { valor: 4, prefixo: "",  sufixo: "",  rotulo: "nichos atendidos" }
+  { valor: 40, prefixo: "+", sufixo: "",      rotulo: "marcas atendidas" },
+  { valor: 2,  prefixo: "+", sufixo: "M",     rotulo: "de alcance em uma campanha" },
+  { valor: 12, prefixo: "",  sufixo: " anos", rotulo: "em vendas antes do UGC" },
+  { valor: 5,  prefixo: "",  sufixo: "",      rotulo: "nichos atendidos" }
 ];
 
 // Três resultados de campanha (placeholders: troque pelos seus)
-const RESULTS = [
-  { numero: "+00%", titulo: "Resultado da campanha 01", texto: "Marca 01 · conte em uma linha o que o vídeo gerou para a marca." },
-  { numero: "+00%", titulo: "Resultado da campanha 02", texto: "Marca 02 · conte em uma linha o que o vídeo gerou para a marca." },
-  { numero: "+00%", titulo: "Resultado da campanha 03", texto: "Marca 03 · conte em uma linha o que o vídeo gerou para a marca." }
-];
+// Vazio = o bloco "Resultados de campanha" fica escondido. Para mostrar, coloque
+// resultados REAIS (ex.: { numero: "+35%", titulo: "Mais vendas", texto: "Marca · o que aconteceu" }).
+const RESULTS = [];
 
 // Quatro depoimentos (placeholders: troque pelo texto real de cada cliente)
+// Avaliações reais das marcas na plataforma SeuInfluencer (todas 5 estrelas)
 const TESTIMONIALS = [
-  { texto: "Depoimento do Cliente 01 aqui. Cole a frase real que ele escreveu sobre o seu trabalho.", nome: "Cliente 01", empresa: "Marca 01" },
-  { texto: "Depoimento do Cliente 02 aqui. Cole a frase real que ele escreveu sobre o seu trabalho.", nome: "Cliente 02", empresa: "Marca 02" },
-  { texto: "Depoimento do Cliente 03 aqui. Cole a frase real que ele escreveu sobre o seu trabalho.", nome: "Cliente 03", empresa: "Marca 03" },
-  { texto: "Depoimento do Cliente 04 aqui. Cole a frase real que ele escreveu sobre o seu trabalho.", nome: "Cliente 04", empresa: "Marca 04" }
+  { texto: "Passando só para elogiar o seu vídeo. Ficou extremamente natural, cativante e com uma qualidade técnica excelente. Você conseguiu transmitir exatamente o tom leve e acolhedor que a gente buscava. Parabéns pelo profissionalismo e pelo talento! O material ficou impecável!", nome: "Zavi Agência", empresa: "Agência" },
+  { texto: "Excelente profissional, muito empenhado e comprometido com o trabalho. Realizou todas as entregas dentro do prazo e com muita qualidade. Foi uma experiência sensacional e, com certeza, faremos novos trabalhos juntos!", nome: "Haag", empresa: "Moda" },
+  { texto: "O Ryan é rápido, inteligente e muito criativo. Adoramos o seu conteúdo em nossa campanha.", nome: "Picnic", empresa: "Campanha" },
+  { texto: "Atencioso, ágil e entrega muito boa!", nome: "Agência 1002", empresa: "Agência" },
+  { texto: "Amamos o conteúdo entregue pelo Ryan!!!", nome: "Di Santinni", empresa: "Moda" },
+  { texto: "Adoramos o formato, parabéns!", nome: "Sincrofit Tecnologia", empresa: "Tecnologia" }
 ];
 
 /* =============================================================
@@ -839,6 +842,10 @@ $("#hero-stats").innerHTML = HERO_STATS.map((s) =>
 // Faixa de marcas (duplicada para o movimento contínuo)
 const brandList = (hidden) => `<ul${hidden ? ' aria-hidden="true"' : ""}>${[...BRANDS, ...BRANDS].map((b) => `<li>${esc(b)}</li>`).join("")}</ul>`;
 $("#brands-track").innerHTML = brandList(false) + brandList(true);
+
+// Seções sem dados reais ficam escondidas (nada de "Marca 01" no ar)
+if (!HIGHLIGHTS.length) { const sd = document.getElementById("destaques"); if (sd) sd.hidden = true; document.querySelectorAll('a[href="#destaques"]').forEach((a) => { (a.closest("li") || a).hidden = true; }); }
+if (!RESULTS.length) { ["results-title", "results"].forEach((id) => { const el = document.getElementById(id); if (el) el.hidden = true; }); }
 
 // Destaques
 const playIcon = '<span class="play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span>';
@@ -1024,6 +1031,7 @@ $("#results").innerHTML = RESULTS.map((r) => `
 
 $("#testimonials").innerHTML = TESTIMONIALS.map((t) => `
   <figure class="testimonial light reveal">
+    <div class="estrelas" role="img" aria-label="Nota 5 de 5">★★★★★</div>
     <blockquote><p style="margin:0">${esc(t.texto)}</p></blockquote>
     <figcaption>
       <span class="avatar" aria-hidden="true">${esc(t.nome.charAt(0))}</span>
