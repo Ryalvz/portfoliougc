@@ -851,3 +851,20 @@ alter table public.preferencias enable row level security;
 drop policy if exists "dono faz tudo" on public.preferencias;
 create policy "dono faz tudo" on public.preferencias
   for all to authenticated using (public.eh_admin()) with check (public.eh_admin());
+
+
+-- -------------------------------------------------------------
+-- 29. COMPROMISSOS QUE SE REPETEM (ex.: terapia toda sexta às 9h)
+--   serie_id:   o mesmo para todos os dias da repetição
+--   repete:     semanal, quinzenal, mensal, diario ou dias_uteis
+--   repete_ate: até quando repete (vazio = sem data para acabar;
+--               o painel vai criando os próximos sozinho)
+-- Cada dia vira um compromisso normal, então aparece no Google
+-- Agenda e no iPhone, com o aviso de 30 minutos antes.
+-- -------------------------------------------------------------
+alter table public.calendario add column if not exists serie_id text;
+alter table public.calendario add column if not exists repete text;
+alter table public.calendario drop constraint if exists calendario_repete_check;
+alter table public.calendario add constraint calendario_repete_check check (repete is null or repete in ('semanal', 'quinzenal', 'mensal', 'diario', 'dias_uteis'));
+alter table public.calendario add column if not exists repete_ate date;
+create index if not exists calendario_serie on public.calendario (serie_id) where serie_id is not null;
