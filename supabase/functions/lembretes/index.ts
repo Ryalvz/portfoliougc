@@ -331,8 +331,15 @@ async function sincronizarGoogle() {
       if (j.nextSyncToken) proximoSync = j.nextSyncToken;
       if (!pagina) break;
     }
+    // O que foi apagado no painel não volta do Google (é apagado lá no passo 3)
+    const { data: jaApagados } = await db.from("calendario_apagados").select("gcal_id");
+    const apagadosNoPainel = new Set((jaApagados || []).map((x: any) => x.gcal_id));
     for (const ev of eventos) {
-      const linha = porId.get(String(ev.extendedProperties?.private?.painelId || "")) || porGcal.get(ev.id);
+      const painelId = String(ev.extendedProperties?.private?.painelId || "");
+      const linha = porId.get(painelId) || porGcal.get(ev.id);
+      if (apagadosNoPainel.has(ev.id)) continue;
+      // Nasceu no painel e não existe mais aqui: foi apagado no painel, então apaga no Google também
+      if (!linha && painelId && ev.status !== "cancelled") { await db.from("calendario_apagados").upsert({ gcal_id: ev.id }, { onConflict: "gcal_id" }); continue; }
       if (ev.status === "cancelled") {
         if (linha && linha.gcal_id === ev.id) { await db.from("calendario").delete().eq("id", linha.id); await db.from("calendario_apagados").delete().eq("gcal_id", ev.id); res.apagou++; }
         continue;
