@@ -986,7 +986,7 @@ dialog.pro-cheia iframe { flex: 1; width: 100%; border: 0; background: #fff; }
 .ctr-campos .campo { width: 100%; }
 .ctr-campos .campo.ctr-vazio { border-color: #e5b45a; background: #fffaf0; }
 .ctr-faltando { margin-bottom: 10px; }
-.ctr-papel { background: #fff; color: #1f2430; border-radius: 6px; box-shadow: 0 18px 40px rgba(26, 42, 108, .16); padding: 34px 30px; font-family: Georgia, "Times New Roman", serif; font-size: 12.5px; line-height: 1.55; max-height: 78vh; overflow: auto; }
+.ctr-papel { background: linear-gradient(rgba(255,255,255,.92), rgba(255,255,255,.92)), url("logo-contrato.png") center 180px / 60% no-repeat, #fff; background-attachment: local; color: #1f2430; border-radius: 6px; box-shadow: 0 18px 40px rgba(26, 42, 108, .16); padding: 34px 30px; font-family: Georgia, "Times New Roman", serif; font-size: 12.5px; line-height: 1.55; max-height: 78vh; overflow: auto; }
 .ctr-papel h1 { font-size: 14px; text-align: center; margin: 0 0 16px; font-family: inherit; color: #111; }
 .ctr-papel h2 { font-size: 12.5px; margin: 14px 0 5px; color: #111; }
 .ctr-papel p { margin: 0 0 8px; text-align: justify; }

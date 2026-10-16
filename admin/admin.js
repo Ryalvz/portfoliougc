@@ -5325,6 +5325,8 @@ function preencherContrato(texto, dados, campos) {
     const v = dados[id];
     if (vazio(v)) { faltando.add(id); return `⟦${(campos.find((c) => c.id === id) || {}).rotulo || id}⟧`; }
     if (id === "data") return dataPorExtenso(v);
+    // CNPJ digitado só com números sai com a pontuação certa
+    if (/cnpj/i.test(id)) { const dg = String(v).replace(/\D/g, ""); if (dg.length === 14) return dg.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5"); }
     if (mod === "extenso") return `${v} (${numeroExtenso(v)})`;
     if (mod === "extensof") return `${v} (${extensoF(v)})`;
     if (mod === "reais") return reaisExtenso(v);
@@ -5386,8 +5388,17 @@ function carregarPdfmake() {
     .catch((e) => { leitorPdf = null; throw e; });
   return leitorPdf;
 }
+// A logo RA bem clarinha no fundo de cada página (igual à marca d'água do contrato no Word)
+let logoContrato = null;
+function carregarLogoContrato() {
+  if (!logoContrato) logoContrato = fetch("logo-contrato.png").then((r) => (r.ok ? r.blob() : null))
+    .then((b) => (b ? new Promise((ok) => { const f = new FileReader(); f.onload = () => ok(f.result); f.onerror = () => ok(null); f.readAsDataURL(b); }) : null))
+    .catch(() => null);
+  return logoContrato;
+}
 async function baixarPdfContrato(texto, dados) {
   const pdfMake = await carregarPdfmake();
+  const logo = await carregarLogoContrato();
   const negritoRotulo = (t) => { const m = t.match(/^([^:]{2,40}):\s(.*)$/); return m ? [{ text: m[1] + ": ", bold: true }, { text: m[2] }] : t; };
   const content = [];
   blocosContrato(texto).forEach((b) => {
@@ -5405,6 +5416,7 @@ async function baixarPdfContrato(texto, dados) {
   });
   const doc = {
     pageSize: "A4", pageMargins: [58, 56, 58, 56], content,
+    background: (pagina, tamanho) => logo ? { image: logo, width: 300, opacity: 0.08, absolutePosition: { x: (tamanho.width - 300) / 2, y: (tamanho.height - 245) / 2 } } : null,
     defaultStyle: { font: "Roboto", fontSize: 10.5, lineHeight: 1.3 },
     footer: (pag, total) => ({ text: `Página ${pag} de ${total}`, alignment: "center", fontSize: 8, color: "#888", margin: [0, 18, 0, 0] }),
     info: { title: `Contrato ${dados.razao_social || ""}`.trim(), author: "Ryan Alves" }
