@@ -6604,7 +6604,11 @@ function partesDoRoteiro(texto) {
   Object.keys(partes).forEach((k) => { partes[k] = partes[k].join("\n").trim(); if (!partes[k]) delete partes[k]; });
   return partes;
 }
-const ganchosDe = (txt) => String(txt || "").split("\n").map((l) => l.replace(/^\s*(\d+[.)]|[-•*])\s*/, "").replace(/^["“]|["”]$/g, "").trim()).filter((l) => l.length > 3);
+// Só a frase do gancho: o que está entre aspas, sem o "(tipo de gancho)" do lado
+const ganchosDe = (txt) => String(txt || "").split("\n").map((l) => {
+  const entreAspas = l.match(/["“]([^"”]{4,})["”]/);
+  return (entreAspas ? entreAspas[1] : l.replace(/^\s*(\d+[.)]|[-•*])\s*/, "").replace(/\s*\([^)]*\)\s*$/, "")).trim();
+}).filter((l) => l.length > 3);
 const hashtagsDe = (txt) => [...new Set((String(txt || "").match(/#[\p{L}\d_]+/gu) || []))];
 
 function abrirPostDoPlano(plano, it, evento) {
