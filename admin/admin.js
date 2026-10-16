@@ -387,7 +387,7 @@ async function iniciar(sessao) {
 /* =============================================================
    ABA 1: PORTFÓLIO
    ============================================================= */
-const NICHOS = [["beleza", "Beleza"], ["moda", "Moda"], ["fitness", "Fitness"], ["tech", "Tech"]];
+const NICHOS = [["tech", "Apps & Tecnologia"], ["cuidado", "Autocuidado"], ["alimentos", "Alimentos"], ["casa", "Casa & Utilidades"], ["moda", "Moda Masculina"]];
 const nomeNicho = (n) => (NICHOS.find((x) => x[0] === n) || [n, n || "Sem nicho"])[1];
 
 function desenharPortfolio(el) {
@@ -550,7 +550,7 @@ function formVideo(v) {
   abrirForm({
     titulo: v ? "Editar vídeo" : "Adicionar vídeo",
     tabela: "videos",
-    valores: v || { visivel: true, nicho: "beleza" },
+    valores: v || { visivel: true, nicho: "tech" },
     campos: [
       { n: "titulo", r: "Título", req: true, inteiro: true },
       { n: "arquivo", r: v && ehDoStorage(v.link) ? "Trocar o vídeo (opcional)" : "Vídeo do seu computador ou celular", t: "file", accept: "video/mp4,video/quicktime,video/webm,.mp4,.mov,.m4v,.webm", inteiro: true,
