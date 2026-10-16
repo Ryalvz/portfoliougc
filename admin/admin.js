@@ -6582,7 +6582,8 @@ function partesDoRoteiro(texto) {
   String(texto || "").split("\n").forEach((bruta) => {
     const l = bruta.replace(/^[#>\s*]+/, "").replace(/^\d+[.)]\s*/, "").replace(/\*\*/g, "").trim();
     // Título de parte: "GANCHOS", "**Legenda**", "3. CHAMADA FINAL:", "## Roteiro"
-    const ehTitulo = l.length < 60 && (l === l.toUpperCase() || /:\s*$/.test(l) || /^\s*(#|\*\*|\d+[.)])/.test(bruta));
+    const semParenteses = l.replace(/\(.*?\)/g, "").replace(/:.*$/, "").trim();
+    const ehTitulo = l.length < 70 && (semParenteses === semParenteses.toUpperCase() || /:\s*$/.test(l) || /^\s*(#|\*\*|\d+[.)])/.test(bruta));
     const achou = ehTitulo && SECOES_ROTEIRO.find(([, re]) => re.test(l));
     if (achou) { atual = achou[0]; partes[atual] = []; return; }
     (partes[atual] = partes[atual] || []).push(bruta);
