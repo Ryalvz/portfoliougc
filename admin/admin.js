@@ -5767,7 +5767,7 @@ O QUE EU PRECISO (pesquise na internet o que está em alta no Brasil nesta seman
    11 final | frase de cima | frase de baixo | caixa de destaque (ex.: Salva esse post) | letra de mão (ex.: Link na bio)
    Modelos possíveis: capa, texto, lista, numero, moldura, notas, polaroid, colagem, cartao, frase, final. Comece sempre com capa e termine com final. Alterne slides com foto e slides de texto.
 
-Fale como gente de verdade, em português do Brasil, sem cara de anúncio. Não use travessão em nenhum texto.`;
+Fale como gente de verdade, em português do Brasil, sem cara de anúncio. Não use travessão em nenhum texto. Nos ganchos e textos, nada de "não é X, é Y", "aí eu descobri", "foi aí que", "você sabia que" ou "isso muda tudo".`;
 }
 
 function desenharPlanoSemana(el) {
@@ -6454,32 +6454,41 @@ const palavrasDe = (s) => [s.titulo, s.texto, s.texto2, s.destaque].join(" ").re
    guia, a ideia, a referência e o formato certo num pedido pronto
    para colar no Claude.
    ============================================================= */
-const VOZ_PADRAO = `QUEM EU SOU
-Ryan Alves (@ryalvz), creator UGC de Tech & Lifestyle. 12 anos em vendas B2B antes do UGC. Mais de 40 marcas no portfólio. Uma campanha passou de 2 milhões de alcance.
+const VOZ_PADRAO = `QUEM GRAVA
+Ryan Alves (@ryalvz), creator de UGC focado em conversão. 12 anos em venda B2B no atacado de moda (vendendo para dono de loja) antes do UGC. Nichos: tech e lifestyle, moda e grooming. Também faz curadoria de TikTok Shop.
+Escreva no masculino quando a fala ou a cena for minha ("cansado", "aponto pros meus poros").
+Público padrão: consumidor final. Lojista só quando o briefing pedir.
 
-MEU TOM
-Próximo, de amigo contando uma coisa que descobriu. Confiante sem ser arrogante. Humor leve e autoironia ("e quem nunca...?", "quem é você da dupla?").
+TOM
+Conversa de café. Íntimo, sem pressa, honesto. Autoridade sem pose, sem amadorismo engraçadinho.
+Português falado, primeira pessoa, frases curtas, ritmo ágil. Se travar na boca, reescreva.
 
-COMO EU ESCREVO E FALO
-Frases curtas, uma ideia por frase. Muitas vezes uma frase por linha, criando ritmo: "Eu não tinha nenhuma marca. Nenhum cliente. Só a vontade de tentar."
-Português do dia a dia: pra, tá, né, gente. Sem gíria forçada.
-Uso números reais e a minha própria experiência como prova (3 meses, 40 marcas, 2 milhões).
+A EXPERIÊNCIA EM VENDAS VIRA TÉCNICA
+Antecipe a objeção principal antes que ela vire motivo para rolar a tela: vale o que custa? funciona pra mim? vou usar mesmo? posso confiar na loja?
+Responda com prova: mostrar, usar, comparar com a rotina.
+Um benefício principal por vídeo, dito do jeito que o cliente falaria.
+Fechamento que conduz: uma ação clara e o motivo para fazer agora, sem urgência inventada.
+Os 12 anos em vendas só viram gancho em conteúdo sobre venda, negócio, carreira de creator ou para lojista.
 
-COMO EU ABRO
-Pergunta direta em que a pessoa se reconhece: "Você também achava que o Hollyland servia só pra gravar áudio?"
-Ou uma confissão que puxa história: "Há 1 ano eu gravava esse vídeo para criar meu primeiro portfólio."
+ESTRUTURA
+Para marca: GANCHO, IDENTIFICAÇÃO, SOLUÇÃO, PROVA, FECHAMENTO.
+Conteúdo de valor no meu perfil: GANCHO, CONTEXTO, CONTEÚDO, FECHAMENTO.
+Se o briefing da marca trouxer estrutura própria, ela vence.
+Gancho para o dedo nos 3 primeiros segundos, com dor grande e comum. Sempre mais de uma opção (em anúncio, 2 ou 3 para gravar todas).
+Mudança perceptível do começo ao fim. O produto entra como consequência da história. Toda afirmação tem prova na tela.
+CTA com uma ação só. Palavra de gatilho única, sem espaço, igual no vídeo, na legenda e na automação.
 
-COMO EU FECHO
-Chamada simples e natural: "salva pra não esquecer", "me conta nos comentários", "segue que tem parte 2".
+DURAÇÃO
+Meu ritmo: 3,25 palavras por segundo. Duração = palavras faladas ÷ 3,25. Demonstração de tela e unboxing somam respiro por fora.
 
-O QUE FUNCIONA COMIGO
-Dica prática de iPhone, equipamento e app (é o que mais salvam e compartilham).
-Série com episódios (EP. 1, EP. 2), como o Diário de Mudança.
-Bastidores de creator e história pessoal com virada.
-
-O QUE EVITAR
-Cara de anúncio e palavra de vendedor ("imperdível", "revolucionário").
-Textão. Travessão. Emoji demais (1 a 3 por legenda).`;
+PROIBIDO
+Travessão.
+Negação seguida de correção: "não é X, é Y", "o problema não é X, é Y", "não é só X, é Y" e variações.
+Falsa revelação: "aí eu descobri", "foi aí que", "foi quando", "até que", "aí eu conheci", "hoje eu descobri".
+"é o tipo de...", "se você ainda tá no ciclo de...", "você já reparou que...", "tem produtos que... e tem produtos que...", "você sabia que" como gancho, "e sinceramente?", "isso muda tudo", "isso muda o jogo", "olá pessoal", "hoje vou falar sobre", "queria compartilhar com vocês", "hoje vim indicar um app".
+Fala picotada linha por linha para dar falso impacto. Frase bonita demais para ser falada. Lista de funcionalidades sem história. Palavra de interface na boca.
+Inventar número, dado, data, preço, funcionalidade ou resultado meu. O que não se sabe vira campo entre parênteses, ex.: (quantos GB voltaram).
+Promessa de resultado financeiro sem base. Acusar concorrente. Alimento ou suplemento prometendo efeito terapêutico.`;
 let vozGuia = null, vozFalta = false;
 async function carregarVoz() {
   if (vozGuia !== null) return vozGuia;
@@ -6490,15 +6499,15 @@ async function carregarVoz() {
 }
 
 const FORMATO_ROTEIRO = {
-  organico: `FORMATO: Reels orgânico para o MEU Instagram (Tech & Lifestyle e bastidores de UGC).
-De 30 a 60 segundos de fala (uns 80 a 150 palavras). O objetivo é alcance, salvamento e seguidores novos, NÃO vender produto.
-Gancho nos 3 primeiros segundos, ritmo rápido, uma virada ou revelação perto do fim.`,
-  tiktok_shop: `FORMATO: vídeo de venda para o TikTok Shop (afiliado).
-De 15 a 40 segundos. Estrutura: dor ou situação real, produto em uso na mão, 2 ou 3 benefícios concretos que dá para ver na tela, prova (antes e depois, teste, detalhe), chamada para o carrinho laranja.
-Fale do preço ou da oferta só se fizer sentido. Nada de promessa exagerada ou proibida.`,
+  organico: `FORMATO: Reels de conteúdo de valor para o MEU Instagram (Tech & Lifestyle e bastidores de UGC).
+Estrutura: GANCHO, CONTEXTO, CONTEÚDO, FECHAMENTO. De 30 a 60 segundos (uns 100 a 195 palavras no meu ritmo).
+O objetivo é alcance, salvamento e seguidores novos. Sem produto de marca, a não ser que a ideia peça.`,
+  tiktok_shop: `FORMATO: vídeo de venda para o TikTok Shop (afiliado), falando com consumidor final.
+Estrutura: GANCHO, IDENTIFICAÇÃO, SOLUÇÃO, PROVA, FECHAMENTO. De 15 a 40 segundos.
+Produto em uso na mão, um benefício principal com prova na tela, a objeção principal respondida, chamada para o carrinho laranja. Preço ou oferta só se eu informar.`,
   publi: `FORMATO: vídeo UGC para uma marca (publi).
-De 20 a 45 segundos, com cara de cliente de verdade, não de anúncio. Siga o briefing das observações, se tiver.
-Estrutura: gancho, dor, produto em uso, benefício principal com prova, chamada da marca.`
+Estrutura: GANCHO, IDENTIFICAÇÃO, SOLUÇÃO, PROVA, FECHAMENTO, a não ser que o briefing traga a estrutura dele. Briefing é lei: antes de escrever, liste obrigatórios e proibidos e aponte o que estiver faltando ou contraditório.
+Falas obrigatórias literais. Ofereça 2 ou 3 ganchos para gravar todos.`
 };
 
 function roteiroNaMinhaVoz(t) {
@@ -6514,14 +6523,18 @@ ${FORMATO_ROTEIRO[cat]}
 A IDEIA
 Título: ${t.titulo || "sem título"}
 ${t.minha_versao ? `O que eu já anotei:\n${t.minha_versao}\n` : ""}${t.observacoes ? `Observações:\n${t.observacoes}\n` : ""}${t.transcricao ? `Referência (vídeo de ${t.perfil || "outra pessoa"}): use só a ESTRUTURA, nunca copie as frases.\n${String(t.transcricao).slice(0, 2500)}\n` : ""}
-ME ENTREGUE ASSIM
-1. GANCHOS: 3 opções diferentes de primeira frase (pergunta, confissão e afirmação polêmica).
-2. ROTEIRO: fala por fala, uma frase por linha, do jeito que eu falaria olhando pra câmera. Entre colchetes, o que aparece na tela: [CENA: ...] e [TEXTO NA TELA: ...].
-3. CHAMADA FINAL.
-4. ${cat === "tiktok_shop" ? "TEXTO DO POST para o TikTok, curto, com 3 a 5 hashtags." : cat === "publi" ? "LEGENDA sugerida para a marca." : "LEGENDA para o Instagram: repita o gancho na primeira linha, 1 a 3 emojis, 3 a 5 hashtags."}
-5. DICAS DE GRAVAÇÃO: enquadramento, cenas de apoio e duração estimada.
+Se você tiver a skill "roteiro-ugc", siga ela. Se não, siga o meu guia acima.
 
-Português do Brasil, natural, sem cara de anúncio. Não use travessão em nenhum texto.`;
+ME ENTREGUE ASSIM (use exatamente estes títulos em maiúsculas)
+GANCHOS: 3 opções de tipos diferentes, com dor grande e comum.
+ROTEIRO: dividido nos blocos da estrutura. Em cada bloco, a fala corrida entre aspas, do jeito que eu falaria, e embaixo a cena em [CENA: ...] escrita em primeira pessoa ("gravo a tela", "aponto pro produto"). Nada de picotar a fala linha por linha.
+CHAMADA FINAL: uma ação só.
+${cat === "tiktok_shop" ? "LEGENDA: texto do post para o TikTok, curto, com 3 a 5 hashtags." : cat === "publi" ? "LEGENDA: sugestão para a marca, respeitando o briefing." : "LEGENDA: para o Instagram, gancho na primeira linha, o mesmo CTA do vídeo, 1 a 3 emojis e 3 a 5 hashtags."}
+DURAÇÃO: quantas palavras faladas, dividido por 3,25, mais o respiro de tela. Se passar do formato, diga qual frase cortar.
+DICAS DE GRAVAÇÃO: enquadramento, cenas de apoio e qual cena é a prova do vídeo.
+ÂNGULO: em uma linha, por que escolheu esse ângulo.
+
+Antes de entregar, confira contra a lista de proibidos do guia. Nada de número ou resultado inventado: o que eu precisar preencher vai entre parênteses.`;
     const d = abrirJanelaSimples("✍️ Roteiro na minha voz", `
       <p class="sub" style="margin-top:0">O pedido já leva o seu guia de voz, a ideia${t.transcricao ? ", a referência" : ""} e o formato de <b>${esc((CATEGORIAS.find((c) => c[0] === cat) || [0, ""])[1])}</b>.</p>
       <ol class="passos"><li>Toque em <b>Copiar o pedido</b> e cole no Claude.</li><li>Ajuste o que quiser conversando com ele.</li><li>Cole o roteiro final em <b>Minha versão</b> e salve. Pronto pra gravar.</li></ol>
@@ -6576,7 +6589,7 @@ ${legendas.map((x) => `- (${num(x.reach)} de alcance) ${String(x.legenda).replac
    citadas (#34 etc.: ganchos, roteiro, chamada, legenda, hashtags,
    dicas) e o trecho da pesquisa que fala do post. Cada parte tem
    o seu botão de copiar. */
-const SECOES_ROTEIRO = [["ganchos", /^GANCHOS?\b/i], ["roteiro", /^ROTEIRO\b/i], ["chamada", /^CHAMADA( FINAL)?\b/i], ["legenda", /^(LEGENDA|TEXTO DO POST)\b/i], ["dicas", /^DICAS( DE GRAVA[ÇC][ÃA]O)?\b/i], ["anotacao", /^ANOTA[ÇC][ÃA]O ORIGINAL\b/i]];
+const SECOES_ROTEIRO = [["ganchos", /^(GANCHOS|OP[ÇC][ÕO]ES DE GANCHO)\b/i], ["duracao", /^DURA[ÇC][ÃA]O\b/i], ["angulo", /^(ÂNGULO|ANGULO)\b/i], ["roteiro", /^ROTEIRO\b/i], ["chamada", /^CHAMADA( FINAL)?\b/i], ["legenda", /^(LEGENDA|TEXTO DO POST)\b/i], ["dicas", /^DICAS( DE GRAVA[ÇC][ÃA]O)?\b/i], ["anotacao", /^ANOTA[ÇC][ÃA]O ORIGINAL\b/i]];
 function partesDoRoteiro(texto) {
   const partes = {}; let atual = "inicio";
   String(texto || "").split("\n").forEach((bruta) => {
@@ -6622,7 +6635,9 @@ function abrirPostDoPlano(plano, it, evento) {
         ${bloco("🎬 Roteiro", p.roteiro)}
         ${bloco("📣 Chamada final", p.chamada)}
         ${bloco("📝 Legenda", p.legenda, tags.length ? `<div class="pp-tags">${tags.map((h) => `<span class="pilula">${esc(h)}</span>`).join(" ")} ${btnCopiar(tags.join(" "), "📋 Hashtags")}</div>` : "")}
-        ${bloco("🎥 Dicas de gravação", p.dicas)}`
+        ${bloco("⏱️ Duração", p.duracao)}
+        ${bloco("🎥 Dicas de gravação", p.dicas)}
+        ${bloco("🧭 Por que esse ângulo", p.angulo)}`
       : `<p class="sub">${t.minha_versao ? "Essa ideia tem anotações, mas ainda não tem roteiro pronto." : "Essa ideia ainda não tem roteiro."}</p>
         ${t.minha_versao ? bloco("Suas anotações", t.minha_versao) : ""}
         <button type="button" class="btn primario" data-voz="${t.id}">✍️ Fazer o roteiro na minha voz</button>`}
