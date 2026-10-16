@@ -5416,7 +5416,7 @@ async function baixarPdfContrato(texto, dados) {
   });
   const doc = {
     pageSize: "A4", pageMargins: [58, 56, 58, 56], content,
-    background: (pagina, tamanho) => logo ? { image: logo, width: 300, opacity: 0.08, absolutePosition: { x: (tamanho.width - 300) / 2, y: (tamanho.height - 245) / 2 } } : null,
+    background: (pagina, tamanho) => logo ? { image: logo, width: 300, opacity: 0.13, absolutePosition: { x: (tamanho.width - 300) / 2, y: (tamanho.height - 245) / 2 } } : null,
     defaultStyle: { font: "Roboto", fontSize: 10.5, lineHeight: 1.3 },
     footer: (pag, total) => ({ text: `Página ${pag} de ${total}`, alignment: "center", fontSize: 8, color: "#888", margin: [0, 18, 0, 0] }),
     info: { title: `Contrato ${dados.razao_social || ""}`.trim(), author: "Ryan Alves" }
