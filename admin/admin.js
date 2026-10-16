@@ -5801,7 +5801,7 @@ function desenharPlanoSemana(el) {
         <article class="pl-dia ${data === hojeISO() ? "hoje" : ""}" data-pl-abrir="${i}" tabindex="0" role="button" aria-label="Ver tudo de ${esc(it.tema)}">
           <header><b>${esc((DIAS_PLANO.find((x) => x[0] === it.dia) || [0, 0, it.dia])[2])}</b><span class="sub">${dataBR(data).slice(0, 5)}</span><span class="pilula ${/reel/i.test(it.formato) ? "p-azul" : /carross/i.test(it.formato) ? "p-oliva" : ""}">${esc(it.formato)}</span></header>
           <h3>${esc(it.tema)}</h3>
-          ${it.gancho ? `<p class="pl-gancho">“${esc(it.gancho)}”</p>` : ""}
+          ${it.gancho ? `<p class="pl-gancho">“${esc(String(it.gancho).replace(/^["“]+|["”]+$/g, ""))}”</p>` : ""}
           ${it.porque ? `<p class="sub">${esc(it.porque)}</p>` : ""}
           <div class="pl-acoes">
             <button class="btn pequeno primario" type="button" data-pl-ver="${i}">👁️ Ver tudo</button>
