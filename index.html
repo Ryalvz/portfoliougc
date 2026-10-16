@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ryan Alves | Portfólio UGC Creator</title>
 <meta name="description" content="Portfólio UGC de Ryan Alves: vídeos autênticos para marcas de tecnologia, autocuidado, alimentos, casa e moda masculina que querem vender mais nas redes.">
-<meta name="theme-color" content="#1F3FC3">
+<meta name="theme-color" content="#F6F2EB">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap" rel="stylesheet">
 <style>
   /* =========================================================
      CORES E FONTES
@@ -17,30 +17,32 @@
      o resto fica com fundo Parchment e texto Cobalt.
      ========================================================= */
   :root {
-    --cobalt: #1F3FC3;
-    --parchment: #F0EEEA;
-    --olive: #8A855E;
+    --cobalt: #2B241C;     /* café (texto e fundos escuros) */
+    --parchment: #F6F2EB;  /* creme */
+    --olive: #A8864A;      /* dourado */
+    --sand: #ECE5D9;       /* areia, seções suaves */
+    --paper: #FCFAF6;      /* cards */
 
     /* Cores do contexto (trocam sozinhas dentro de .dark e .light) */
     --fg: var(--cobalt);
     --bg-ctx: var(--parchment);
-    --muted: rgba(31, 63, 195, .85);
-    --line: rgba(31, 63, 195, .18);
-    --tint: rgba(31, 63, 195, .06);
+    --muted: rgba(43, 36, 28, .85);
+    --line: rgba(43, 36, 28, .18);
+    --tint: rgba(43, 36, 28, .06);
     --focus: var(--cobalt);
 
-    --radius: 6px;
-    --head: "Anton", Impact, "Arial Narrow", sans-serif;
-    --body: "Archivo", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --radius: 14px;
+    --head: "Playfair Display", Georgia, "Times New Roman", serif;
+    --body: "Montserrat", system-ui, -apple-system, "Segoe UI", sans-serif;
     --max: 1240px;
     --nav-h: 68px;
   }
   .dark {
     --fg: var(--parchment);
     --bg-ctx: var(--cobalt);
-    --muted: rgba(240, 238, 234, .82);
-    --line: rgba(240, 238, 234, .25);
-    --tint: rgba(240, 238, 234, .08);
+    --muted: rgba(246, 242, 235, .82);
+    --line: rgba(246, 242, 235, .25);
+    --tint: rgba(246, 242, 235, .08);
     --focus: var(--parchment);
     background: var(--cobalt);
     color: var(--parchment);
@@ -48,9 +50,9 @@
   .light {
     --fg: var(--cobalt);
     --bg-ctx: var(--parchment);
-    --muted: rgba(31, 63, 195, .85);
-    --line: rgba(31, 63, 195, .18);
-    --tint: rgba(31, 63, 195, .06);
+    --muted: rgba(43, 36, 28, .85);
+    --line: rgba(43, 36, 28, .18);
+    --tint: rgba(43, 36, 28, .06);
     --focus: var(--cobalt);
     background: var(--parchment);
     color: var(--cobalt);
@@ -119,7 +121,7 @@
   .media {
     position: relative; overflow: hidden; border-radius: var(--radius);
     background:
-      radial-gradient(circle at 30% 20%, rgba(240, 238, 234, .35), transparent 55%),
+      radial-gradient(circle at 30% 20%, rgba(246, 242, 235, .35), transparent 55%),
       linear-gradient(160deg, var(--olive) 0%, var(--cobalt) 100%);
   }
   .media img { width: 100%; height: 100%; object-fit: cover; }
@@ -141,7 +143,7 @@
     background: var(--parchment); border-bottom: 1px solid transparent;
     transition: border-color .3s ease, box-shadow .3s ease;
   }
-  .nav.scrolled { border-bottom-color: var(--line); box-shadow: 0 6px 20px rgba(31, 63, 195, .08); }
+  .nav.scrolled { border-bottom-color: var(--line); box-shadow: 0 6px 20px rgba(43, 36, 28, .08); }
   .nav .wrap { height: 100%; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
   .logo { font-family: var(--head); font-size: 28px; color: var(--fg); text-decoration: none; letter-spacing: 1px; text-transform: uppercase; white-space: nowrap; }
   .nav-links { display: flex; gap: 26px; list-style: none; margin: 0; padding: 0; }
@@ -173,7 +175,7 @@
     min-height: 100vh; min-height: 100svh; padding: calc(var(--nav-h) + 40px) 0 0;
     display: flex; flex-direction: column; justify-content: space-between;
     background:
-      radial-gradient(ellipse at 85% 20%, rgba(138, 133, 94, .45), transparent 55%),
+      radial-gradient(ellipse at 85% 20%, rgba(168, 134, 74, .45), transparent 55%),
       var(--cobalt);
     overflow: hidden;
   }
@@ -238,7 +240,7 @@
   }
   .play {
     position: absolute; inset: 0; margin: auto; width: 72px; height: 72px; border-radius: 50%;
-    background: rgba(31, 63, 195, .6); border: 2px solid var(--parchment); display: grid; place-items: center;
+    background: rgba(43, 36, 28, .6); border: 2px solid var(--parchment); display: grid; place-items: center;
     transition: background .25s, transform .25s; z-index: 1;
   }
   .play svg { width: 28px; height: 28px; margin-left: 4px; fill: var(--parchment); }
@@ -284,12 +286,12 @@
   .work .media { border-radius: 0; }
   .work-info {
     position: absolute; inset: auto 0 0 0; padding: 40px 14px 14px;
-    background: linear-gradient(180deg, transparent, rgba(31, 63, 195, .96) 55%);
+    background: linear-gradient(180deg, transparent, rgba(43, 36, 28, .96) 55%);
     color: var(--parchment);
   }
   .work-info h4 { margin: 0 0 4px; font-size: 16px; font-weight: 700; line-height: 1.25; }
-  .work-meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 12px; color: rgba(240, 238, 234, .85); }
-  .work-meta .tag { border: 1px solid rgba(240, 238, 234, .7); padding: 1px 6px; border-radius: 3px; text-transform: uppercase; letter-spacing: 1px; font-size: 11px; color: var(--parchment); }
+  .work-meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 12px; color: rgba(246, 242, 235, .85); }
+  .work-meta .tag { border: 1px solid rgba(246, 242, 235, .7); padding: 1px 6px; border-radius: 3px; text-transform: uppercase; letter-spacing: 1px; font-size: 11px; color: var(--parchment); }
   .work-meta .new { background: var(--parchment); color: var(--cobalt); font-weight: 700; padding: 1px 6px; border-radius: 3px; }
 
   /* Ponteiro do mouse: claquete 🎬 (imagem PNG, só no computador) */
@@ -303,12 +305,12 @@
   /* Fileiras no estilo catálogo: título grande, frase, setas e cards em pé */
   .row-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
   .row .row-title { font-family: var(--head); font-weight: 400; font-size: clamp(34px, 4vw, 48px); text-transform: uppercase; letter-spacing: 1px; margin: 0; align-items: baseline; }
-  .row .row-title small { font-family: var(--body); font-size: 15px; font-weight: 600; letter-spacing: 1px; color: rgba(240, 238, 234, .7); }
-  .row-sub { margin: 4px 0 0; font-style: italic; color: rgba(240, 238, 234, .78); font-size: 16px; }
+  .row .row-title small { font-family: var(--body); font-size: 15px; font-weight: 600; letter-spacing: 1px; color: rgba(246, 242, 235, .7); }
+  .row-sub { margin: 4px 0 0; font-style: italic; color: rgba(246, 242, 235, .78); font-size: 16px; }
   .row-nav { display: flex; gap: 8px; flex: none; }
-  .row-seta { width: 44px; height: 44px; border-radius: 50%; border: 1.5px solid rgba(240, 238, 234, .55); background: transparent; color: var(--parchment); display: grid; place-items: center; cursor: pointer; transition: background .2s, opacity .2s; }
+  .row-seta { width: 44px; height: 44px; border-radius: 50%; border: 1.5px solid rgba(246, 242, 235, .55); background: transparent; color: var(--parchment); display: grid; place-items: center; cursor: pointer; transition: background .2s, opacity .2s; }
   .row-seta svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-  .row-seta:hover:not(:disabled) { background: rgba(240, 238, 234, .14); }
+  .row-seta:hover:not(:disabled) { background: rgba(246, 242, 235, .14); }
   .row-seta:disabled { opacity: .3; cursor: default; }
   .row .row-scroller { gap: 16px; padding: 4px 2px 18px; margin: 0; scroll-snap-type: x mandatory; scrollbar-width: none; }
   .row .row-scroller::-webkit-scrollbar { display: none; }
@@ -318,13 +320,13 @@
   @media (min-width: 600px) { .row .row-scroller { grid-auto-columns: calc((100% - 32px) / 3); } }
   @media (min-width: 1000px) { .row .row-scroller { grid-auto-columns: calc((100% - 72px) / 4); gap: 24px; } }
   @media (max-width: 599px) { .row .row-scroller { grid-auto-columns: 78%; } .row-nav { display: none; } }
-  .work-v { display: block; position: relative; aspect-ratio: 9 / 16; border-radius: 18px; overflow: hidden; background: #0d1a4d; color: var(--parchment); text-decoration: none; cursor: pointer; box-shadow: 0 10px 26px rgba(0, 0, 0, .22); }
+  .work-v { display: block; position: relative; aspect-ratio: 9 / 16; border-radius: 18px; overflow: hidden; background: #2B241C; color: var(--parchment); text-decoration: none; cursor: pointer; box-shadow: 0 10px 26px rgba(0, 0, 0, .22); }
   /* Card parado no lugar: nada de aumentar ou subir (isso fazia a tela "pular") */
   .work.work-v, .work.work-v:hover, .work.work-v:focus-within { transform: none; transition: box-shadow .2s; z-index: auto; }
   .work.work-v:hover, .work.work-v:focus-visible { box-shadow: 0 0 0 3px rgba(250, 248, 244, .85), 0 10px 26px rgba(0, 0, 0, .22); }
   .work-v video, .work-v img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
-  .work-v::after { content: ""; position: absolute; inset: 45% 0 0 0; background: linear-gradient(180deg, transparent, rgba(8, 14, 40, .82)); pointer-events: none; }
-  .work-pill { position: absolute; top: 14px; left: 14px; z-index: 2; background: rgba(250, 248, 244, .94); color: #1a2240; font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; padding: 6px 11px; border-radius: 999px; max-width: calc(100% - 70px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .work-v::after { content: ""; position: absolute; inset: 45% 0 0 0; background: linear-gradient(180deg, transparent, rgba(24, 19, 14, .82)); pointer-events: none; }
+  .work-pill { position: absolute; top: 14px; left: 14px; z-index: 2; background: rgba(250, 248, 244, .94); color: #2B241C; font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; padding: 6px 11px; border-radius: 999px; max-width: calc(100% - 70px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .work-v .work-info { position: absolute; inset: auto 0 0 0; z-index: 2; padding: 0 16px 16px; background: none; }
   .work-v .work-info h4 { margin: 0 0 6px; font-size: 22px; font-weight: 700; line-height: 1.2; color: #fff; text-shadow: 0 1px 8px rgba(0, 0, 0, .35); }
   .work-nicho { display: block; font-size: 11px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; color: rgba(255, 255, 255, .78); }
@@ -334,7 +336,7 @@
   .work-v.tocando .work-play { opacity: 0; transform: scale(.8); }
   .work-v.tocando .work-pill, .work-v.tocando .work-info, .work-v.tocando::after { opacity: 0; transition: opacity .3s; }
 
-  .work-som { position: absolute; top: 12px; right: 12px; z-index: 3; width: 36px; height: 36px; border-radius: 50%; border: 0; background: rgba(8, 14, 40, .55); color: #fff; display: grid; place-items: center; cursor: pointer; }
+  .work-som { position: absolute; top: 12px; right: 12px; z-index: 3; width: 36px; height: 36px; border-radius: 50%; border: 0; background: rgba(24, 19, 14, .55); color: #fff; display: grid; place-items: center; cursor: pointer; }
   .work-som svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
   .work-v.com-som .work-som { background: var(--parchment); color: var(--cobalt); }
 
@@ -384,14 +386,14 @@
   .testi-carrossel { position: relative; }
   .testimonials { display: grid; grid-auto-flow: column; grid-auto-columns: calc((100% - 36px) / 3); gap: 18px; overflow-x: auto; scroll-snap-type: x mandatory; scroll-behavior: smooth; scrollbar-width: none; padding: 6px 2px 14px; align-items: start; }
   .testimonials::-webkit-scrollbar { display: none; }
-  .testimonial { margin: 0; scroll-snap-align: start; background: #fff; color: #1f2430; border-radius: 14px; padding: 22px 22px 24px; box-shadow: 0 12px 30px rgba(10, 20, 60, .22); }
+  .testimonial { margin: 0; scroll-snap-align: start; background: #fff; color: #1f2430; border-radius: 14px; padding: 22px 22px 24px; box-shadow: 0 12px 30px rgba(43, 36, 28, .22); }
   .t-topo { display: flex; align-items: center; gap: 12px; }
   .t-topo .avatar { width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; background: var(--cobalt); color: #fff; font-family: var(--head); font-size: 19px; flex: none; }
   .t-topo b { display: block; font-size: 17px; line-height: 1.25; color: #1f2430; }
   .t-topo span { display: block; color: #6b7280; font-size: 14px; }
   .testimonial .estrelas { color: #F2B705; letter-spacing: 4px; font-size: 22px; line-height: 1; margin: 16px 0 12px; }
   .testimonial blockquote { margin: 0; font-size: 16px; line-height: 1.65; }
-  .testi-seta { position: absolute; top: 50%; transform: translateY(-50%); z-index: 2; width: 42px; height: 42px; border-radius: 50%; border: 0; background: #fff; color: var(--cobalt); box-shadow: 0 6px 18px rgba(10, 20, 60, .25); display: grid; place-items: center; cursor: pointer; }
+  .testi-seta { position: absolute; top: 50%; transform: translateY(-50%); z-index: 2; width: 42px; height: 42px; border-radius: 50%; border: 0; background: #fff; color: var(--cobalt); box-shadow: 0 6px 18px rgba(43, 36, 28, .25); display: grid; place-items: center; cursor: pointer; }
   .testi-seta svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
   .testi-seta[data-dir="-1"] { left: -20px; }
   .testi-seta[data-dir="1"] { right: -20px; }
@@ -413,7 +415,7 @@
     width: 100%; background: var(--parchment); color: var(--cobalt); border: 2px solid transparent; border-radius: 4px; padding: 13px 14px; font-size: 16px;
     transition: border-color .2s;
   }
-  .field input::placeholder, .field textarea::placeholder { color: rgba(31, 63, 195, .6); }
+  .field input::placeholder, .field textarea::placeholder { color: rgba(43, 36, 28, .6); }
   .field input:focus, .field textarea:focus { outline: none; border-color: var(--olive); box-shadow: 0 0 0 3px var(--parchment), 0 0 0 5px var(--olive); }
   .field textarea { min-height: 130px; resize: vertical; }
   .form-erro { margin: 0 0 14px; padding: 10px 12px; border-radius: 4px; background: var(--parchment); color: var(--cobalt); font-weight: 600; font-size: 15px; border-left: 4px solid var(--olive); }
@@ -456,7 +458,7 @@
      ========================================================= */
   .modal { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; padding: 16px; }
   .modal[hidden] { display: none; }
-  .modal-bg { position: absolute; inset: 0; background: rgba(31, 63, 195, .82); animation: fade .3s ease; }
+  .modal-bg { position: absolute; inset: 0; background: rgba(43, 36, 28, .82); animation: fade .3s ease; }
   .modal-card {
     position: relative; width: 100%; max-width: 440px; max-height: calc(100vh - 32px); overflow-y: auto;
     border-radius: 8px; border-top: 6px solid var(--olive);
@@ -465,7 +467,7 @@
   .modal-card h2 { font-size: 34px; margin-bottom: 8px; padding-right: 30px; }
   .modal-card > div > p { color: var(--muted); }
   .modal-card .field input { background: var(--tint); border-color: var(--line); }
-  .modal-card .field input:focus { border-color: var(--cobalt); box-shadow: 0 0 0 3px rgba(31, 63, 195, .2); }
+  .modal-card .field input:focus { border-color: var(--cobalt); box-shadow: 0 0 0 3px rgba(43, 36, 28, .2); }
   .modal-close {
     position: absolute; top: 12px; right: 12px; width: 40px; height: 40px; border-radius: 50%;
     background: var(--tint); border: 0; cursor: pointer; display: grid; place-items: center;
@@ -490,6 +492,96 @@
     *, *::before, *::after { animation: none !important; transition: none !important; }
     .js .reveal { opacity: 1; transform: none; }
     .brands-track { flex-wrap: wrap; width: 100%; }
+  }
+
+  /* =========================================================
+     TEMA PREMIUM: creme, café e dourado (o mesmo do carrossel)
+     Suave e minimalista: títulos serifados sem caixa alta,
+     uma palavra em itálico dourado, mais respiro, sem sombras duras.
+     ========================================================= */
+  body { font-size: 16.5px; line-height: 1.7; }
+  h1, h2, h3 { font-weight: 500; text-transform: none; letter-spacing: -.01em; line-height: 1.08; }
+  h1 em, h2 em, h3 em, .sec-title em { font-style: italic; color: var(--olive); font-weight: 400; }
+  section { padding: 104px 0; }
+  .soft { background: var(--sand); }
+  .eyebrow { font-size: 12px; letter-spacing: 3.5px; font-weight: 600; color: var(--olive); }
+  .eyebrow::before { width: 28px; height: 1px; border-radius: 0; background: var(--olive); }
+  .sec-title { font-size: clamp(34px, 5vw, 58px); margin-bottom: 16px; }
+  .sec-lead { font-size: 17px; }
+  .btn { border-radius: 999px; padding: 14px 28px; font-weight: 600; font-size: 15px; border-width: 1.5px; letter-spacing: .2px; }
+  .btn-primary:hover { box-shadow: 0 12px 28px rgba(43, 36, 28, .18); }
+  .logo { font-family: var(--head); font-weight: 500; text-transform: none; letter-spacing: .5px; font-size: 25px; }
+  .nav { background: rgba(246, 242, 235, .92); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+  .nav-links a { font-size: 14.5px; letter-spacing: .3px; }
+  .nav-links a.active { border-bottom-color: var(--olive); font-weight: 600; }
+
+  /* Capa clara */
+  .hero { background: radial-gradient(ellipse at 88% 18%, rgba(168, 134, 74, .16), transparent 55%), var(--parchment); }
+  .hero h1 { font-size: clamp(58px, 10.5vw, 136px); line-height: .95; font-weight: 500; }
+  .hero h1 span { color: var(--olive); -webkit-text-stroke: 0; font-style: italic; font-weight: 400; }
+  .hero-tag { font-weight: 600; letter-spacing: 3px; font-size: 12px; }
+  .hero-tag b { background: var(--cobalt); color: var(--parchment); font-family: var(--body); font-weight: 700; font-size: 11px; letter-spacing: 1.5px; padding: 4px 9px; border-radius: 999px; }
+  .hero-stats div { border-left: 1px solid var(--olive); }
+  .hero-stats strong { font-weight: 500; font-size: 38px; }
+  .hero-photo .media { box-shadow: 0 30px 70px rgba(43, 36, 28, .2); border-radius: 18px; }
+  .hero-photo .media::after { content: ""; position: absolute; inset: 10px; border: 1px solid rgba(246, 242, 235, .7); border-radius: 12px; pointer-events: none; }
+  .hero-photo .badge { border-radius: 999px; font-size: 11px; background: rgba(246, 242, 235, .92); }
+  .brands { background: transparent; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); margin-top: 64px; }
+  .brands-track li { font-family: var(--head); font-style: italic; text-transform: none; letter-spacing: .3px; font-size: 22px; color: var(--cobalt); }
+  .brands-track li::after { width: 5px; height: 5px; background: var(--olive); }
+
+  /* Sobre */
+  .about-grid > .media { box-shadow: 0 26px 60px rgba(43, 36, 28, .16); border-radius: 18px; }
+  .promises li { background: var(--paper); border-left: 0; border: 1px solid var(--line); border-radius: 12px; font-weight: 500; }
+  .promises svg { color: var(--olive); }
+  .signature { font-family: var(--head); font-style: italic; text-transform: none; font-size: 32px; transform: none; }
+
+  /* Trabalhos (fundo café) */
+  .filter { font-weight: 500; font-size: 14.5px; border-width: 1px; }
+  .row .row-title { font-family: var(--head); font-weight: 500; text-transform: none; letter-spacing: -.01em; font-size: clamp(30px, 3.6vw, 44px); }
+  .row .row-title small { font-family: var(--body); font-weight: 500; }
+  .row-sub { font-family: var(--head); }
+  .work-v { border-radius: 16px; box-shadow: 0 14px 34px rgba(0, 0, 0, .28); }
+  .work-pill { font-weight: 600; letter-spacing: 1.2px; }
+  .work-v .work-info h4 { font-family: var(--head); font-weight: 500; font-size: 21px; }
+  .work-play { color: var(--cobalt); }
+
+  /* Serviços */
+  .service { background: var(--paper); border: 1px solid var(--line); border-radius: 16px; }
+  .service:hover { background: var(--paper); color: var(--cobalt); border-color: var(--olive); transform: translateY(-3px); box-shadow: 0 18px 40px rgba(43, 36, 28, .1); }
+  .service-num { font-family: var(--head); font-style: italic; color: var(--olive); -webkit-text-stroke: 0; font-size: 34px; font-weight: 400; }
+  .service h3 { font-size: 23px; }
+
+  /* Números e feedbacks (fundo areia) */
+  .metric { background: var(--paper); border: 1px solid var(--line); border-bottom: 1px solid var(--line); border-radius: 16px; }
+  .metric strong { font-weight: 500; }
+  .sub-title { font-family: var(--head); font-weight: 500; font-size: 28px; margin: 64px 0 18px; }
+  .result { background: var(--paper); border: 1px solid var(--line); border-radius: 16px; }
+  .result .big { font-weight: 500; color: var(--olive); }
+  .testimonial { background: var(--paper); border: 1px solid var(--line); box-shadow: 0 10px 30px rgba(43, 36, 28, .08); border-radius: 18px; }
+  .t-topo .avatar { background: var(--cobalt); color: var(--parchment); font-family: var(--head); font-style: italic; }
+  .testimonial .estrelas { color: var(--olive); font-size: 18px; letter-spacing: 3px; }
+  .testimonial blockquote { font-family: var(--head); font-size: 17px; line-height: 1.6; }
+  .testi-seta { background: var(--paper); color: var(--cobalt); box-shadow: 0 6px 18px rgba(43, 36, 28, .16); }
+
+  /* Contato */
+  .form { box-shadow: 0 30px 70px rgba(43, 36, 28, .22); border-radius: 20px; }
+  .field input, .field textarea { border-radius: 10px; }
+  .channel { border-radius: 14px; border-width: 1px; background: var(--paper); }
+  .channel:hover { border-color: var(--olive); }
+  .channel .ico { background: var(--cobalt); }
+
+  /* Rodapé e mídia kit */
+  footer { border-top: 0; }
+  .modal-card { border-top: 0; border-radius: 20px; box-shadow: 0 40px 90px rgba(24, 19, 14, .35); }
+  .modal-bg { background: rgba(24, 19, 14, .62); }
+  .player-card video { box-shadow: 0 30px 80px rgba(0, 0, 0, .45); border-radius: 14px; }
+
+  /* Filtros de nicho no celular: uma linha só, deslizando pro lado */
+  @media (max-width: 700px) {
+    .filters { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-inline: -16px; padding: 2px 16px 6px; scroll-padding-inline: 16px; scroll-snap-type: x proximity; }
+    .filters::-webkit-scrollbar { display: none; }
+    .filter { flex: 0 0 auto; white-space: nowrap; scroll-snap-align: start; }
   }
 </style>
 
@@ -520,10 +612,10 @@
 <main id="conteudo">
 
   <!-- ================= 1. CAPA ================= -->
-  <section class="hero dark" id="inicio" aria-labelledby="hero-title">
+  <section class="hero" id="inicio" aria-labelledby="hero-title">
     <div class="wrap hero-grid">
       <div>
-        <p class="hero-tag"><b>UGC</b> Creator de conteúdo · Vila Velha</p>
+        <p class="hero-tag"><b>UGC</b> Creator · Vila Velha, ES</p>
         <h1 id="hero-title">Ryan <span>Alves</span></h1>
         <p class="hero-sub">Eu crio vídeos com cara de gente real que fazem a sua marca parar o scroll, ganhar confiança e vender mais.</p>
         <div class="hero-btns">
@@ -560,12 +652,12 @@
     <div class="wrap about-grid">
       <!-- FOTO DO SOBRE: troque o bloco abaixo por
            <img src="sobre.jpg" alt="Ryan Alves gravando um vídeo" class="media ratio-45"> -->
-      <div class="media ratio-45 reveal" role="img" aria-label="Espaço para foto do Ryan Alves gravando, formato 4:5">
-        <span class="media-cap">foto do creator gravando 4:5</span>
+      <div class="media ratio-45 reveal">
+        <img src="https://jlehawiwklvyvrzbfuiu.supabase.co/storage/v1/object/public/portfolio/capas/canva-843a2479be9e0c7f24ca8bca2db2617c.jpg" alt="Ryan Alves falando para a câmera" loading="lazy" style="object-position: center 35%">
       </div>
       <div class="about-text reveal">
-        <span class="eyebrow">Sobre mim</span>
-        <h2 class="sec-title" id="sobre-title">Prazer, eu sou o Ryan</h2>
+        <span class="eyebrow">Quem grava</span>
+        <h2 class="sec-title" id="sobre-title">Prazer, <em>Ryan Alves.</em></h2>
         <p>Moro em Vila Velha e transformo produto em história. Gravo do jeito que as pessoas realmente falam com os amigos: sem cara de propaganda, com verdade e com ritmo de quem entende de rede social.</p>
         <p>Atendo marcas de tecnologia, autocuidado, alimentos, casa e moda masculina, e cuido de cada vídeo como se fosse da minha própria marca.</p>
         <ul class="promises">
@@ -597,9 +689,9 @@
   <section class="dark" id="trabalhos" aria-labelledby="trabalhos-title">
     <div class="wrap">
       <div class="reveal">
-        <span class="eyebrow">Catálogo</span>
-        <h2 class="sec-title" id="trabalhos-title">Trabalhos por nicho</h2>
-        <p class="sec-lead">Escolha um nicho e veja o que eu já criei nele.</p>
+        <span class="eyebrow">Portfólio</span>
+        <h2 class="sec-title" id="trabalhos-title">Escolha o nicho e <em>dá o play.</em></h2>
+        <p class="sec-lead">Vídeos reais, feitos para marcas reais. Toque em qualquer um para assistir com som.</p>
       </div>
       <div class="filters" id="filters" role="group" aria-label="Filtrar trabalhos por nicho"></div>
       <p class="sr-only" aria-live="polite" id="filter-status"></p>
@@ -613,7 +705,7 @@
     <div class="wrap">
       <div class="reveal">
         <span class="eyebrow">Serviços</span>
-        <h2 class="sec-title" id="servicos-title">Como eu te ajudo</h2>
+        <h2 class="sec-title" id="servicos-title">O que eu <em>entrego</em> pra sua marca</h2>
         <p class="sec-lead">Do vídeo avulso ao pacote do mês inteiro. Você escolhe o formato, eu entrego pronto para postar ou anunciar.</p>
       </div>
       <!-- Os serviços vêm do array SERVICES no script -->
@@ -622,17 +714,17 @@
   </section>
 
   <!-- ================= 6. NÚMEROS E DEPOIMENTOS ================= -->
-  <section class="dark" id="numeros" aria-labelledby="numeros-title">
+  <section class="soft" id="numeros" aria-labelledby="numeros-title">
     <div class="wrap">
       <div class="reveal">
-        <span class="eyebrow">Resultados</span>
-        <h2 class="sec-title" id="numeros-title">Números e depoimentos</h2>
+        <span class="eyebrow">Prova social</span>
+        <h2 class="sec-title" id="numeros-title">Resultados que <em>falam por mim</em></h2>
       </div>
       <!-- Métricas: array METRICS. Resultados: array RESULTS. Depoimentos: array TESTIMONIALS. -->
       <div class="metrics" id="metrics"></div>
-      <h3 class="sub-title reveal" id="results-title">Resultados de campanha</h3>
+      <h3 class="sub-title reveal" id="results-title">O case que mais rendeu</h3>
       <div class="results" id="results"></div>
-      <h3 class="sub-title reveal">Quem já trabalhou comigo</h3>
+      <h3 class="sub-title reveal">O que as marcas dizem</h3>
       <div class="testi-carrossel reveal">
         <button class="testi-seta" type="button" data-dir="-1" aria-label="Feedbacks anteriores"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg></button>
         <div class="testimonials" id="testimonials" tabindex="0" aria-label="Feedbacks das marcas"></div>
@@ -647,7 +739,7 @@
     <div class="wrap">
       <div class="reveal">
         <span class="eyebrow">Contato</span>
-        <h2 class="sec-title" id="contato-title">Bora criar juntos?</h2>
+        <h2 class="sec-title" id="contato-title">Vamos criar o seu <em>próximo case?</em></h2>
         <p class="sec-lead">Me conta sobre a sua marca e o que você precisa. Eu respondo rapidinho.</p>
       </div>
       <div class="contact-grid">
@@ -693,7 +785,7 @@
             <span><b>Instagram</b><span>@ryalvz</span></span>
           </a>
           <p class="city">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="#8A855E" aria-hidden="true"><path d="M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="#A8864A" aria-hidden="true"><path d="M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg>
             Vila Velha, ES · atendo marcas de todo o Brasil
           </p>
         </div>
@@ -708,8 +800,7 @@
     <a class="logo" href="#inicio">Ryan Alves</a>
     <ul class="socials">
       <li><a href="https://instagram.com/ryalvz" target="_blank" rel="noopener" aria-label="Instagram @ryalvz"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7.3A4.7 4.7 0 1 0 12 16.7 4.7 4.7 0 0 0 12 7.3zm0 7.7a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm6-7.9a1.1 1.1 0 1 1-2.2 0 1.1 1.1 0 0 1 2.2 0zM21.9 8c-.1-1.6-.4-3-1.6-4.2S17.6 2.2 16 2.1C14.3 2 9.7 2 8 2.1c-1.6.1-3 .4-4.2 1.6S2.2 6.4 2.1 8C2 9.7 2 14.3 2.1 16c.1 1.6.4 3 1.6 4.2s2.6 1.5 4.2 1.6c1.7.1 6.3.1 8 0 1.6-.1 3-.4 4.2-1.6s1.5-2.6 1.6-4.2c.1-1.7.1-6.3 0-8z"/></svg></a></li>
-      <!-- TIKTOK: troque @seuusuario pelo seu usuário no TikTok -->
-      <li><a href="https://www.tiktok.com/@seuusuario" target="_blank" rel="noopener" aria-label="TikTok @seuusuario"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.6 5.8A4.3 4.3 0 0 1 15.5 3h-3.1v12.4a2.6 2.6 0 1 1-2.6-2.6c.3 0 .5 0 .8.1V9.7a5.7 5.7 0 1 0 4.9 5.7V9a7.4 7.4 0 0 0 4.3 1.4V7.3a4.3 4.3 0 0 1-3.2-1.5z"/></svg></a></li>
+      <!-- TIKTOK: quando tiver o @, volte com o link aqui -->
       <li><a href="https://wa.me/5511913012249" target="_blank" rel="noopener" aria-label="WhatsApp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm4.5 12.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.4.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.4.1-.7.3-.2.3-.9.9-.9 2.2s.9 2.5 1 2.7c.1.2 1.8 2.8 4.4 3.9 1.6.7 2.3.8 3.1.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3z"/></svg></a></li>
       <li><a href="mailto:heyryan.ugc@gmail.com" aria-label="E-mail"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm8 7.5L20 6.5V6H4v.5l8 5z"/></svg></a></li>
     </ul>
@@ -829,7 +920,7 @@ const TESTIMONIALS = [
   { texto: "Passando só para elogiar o seu vídeo. Ficou extremamente natural, cativante e com uma qualidade técnica excelente. Você conseguiu transmitir exatamente o tom leve e acolhedor que a gente buscava. Parabéns pelo profissionalismo e pelo talento! O material ficou impecável!", nome: "Zavi Agência", empresa: "Agência" },
   { texto: "Excelente profissional, muito empenhado e comprometido com o trabalho. Realizou todas as entregas dentro do prazo e com muita qualidade. Foi uma experiência sensacional e, com certeza, faremos novos trabalhos juntos!", nome: "Haag", empresa: "Moda" },
   { texto: "O Ryan é rápido, inteligente e muito criativo. Adoramos o seu conteúdo em nossa campanha.", nome: "Picnic", empresa: "Marca parceira" },
-  { texto: "Atencioso, ágil e entrega muito boa!", nome: "Agência 1002", empresa: "Agência" },
+  { texto: "Atencioso, ágil e entrega muito boa!", nome: "Share Living", empresa: "Coliving" },
   { texto: "Amamos o conteúdo entregue pelo Ryan!!!", nome: "Di Santinni", empresa: "Calçados" },
   { texto: "Adoramos o formato, parabéns!", nome: "Sincrofit Tecnologia", empresa: "Tecnologia" },
   { texto: "Conteúdo excelente.", nome: "Smart Gr", empresa: "Marca parceira" },
