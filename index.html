@@ -376,6 +376,7 @@
   .metric span { color: var(--muted); font-size: 15px; }
   .sub-title { font-family: var(--body); font-weight: 700; font-size: 22px; margin: 56px 0 16px; text-transform: none; letter-spacing: 0; }
   .results { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  .results:has(> :only-child) { grid-template-columns: minmax(0, 460px); }
   .result { border-radius: var(--radius); padding: 26px 22px; border: 1.5px solid var(--line); background: var(--tint); }
   .result .big { font-family: var(--head); font-size: 46px; line-height: 1; }
   .result .what { font-weight: 700; margin: 6px 0 10px; }
@@ -768,7 +769,7 @@
 const HERO_STATS = [
   { valor: 40, sufixo: "+", rotulo: "marcas atendidas" },
   { valor: 34, sufixo: "", rotulo: "vídeos no portfólio" },
-  { valor: 2, sufixo: "M+", rotulo: "de alcance em uma campanha" }
+  { valor: 2, sufixo: "M+", rotulo: "de alcance em um vídeo da Di Santinni" }
 ];
 
 // Marcas da faixa da capa
@@ -810,7 +811,7 @@ const SERVICES = [
 // Quatro métricas da seção de números. TROQUE os 0 pelos seus números reais.
 const METRICS = [
   { valor: 40, prefixo: "+", sufixo: "",      rotulo: "marcas atendidas" },
-  { valor: 2,  prefixo: "+", sufixo: "M",     rotulo: "de alcance em uma campanha" },
+  { valor: 2,  prefixo: "+", sufixo: "M",     rotulo: "de alcance em um único vídeo" },
   { valor: 12, prefixo: "",  sufixo: " anos", rotulo: "em vendas antes do UGC" },
   { valor: 5,  prefixo: "",  sufixo: "",      rotulo: "nichos atendidos" }
 ];
@@ -818,7 +819,9 @@ const METRICS = [
 // Três resultados de campanha (placeholders: troque pelos seus)
 // Vazio = o bloco "Resultados de campanha" fica escondido. Para mostrar, coloque
 // resultados REAIS (ex.: { numero: "+35%", titulo: "Mais vendas", texto: "Marca · o que aconteceu" }).
-const RESULTS = [];
+const RESULTS = [
+  { numero: "+2M", titulo: "de alcance com um vídeo", texto: "Di Santinni · quebra de padrão para o Dia dos Namorados" }
+];
 
 // Quatro depoimentos (placeholders: troque pelo texto real de cada cliente)
 // Avaliações reais das marcas na plataforma SeuInfluencer (todas 5 estrelas)
