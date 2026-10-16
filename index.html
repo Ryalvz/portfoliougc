@@ -380,18 +380,25 @@
   .result .big { font-family: var(--head); font-size: 46px; line-height: 1; }
   .result .what { font-weight: 700; margin: 6px 0 10px; }
   .result p { color: var(--muted); font-size: 15px; margin: 0; }
-  .testimonials { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; }
-  .testimonial { margin: 0; border-radius: var(--radius); padding: 26px 24px; }
-  .testimonial blockquote { margin: 0 0 18px; font-size: 17px; position: relative; padding-top: 28px; }
-  .testimonial blockquote::before { content: "\201C"; font-family: var(--head); font-size: 64px; color: var(--olive); position: absolute; top: -14px; left: 0; line-height: 1; }
-  .testimonial figcaption { display: flex; align-items: center; gap: 12px; }
-  .testimonial figcaption .avatar { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--cobalt); color: var(--parchment); font-family: var(--head); font-size: 18px; flex: none; }
-  .testimonial figcaption b { display: block; }
-  .testimonial .estrelas { color: #E3B341; letter-spacing: 3px; font-size: 18px; margin-bottom: 6px; }
-  .testi-fonte { margin: 16px 0 0; font-size: 14px; opacity: .8; }
-  .testimonial figcaption span { color: var(--muted); font-size: 14px; }
+  .testi-carrossel { position: relative; }
+  .testimonials { display: grid; grid-auto-flow: column; grid-auto-columns: calc((100% - 36px) / 3); gap: 18px; overflow-x: auto; scroll-snap-type: x mandatory; scroll-behavior: smooth; scrollbar-width: none; padding: 6px 2px 14px; align-items: start; }
+  .testimonials::-webkit-scrollbar { display: none; }
+  .testimonial { margin: 0; scroll-snap-align: start; background: #fff; color: #1f2430; border-radius: 14px; padding: 22px 22px 24px; box-shadow: 0 12px 30px rgba(10, 20, 60, .22); }
+  .t-topo { display: flex; align-items: center; gap: 12px; }
+  .t-topo .avatar { width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; background: var(--cobalt); color: #fff; font-family: var(--head); font-size: 19px; flex: none; }
+  .t-topo b { display: block; font-size: 17px; line-height: 1.25; }
+  .t-topo span { display: block; color: #6b7280; font-size: 14px; }
+  .testimonial .estrelas { color: #F2B705; letter-spacing: 4px; font-size: 22px; line-height: 1; margin: 16px 0 12px; }
+  .testimonial blockquote { margin: 0; font-size: 16px; line-height: 1.65; }
+  .testi-seta { position: absolute; top: 50%; transform: translateY(-50%); z-index: 2; width: 42px; height: 42px; border-radius: 50%; border: 0; background: #fff; color: var(--cobalt); box-shadow: 0 6px 18px rgba(10, 20, 60, .25); display: grid; place-items: center; cursor: pointer; }
+  .testi-seta svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+  .testi-seta[data-dir="-1"] { left: -20px; }
+  .testi-seta[data-dir="1"] { right: -20px; }
+  .testi-seta:disabled { opacity: 0; pointer-events: none; }
+  .testi-fonte { margin: 18px 0 0; font-size: 14px; opacity: .85; }
   @media (max-width: 899px) { .metrics { grid-template-columns: repeat(2, 1fr); } .results { grid-template-columns: 1fr; } }
-  @media (max-width: 699px) { .testimonials { grid-template-columns: 1fr; } }
+  @media (max-width: 899px) { .testimonials { grid-auto-columns: calc((100% - 18px) / 2); } }
+  @media (max-width: 699px) { .testimonials { grid-auto-columns: 86%; } .testi-seta[data-dir="-1"] { left: -6px; } .testi-seta[data-dir="1"] { right: -6px; } }
   @media (max-width: 330px) { .metrics { grid-template-columns: 1fr; } }
 
   /* =========================================================
@@ -625,7 +632,11 @@
       <h3 class="sub-title reveal" id="results-title">Resultados de campanha</h3>
       <div class="results" id="results"></div>
       <h3 class="sub-title reveal">Quem já trabalhou comigo</h3>
-      <div class="testimonials" id="testimonials"></div>
+      <div class="testi-carrossel reveal">
+        <button class="testi-seta" type="button" data-dir="-1" aria-label="Feedbacks anteriores"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg></button>
+        <div class="testimonials" id="testimonials" tabindex="0" aria-label="Feedbacks das marcas"></div>
+        <button class="testi-seta" type="button" data-dir="1" aria-label="Próximos feedbacks"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
+      </div>
       <p class="testi-fonte reveal">Avaliações reais de marcas na plataforma SeuInfluencer, todas com nota 5.</p>
     </div>
   </section>
@@ -814,10 +825,12 @@ const RESULTS = [];
 const TESTIMONIALS = [
   { texto: "Passando só para elogiar o seu vídeo. Ficou extremamente natural, cativante e com uma qualidade técnica excelente. Você conseguiu transmitir exatamente o tom leve e acolhedor que a gente buscava. Parabéns pelo profissionalismo e pelo talento! O material ficou impecável!", nome: "Zavi Agência", empresa: "Agência" },
   { texto: "Excelente profissional, muito empenhado e comprometido com o trabalho. Realizou todas as entregas dentro do prazo e com muita qualidade. Foi uma experiência sensacional e, com certeza, faremos novos trabalhos juntos!", nome: "Haag", empresa: "Moda" },
-  { texto: "O Ryan é rápido, inteligente e muito criativo. Adoramos o seu conteúdo em nossa campanha.", nome: "Picnic", empresa: "Campanha" },
+  { texto: "O Ryan é rápido, inteligente e muito criativo. Adoramos o seu conteúdo em nossa campanha.", nome: "Picnic", empresa: "Marca parceira" },
   { texto: "Atencioso, ágil e entrega muito boa!", nome: "Agência 1002", empresa: "Agência" },
-  { texto: "Amamos o conteúdo entregue pelo Ryan!!!", nome: "Di Santinni", empresa: "Moda" },
-  { texto: "Adoramos o formato, parabéns!", nome: "Sincrofit Tecnologia", empresa: "Tecnologia" }
+  { texto: "Amamos o conteúdo entregue pelo Ryan!!!", nome: "Di Santinni", empresa: "Calçados" },
+  { texto: "Adoramos o formato, parabéns!", nome: "Sincrofit Tecnologia", empresa: "Tecnologia" },
+  { texto: "Conteúdo excelente.", nome: "Smart Gr", empresa: "Marca parceira" },
+  { texto: "Bom trabalho!", nome: "Hg Empreendimentos", empresa: "Marca parceira" }
 ];
 
 /* =============================================================
@@ -1030,14 +1043,24 @@ $("#results").innerHTML = RESULTS.map((r) => `
   </article>`).join("");
 
 $("#testimonials").innerHTML = TESTIMONIALS.map((t) => `
-  <figure class="testimonial light reveal">
-    <div class="estrelas" role="img" aria-label="Nota 5 de 5">★★★★★</div>
-    <blockquote><p style="margin:0">${esc(t.texto)}</p></blockquote>
-    <figcaption>
+  <figure class="testimonial">
+    <figcaption class="t-topo">
       <span class="avatar" aria-hidden="true">${esc(t.nome.charAt(0))}</span>
       <span><b>${esc(t.nome)}</b><span>${esc(t.empresa)}</span></span>
     </figcaption>
+    <div class="estrelas" role="img" aria-label="Nota 5 de 5">★★★★★</div>
+    <blockquote><p style="margin:0">${esc(t.texto)}</p></blockquote>
   </figure>`).join("");
+// Setas do carrossel de feedbacks
+(() => {
+  const trilho = $("#testimonials"), setas = document.querySelectorAll(".testi-seta");
+  const passo = () => { const c = trilho.querySelector(".testimonial"); return c ? c.getBoundingClientRect().width + 18 : 300; };
+  const atualizar = () => { setas[0].disabled = trilho.scrollLeft < 8; setas[1].disabled = trilho.scrollLeft + trilho.clientWidth > trilho.scrollWidth - 8; };
+  setas.forEach((b) => b.addEventListener("click", () => { trilho.scrollBy({ left: passo() * Number(b.dataset.dir), behavior: reduceMotion ? "auto" : "smooth" }); }));
+  trilho.addEventListener("scroll", atualizar, { passive: true });
+  window.addEventListener("resize", atualizar);
+  atualizar();
+})();
 
 // Ano automático no rodapé
 $("#ano").textContent = new Date().getFullYear();
