@@ -1130,14 +1130,14 @@ ${legendas.map((x) => `- (${num(x.reach)} de alcance) ${String(x.legenda).replac
    citadas (#34 etc.: ganchos, roteiro, chamada, legenda, hashtags,
    dicas) e o trecho da pesquisa que fala do post. Cada parte tem
    o seu botão de copiar. */
-const SECOES_ROTEIRO = [["ganchos", /^(GANCHOS|OP[ÇC][ÕO]ES DE GANCHO)\b/i], ["duracao", /^DURA[ÇC][ÃA]O\b/i], ["angulo", /^(ÂNGULO|ANGULO)\b/i], ["roteiro", /^ROTEIRO\b/i], ["chamada", /^CHAMADA( FINAL)?\b/i], ["legenda", /^(LEGENDA|TEXTO DO POST)\b/i], ["dicas", /^DICAS( DE GRAVA[ÇC][ÃA]O)?\b/i], ["anotacao", /^ANOTA[ÇC][ÃA]O ORIGINAL\b/i]];
+const SECOES_ROTEIRO = [["ganchos", /^(GANCHOS|OP[ÇC][ÕO]ES DE GANCHO)\b/i], ["duracao", /^DURA[ÇC][ÃA]O\b/i], ["angulo", /^(ÂNGULO|ANGULO)\b/i], ["filmar", /^O QUE FILMAR\b/i], ["roteiro", /^ROTEIRO\b/i], ["chamada", /^CHAMADA( FINAL)?\b/i], ["legenda", /^(LEGENDA|TEXTO DO POST)\b/i], ["dicas", /^DICAS( DE GRAVA[ÇC][ÃA]O)?\b/i], ["anotacao", /^ANOTA[ÇC][ÃA]O ORIGINAL\b/i]];
 function partesDoRoteiro(texto) {
   const partes = {}; let atual = "inicio";
   String(texto || "").split("\n").forEach((bruta) => {
     const l = bruta.replace(/^[#>\s*]+/, "").replace(/^\d+[.)]\s*/, "").replace(/\*\*/g, "").trim();
     // Título de parte: "GANCHOS", "**Legenda**", "3. CHAMADA FINAL:", "## Roteiro"
     const semParenteses = l.replace(/\(.*?\)/g, "").replace(/:.*$/, "").trim();
-    const ehTitulo = l.length < 70 && (semParenteses === semParenteses.toUpperCase() || /:\s*$/.test(l) || /^\s*(#|\*\*|\d+[.)])/.test(bruta));
+    const ehTitulo = l.length < 100 && (semParenteses === semParenteses.toUpperCase() || /:\s*$/.test(l) || /^\s*(#|\*\*|\d+[.)])/.test(bruta));
     const achou = ehTitulo && SECOES_ROTEIRO.find(([, re]) => re.test(l));
     if (achou) { atual = achou[0]; partes[atual] = []; return; }
     (partes[atual] = partes[atual] || []).push(bruta);
@@ -1181,6 +1181,7 @@ function abrirPostDoPlano(plano, it, evento) {
         ${bloco("📣 Chamada final", p.chamada)}
         ${bloco("📝 Legenda", p.legenda, tags.length ? `<div class="pp-tags">${tags.map((h) => `<span class="pilula">${esc(h)}</span>`).join(" ")} ${btnCopiar(tags.join(" "), "📋 Hashtags")}</div>` : "")}
         ${bloco("⏱️ Duração", p.duracao)}
+        ${bloco("🎞️ O que filmar", p.filmar)}
         ${bloco("🎥 Dicas de gravação", p.dicas)}
         ${bloco("🧭 Por que esse ângulo", p.angulo)}`
       : `<p class="sub">${t.minha_versao ? "Essa ideia tem anotações, mas ainda não tem roteiro pronto." : "Essa ideia ainda não tem roteiro."}</p>
