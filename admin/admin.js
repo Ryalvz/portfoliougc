@@ -79,7 +79,7 @@ function traduzErro(e) {
 const ESQUEMA = {
   videos: ["id", "titulo", "link", "capa", "nicho", "formato", "marca", "destaque", "ordem", "visivel", "exemplo"],
   marcas: ["id", "nome", "instagram", "email", "telefone", "situacao", "nicho", "favorita", "fixada", "selecionada", "email_enviado_em", "obs", "ultimo_contato", "exemplo", "criado_em"],
-  calendario: ["id", "titulo", "marca", "tipo", "data", "hora", "hora_fim", "local", "status", "exemplo"],
+  calendario: ["id", "titulo", "marca", "tipo", "data", "hora", "hora_fim", "local", "status", "serie_id", "repete", "repete_ate", "exemplo"],
   campanhas: ["id", "campanha", "cliente", "tipo", "status", "qtd", "valor", "prazo", "pagamento", "ativa", "favorita", "exemplo"],
   comissoes_ttk: ["id", "data", "valor", "gmv", "itens", "obs"],
   metas: ["ano", "mes", "valor"],
@@ -203,7 +203,7 @@ function campoHTML(c, v) {
 }
 
 function abrirForm({ titulo, tabela, campos, valores = {}, aoSalvar, aoApagar }) {
-  const usados = campos.filter((c) => !tabela || c.t === "file" || temCampo(tabela, c.n));
+  const usados = campos.filter((c) => !tabela || c.t === "file" || c.livre || temCampo(tabela, c.n));
   const d = janela();
   d.innerHTML = `<form class="form-janela" novalidate>
     <div class="janela-topo"><h3>${esc(titulo)}</h3><button type="button" class="icone-btn" data-fechar aria-label="Fechar">${ic("fechar")}</button></div>
@@ -369,6 +369,7 @@ async function iniciar(sessao) {
   ligarCabecalho();
   $("#aba-inicio").innerHTML = '<p class="vazio">Carregando seus dados...</p>';
   await carregarTudo();
+  completarSeriesCal().catch((e) => console.warn("repetições", e));
   irParaEndereco();
   // A cada minuto o sino confere se algum lembrete rápido chegou na hora
   setInterval(() => { try { pintarLembretes(); } catch (_) {} }, 60000);
@@ -1030,7 +1031,7 @@ const cal = { mes: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
 
 function eventosCalendario() {
   const itens = S.calendario.filter((c) => c.data).map((c) => ({
-    tipo: c.tipo || "gravar", titulo: c.titulo, marca: c.marca, data: String(c.data).slice(0, 10),
+    tipo: c.tipo || "gravar", titulo: (c.serie_id ? "🔁 " : "") + c.titulo, marca: c.marca, data: String(c.data).slice(0, 10),
     hora: c.hora ? String(c.hora).slice(0, 5) : "", horaFim: c.hora_fim ? String(c.hora_fim).slice(0, 5) : "", local: c.local || "",
     feito: c.status === "feito", origem: "calendario", ref: c
   }));
@@ -1154,27 +1155,133 @@ async function formCalendario(c, dataPadrao) {
   formCalendarioBase(c, dataPadrao);
 }
 function formCalendarioBase(c, dataPadrao) {
+  const daSerie = !!(c && c.serie_id);
   abrirForm({
     titulo: c ? "Editar compromisso" : "Novo compromisso no calendário",
     tabela: "calendario",
-    valores: c ? { ...c, hora: c.hora ? String(c.hora).slice(0, 5) : "", hora_fim: c.hora_fim ? String(c.hora_fim).slice(0, 5) : "" }
-      : { data: dataPadrao, tipo: cal.filtro !== "todos" && cal.filtro !== "prazo" ? cal.filtro : "gravar", status: "a fazer" },
+    valores: c ? { ...c, hora: c.hora ? String(c.hora).slice(0, 5) : "", hora_fim: c.hora_fim ? String(c.hora_fim).slice(0, 5) : "", repete: c.repete || "", _alcance: "este" }
+      : { data: dataPadrao, tipo: cal.filtro !== "todos" && cal.filtro !== "prazo" ? cal.filtro : "gravar", status: "a fazer", repete: "" },
     campos: [
       { n: "titulo", r: "O que é", req: true, inteiro: true, ph: "Ex.: Reunião com a Canva" },
       { n: "tipo", r: "Tipo", t: "select", op: TIPOS_CAL },
       { n: "marca", r: "Marca" },
-      { n: "data", r: "Data", t: "date", req: true },
+      { n: "data", r: daSerie ? "Data (deste dia)" : "Data", t: "date", req: true },
       { n: "status", r: "Situação", t: "select", op: [["a fazer", "A fazer"], ["feito", "Feito"]] },
       { n: "hora", r: "Começa às (opcional)", t: "time" },
       { n: "hora_fim", r: "Termina às (opcional)", t: "time" },
-      { n: "local", r: "Local ou link (opcional)", inteiro: true, ph: "Endereço, Google Meet, Zoom..." }
+      { n: "local", r: "Local ou link (opcional)", inteiro: true, ph: "Endereço, Google Meet, Zoom..." },
+      { n: "repete", r: "🔁 Repetir", t: "select", op: REPETE_CAL },
+      { n: "repete_ate", r: "Repetir até (vazio = sem fim)", t: "date" },
+      ...(daSerie ? [{ n: "_alcance", r: "Mudar ou apagar", t: "select", livre: true, inteiro: true, op: [["este", "Só este dia"], ["proximos", "Este e todos os próximos"]] }] : [])
     ],
     aoSalvar: async (d) => {
       if (d.hora_fim && !d.hora) { avisar("Coloque também a hora de começo.", true); return false; }
       if (d.hora && d.hora_fim && d.hora_fim <= d.hora) { avisar("A hora de término precisa ser depois da hora de começo.", true); return false; }
-      const ok = await gravar("calendario", d, c ? c.id : null); if (ok) { recarregar("calendario"); sincronizarAgendaGoogle(); } return ok; },
-    aoApagar: c ? async () => { const ok = await apagarLinha("calendario", c.id); if (ok) { recarregar("calendario"); sincronizarAgendaGoogle(); } return ok; } : null
+      if (d.repete_ate && d.repete && d.repete_ate < d.data) { avisar("O \"repetir até\" precisa ser depois da data.", true); return false; }
+      const alcance = d._alcance; delete d._alcance;
+      if (!d.repete) d.repete_ate = null;
+      let ok;
+      if (!c) ok = d.repete ? await criarSerieCal(d) : await gravar("calendario", d, null);
+      else if (daSerie && alcance === "este") ok = await gravar("calendario", { ...d, repete: c.repete, repete_ate: c.repete_ate }, c.id);
+      else if (daSerie || d.repete) ok = await refazerSerieCal(c, d);
+      else ok = await gravar("calendario", d, c.id);
+      if (ok) { recarregar("calendario"); sincronizarAgendaGoogle(); }
+      return ok;
+    },
+    aoApagar: c ? async () => {
+      const proximos = daSerie && ($("#janela form").elements._alcance || {}).value === "proximos";
+      let ok;
+      if (proximos) {
+        const { error } = await db.from("calendario").delete().eq("serie_id", c.serie_id).gte("data", String(c.data).slice(0, 10));
+        ok = !error; if (error) avisar(traduzErro(error), true);
+      } else ok = await apagarLinha("calendario", c.id);
+      if (ok) { recarregar("calendario"); sincronizarAgendaGoogle(); }
+      return ok;
+    } : null
   });
+}
+
+/* ---------- 🔁 Compromissos que se repetem ----------
+   Cada dia da repetição vira um compromisso normal (com o mesmo
+   serie_id), então vai para o Google Agenda e o iPhone com aviso.
+   Sem data para acabar, o painel cria os próximos meses e vai
+   completando sozinho quando você abre o painel. */
+const REPETE_CAL = [["", "Não repete"], ["semanal", "Toda semana"], ["quinzenal", "A cada 2 semanas"], ["mensal", "Todo mês"], ["diario", "Todo dia"], ["dias_uteis", "De segunda a sexta"]];
+const HORIZONTE_CAL = { semanal: 182, quinzenal: 182, mensal: 365, diario: 60, dias_uteis: 60 }; // dias criados à frente
+function proximaData(iso, repete, inicio) {
+  const d = deISO(iso);
+  if (repete === "semanal") d.setDate(d.getDate() + 7);
+  else if (repete === "quinzenal") d.setDate(d.getDate() + 14);
+  else if (repete === "diario") d.setDate(d.getDate() + 1);
+  else if (repete === "dias_uteis") { do { d.setDate(d.getDate() + 1); } while (d.getDay() === 0 || d.getDay() === 6); }
+  else if (repete === "mensal") {
+    // Mesmo dia do mês do começo (dia 31 vira o último dia dos meses curtos)
+    const dia = deISO(inicio || iso).getDate();
+    const alvo = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+    alvo.setDate(Math.min(dia, new Date(alvo.getFullYear(), alvo.getMonth() + 1, 0).getDate()));
+    return isoLocal(alvo);
+  }
+  return isoLocal(d);
+}
+// Datas depois de "ultima" até o limite (o "repetir até" ou o horizonte a partir de hoje)
+function datasDaSerie(ultima, repete, ate, inicio) {
+  const limite = ate || somaDiasISO(HORIZONTE_CAL[repete] || 182);
+  const datas = [];
+  let atual = ultima;
+  for (let i = 0; i < 400; i++) {
+    atual = proximaData(atual, repete, inicio);
+    if (atual > limite) break;
+    datas.push(atual);
+  }
+  return datas;
+}
+const camposSerie = (d) => ({ titulo: d.titulo, tipo: d.tipo, marca: d.marca || null, hora: d.hora || null, hora_fim: d.hora_fim || null, local: d.local || null, repete: d.repete, repete_ate: d.repete_ate || null });
+const idSerie = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
+async function inserirLote(linhas) {
+  for (let i = 0; i < linhas.length; i += 100) {
+    const { error } = await db.from("calendario").insert(linhas.slice(i, i + 100));
+    if (error) { avisar(traduzErro(error), true); return false; }
+  }
+  return true;
+}
+async function criarSerieCal(d) {
+  const serie_id = idSerie();
+  const primeira = { ...d, serie_id };
+  const datas = datasDaSerie(d.data, d.repete, d.repete_ate, d.data);
+  const ok = await inserirLote([primeira, ...datas.map((data) => ({ ...camposSerie(d), data, status: "a fazer", serie_id }))]);
+  if (ok) setTimeout(() => avisar(`Repetição criada: ${plural(datas.length + 1, "compromisso", "compromissos")} até ${dataBR(datas[datas.length - 1] || d.data)}.`), 400);
+  return ok;
+}
+// Mudou "este e os próximos" (ou ligou/desligou a repetição): apaga os próximos e recria
+async function refazerSerieCal(c, d) {
+  const serie_id = c.serie_id || idSerie();
+  if (c.serie_id) {
+    const { error } = await db.from("calendario").delete().eq("serie_id", c.serie_id).gt("data", String(c.data).slice(0, 10)).neq("id", c.id);
+    if (error) { avisar(traduzErro(error), true); return false; }
+  }
+  if (!d.repete) return gravar("calendario", { ...d, serie_id: null, repete: null, repete_ate: null }, c.id);
+  if (!(await gravar("calendario", { ...d, serie_id }, c.id))) return false;
+  const datas = datasDaSerie(d.data, d.repete, d.repete_ate, d.data);
+  return inserirLote(datas.map((data) => ({ ...camposSerie(d), data, status: "a fazer", serie_id })));
+}
+// Ao abrir o painel: repetição sem fim que está acabando ganha os próximos meses
+async function completarSeriesCal() {
+  if (!temCampo("calendario", "serie_id")) return;
+  const porSerie = new Map();
+  S.calendario.filter((x) => x.serie_id && x.repete && x.data).forEach((x) => {
+    const atual = porSerie.get(x.serie_id);
+    if (!atual || String(x.data) > String(atual.data)) porSerie.set(x.serie_id, x);
+  });
+  const novas = [];
+  porSerie.forEach((ultima) => {
+    const fim = String(ultima.data).slice(0, 10);
+    if (ultima.repete_ate && fim >= String(ultima.repete_ate).slice(0, 10)) return;
+    if (fim > somaDiasISO(Math.round((HORIZONTE_CAL[ultima.repete] || 182) / 2))) return;
+    const primeira = S.calendario.filter((x) => x.serie_id === ultima.serie_id).map((x) => String(x.data).slice(0, 10)).sort()[0];
+    datasDaSerie(fim, ultima.repete, ultima.repete_ate ? String(ultima.repete_ate).slice(0, 10) : null, primeira)
+      .forEach((data) => novas.push({ ...camposSerie(ultima), data, status: "a fazer", serie_id: ultima.serie_id }));
+  });
+  if (novas.length && await inserirLote(novas)) { await recarregar("calendario"); sincronizarAgendaGoogle(); }
 }
 
 /* =============================================================
