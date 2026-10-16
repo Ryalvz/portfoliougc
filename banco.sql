@@ -868,3 +868,13 @@ alter table public.calendario drop constraint if exists calendario_repete_check;
 alter table public.calendario add constraint calendario_repete_check check (repete is null or repete in ('semanal', 'quinzenal', 'mensal', 'diario', 'dias_uteis'));
 alter table public.calendario add column if not exists repete_ate date;
 create index if not exists calendario_serie on public.calendario (serie_id) where serie_id is not null;
+
+
+-- -------------------------------------------------------------
+-- 30. SEÇÕES NOVAS DO PORTFÓLIO
+-- Apps & Tecnologia (tech), Autocuidado (cuidado), Alimentos
+-- (alimentos), Casa & Utilidades (casa) e Moda Masculina (moda).
+-- beleza e fitness continuam aceitos para não quebrar nada antigo.
+-- -------------------------------------------------------------
+alter table public.videos drop constraint if exists videos_nicho_check;
+alter table public.videos add constraint videos_nicho_check check (nicho in ('tech', 'cuidado', 'alimentos', 'casa', 'moda', 'beleza', 'fitness'));
