@@ -1140,7 +1140,18 @@ function abrirDia(iso, lista) {
   $("[data-novo]", d).onclick = () => { d.close(); formCalendario(null, iso); };
 }
 
-function formCalendario(c, dataPadrao) {
+// Post que veio do Plano da semana: abre o conteúdo (ganchos, roteiro, legenda) antes do formulário
+async function formCalendario(c, dataPadrao) {
+  if (c && c.tipo === "postar") {
+    if (igx.planos === null) await carregarPlanos();
+    for (const p of igx.planos || []) {
+      const it = ((p.itens || {}).itens || []).find((x) => `${x.formato}: ${x.tema}`.slice(0, 200) === c.titulo);
+      if (it) { abrirPostDoPlano(p, it, c); return; }
+    }
+  }
+  formCalendarioBase(c, dataPadrao);
+}
+function formCalendarioBase(c, dataPadrao) {
   abrirForm({
     titulo: c ? "Editar compromisso" : "Novo compromisso no calendário",
     tabela: "calendario",
@@ -5787,13 +5798,14 @@ function desenharPlanoSemana(el) {
 
     ${itens.length ? `
       <div class="pl-dias">${itens.map((it, i) => { const ci = carDoItem(it); const data = dataDoDia(it.dia); return `
-        <article class="pl-dia ${data === hojeISO() ? "hoje" : ""}">
+        <article class="pl-dia ${data === hojeISO() ? "hoje" : ""}" data-pl-abrir="${i}" tabindex="0" role="button" aria-label="Ver tudo de ${esc(it.tema)}">
           <header><b>${esc((DIAS_PLANO.find((x) => x[0] === it.dia) || [0, 0, it.dia])[2])}</b><span class="sub">${dataBR(data).slice(0, 5)}</span><span class="pilula ${/reel/i.test(it.formato) ? "p-azul" : /carross/i.test(it.formato) ? "p-oliva" : ""}">${esc(it.formato)}</span></header>
           <h3>${esc(it.tema)}</h3>
           ${it.gancho ? `<p class="pl-gancho">“${esc(it.gancho)}”</p>` : ""}
           ${it.porque ? `<p class="sub">${esc(it.porque)}</p>` : ""}
           <div class="pl-acoes">
-            ${ci >= 0 ? `<button class="btn pequeno primario" type="button" data-pl-car="${ci}">🎨 Abrir carrossel</button>` : ""}
+            <button class="btn pequeno primario" type="button" data-pl-ver="${i}">👁️ Ver tudo</button>
+            ${ci >= 0 ? `<button class="btn pequeno" type="button" data-pl-car="${ci}">🎨 Carrossel</button>` : ""}
             <button class="btn pequeno" type="button" data-pl-agenda="${i}">📅 Agenda</button>
             ${it.gancho ? `<button class="btn pequeno" type="button" data-pl-copiar="${i}">📋 Gancho</button>` : ""}
           </div>
@@ -5846,6 +5858,12 @@ function desenharPlanoSemana(el) {
     igx.sub = "carrossel"; try { localStorage.setItem("ig-sub", "carrossel"); } catch (_) {}
     desenhar(); window.scrollTo({ top: 0 });
   });
+  const abrirItem = (i) => abrirPostDoPlano(plano, itens[i]);
+  $$("[data-pl-abrir]", el).forEach((card) => {
+    card.addEventListener("click", (e) => { if (e.target.closest("button, a")) return; abrirItem(Number(card.dataset.plAbrir)); });
+    card.addEventListener("keydown", (e) => { if ((e.key === "Enter" || e.key === " ") && e.target === card) { e.preventDefault(); abrirItem(Number(card.dataset.plAbrir)); } });
+  });
+  $$("[data-pl-ver]", el).forEach((b) => b.onclick = () => abrirItem(Number(b.dataset.plVer)));
   $$("[data-pl-copiar]", el).forEach((b) => b.onclick = async () => {
     try { await navigator.clipboard.writeText(itens[Number(b.dataset.plCopiar)].gancho); avisar("Gancho copiado."); } catch (_) { avisar("Não deu para copiar.", true); }
   });
@@ -6550,5 +6568,94 @@ ${legendas.map((x) => `- (${num(x.reach)} de alcance) ${String(x.legenda).replac
     const { error } = await db.from("preferencias").upsert({ chave: "guia_voz", valor, atualizado_em: new Date().toISOString() }, { onConflict: "chave" });
     if (error) { avisar("Falta rodar a parte 28 do banco.sql no Supabase.", true); return; }
     vozGuia = valor; vozFalta = false; d.close(); avisar("Guia de voz salvo. Os próximos roteiros já saem assim.");
+  };
+}
+
+/* ---------- 👁️ Tudo de um post do plano numa janela ----------
+   Junta o que está no plano (gancho, por quê), o roteiro das ideias
+   citadas (#34 etc.: ganchos, roteiro, chamada, legenda, hashtags,
+   dicas) e o trecho da pesquisa que fala do post. Cada parte tem
+   o seu botão de copiar. */
+const SECOES_ROTEIRO = [["ganchos", /^GANCHOS?\b/i], ["roteiro", /^ROTEIRO\b/i], ["chamada", /^CHAMADA( FINAL)?\b/i], ["legenda", /^(LEGENDA|TEXTO DO POST)\b/i], ["dicas", /^DICAS( DE GRAVA[ÇC][ÃA]O)?\b/i], ["anotacao", /^ANOTA[ÇC][ÃA]O ORIGINAL\b/i]];
+function partesDoRoteiro(texto) {
+  const partes = {}; let atual = "inicio";
+  String(texto || "").split("\n").forEach((bruta) => {
+    const l = bruta.replace(/^[#>\s*]+/, "").replace(/^\d+[.)]\s*/, "").replace(/\*\*/g, "").trim();
+    // Título de parte: "GANCHOS", "**Legenda**", "3. CHAMADA FINAL:", "## Roteiro"
+    const ehTitulo = l.length < 60 && (l === l.toUpperCase() || /:\s*$/.test(l) || /^\s*(#|\*\*|\d+[.)])/.test(bruta));
+    const achou = ehTitulo && SECOES_ROTEIRO.find(([, re]) => re.test(l));
+    if (achou) { atual = achou[0]; partes[atual] = []; return; }
+    (partes[atual] = partes[atual] || []).push(bruta);
+  });
+  Object.keys(partes).forEach((k) => { partes[k] = partes[k].join("\n").trim(); if (!partes[k]) delete partes[k]; });
+  return partes;
+}
+const ganchosDe = (txt) => String(txt || "").split("\n").map((l) => l.replace(/^\s*(\d+[.)]|[-•*])\s*/, "").replace(/^["“]|["”]$/g, "").trim()).filter((l) => l.length > 3);
+const hashtagsDe = (txt) => [...new Set((String(txt || "").match(/#[\p{L}\d_]+/gu) || []))];
+
+function abrirPostDoPlano(plano, it, evento) {
+  const numeros = [...String(it.tema || "").matchAll(/#(\d+)/g)].map((m) => m[1]);
+  const ideias = numeros.map((n) => S.transcricoes.find((t) => String(t.id) === n)).filter(Boolean);
+  const dia = (DIAS_PLANO.find((x) => x[0] === it.dia) || [0, 0, it.dia]);
+  const data = somaDiasISO(dia[1] || 0, plano.semana);
+  const car = ((plano.itens || {}).carrosseis || []).find((c) => semAcento(c.titulo).includes(semAcento(String(it.tema).replace(/#\d+\s*/g, "")).slice(0, 16)));
+  // Trecho da pesquisa que fala deste post (fora a própria linha do plano)
+  const chaves = [...numeros.map((n) => "#" + n), semAcento(String(it.tema).replace(/#\d+\s*/g, "")).slice(0, 18)].filter((x) => x.length > 2);
+  const trechos = String(plano.resposta || "").split("\n").map((l) => l.trim()).filter((l) => l && !/^(SEG|TER|QUA|QUI|SEX|S[AÁ]B|DOM)\s*\|/i.test(l.replace(/^[|*\s-]+/, "")) && chaves.some((c) => semAcento(l).includes(semAcento(c)))).slice(0, 6);
+
+  const copiaveis = [];
+  const btnCopiar = (texto, rotulo = "📋") => { copiaveis.push(texto); return `<button type="button" class="btn pequeno" data-copiar="${copiaveis.length - 1}">${rotulo}</button>`; };
+  const bloco = (titulo, texto, extra = "") => texto ? `<section class="pp-bloco"><div class="pp-bloco-topo"><h4>${titulo}</h4>${btnCopiar(texto, "📋 Copiar")}</div><div class="pp-texto">${esc(texto).replace(/\n/g, "<br>")}</div>${extra}</section>` : "";
+
+  // Ganchos: o do plano + os do roteiro
+  const ganchos = [...new Set([it.gancho, ...ideias.flatMap((t) => ganchosDe(partesDoRoteiro(t.minha_versao).ganchos))].map((g) => String(g || "").replace(/^["“]|["”]$/g, "").trim()).filter(Boolean))];
+
+  const htmlIdeias = ideias.map((t) => {
+    const p = partesDoRoteiro(t.minha_versao);
+    const pronto = !!(p.roteiro || p.legenda);
+    const tags = hashtagsDe(p.legenda);
+    return `<div class="pp-ideia">
+      <div class="pp-ideia-topo"><b>#${t.id} ${esc(t.titulo || "")}</b><span class="espaco"></span>
+        <button type="button" class="btn pequeno" data-ir-ideia="${t.id}">Abrir nos Roteiros</button></div>
+      ${pronto ? `
+        ${bloco("🎬 Roteiro", p.roteiro)}
+        ${bloco("📣 Chamada final", p.chamada)}
+        ${bloco("📝 Legenda", p.legenda, tags.length ? `<div class="pp-tags">${tags.map((h) => `<span class="pilula">${esc(h)}</span>`).join(" ")} ${btnCopiar(tags.join(" "), "📋 Hashtags")}</div>` : "")}
+        ${bloco("🎥 Dicas de gravação", p.dicas)}`
+      : `<p class="sub">${t.minha_versao ? "Essa ideia tem anotações, mas ainda não tem roteiro pronto." : "Essa ideia ainda não tem roteiro."}</p>
+        ${t.minha_versao ? bloco("Suas anotações", t.minha_versao) : ""}
+        <button type="button" class="btn primario" data-voz="${t.id}">✍️ Fazer o roteiro na minha voz</button>`}
+    </div>`;
+  }).join("");
+
+  const d = abrirJanelaSimples(`${esc(dia[2])} ${dataBR(data).slice(0, 5)} · ${esc(it.formato)}`, `
+    <h3 class="pp-tema">${esc(it.tema)}</h3>
+    ${it.porque ? `<p class="pp-porque">💡 ${esc(it.porque)}</p>` : ""}
+    ${ganchos.length ? `<section class="pp-bloco"><div class="pp-bloco-topo"><h4>🪝 Ganchos</h4></div>
+      <ul class="pp-ganchos">${ganchos.map((g) => `<li><span>“${esc(g)}”</span>${btnCopiar(g)}</li>`).join("")}</ul></section>` : ""}
+    ${htmlIdeias || `<section class="pp-bloco"><p class="sub" style="margin:0 0 8px">Esse post não está ligado a uma ideia dos Roteiros, então ainda não tem roteiro, legenda nem hashtags.</p>
+      <button type="button" class="btn primario" data-voz-novo>✍️ Fazer o roteiro na minha voz</button></section>`}
+    ${car ? `<section class="pp-bloco"><div class="pp-bloco-topo"><h4>🎨 Slides do carrossel</h4><button type="button" class="btn pequeno primario" data-abrir-car>Abrir no gerador</button></div>
+      <ol class="pp-slides">${car.slides.map((sl) => `<li><span class="pilula">${esc((MODELOS_SLIDE.find((m) => m[0] === sl.modelo) || [0, sl.modelo])[1])}</span> ${esc([sl.titulo, sl.texto].filter(Boolean).join(" · ").replace(/\*/g, ""))}</li>`).join("")}</ol></section>` : ""}
+    ${trechos.length ? `<details class="pp-bloco"><summary><b>🔎 O que a pesquisa falou desse post</b></summary><div class="pp-texto">${trechos.map((l) => esc(l.replace(/\*\*/g, ""))).join("<br>")}</div></details>` : ""}`,
+    `${evento ? `<button type="button" class="btn" data-editar-evento>Editar data e hora</button>` : `<button type="button" class="btn" data-agenda>📅 Pôr na agenda</button>`}<button type="button" class="btn primario" data-fechar>Fechar</button>`);
+  d.classList.add("janela-larga");
+  d.addEventListener("close", () => { d.classList.remove("janela-larga"); d.onclick = null; }, { once: true });
+
+  d.onclick = async (e) => {
+    const c = e.target.closest("[data-copiar]");
+    if (c) { try { await navigator.clipboard.writeText(copiaveis[Number(c.dataset.copiar)]); const antes = c.textContent; c.textContent = "copiado ✓"; setTimeout(() => { c.textContent = antes; }, 1500); } catch (_) { avisar("Não deu para copiar.", true); } return; }
+    const ir = e.target.closest("[data-ir-ideia]");
+    if (ir) { d.close(); trans.sel = ir.dataset.irIdeia; irPara("transcricoes"); return; }
+    const voz = e.target.closest("[data-voz]");
+    if (voz) { const t = S.transcricoes.find((x) => String(x.id) === voz.dataset.voz); d.close(); if (t) roteiroNaMinhaVoz(t); return; }
+    if (e.target.closest("[data-voz-novo]")) { d.close(); roteiroNaMinhaVoz({ titulo: String(it.tema).replace(/#\d+\s*/g, ""), categoria: "organico", minha_versao: [it.gancho && `Gancho sugerido: ${it.gancho}`, it.porque && `Por que vai funcionar: ${it.porque}`].filter(Boolean).join("\n") }); return; }
+    if (e.target.closest("[data-abrir-car]")) { d.close(); igx.car = { titulo: car.titulo, slides: car.slides.map((x) => ({ ...x })) }; igx.sub = "carrossel"; try { localStorage.setItem("ig-sub", "carrossel"); } catch (_) {} irPara("instagram"); return; }
+    if (e.target.closest("[data-editar-evento]")) { d.close(); formCalendarioBase(evento); return; }
+    if (e.target.closest("[data-agenda]")) {
+      const titulo = `${it.formato}: ${it.tema}`.slice(0, 200);
+      if (S.calendario.some((a) => a.titulo === titulo)) { avisar("Esse post já está na agenda."); return; }
+      if (await gravar("calendario", { titulo, tipo: "postar", data, status: "a fazer" })) { avisar(`Na agenda: ${dia[2]}.`); recarregar("calendario"); }
+    }
   };
 }
