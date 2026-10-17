@@ -767,6 +767,14 @@
   .result-v.com-som .result-video:hover .result-som { opacity: 1; }
   /* "&" mais simples nos títulos (o da Playfair é muito rebuscado) */
   .amp { font-family: var(--body); font-style: normal; font-weight: 400; font-size: .78em; vertical-align: .06em; }
+  /* Menu mais leve + seletor de idioma */
+  .nav-links a { font-weight: 500; font-size: 12px; letter-spacing: 1.8px; color: rgba(43, 36, 28, .62); }
+  .nav-links a.active { font-weight: 500; }
+  .nav-cta { font-weight: 500; font-size: 13.5px; padding: 10px 18px; }
+  .lang { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 2px; margin-left: auto; margin-right: 14px; }
+  .lang button { border: 0; background: none; font: inherit; font-size: 11.5px; font-weight: 600; letter-spacing: 1px; color: rgba(43, 36, 28, .6); padding: 5px 10px; border-radius: 999px; cursor: pointer; }
+  .lang button[aria-pressed="true"] { background: var(--cobalt); color: var(--parchment); }
+  @media (max-width: 899px) { .lang { margin-right: 4px; } }
 </style>
 
 </head>
@@ -792,10 +800,11 @@
         <li><a href="#sobre">Sobre</a></li>
         <li><a href="#trabalhos">Trabalhos</a></li>
         <li><a href="#servicos">Serviços</a></li>
-        <li><a href="#numeros">Números</a></li>
+        <li><a href="#numeros">Cases</a></li>
         <li><a href="#contato">Contato</a></li>
       </ul>
     </nav>
+    <div class="lang" role="group" aria-label="Idioma / Language"><button type="button" data-lang="pt">PT</button><button type="button" data-lang="en">EN</button></div>
     <a class="nav-cta" href="#contato">Trabalhe comigo</a>
   </div>
 </header>
@@ -940,7 +949,6 @@
         <h2 class="sec-title" id="numeros-title">Resultados que <em>falam por mim</em></h2>
       </div>
       <!-- Métricas: array METRICS. Resultados: array RESULTS. Depoimentos: array TESTIMONIALS. -->
-      <div class="metrics" id="metrics"></div>
       <!-- Case em destaque: objeto CASE no script -->
       <article class="case reveal" id="case" aria-labelledby="case-title"></article>
       <h3 class="sub-title reveal">O que as marcas dizem</h3>
@@ -1381,11 +1389,7 @@ $("#services").innerHTML = SERVICES.map((s) => `
   </article>`).join("");
 
 // Métricas, resultados e depoimentos
-$("#metrics").innerHTML = METRICS.map((m) => `
-  <div class="metric light reveal">
-    <strong data-count="${m.valor}" data-prefix="${esc(m.prefixo)}" data-suffix="${esc(m.sufixo)}">${esc(m.prefixo)}${m.valor}${esc(m.sufixo)}</strong>
-    <span>${esc(m.rotulo)}</span>
-  </div>`).join("");
+
 
 $("#results").innerHTML = RESULTS.map((r) => `
   <article class="result-v">
@@ -1743,6 +1747,175 @@ carregarTrabalhos();
   } catch (_) {}
   window.bancoInserir("visitas", { pagina: location.pathname.slice(0, 200), origem: (origem || "Direto").slice(0, 200) }).catch(() => {});
 })();
+
+/* ---------- Versão em inglês (PT | EN no menu) ---------- */
+// Dicionário: texto em português -> inglês. O que não estiver aqui continua em português (nomes de marca, por exemplo).
+const EN = {
+  "Pular para o conteúdo": "Skip to content",
+  "Black Friday": "Black Friday",
+  "vídeo de e-commerce que vende no dia": "e-commerce videos that sell on the day",
+  "poucas vagas pra gravar em novembro": "few November slots left",
+  "roteiro pronto antes do pico": "scripts ready before the peak",
+  "Hoje é Black Friday": "Black Friday is today",
+  "Falta 1 dia pra Black Friday": "1 day to Black Friday",
+  "reservar agenda →": "book a slot →",
+  "Sobre": "About", "Trabalhos": "Work", "Serviços": "Services", "Cases": "Cases", "Contato": "Contact",
+  "Trabalhe comigo": "Work with me",
+  "Creator · Tech & Lifestyle": "Creator · Tech & Lifestyle",
+  "Vendi por 12 anos antes de gravar o primeiro vídeo. Por isso cada roteiro começa pela objeção do seu cliente, não pela câmera.": "I spent 12 years in sales before filming my first video. That's why every script starts from your customer's objection, not from the camera.",
+  "Falar no WhatsApp": "Chat on WhatsApp",
+  "Ver os trabalhos": "See my work",
+  "em vendas B2B": "in B2B sales",
+  "de views em um vídeo · Di Santinni": "views on one video · Di Santinni",
+  "para entregar, roteiro aprovado antes": "delivery, script approved first",
+  "Em cartaz": "Now showing",
+  "Quem grava": "Behind the camera",
+  "Prazer,": "Nice to meet you,",
+  "Passei 12 anos vendendo no B2B, ajudando produto a ganhar espaço na prateleira e na decisão de compra. O trabalho se destacou tanto que me levou pra São Paulo, onde morei por 3 anos. Foi ali que aprendi, na prática, o que faz alguém comprar.": "I spent 12 years in B2B sales, helping products win shelf space and the buying decision. My work stood out so much that it took me to São Paulo, where I lived for 3 years. That's where I learned, in practice, what makes someone buy.",
+  "No caminho fiz faculdade, pós, MBA e até tentei a fotografia. Gostava de criar imagens, mas o que me prendia mesmo era entender por que uma mensagem convence e outra passa batido. Quando conheci o UGC, tudo se juntou.": "Along the way I got a degree, a postgrad, an MBA and even tried photography. I loved creating images, but what really hooked me was understanding why one message convinces and another goes unnoticed. When I found UGC, it all came together.",
+  "Quando comecei a viver do UGC, voltei pra Vila Velha, minha cidade natal. Hoje uno essa visão comercial com criatividade: roteiro que começa pela objeção do seu cliente e vídeo com cara de gente real. Já são": "Once UGC became my living, I moved back to Vila Velha, my hometown. Today I combine that sales mindset with creativity: scripts that start from your customer's objection and videos that feel like real people. That's",
+  "mais de 50 marcas": "50+ brands",
+  "atendidas e um vídeo com": "served and one video with",
+  "mais de 2M de views": "over 2M views",
+  "Conteúdos que deram resultado": "Content that delivered",
+  "Os vídeos que": "The videos that",
+  "mais renderam": "performed best",
+  "Storytelling com verdade, quebra de padrão e roteiro que a marca aprova. Toque em um vídeo para assistir.": "Honest storytelling, pattern breaks and scripts brands approve. Tap a video to watch.",
+  "toque para ouvir": "tap to listen", "toque para pausar": "tap to pause", "toque para continuar": "tap to resume",
+  "História real": "Real story",
+  "“Dá pra sentir a dedicação em cada detalhe. Ficou exatamente como a gente precisava.”": "“You can feel the dedication in every detail. It turned out exactly as we needed.”",
+  "Visualizações": "Views",
+  "Quebra de padrão no Dia dos Namorados": "Breaking the pattern on Valentine's Day",
+  "Roteiro": "Script", "Elogiado": "Praised",
+  "“Uma das melhores linhas que recebemos até agora”": "“One of the best lines we've received so far”",
+  "Roteiro que vende": "Scripts that sell",
+  "Portfólio": "Portfolio",
+  "Escolha o nicho e": "Pick a niche and",
+  "dá o play.": "hit play.",
+  "Vídeos reais, feitos para marcas reais. Toque em qualquer um para assistir com som.": "Real videos made for real brands. Tap any of them to watch with sound.",
+  "Todos": "All", "Beleza & Cuidados": "Beauty & Care", "Gastronomia": "Food", "Casa": "Home", "Moda": "Fashion",
+  "Apps, serviços e gadgets usados no dia a dia": "Apps, services and gadgets for everyday life",
+  "Cabelo, pele e barba sem complicação": "Hair, skin and beard made simple",
+  "Receitas e lanches que dão vontade na hora": "Recipes and snacks that make you hungry",
+  "Limpeza, perfume e utilidades para a casa": "Cleaning, fragrance and home essentials",
+  "Looks e acessórios do dia a dia": "Everyday looks and accessories",
+  "Vídeo UGC": "UGC video",
+  "O que eu": "What I", "entrego": "deliver", "pra sua marca": "for your brand",
+  "Cada formato tem um objetivo: anunciar, vender na loja ou construir marca. Me conta o seu que eu monto o combo certo pra você.": "Every format has a goal: ads, store sales or brand building. Tell me yours and I'll put together the right mix.",
+  "Bora criar juntos →": "Let's create together →",
+  "Anúncios": "Ads",
+  "Vídeo UGC roteirizado e cortes com ganchos diferentes, prontos pra testar no Meta e no TikTok Ads.": "Scripted UGC videos and cuts with different hooks, ready to test on Meta and TikTok Ads.",
+  "E-commerce": "E-commerce",
+  "Fotos do produto em uso, unboxing e roteiro e vídeo para TikTok Shop, pra sua loja vender todo dia.": "Product-in-use photos, unboxing, and scripts and videos for TikTok Shop, so your store sells every day.",
+  "No meu perfil": "On my profile",
+  "Publicação no meu Instagram, falando com quem já confia nas minhas indicações.": "Posts on my Instagram, reaching people who already trust my recommendations.",
+  "Recorrência": "Retainer",
+  "Pacote mensal com calendário combinado, conteúdo toda semana e preço especial.": "Monthly package with an agreed calendar, content every week and a special rate.",
+  "Prova social": "Social proof",
+  "Resultados que": "Results that",
+  "falam por mim": "speak for me",
+  "Case Di Santinni": "Di Santinni case",
+  "de views no Instagram": "views on Instagram",
+  "O desafio": "The challenge",
+  "Para o Dia dos Namorados, a marca imaginava o casal tradicional que aparece em toda propaganda da data.": "For Valentine's Day, the brand had in mind the traditional couple that shows up in every ad for the date.",
+  "A ideia": "The idea",
+  "Propus mostrar a gente como somos: um casal gay. Logo no primeiro segundo isso quebra o padrão que todo mundo está acostumado a ver nesse tipo de anúncio, e a marca topou na hora.": "I suggested showing us as we are: a gay couple. In the very first second it breaks the pattern everyone is used to seeing in this kind of ad, and the brand said yes right away.",
+  "O resultado": "The result",
+  "Roteiro aprovado de primeira, entrega aprovada de primeira e a campanha foi pro ar. Em 2 dias o vídeo bateu 1,5M de views e hoje passa de 2M.": "Script approved on the first try, delivery approved on the first try, and the campaign went live. In 2 days the video hit 1.5M views and today it's past 2M.",
+  "1,5M em 2 dias": "1.5M in 2 days",
+  "Roteiro aprovado de primeira": "Script approved first try",
+  "Entrega aprovada de primeira": "Delivery approved first try",
+  "O que as marcas dizem": "What brands say",
+  "Equipe de marketing": "Marketing team", "Tecnologia": "Technology", "Agência": "Agency", "Moda ": "Fashion", "Marca parceira": "Partner brand", "Calçados": "Footwear",
+  "Adoramos os dois roteiros: a escrita está excelente, a direção de cena é muito bem pensada e a linha \"isso não é mágica. É Canva.\" é uma das melhores que recebemos até agora. Os vídeos ficaram ótimos e adoramos trabalhar com você.": "We loved both scripts: the writing is excellent, the scene direction is very well thought out, and the line \"this isn't magic. It's Canva.\" is one of the best we've received so far. The videos turned out great and we loved working with you.",
+  "Só passando pra agradecer demais pelo trabalho. Dá pra sentir a dedicação em cada detalhe, e a atenção e o carinho que você teve nos ajustes fez toda a diferença. Ficou exatamente como a gente precisava.": "Just stopping by to thank you so much for the work. You can feel the dedication in every detail, and the care you put into the revisions made all the difference. It turned out exactly as we needed.",
+  "Adorei sua forma de criar, e o conteúdo estava super alinhado com o que buscamos por aqui! Além de extremamente comunicativo, profissional e pontual, amamos a sua entrega e dedicação com o nosso conteúdo!": "I loved the way you create, and the content was perfectly aligned with what we're looking for! Besides being extremely communicative, professional and on time, we loved your delivery and dedication to our content!",
+  "Passando só para elogiar o seu vídeo. Ficou extremamente natural, cativante e com uma qualidade técnica excelente. Você conseguiu transmitir exatamente o tom leve e acolhedor que a gente buscava. Parabéns pelo profissionalismo e pelo talento! O material ficou impecável!": "Just stopping by to compliment your video. It's extremely natural, engaging and technically excellent. You captured exactly the light, warm tone we were looking for. Congrats on your professionalism and talent! The material is flawless!",
+  "Excelente profissional, muito empenhado e comprometido com o trabalho. Realizou todas as entregas dentro do prazo e com muita qualidade. Foi uma experiência sensacional e, com certeza, faremos novos trabalhos juntos!": "An excellent professional, very dedicated and committed to the work. Every delivery was on time and high quality. It was an amazing experience and we'll definitely work together again!",
+  "O Ryan é rápido, inteligente e muito criativo. Adoramos o seu conteúdo em nossa campanha.": "Ryan is fast, smart and very creative. We loved his content in our campaign.",
+  "Atencioso, ágil e entrega muito boa!": "Attentive, quick and a great delivery!",
+  "Amamos o conteúdo entregue pelo Ryan!!!": "We loved the content Ryan delivered!!!",
+  "Adoramos o formato, parabéns!": "We loved the format, congrats!",
+  "Conteúdo excelente.": "Excellent content.",
+  "Bom trabalho!": "Great work!",
+  "Vamos criar o seu": "Let's create your",
+  "próximo case?": "next case?",
+  "Me conta um pouco sobre a sua marca e o que você quer alcançar. Eu respondo rapidinho.": "Tell me a bit about your brand and what you want to achieve. I'll get back to you quickly.",
+  "Vila Velha, ES · atendo marcas de todo o Brasil": "Vila Velha, Brazil · working with brands worldwide",
+  "Nome": "Name", "Marca / empresa": "Brand / company", "Orçamento estimado": "Estimated budget", "Conta sobre o projeto": "Tell me about the project",
+  "Enviar mensagem": "Send message", "Enviando...": "Sending...",
+  "Digite um e-mail válido.": "Please enter a valid email.",
+  "Preencha nome, e-mail e mensagem.": "Please fill in name, email and message.",
+  "Mensagem enviada!": "Message sent!", "Prontinho!": "All set!",
+  "Ryan Alves · UGC Creator · Vila Velha, ES": "Ryan Alves · UGC Creator · Vila Velha, Brazil",
+  "Mídia kit": "Media kit",
+  "Quer meu mídia kit completo?": "Want my full media kit?",
+  "Preços, formatos, prazos e cases. Deixa seu contato que eu te mando.": "Rates, formats, timelines and cases. Leave your contact and I'll send it over.",
+  "Quero receber": "Send it to me",
+  // atributos (placeholder, aria-label, alt)
+  "Abrir menu": "Open menu", "Menu principal": "Main menu", "Seu nome": "Your name", "voce@marca.com": "you@brand.com", "Nome da marca": "Brand name",
+  "Ex: R$ 1.000 a R$ 3.000": "E.g. US$ 500 to US$ 1,500", "Produto, formato, prazo, objetivo da campanha...": "Product, format, deadline, campaign goal...",
+  "Resultado anterior": "Previous result", "Próximo resultado": "Next result", "Filtrar trabalhos por nicho": "Filter work by niche",
+  "Feedbacks anteriores": "Previous reviews", "Próximos feedbacks": "Next reviews", "Feedbacks das marcas": "Brand reviews", "Nota 5 de 5": "Rated 5 out of 5",
+  "Fechar vídeo": "Close video", "Fechar": "Close", "Marcas com quem já trabalhei": "Brands I've worked with",
+  "Ryan Alves de blusa preta de gola alta, sentado, com a mão no queixo": "Ryan Alves in a black turtleneck, seated, hand on chin",
+  "Ryan Alves sorrindo numa loja da Torra, com a bolsa laranja da marca no ombro": "Ryan Alves smiling in a Torra store with the brand's orange bag on his shoulder",
+  "Print do Instagram: 2M de views no vídeo da Di Santinni": "Instagram screenshot: 2M views on the Di Santinni video",
+  // títulos dos vídeos
+  "Dia dos Namorados": "Valentine's Day", "Loja física vs grupo de promoções": "Physical store vs deals group", "Compra antes de ver as promoções": "Buying before checking the deals",
+  "Conta global com spread zero": "Global account with zero spread", "A importância do inglês para profissionais": "Why English matters for professionals",
+  "Descontaço Mercado Livre": "Mercado Livre mega sale", "IA do Canva": "Canva AI", "Licenciamento do Carro": "Car licensing",
+  "Companheira emocional com IA": "AI emotional companion", "Templates Canva": "Canva templates", "App para IPVA e multas": "Car tax and fines app",
+  "Kit para cabelos cacheados": "Curly hair kit", "Shampoo para combater a queda capilar": "Anti hair loss shampoo", "Sabonete natural para homens": "Natural soap for men",
+  "Lançamento de shampoo antiqueda": "Anti hair loss shampoo launch", "Linha de barbear": "Shaving line", "Barbeador BIC Flex 3": "BIC Flex 3 razor",
+  "Carta aberta para quem não usa protetor solar": "Open letter to people who skip sunscreen", "Lançamento de protetor facial": "Facial sunscreen launch",
+  "NBA com Hellmann's": "NBA with Hellmann's", "Lançamento de novos biscoitos": "New cookies launch", "Mix de castanhas": "Nut mix",
+  "Receita com o BIC EZ Reach": "Recipe with BIC EZ Reach", "Carnaval com Ateliê": "Carnival with Ateliê", "Programa embaixador": "Ambassador program",
+  "Receita com presunto": "Ham recipe", "Praticidade com os sanduíches": "Easy sandwiches", "Tecnologia que fixa o perfume": "Scent-locking technology",
+  "Perfume para casa": "Home fragrance", "Novo isqueiro BIC EZ Reach": "New BIC EZ Reach lighter", "Lançamento Omo Ciclo Rápido": "Omo Quick Cycle launch",
+  "Moda tecnológica": "Tech fashion", "GRWM para joalheria": "Jewelry GRWM", "Natal com Lojas Torra": "Christmas with Lojas Torra", "Lançamento Mezul": "Mezul launch"
+};
+const EN_REGRAS = [
+  [/^Faltam (\d+) dias pra Black Friday$/, (m) => `${m[1]} days to Black Friday`],
+  [/^(Vídeo|Assistir|Capa do vídeo):? (.+?)( · (.+))?$/, (m) => `${{ "Vídeo": "Video:", "Assistir": "Watch:", "Capa do vídeo": "Cover of" }[m[1]]} ${EN[m[2]] || m[2]}${m[3] ? " · " + m[4] : ""}`],
+  [/^(Voltar|Avançar) os vídeos de (.+)$/, (m) => `${m[1] === "Voltar" ? "Previous" : "Next"} ${EN[m[2]] || m[2]} videos`],
+  [/^Ouvir o vídeo da (.+) com som$/, (m) => `Play the ${m[1]} video with sound`],
+  [/^Valeu, (.+)! Eu respondo no seu e-mail em breve\.$/, (m) => `Thanks, ${m[1]}! I'll reply to your email soon.`],
+  [/^Valeu, (.+)! O mídia kit vai chegar no seu e-mail\.$/, (m) => `Thanks, ${m[1]}! The media kit is on its way to your email.`],
+  [/^(\d+) anos$/, (m) => `${m[1]} years`]
+];
+const traduz = (t) => {
+  const k = t.trim().replace(/\s+/g, " ");
+  if (!k) return null;
+  if (EN[k] != null) return t.replace(t.trim(), EN[k]);
+  for (const [re, fn] of EN_REGRAS) { const m = k.match(re); if (m) return t.replace(t.trim(), fn(m)); }
+  return null;
+};
+function traduzirTudo(raiz) {
+  const w = document.createTreeWalker(raiz, NodeFilter.SHOW_TEXT, { acceptNode: (n) => (n.parentElement && /SCRIPT|STYLE/.test(n.parentElement.tagName) ? 2 : 1) });
+  let n; while ((n = w.nextNode())) { const x = traduz(n.textContent); if (x != null && x !== n.textContent) n.textContent = x; }
+  (raiz.querySelectorAll ? raiz : document).querySelectorAll("[placeholder],[aria-label],[alt],[data-suffix]").forEach((e) => {
+    ["placeholder", "aria-label", "alt"].forEach((a) => { const v = e.getAttribute(a); const x = v && traduz(v); if (x != null && x !== v) e.setAttribute(a, x); });
+    if (e.dataset.suffix === " anos") e.dataset.suffix = " years";
+  });
+}
+const LANG = (() => { try { return new URLSearchParams(location.search).get("lang") || localStorage.getItem("lang") || "pt"; } catch (_) { return "pt"; } })();
+document.querySelectorAll("[data-lang]").forEach((b) => {
+  b.setAttribute("aria-pressed", b.dataset.lang === LANG);
+  b.addEventListener("click", () => { try { localStorage.setItem("lang", b.dataset.lang); } catch (_) {} const u = new URL(location.href); u.searchParams.delete("lang"); location.href = u.pathname + u.hash; });
+});
+if (LANG === "en") {
+  document.documentElement.lang = "en";
+  document.title = "Ryan Alves | UGC Creator Portfolio";
+  traduzirTudo(document.body);
+  let fila = [];
+  new MutationObserver((novas) => {
+    if (fila.length) { fila.push(...novas); return; }
+    fila.push(...novas);
+    setTimeout(() => { const ms = fila; fila = []; ms.forEach((m) => { if (m.type === "characterData") { const x = traduz(m.target.textContent); if (x != null && x !== m.target.textContent) m.target.textContent = x; } else m.addedNodes.forEach((a) => { if (a.nodeType === 1) traduzirTudo(a); else if (a.nodeType === 3) { const x = traduz(a.textContent); if (x != null && x !== a.textContent) a.textContent = x; } }); }); }, 30);
+  }).observe(document.body, { childList: true, subtree: true, characterData: true });
+}
+
 </script>
 </body>
 </html>
