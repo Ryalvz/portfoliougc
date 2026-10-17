@@ -584,13 +584,12 @@
     .filter { flex: 0 0 auto; white-space: nowrap; scroll-snap-align: start; }
   }
 
-  /* Faixa de logos: deslizando sozinha, todas no tom café */
+  /* Faixa de logos: deslizando sozinha, com as cores reais de cada marca */
   .brands-track { animation-duration: 150s; }
   .brands-track ul { padding: 26px 0; align-items: center; }
   .brands-track li { padding: 0 34px; gap: 0; }
   .brands-track li::after { display: none; }
-  .brands-track img { display: block; height: 34px; width: auto; max-width: 170px; object-fit: contain; opacity: .72; transition: opacity .2s; }
-  .brands-track img:hover { opacity: 1; }
+  .brands-track img { display: block; height: 34px; width: auto; max-width: 170px; object-fit: contain; }
   @media (max-width: 700px) { .brands-track li { padding: 0 22px; } .brands-track img { height: 26px; max-width: 130px; } }
   @media (prefers-reduced-motion: reduce) { .brands-track ul[aria-hidden] { display: none; } .brands-track ul { flex-wrap: wrap; justify-content: center; row-gap: 18px; } }
   /* Feedbacks com a logo da marca */
