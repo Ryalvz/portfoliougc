@@ -389,6 +389,8 @@ async function iniciar(sessao) {
    ============================================================= */
 const NICHOS = [["tech", "Apps & Tecnologia"], ["cuidado", "Autocuidado"], ["alimentos", "Alimentos"], ["casa", "Casa & Utilidades"], ["moda", "Moda Masculina"]];
 const nomeNicho = (n) => (NICHOS.find((x) => x[0] === n) || [n, n || "Sem nicho"])[1];
+// Filtro da lista "Meus vídeos": "" mostra todos, ou só um nicho para ordenar dentro dele
+const pf = { nicho: "" };
 
 function desenharPortfolio(el) {
   const hoje = hojeISO();
@@ -435,8 +437,12 @@ function desenharPortfolio(el) {
       <div class="cartao"><h2>Por onde chegaram</h2>${listaOrig}</div>
     </div>
     <div class="barra">
-      <h2 style="margin:0">Meus vídeos</h2><span class="sub">arraste pela alça para mudar a ordem no site</span>
+      <h2 style="margin:0">Meus vídeos</h2><span class="sub">${pf.nicho ? "arraste pela alça para mudar a ordem dentro deste nicho" : "arraste pela alça para mudar a ordem no site"}</span>
       <span class="espaco"></span>
+      <div class="chips" role="group" aria-label="Mostrar só um nicho">
+        ${[["", "Todos", S.videos.length], ...NICHOS.map(([k, n]) => [k, n, S.videos.filter((v) => v.nicho === k).length])].filter(([k, , q]) => !k || q)
+          .map(([k, n, q]) => `<button class="chip" type="button" data-pf-nicho="${k}" aria-pressed="${pf.nicho === k}">${esc(n)} <span class="sub">${q}</span></button>`).join("")}
+      </div>
       <button class="btn primario" type="button" id="add-video">${ic("mais")}Adicionar vídeo</button>
     </div>
     <div class="tabela-caixa">
@@ -444,11 +450,12 @@ function desenharPortfolio(el) {
         <thead><tr><th style="width:30px"><span class="sr-only">Ordem</span></th><th>Título</th><th>Nicho</th><th>Formato</th><th>Marca</th><th>Destaque</th><th>Link</th><th class="num">Ações</th></tr></thead>
         <tbody id="lista-videos">${S.videos.length === 0
           ? `<tr><td colspan="8"><p class="vazio">Nenhum vídeo cadastrado. Clique em Adicionar vídeo e ele aparece no seu portfólio na hora.</p></td></tr>`
-          : S.videos.map(linhaVideo).join("")}</tbody>
+          : S.videos.filter((v) => !pf.nicho || v.nicho === pf.nicho).map(linhaVideo).join("")}</tbody>
       </table>
     </div>`;
 
-  $("#add-video").addEventListener("click", () => formVideo());
+  $("#add-video").addEventListener("click", () => formVideo(null, pf.nicho));
+  $$("[data-pf-nicho]", el).forEach((b) => b.onclick = () => { pf.nicho = b.dataset.pfNicho; desenharPortfolio(el); });
   ligarContatosSite(el);
   const corpo = $("#lista-videos");
   corpo.addEventListener("click", async (e) => {
@@ -475,7 +482,7 @@ function linhaVideo(v) {
     <td>${esc(nomeNicho(v.nicho))}</td>
     <td>${esc(v.formato || "")}</td>
     <td>${esc(v.marca || "")}</td>
-    <td>${esc(v.destaque || "")}</td>
+    <td>${v.destaque === true || v.destaque === "true" ? "Sim" : v.destaque && v.destaque !== "false" ? esc(v.destaque) : ""}</td>
     <td class="corta">${v.link ? `<a href="${esc(linkAbrivel(v.link))}" target="_blank" rel="noopener">${ehDoStorage(v.link) ? "Vídeo enviado (abrir)" : esc(v.link)}</a>` : ""}</td>
     <td class="acoes">
       <button class="icone-btn" type="button" data-olho title="${escondido ? "Escondido do site. Clique para mostrar" : "Aparecendo no site. Clique para esconder"}" aria-label="${escondido ? "Mostrar no site" : "Esconder do site"}">${ic(escondido ? "olho-fechado" : "olho")}</button>
@@ -546,11 +553,11 @@ async function apagarVideo(v) {
   return ok;
 }
 
-function formVideo(v) {
+function formVideo(v, nicho) {
   abrirForm({
     titulo: v ? "Editar vídeo" : "Adicionar vídeo",
     tabela: "videos",
-    valores: v || { visivel: true, nicho: "tech" },
+    valores: v || { visivel: true, nicho: nicho || "tech" },
     campos: [
       { n: "titulo", r: "Título", req: true, inteiro: true },
       { n: "arquivo", r: v && ehDoStorage(v.link) ? "Trocar o vídeo (opcional)" : "Vídeo do seu computador ou celular", t: "file", accept: "video/mp4,video/quicktime,video/webm,.mp4,.mov,.m4v,.webm", inteiro: true,
@@ -631,7 +638,10 @@ function ligarArraste(corpo) {
     if (!linha) return;
     linha.classList.remove("arrastando");
     linha = null;
-    const ids = $$("tr[data-id]", corpo).map((tr) => tr.dataset.id);
+    // Com um nicho filtrado, os vídeos dele trocam de lugar entre si e o resto da lista fica onde está
+    const novos = $$("tr[data-id]", corpo).map((tr) => tr.dataset.id), naTela = new Set(novos);
+    let k = 0;
+    const ids = S.videos.map((v) => (naTela.has(String(v.id)) ? novos[k++] : String(v.id)));
     const mudou = ids.map((id, i) => ({ id, ordem: i + 1 })).filter(({ id, ordem }) => {
       const v = S.videos.find((x) => String(x.id) === id);
       return v && Number(v.ordem) !== ordem;
