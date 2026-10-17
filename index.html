@@ -583,6 +583,19 @@
     .filters::-webkit-scrollbar { display: none; }
     .filter { flex: 0 0 auto; white-space: nowrap; scroll-snap-align: start; }
   }
+
+  /* Faixa de logos: deslizando sozinha, todas no tom café */
+  .brands-track { animation-duration: 150s; }
+  .brands-track ul { padding: 26px 0; align-items: center; }
+  .brands-track li { padding: 0 34px; gap: 0; }
+  .brands-track li::after { display: none; }
+  .brands-track img { display: block; height: 34px; width: auto; max-width: 170px; object-fit: contain; opacity: .72; transition: opacity .2s; }
+  .brands-track img:hover { opacity: 1; }
+  @media (max-width: 700px) { .brands-track li { padding: 0 22px; } .brands-track img { height: 26px; max-width: 130px; } }
+  @media (prefers-reduced-motion: reduce) { .brands-track ul[aria-hidden] { display: none; } .brands-track ul { flex-wrap: wrap; justify-content: center; row-gap: 18px; } }
+  /* Feedbacks com a logo da marca */
+  .t-topo .avatar.com-logo { background: #fff; border: 1px solid var(--line); overflow: hidden; }
+  .t-topo .avatar.com-logo img { width: 100%; height: 100%; object-fit: contain; }
 </style>
 
 </head>
@@ -864,7 +877,59 @@ const HERO_STATS = [
 ];
 
 // Marcas da faixa da capa
-const BRANDS = ["Zapay", "Canva", "Mercado Livre", "BIC", "Hellmann's", "Omo", "Veja", "Skala", "Picnic", "Haag", "Lojas Torra", "Mezul", "Frooty", "Ateliê", "Iracema", "Di Santinni", "Jean Paul Gaultier"];
+// Faixa de logos: das marcas mais conhecidas para as menos. [nome, arquivo em logos/]
+const BRANDS = [
+  ["Mercado Livre", "mercado-livre"],
+  ["L'Oréal Paris", "loreal"],
+  ["Canva", "canva"],
+  ["OLX", "olx"],
+  ["Pantene", "pantene"],
+  ["Oral-B", "oral-b"],
+  ["Rexona", "rexona"],
+  ["Hellmann's", "hellmanns"],
+  ["Sadia", "sadia"],
+  ["Mentos", "mentos"],
+  ["BIC", "bic"],
+  ["Omo", "omo"],
+  ["Downy", "downy"],
+  ["Tupperware", "tupperware"],
+  ["Jean Paul Gaultier", "jean-paul-gaultier"],
+  ["Veja", "veja"],
+  ["Piraquê", "piraque"],
+  ["Lojas Torra", "torra"],
+  ["Unopar", "unopar"],
+  ["Open English", "open-english"],
+  ["Lalamove", "lalamove"],
+  ["Panini", "panini"],
+  ["Alpecin", "alpecin"],
+  ["Neoenergia", "neoenergia"],
+  ["Iracema", "iracema"],
+  ["Coala", "coala"],
+  ["Di Santinni", "di-santinni"],
+  ["Matrix", "matrix"],
+  ["Beautyfair", "beautyfair"],
+  ["Zapay", "zapay"],
+  ["Zap", "zap"],
+  ["Brilhante", "brilhante"],
+  ["Emma", "emma"],
+  ["Skala", "skala"],
+  ["Frooty", "frooty"],
+  ["Ateliê", "atelie"],
+  ["Picnic", "picnic"],
+  ["Bagaggio", "bagaggio"],
+  ["Mezul", "mezul"],
+  ["Haag", "haag"],
+  ["Zorba", "zorba"],
+  ["Quadrix", "quadrix"],
+  ["Share Living", "share-living"],
+  ["Smart Gr", "smart-gr"],
+  ["Seu Influencer", "seu-influencer"],
+  ["Meu Anel Joias", "meu-anel"],
+  ["Método Polvo", "metodo-polvo"],
+  ["Passageiro de Primeira", "passageiro-de-primeira"],
+  ["Mentora Virtual", "mentora-virtual"],
+  ["Shopping Light", "shopping-light"]
+];
 
 // Três vídeos de destaque.
 // link: cole aqui o link do vídeo (Reels, TikTok, YouTube, Drive...)
@@ -918,12 +983,12 @@ const RESULTS = [
 // Avaliações reais das marcas na plataforma SeuInfluencer (todas 5 estrelas)
 const TESTIMONIALS = [
   { texto: "Passando só para elogiar o seu vídeo. Ficou extremamente natural, cativante e com uma qualidade técnica excelente. Você conseguiu transmitir exatamente o tom leve e acolhedor que a gente buscava. Parabéns pelo profissionalismo e pelo talento! O material ficou impecável!", nome: "Zavi Agência", empresa: "Agência" },
-  { texto: "Excelente profissional, muito empenhado e comprometido com o trabalho. Realizou todas as entregas dentro do prazo e com muita qualidade. Foi uma experiência sensacional e, com certeza, faremos novos trabalhos juntos!", nome: "Haag", empresa: "Moda" },
-  { texto: "O Ryan é rápido, inteligente e muito criativo. Adoramos o seu conteúdo em nossa campanha.", nome: "Picnic", empresa: "Marca parceira" },
-  { texto: "Atencioso, ágil e entrega muito boa!", nome: "Share Living", empresa: "Coliving" },
-  { texto: "Amamos o conteúdo entregue pelo Ryan!!!", nome: "Di Santinni", empresa: "Calçados" },
+  { texto: "Excelente profissional, muito empenhado e comprometido com o trabalho. Realizou todas as entregas dentro do prazo e com muita qualidade. Foi uma experiência sensacional e, com certeza, faremos novos trabalhos juntos!", logo: "fb-haag", nome: "Haag", empresa: "Moda" },
+  { texto: "O Ryan é rápido, inteligente e muito criativo. Adoramos o seu conteúdo em nossa campanha.", logo: "fb-picnic", nome: "Picnic", empresa: "Marca parceira" },
+  { texto: "Atencioso, ágil e entrega muito boa!", logo: "fb-share-living", nome: "Share Living", empresa: "Coliving" },
+  { texto: "Amamos o conteúdo entregue pelo Ryan!!!", logo: "fb-di-santinni", nome: "Di Santinni", empresa: "Calçados" },
   { texto: "Adoramos o formato, parabéns!", nome: "Sincrofit Tecnologia", empresa: "Tecnologia" },
-  { texto: "Conteúdo excelente.", nome: "Smart Gr", empresa: "Marca parceira" },
+  { texto: "Conteúdo excelente.", logo: "fb-smart-gr", nome: "Smart Gr", empresa: "Marca parceira" },
   { texto: "Bom trabalho!", nome: "Hg Empreendimentos", empresa: "Marca parceira" }
 ];
 
@@ -947,7 +1012,7 @@ $("#hero-stats").innerHTML = HERO_STATS.map((s) =>
 ).join("");
 
 // Faixa de marcas (duplicada para o movimento contínuo)
-const brandList = (hidden) => `<ul${hidden ? ' aria-hidden="true"' : ""}>${[...BRANDS, ...BRANDS].map((b) => `<li>${esc(b)}</li>`).join("")}</ul>`;
+const brandList = (hidden) => `<ul${hidden ? ' aria-hidden="true"' : ""}>${BRANDS.map(([nome, arq]) => `<li><img src="logos/${arq}.png" alt="${hidden ? "" : esc(nome)}" loading="lazy" decoding="async"></li>`).join("")}</ul>`;
 $("#brands-track").innerHTML = brandList(false) + brandList(true);
 
 // Seções sem dados reais ficam escondidas (nada de "Marca 01" no ar)
@@ -1139,7 +1204,7 @@ $("#results").innerHTML = RESULTS.map((r) => `
 $("#testimonials").innerHTML = TESTIMONIALS.map((t) => `
   <figure class="testimonial">
     <figcaption class="t-topo">
-      <span class="avatar" aria-hidden="true">${esc(t.nome.charAt(0))}</span>
+      ${t.logo ? `<span class="avatar com-logo" aria-hidden="true"><img src="logos/${t.logo}.png" alt="" loading="lazy"></span>` : `<span class="avatar" aria-hidden="true">${esc(t.nome.charAt(0))}</span>`}
       <span><b>${esc(t.nome)}</b><span>${esc(t.empresa)}</span></span>
     </figcaption>
     <div class="estrelas" role="img" aria-label="Nota 5 de 5">★★★★★</div>
