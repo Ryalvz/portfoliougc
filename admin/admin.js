@@ -3362,7 +3362,9 @@ function calcularLembretes() {
       const oque = `<b>${a.hora ? horaCurta(a.hora) + " · " : ""}${esc((TIPOS_CAL.find((t) => t[0] === a.tipo) || [0, a.tipo])[1])}: ${esc(a.titulo)}</b>${a.marca ? ` (${esc(a.marca)})` : ""}`;
       L.push({ aba: "calendario", ic: "calendario", nivel: data < hoje ? "alerta" : "",
         texto: data === hoje ? `Na sua agenda de hoje: ${oque}.` : `Ficou pra trás no dia ${dataBR(data).slice(0, 5)}: ${oque}.`,
-        acoes: [["Já fiz", true, async () => { if (await gravar("calendario", { status: "feito" }, a.id)) { avisar("Marcado como feito."); recarregar("calendario"); } }],
+        acoes: [["Já fiz", true, async () => { if (await gravar("calendario", { status: "feito" }, a.id)) { avisar("Marcado como feito."); recarregar("calendario"); sincronizarAgendaGoogle(); } }],
+          ["Remarcar", false, () => remarcarCal(a)],
+          ["Não vou fazer", false, () => desistirCal(a)],
           ["Lembrar amanhã", false, () => adiarLembrete(k, hoje)]] });
     });
   // Meta do mês: a partir do dia 20, se ainda não bateu
@@ -3382,6 +3384,30 @@ function calcularLembretes() {
       acoes: [["Ver o que funciona", true, () => irPara("instagram")], ["Lembrar em 3 dias", false, () => adiarLembrete(`postar-${ultimoPost}`, somaDiasISO(2))]] });
   }
   return L;
+}
+
+// Compromisso que ficou pra trás: muda o dia (e a hora) sem abrir a agenda
+function remarcarCal(a) {
+  abrirForm({
+    titulo: `Remarcar: ${a.titulo}`,
+    valores: { data: hojeISO() > String(a.data).slice(0, 10) ? hojeISO() : String(a.data).slice(0, 10), hora: a.hora ? String(a.hora).slice(0, 5) : "" },
+    campos: [
+      { n: "data", r: "Novo dia", t: "date" },
+      { n: "hora", r: "Hora (opcional)", t: "time" }
+    ],
+    aoSalvar: async (d) => {
+      if (!d.data) { avisar("Escolha o novo dia.", true); return false; }
+      const ok = await gravar("calendario", { data: d.data, hora: d.hora || null }, a.id);
+      if (ok) { avisar(`Remarcado para ${dataBR(d.data).slice(0, 5)}.`); recarregar("calendario"); sincronizarAgendaGoogle(); }
+      return ok;
+    }
+  });
+}
+
+// Não vai rolar: tira da agenda (e do Google) e o lembrete some
+async function desistirCal(a) {
+  if (!(await confirmar(`Tirar "${a.titulo}" da agenda? Ele some dos lembretes e do Google Agenda.`, "Sim, não vou fazer"))) return;
+  if (await apagarLinha("calendario", a.id)) { avisar("Tirado da agenda."); recarregar("calendario"); sincronizarAgendaGoogle(); }
 }
 
 // "Sim, recebi": lança o pagamento na parcela livre e marca Pago quando completa o valor
