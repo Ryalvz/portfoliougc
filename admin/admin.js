@@ -387,7 +387,7 @@ async function iniciar(sessao) {
 /* =============================================================
    ABA 1: PORTFÓLIO
    ============================================================= */
-const NICHOS = [["tech", "Apps & Tecnologia"], ["cuidado", "Autocuidado"], ["alimentos", "Alimentos"], ["casa", "Casa & Utilidades"], ["moda", "Moda Masculina"]];
+const NICHOS = [["tech", "Tech & Apps"], ["cuidado", "Beleza & Cuidados"], ["alimentos", "Gastronomia"], ["casa", "Casa"], ["moda", "Moda"]];
 const nomeNicho = (n) => (NICHOS.find((x) => x[0] === n) || [n, n || "Sem nicho"])[1];
 // Filtro da lista "Meus vídeos": "" mostra todos, ou só um nicho para ordenar dentro dele
 const pf = { nicho: "" };
