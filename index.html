@@ -785,6 +785,8 @@
   #trabalhos .wrap { max-width: 1440px; }
   /* A capa não passa de 900px de altura (no celular a "altura da tela" fica enorme) */
   .hero { min-height: min(100vh, 900px); min-height: min(100svh, 900px); }
+  /* Vídeo do carrossel ocupa o card inteiro */
+  .result-video { display: block; width: 100%; padding: 0; border: 0; background: #2B241C; cursor: pointer; font: inherit; color: inherit; }
 </style>
 
 </head>
@@ -1772,26 +1774,26 @@ const EN = {
   "Sobre": "About", "Trabalhos": "Work", "Serviços": "Services", "Cases": "Cases", "Contato": "Contact",
   "Trabalhe comigo": "Work with me",
   "Creator · Tech & Lifestyle": "Creator · Tech & Lifestyle",
-  "Vendi por 12 anos antes de gravar o primeiro vídeo. Por isso cada roteiro começa pela objeção do seu cliente, não pela câmera.": "I spent 12 years in sales before filming my first video. That's why every script starts from your customer's objection, not from the camera.",
+  "Vendi por 12 anos antes de gravar o primeiro vídeo. Por isso cada roteiro começa pela objeção do seu cliente, não pela câmera.": "I spent 12 years in sales before filming my first video. That's why every script starts with your customer's objections, not the camera.",
   "Falar no WhatsApp": "Chat on WhatsApp",
   "Ver os trabalhos": "See my work",
   "em vendas B2B": "in B2B sales",
   "de views em um vídeo · Di Santinni": "views on one video · Di Santinni",
-  "para entregar, roteiro aprovado antes": "delivery, script approved first",
+  "para entregar, roteiro aprovado antes": "turnaround, with the script approved first",
   "Em cartaz": "Now showing",
   "Quem grava": "Behind the camera",
-  "Prazer,": "Nice to meet you,",
-  "Passei 12 anos vendendo no B2B, ajudando produto a ganhar espaço na prateleira e na decisão de compra. O trabalho se destacou tanto que me levou pra São Paulo, onde morei por 3 anos. Foi ali que aprendi, na prática, o que faz alguém comprar.": "I spent 12 years in B2B sales, helping products win shelf space and the buying decision. My work stood out so much that it took me to São Paulo, where I lived for 3 years. That's where I learned, in practice, what makes someone buy.",
-  "No caminho fiz faculdade, pós, MBA e até tentei a fotografia. Gostava de criar imagens, mas o que me prendia mesmo era entender por que uma mensagem convence e outra passa batido. Quando conheci o UGC, tudo se juntou.": "Along the way I got a degree, a postgrad, an MBA and even tried photography. I loved creating images, but what really hooked me was understanding why one message convinces and another goes unnoticed. When I found UGC, it all came together.",
-  "Quando comecei a viver do UGC, voltei pra Vila Velha, minha cidade natal. Hoje uno essa visão comercial com criatividade: roteiro que começa pela objeção do seu cliente e vídeo com cara de gente real. Já são": "Once UGC became my living, I moved back to Vila Velha, my hometown. Today I combine that sales mindset with creativity: scripts that start from your customer's objection and videos that feel like real people. That's",
+  "Prazer,": "Hi, I'm",
+  "Passei 12 anos vendendo no B2B, ajudando produto a ganhar espaço na prateleira e na decisão de compra. O trabalho se destacou tanto que me levou pra São Paulo, onde morei por 3 anos. Foi ali que aprendi, na prática, o que faz alguém comprar.": "I spent 12 years in B2B sales, helping products win shelf space and close the sale. My work stood out so much that it took me to São Paulo, where I lived for 3 years. That's where I learned firsthand what makes people buy.",
+  "No caminho fiz faculdade, pós, MBA e até tentei a fotografia. Gostava de criar imagens, mas o que me prendia mesmo era entender por que uma mensagem convence e outra passa batido. Quando conheci o UGC, tudo se juntou.": "Along the way I earned a degree, a postgraduate diploma and an MBA, and even gave photography a shot. I loved creating images, but what really hooked me was understanding why one message persuades and another goes unnoticed. When I discovered UGC, it all came together.",
+  "Quando comecei a viver do UGC, voltei pra Vila Velha, minha cidade natal. Hoje uno essa visão comercial com criatividade: roteiro que começa pela objeção do seu cliente e vídeo com cara de gente real. Já são": "Once UGC became my full-time work, I moved back to my hometown, Vila Velha. Today I combine that sales mindset with creativity: scripts that start with your customer's objections and videos that feel like real people. So far, that's",
   "mais de 50 marcas": "50+ brands",
-  "atendidas e um vídeo com": "served and one video with",
+  "atendidas e um vídeo com": "and one video with",
   "mais de 2M de views": "over 2M views",
   "Conteúdos que deram resultado": "Content that delivered",
   "Os vídeos que": "The videos that",
   "mais renderam": "performed best",
   "Storytelling com verdade, quebra de padrão e roteiro que a marca aprova. Toque em um vídeo para assistir.": "Honest storytelling, pattern breaks and scripts brands approve. Tap a video to watch.",
-  "toque para ouvir": "tap to listen", "toque para pausar": "tap to pause", "toque para continuar": "tap to resume",
+  "toque para ouvir": "tap for sound", "toque para pausar": "tap to pause", "toque para continuar": "tap to resume",
   "História real": "Real story",
   "“Dá pra sentir a dedicação em cada detalhe. Ficou exatamente como a gente precisava.”": "“You can feel the dedication in every detail. It turned out exactly as we needed.”",
   "Visualizações": "Views",
@@ -1802,7 +1804,7 @@ const EN = {
   "Portfólio": "Portfolio",
   "Escolha o nicho e": "Pick a niche and",
   "dá o play.": "hit play.",
-  "Vídeos reais, feitos para marcas reais. Toque em qualquer um para assistir com som.": "Real videos made for real brands. Tap any of them to watch with sound.",
+  "Vídeos reais, feitos para marcas reais. Toque em qualquer um para assistir com som.": "Real videos made for real brands. Tap any video to watch it with sound.",
   "Todos": "All", "Beleza & Cuidados": "Beauty & Care", "Beleza": "Beauty", "Cuidados": "Care", "Gastronomia": "Food", "Casa": "Home", "Moda": "Fashion",
   "Apps, serviços e gadgets usados no dia a dia": "Apps, services and gadgets for everyday life",
   "Cabelo, pele e barba sem complicação": "Hair, skin and beard made simple",
@@ -1811,30 +1813,30 @@ const EN = {
   "Looks e acessórios do dia a dia": "Everyday looks and accessories",
   "Vídeo UGC": "UGC video",
   "O que eu": "What I", "entrego": "deliver", "pra sua marca": "for your brand",
-  "Cada formato tem um objetivo: anunciar, vender na loja ou construir marca. Me conta o seu que eu monto o combo certo pra você.": "Every format has a goal: ads, store sales or brand building. Tell me yours and I'll put together the right mix.",
+  "Cada formato tem um objetivo: anunciar, vender na loja ou construir marca. Me conta o seu que eu monto o combo certo pra você.": "Every format has a goal: ads, store sales or brand building. Tell me yours and I'll put together the right mix for you.",
   "Bora criar juntos →": "Let's create together →",
   "Anúncios": "Ads",
-  "Vídeo UGC roteirizado e cortes com ganchos diferentes, prontos pra testar no Meta e no TikTok Ads.": "Scripted UGC videos and cuts with different hooks, ready to test on Meta and TikTok Ads.",
+  "Vídeo UGC roteirizado e cortes com ganchos diferentes, prontos pra testar no Meta e no TikTok Ads.": "Scripted UGC videos plus edits with different hooks, ready to test on Meta and TikTok Ads.",
   "E-commerce": "E-commerce",
-  "Fotos do produto em uso, unboxing e roteiro e vídeo para TikTok Shop, pra sua loja vender todo dia.": "Product-in-use photos, unboxing, and scripts and videos for TikTok Shop, so your store sells every day.",
+  "Fotos do produto em uso, unboxing e roteiro e vídeo para TikTok Shop, pra sua loja vender todo dia.": "Lifestyle product photos, unboxing videos, and TikTok Shop scripts and videos, so your store sells every day.",
   "No meu perfil": "On my profile",
   "Publicação no meu Instagram, falando com quem já confia nas minhas indicações.": "Posts on my Instagram, reaching people who already trust my recommendations.",
   "Recorrência": "Retainer",
-  "Pacote mensal com calendário combinado, conteúdo toda semana e preço especial.": "Monthly package with an agreed calendar, content every week and a special rate.",
+  "Pacote mensal com calendário combinado, conteúdo toda semana e preço especial.": "A monthly package with a set content calendar, new content every week and a special rate.",
   "Prova social": "Social proof",
   "Resultados que": "Results that",
-  "falam por mim": "speak for me",
-  "Case Di Santinni": "Di Santinni case",
+  "falam por mim": "speak for themselves",
+  "Case Di Santinni": "Case study · Di Santinni",
   "de views no Instagram": "views on Instagram",
   "O desafio": "The challenge",
-  "Para o Dia dos Namorados, a marca imaginava o casal tradicional que aparece em toda propaganda da data.": "For Valentine's Day, the brand had in mind the traditional couple that shows up in every ad for the date.",
+  "Para o Dia dos Namorados, a marca imaginava o casal tradicional que aparece em toda propaganda da data.": "For Valentine's Day, the brand was picturing the traditional couple you see in every holiday ad.",
   "A ideia": "The idea",
-  "Propus mostrar a gente como somos: um casal gay. Logo no primeiro segundo isso quebra o padrão que todo mundo está acostumado a ver nesse tipo de anúncio, e a marca topou na hora.": "I suggested showing us as we are: a gay couple. In the very first second it breaks the pattern everyone is used to seeing in this kind of ad, and the brand said yes right away.",
+  "Propus mostrar a gente como somos: um casal gay. Logo no primeiro segundo isso quebra o padrão que todo mundo está acostumado a ver nesse tipo de anúncio, e a marca topou na hora.": "I suggested showing us as we really are: a gay couple. From the very first second, it breaks the pattern people are used to seeing in this kind of ad, and the brand said yes on the spot.",
   "O resultado": "The result",
   "Roteiro aprovado de primeira, entrega aprovada de primeira e a campanha foi pro ar. Em 2 dias o vídeo bateu 1,5M de views e hoje passa de 2M.": "Script approved on the first try, delivery approved on the first try, and the campaign went live. In 2 days the video hit 1.5M views and today it's past 2M.",
   "1,5M em 2 dias": "1.5M in 2 days",
-  "Roteiro aprovado de primeira": "Script approved first try",
-  "Entrega aprovada de primeira": "Delivery approved first try",
+  "Roteiro aprovado de primeira": "Script approved on the first try",
+  "Entrega aprovada de primeira": "Delivery approved on the first try",
   "O que as marcas dizem": "What brands say",
   "Equipe de marketing": "Marketing team", "Tecnologia": "Technology", "Agência": "Agency", "Moda ": "Fashion", "Marca parceira": "Partner brand", "Calçados": "Footwear",
   "Adoramos os dois roteiros: a escrita está excelente, a direção de cena é muito bem pensada e a linha \"isso não é mágica. É Canva.\" é uma das melhores que recebemos até agora. Os vídeos ficaram ótimos e adoramos trabalhar com você.": "We loved both scripts: the writing is excellent, the scene direction is very well thought out, and the line \"this isn't magic. It's Canva.\" is one of the best we've received so far. The videos turned out great and we loved working with you.",
@@ -1848,11 +1850,11 @@ const EN = {
   "Adoramos o formato, parabéns!": "We loved the format, congrats!",
   "Conteúdo excelente.": "Excellent content.",
   "Bom trabalho!": "Great work!",
-  "Vamos criar o seu": "Let's create your",
-  "próximo case?": "next case?",
-  "Me conta um pouco sobre a sua marca e o que você quer alcançar. Eu respondo rapidinho.": "Tell me a bit about your brand and what you want to achieve. I'll get back to you quickly.",
+  "Vamos criar o seu": "Ready to create your",
+  "próximo case?": "next success story?",
+  "Me conta um pouco sobre a sua marca e o que você quer alcançar. Eu respondo rapidinho.": "Tell me a bit about your brand and what you want to achieve. I'll get back to you fast.",
   "Vila Velha, ES · atendo marcas de todo o Brasil": "Vila Velha, Brazil · working with brands worldwide",
-  "Nome": "Name", "Marca / empresa": "Brand / company", "Orçamento estimado": "Estimated budget", "Conta sobre o projeto": "Tell me about the project",
+  "Nome": "Name", "E-mail": "Email", "Marca / empresa": "Brand / company", "Orçamento estimado": "Estimated budget", "Conta sobre o projeto": "Tell me about the project",
   "Enviar mensagem": "Send message", "Enviando...": "Sending...",
   "Digite um e-mail válido.": "Please enter a valid email.",
   "Preencha nome, e-mail e mensagem.": "Please fill in name, email and message.",
@@ -1872,7 +1874,7 @@ const EN = {
   "Ryan Alves sorrindo numa loja da Torra, com a bolsa laranja da marca no ombro": "Ryan Alves smiling in a Torra store with the brand's orange bag on his shoulder",
   "Print do Instagram: 2M de views no vídeo da Di Santinni": "Instagram screenshot: 2M views on the Di Santinni video",
   // títulos dos vídeos
-  "Dia dos Namorados": "Valentine's Day", "Loja física vs grupo de promoções": "Physical store vs deals group", "Compra antes de ver as promoções": "Buying before checking the deals",
+  "Dia dos Namorados": "Valentine's Day", "Loja física vs grupo de promoções": "Physical store vs deals group", "Compra antes de ver as promoções": "Buying without checking the deals first",
   "Conta global com spread zero": "Global account with zero spread", "A importância do inglês para profissionais": "Why English matters for professionals",
   "Descontaço Mercado Livre": "Mercado Livre mega sale", "IA do Canva": "Canva AI", "Licenciamento do Carro": "Car licensing",
   "Companheira emocional com IA": "AI emotional companion", "Templates Canva": "Canva templates", "App para IPVA e multas": "Car tax and fines app",
@@ -1926,11 +1928,10 @@ function ativarIngles() {
   document.documentElement.lang = "en";
   document.title = "Ryan Alves | UGC Creator Portfolio";
   semPular(() => traduzirTudo(document.body));
-  let fila = [];
-  observador = new MutationObserver((novas) => {
-    if (fila.length) { fila.push(...novas); return; }
-    fila.push(...novas);
-    setTimeout(() => { const ms = fila; fila = []; if (!emIngles) return; ms.forEach((m) => { if (m.type === "characterData") trocaTexto(m.target); else m.addedNodes.forEach((a) => { if (a.nodeType === 1) traduzirTudo(a); else if (a.nodeType === 3) trocaTexto(a); }); }); }, 30);
+  // Traduz na hora tudo que aparecer ou mudar depois (vídeos do banco, etiquetas, faixa da Black Friday)
+  observador = new MutationObserver((ms) => {
+    if (!emIngles) return;
+    ms.forEach((m) => { if (m.type === "characterData") trocaTexto(m.target); else m.addedNodes.forEach((a) => { if (a.nodeType === 1) traduzirTudo(a); else if (a.nodeType === 3) trocaTexto(a); }); });
   });
   observador.observe(document.body, { childList: true, subtree: true, characterData: true });
 }
