@@ -803,9 +803,10 @@
   .contato-novo { padding: 64px 0; }
   .serv-grid { gap: 48px; }
   /* Menu: nome à esquerda, links no centro, idioma e botão à direita */
-  .nav nav { flex: 1; display: flex; justify-content: center; }
+  .nav .wrap { position: relative; }
+  .nav nav { position: absolute; left: 50%; transform: translateX(-50%); }
   .nav-links { justify-content: center; }
-  .lang { margin-left: 0; }
+  .lang { margin-left: auto; }
 </style>
 
 </head>
