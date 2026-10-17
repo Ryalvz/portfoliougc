@@ -808,6 +808,17 @@
   .nav-links { justify-content: center; }
   .lang { margin-left: auto; }
   .sub-title em { font-style: italic; color: var(--olive); font-weight: 400; }
+  /* Capa mais compacta (estilo Lara): título menor, foto menor, tudo num bloco central */
+  .hero .hero-grid { max-width: 1080px; margin: 0 auto; grid-template-columns: 1.15fr .85fr; gap: 56px; }
+  .hero h1 { font-size: 96px; line-height: .95; margin-bottom: 18px; }
+  .hero-tag { margin-bottom: 14px; }
+  .hero-sub { font-size: 17.5px; max-width: 480px; margin-bottom: 24px; }
+  .hero-btns .btn { padding: 12px 22px; font-size: 14.5px; }
+  .hero-stats { margin-top: 26px; gap: 12px 28px; }
+  .hero-stats strong { font-size: 30px; }
+  .hero-stats span { font-size: 13px; }
+  .hero-photo { max-width: 380px; justify-self: end; width: 100%; }
+  .hero-photo .media { max-height: none; }
 </style>
 
 </head>
@@ -1191,7 +1202,7 @@ const METRICS = [
 // resultados REAIS (ex.: { numero: "+35%", titulo: "Mais vendas", texto: "Marca · o que aconteceu" }).
 const ST = "https://jlehawiwklvyvrzbfuiu.supabase.co/storage/v1/object/public/portfolio/";
 // Resultados: só o que é real (número da marca, aprovação ou elogio). video/capa: arquivos do Storage
-const RESULTS = [
+let RESULTS = [
   { marca: "EITA Mentora Virtual", rotulo: "Storytelling", valor: "História real", texto: "\u201cDá pra sentir a dedicação em cada detalhe. Ficou exatamente como a gente precisava.\u201d", video: ST + "videos/canva-c911bd2eb816417aca1eeec774f1d39c.mp4", capa: ST + "capas/canva-c911bd2eb816417aca1eeec774f1d39c.jpg" },
   { marca: "Di Santinni", rotulo: "Visualizações", valor: "2M", texto: "Quebra de padrão no Dia dos Namorados", video: ST + "videos/disantinni-namorados.mp4", capa: ST + "capas/disantinni-namorados.jpg" },
   { marca: "Canva", rotulo: "Roteiro", valor: "Elogiado", texto: "\u201cUma das melhores linhas que recebemos até agora\u201d", video: ST + "videos/1791826892574-canva-ia.mp4", capa: ST + "capas/1791827002580-capa-canva.jpg" }
@@ -1199,7 +1210,7 @@ const RESULTS = [
 
 // Case em destaque. PREENCHA os campos vazios ("") com o texto real:
 // enquanto um campo estiver vazio, a parte dele simplesmente não aparece no site.
-const CASE = {
+let CASE = {
   marca: "Di Santinni",
   titulo: "Quebra de padrão no Dia dos Namorados",
   numero: "2M",
@@ -1214,7 +1225,7 @@ const CASE = {
 
 // Quatro depoimentos (placeholders: troque pelo texto real de cada cliente)
 // Avaliações reais das marcas na plataforma SeuInfluencer (todas 5 estrelas)
-const TESTIMONIALS = [
+let TESTIMONIALS = [
   // selo: aparece no lugar das estrelas. semNota: true esconde as estrelas (feedback que veio sem nota, fora da SeuInfluencer)
   { texto: "Adoramos os dois roteiros: a escrita está excelente, a direção de cena é muito bem pensada e a linha \"isso não é mágica. É Canva.\" é uma das melhores que recebemos até agora. Os vídeos ficaram ótimos e adoramos trabalhar com você.", nome: "Canva", empresa: "Equipe de marketing", logo: "fb-canva" },
   { texto: "Só passando pra agradecer demais pelo trabalho. Dá pra sentir a dedicação em cada detalhe, e a atenção e o carinho que você teve nos ajustes fez toda a diferença. Ficou exatamente como a gente precisava.", nome: "EITA Mentora Virtual", empresa: "Tecnologia", logo: "fb-mentora-virtual" },
@@ -1424,6 +1435,7 @@ $("#services").innerHTML = SERVICES.map((s) => `
 // Métricas, resultados e depoimentos
 
 
+function montarResultados() {
 $("#results").innerHTML = RESULTS.map((r) => `
   <article class="result-v">
     <h4>${esc(r.marca)}</h4>
@@ -1436,7 +1448,7 @@ $("#results").innerHTML = RESULTS.map((r) => `
     <p>${esc(r.texto)}</p>
   </article>`).join("");
 // Carrossel dos resultados: um no centro, os vizinhos menores atrás. Clicar num de trás traz ele pro centro
-(() => {
+{
   const caixa = $("#results"), cards = [...caixa.children], n = cards.length;
   let atual = 0;
   const pos = () => cards.forEach((c, k) => {
@@ -1474,10 +1486,11 @@ $("#results").innerHTML = RESULTS.map((r) => `
   caixa.addEventListener("touchend", (e) => { if (x0 == null) return; const dx = e.changedTouches[0].clientX - x0; if (Math.abs(dx) > 40) ir(dx < 0 ? 1 : -1); x0 = null; });
   if (n < 2) document.querySelectorAll("[data-res]").forEach((b) => (b.hidden = true));
   pos();
-})();
+}
+}
 
-(() => {
-  const c = CASE, partes = [["Gancho", c.roteiro.gancho], ["Desenvolvimento", c.roteiro.desenvolvimento], ["CTA", c.roteiro.cta]].filter(([, t]) => t);
+function montarCase() {
+  const c = CASE, r = c.roteiro || {}, partes = [["Gancho", r.gancho], ["Desenvolvimento", r.desenvolvimento], ["CTA", r.cta]].filter(([, t]) => t);
   $("#case").innerHTML = `
     <figure class="case-print"><img src="${esc(c.print)}" alt="Print do Instagram: ${esc(c.numero)} de views no vídeo da ${esc(c.marca)}" loading="lazy"></figure>
     <div class="case-txt">
@@ -1490,17 +1503,20 @@ $("#results").innerHTML = RESULTS.map((r) => `
       ${c.selos && c.selos.length ? `<ul class="case-selos">${c.selos.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
       ${partes.length ? `<h4>O roteiro</h4><ol class="case-roteiro">${partes.map(([n, t]) => `<li><b>${n}</b><span>${esc(t)}</span></li>`).join("")}</ol>` : ""}
     </div>`;
-})();
+}
 
+function montarFeedbacks() {
 $("#testimonials").innerHTML = TESTIMONIALS.map((t) => `
   <figure class="testimonial">
     <figcaption class="t-topo">
-      ${t.logo ? `<span class="avatar com-logo" aria-hidden="true"><img src="logos/${t.logo}.png" alt="" loading="lazy"></span>` : `<span class="avatar" aria-hidden="true">${esc(t.nome.charAt(0))}</span>`}
+      ${t.logo ? `<span class="avatar com-logo" aria-hidden="true"><img src="${esc(/[/.]/.test(t.logo) ? t.logo : "logos/" + t.logo + ".png")}" alt="" loading="lazy"></span>` : `<span class="avatar" aria-hidden="true">${esc(t.nome.charAt(0))}</span>`}
       <span><b>${esc(t.nome)}</b><span>${esc(t.empresa)}</span></span>
     </figcaption>
-    ${t.selo ? `<div class="t-selo">${esc(t.selo)}</div>` : t.semNota ? `<div class="t-espaco"></div>` : `<div class="estrelas" role="img" aria-label="Nota 5 de 5">★★★★★</div>`}
+    ${t.selo ? `<div class="t-selo">${esc(t.selo)}</div>` : (t.semNota || t.estrelas === false) ? `<div class="t-espaco"></div>` : `<div class="estrelas" role="img" aria-label="Nota 5 de 5">★★★★★</div>`}
     <blockquote><p style="margin:0">${esc(t.texto)}</p></blockquote>
   </figure>`).join("");
+  $("#testimonials").dispatchEvent(new Event("scroll"));
+}
 // Setas do carrossel de feedbacks
 (() => {
   const trilho = $("#testimonials"), setas = document.querySelectorAll(".testi-seta");
@@ -1636,21 +1652,28 @@ document.getElementById("bf-reservar").addEventListener("click", () => {
   if (msg && !msg.value.trim()) msg.value = document.documentElement.lang === "en" ? "Hi Ryan! I'd like to book a slot for Black Friday. " : "Oi Ryan! Quero reservar agenda pra Black Friday. ";
   setTimeout(() => { const n = document.getElementById("c-nome"); if (n) n.focus({ preventScroll: true }); }, 700);
 });
-(() => {
-  const BF = new Date(2026, 10, 27); // 27 de novembro de 2026
+let BLACK_FRIDAY = { ativo: true, data: "2026-11-27", frases: ["poucas vagas pra gravar em novembro", "vídeo de e-commerce que vende no dia", "roteiro pronto antes do pico"] };
+function montarBF() {
+  const cfg = BLACK_FRIDAY;
+  if (!cfg || cfg.ativo === false || !cfg.data) return;
+  const [ano, mes, dia] = String(cfg.data).split("-").map(Number);
+  const BF = new Date(ano, mes - 1, dia);
   const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
   const dias = Math.round((BF - hoje) / 864e5);
   if (dias < 0) return; // passou: a faixa não aparece
   $("#bf-conta").textContent = dias === 0 ? "Hoje é Black Friday" : dias === 1 ? "Falta 1 dia pra Black Friday" : `Faltam ${dias} dias pra Black Friday`;
   $("#bf").hidden = false;
   document.documentElement.classList.add("com-bf");
-  const msgs = ["poucas vagas pra gravar em novembro", "vídeo de e-commerce que vende no dia", "roteiro pronto antes do pico"];
+  const msgs = (cfg.frases || []).filter(Boolean);
+  const m = $("#bf-msg");
+  if (!msgs.length) { m.hidden = true; return; }
+  m.textContent = msgs[0];
   let i = 0;
-  if (!reduceMotion) setInterval(() => {
-    const m = $("#bf-msg"); m.style.opacity = 0;
+  if (!reduceMotion && msgs.length > 1) setInterval(() => {
+    m.style.opacity = 0;
     setTimeout(() => { i = (i + 1) % msgs.length; m.textContent = msgs[i]; m.style.opacity = 1; }, 300);
   }, 4000);
-})();
+}
 
 /* ---------- Cards com vídeo: prévia e player ---------- */
 const videoModal = $("#video-modal");
@@ -1985,6 +2008,28 @@ document.querySelectorAll("[data-lang]").forEach((b) => b.addEventListener("clic
 }));
 if (LANG === "en") ativarIngles();
 
+
+/* ---------- Conteúdo editado pelo painel (feedbacks, resultados, case, Black Friday) ---------- */
+// Se o banco não responder, o site usa o que está escrito acima.
+(async () => {
+  try {
+    const linhas = await Promise.race([window.bancoLer("site_conteudo", "select=chave,valor"), new Promise((_, nao) => setTimeout(() => nao(new Error("tempo")), 3000))]);
+    const v = Object.fromEntries(linhas.map((l) => [l.chave, l.valor]));
+    if (Array.isArray(v.feedbacks) && v.feedbacks.length) TESTIMONIALS = v.feedbacks;
+    if (Array.isArray(v.resultados) && v.resultados.length) RESULTS = v.resultados;
+    if (v.case && v.case.marca) CASE = v.case;
+    if (v.black_friday) BLACK_FRIDAY = v.black_friday;
+  } catch (_) {}
+  // Versão em inglês do que foi escrito no painel
+  const par = (pt, en) => { if (pt && en) EN[String(pt).trim()] = String(en).trim(); };
+  TESTIMONIALS.forEach((t) => { par(t.texto, t.texto_en); par(t.empresa, t.empresa_en); });
+  RESULTS.forEach((r) => { par(r.rotulo, r.rotulo_en); par(r.valor, r.valor_en); par(r.texto, r.texto_en); });
+  ["titulo", "rotulo", "desafio", "ideia", "resultado"].forEach((k) => par(CASE[k], CASE[k + "_en"]));
+  (CASE.selos || []).forEach((x, k) => par(x, (CASE.selos_en || [])[k]));
+  (BLACK_FRIDAY.frases || []).forEach((x, k) => par(x, (BLACK_FRIDAY.frases_en || [])[k]));
+  montarBF(); montarResultados(); montarCase(); montarFeedbacks();
+  if (emIngles) traduzirTudo(document.body);
+})();
 </script>
 </body>
 </html>

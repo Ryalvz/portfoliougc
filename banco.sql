@@ -878,3 +878,22 @@ create index if not exists calendario_serie on public.calendario (serie_id) wher
 -- -------------------------------------------------------------
 alter table public.videos drop constraint if exists videos_nicho_check;
 alter table public.videos add constraint videos_nicho_check check (nicho in ('tech', 'cuidado', 'alimentos', 'casa', 'moda', 'beleza', 'fitness'));
+
+
+-- -------------------------------------------------------------
+-- 31. CONTEÚDO DO SITE EDITÁVEL PELO PAINEL
+-- Uma linha por bloco do site: feedbacks, resultados (carrossel),
+-- case (case em destaque) e black_friday (faixa do topo).
+-- valor é um JSON. O site só LÊ; só o seu login grava.
+-- -------------------------------------------------------------
+create table if not exists public.site_conteudo (
+  chave         text primary key check (chave in ('feedbacks', 'resultados', 'case', 'black_friday')),
+  valor         jsonb not null,
+  atualizado_em timestamptz not null default now()
+);
+alter table public.site_conteudo enable row level security;
+drop policy if exists "site le" on public.site_conteudo;
+create policy "site le" on public.site_conteudo for select to anon, authenticated using (true);
+drop policy if exists "dono grava" on public.site_conteudo;
+create policy "dono grava" on public.site_conteudo
+  for all to authenticated using (public.eh_admin()) with check (public.eh_admin());
