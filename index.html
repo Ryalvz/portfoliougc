@@ -705,6 +705,8 @@
     .result-linha span { font-size: 10.5px; letter-spacing: 1.2px; }
     .res-seta { top: 230px; }
   }
+  .case-selos { list-style: none; margin: 18px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+  .case-selos li { padding: 6px 14px; border-radius: 999px; background: var(--sand); color: var(--cobalt); font-size: 13px; font-weight: 600; }
 </style>
 
 </head>
@@ -1133,8 +1135,10 @@ const CASE = {
   numero: "2M",
   rotulo: "de views no Instagram",
   print: "cases/disantinni-2mi.jpg",
-  desafio: "",          // PREENCHA: o que a marca precisava (ex: vender o chinelo no Dia dos Namorados)
-  ideia: "Fugir do óbvio que todo mundo posta no Dia dos Namorados e quebrar o padrão logo no primeiro segundo.", // CONFIRA
+  desafio: "Para o Dia dos Namorados, a marca imaginava o casal tradicional que aparece em toda propaganda da data.",
+  ideia: "Propus mostrar a gente como somos: um casal gay. Logo no primeiro segundo isso quebra o padrão que todo mundo está acostumado a ver nesse tipo de anúncio, e a marca topou na hora.",
+  resultado: "Roteiro aprovado de primeira, entrega aprovada de primeira e a campanha foi pro ar. Em 2 dias o vídeo bateu 1,5M de views e hoje passa de 2M.",
+  selos: ["1,5M em 2 dias", "Roteiro aprovado de primeira", "Entrega aprovada de primeira"],
   roteiro: { gancho: "", desenvolvimento: "", cta: "" } // PREENCHA: as falas ou a ideia de cada parte
 };
 
@@ -1402,6 +1406,8 @@ $("#results").innerHTML = RESULTS.map((r) => `
       <p class="case-num"><b>${esc(c.numero)}</b> ${esc(c.rotulo)}</p>
       ${c.desafio ? `<h4>O desafio</h4><p>${esc(c.desafio)}</p>` : ""}
       ${c.ideia ? `<h4>A ideia</h4><p>${esc(c.ideia)}</p>` : ""}
+      ${c.resultado ? `<h4>O resultado</h4><p>${esc(c.resultado)}</p>` : ""}
+      ${c.selos && c.selos.length ? `<ul class="case-selos">${c.selos.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
       ${partes.length ? `<h4>O roteiro</h4><ol class="case-roteiro">${partes.map(([n, t]) => `<li><b>${n}</b><span>${esc(t)}</span></li>`).join("")}</ol>` : ""}
     </div>`;
 })();
