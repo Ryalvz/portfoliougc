@@ -707,6 +707,31 @@
   }
   .case-selos { list-style: none; margin: 18px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
   .case-selos li { padding: 6px 14px; border-radius: 999px; background: var(--sand); color: var(--cobalt); font-size: 13px; font-weight: 600; }
+  /* Contato no formato compacto: info à esquerda, formulário escuro à direita */
+  .t-espaco { height: 14px; }
+  .contato-novo { padding: 96px 0; }
+  .contato-grid { display: grid; grid-template-columns: .9fr 1.2fr; gap: 64px; align-items: start; }
+  .contato-novo .sec-lead { color: rgba(246, 242, 235, .72); }
+  .contato-lista { list-style: none; margin: 34px 0 0; padding: 0; display: grid; gap: 14px; }
+  .contato-lista a { display: inline-flex; align-items: center; gap: 14px; color: var(--parchment); text-decoration: none; font-size: 16.5px; }
+  .contato-lista a:hover { color: var(--olive); }
+  .contato-lista .ico { width: 46px; height: 46px; border-radius: 50%; border: 1px solid rgba(246, 242, 235, .22); display: grid; place-items: center; flex: none; }
+  .contato-lista .ico svg { width: 19px; height: 19px; fill: currentColor; }
+  .contato-novo .city { color: rgba(246, 242, 235, .6); margin-top: 26px; font-size: 14.5px; }
+  .form-novo .campos-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+  .form-novo .field { margin-bottom: 18px; }
+  .form-novo .field label { display: block; font-size: 12px; font-weight: 600; letter-spacing: 1.6px; text-transform: uppercase; color: rgba(246, 242, 235, .72); margin-bottom: 8px; }
+  .form-novo .field input, .form-novo .field textarea { background: rgba(246, 242, 235, .06); border: 1px solid rgba(246, 242, 235, .14); color: var(--parchment); border-radius: 12px; padding: 14px 16px; font-size: 15.5px; }
+  .form-novo .field input::placeholder, .form-novo .field textarea::placeholder { color: rgba(246, 242, 235, .38); }
+  .form-novo .field input:focus, .form-novo .field textarea:focus { border-color: var(--olive); box-shadow: 0 0 0 3px rgba(168, 134, 74, .25); outline: none; }
+  .form-novo .field textarea { min-height: 150px; }
+  .btn-enviar { background: var(--olive); color: #fff; border: 0; border-radius: 999px; padding: 16px 30px; font-weight: 600; display: inline-flex; align-items: center; gap: 10px; cursor: pointer; }
+  .btn-enviar:hover { background: #B8954A; }
+  .btn-enviar svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; }
+  .contato-novo .success { color: var(--parchment); }
+  footer { border-top: 1px solid rgba(246, 242, 235, .1); }
+  @media (max-width: 899px) { .contato-grid { grid-template-columns: 1fr; gap: 40px; } }
+  @media (max-width: 560px) { .form-novo .campos-2 { grid-template-columns: 1fr; } .btn-enviar { width: 100%; justify-content: center; } }
 </style>
 
 </head>
@@ -889,70 +914,35 @@
   </section>
 
   <!-- ================= 7. BORA CRIAR JUNTOS ================= -->
-  <section class="contact" id="contato" aria-labelledby="contato-title">
-    <div class="wrap">
-      <div class="reveal">
+  <section class="contact dark contato-novo" id="contato" aria-labelledby="contato-title">
+    <div class="wrap contato-grid">
+      <div class="contato-info reveal">
         <span class="eyebrow">Contato</span>
         <h2 class="sec-title" id="contato-title">Vamos criar o seu <em>próximo case?</em></h2>
-        <p class="sec-lead">Me conta sobre a sua marca e o que você precisa. Eu respondo rapidinho.</p>
+        <p class="sec-lead">Me conta um pouco sobre a sua marca e o que você quer alcançar. Eu respondo rapidinho.</p>
+        <ul class="contato-lista">
+          <li><a href="mailto:heyryan.ugc@gmail.com"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm8 7.5L20 6.5V6H4v.5l8 5z"/></svg></span>heyryan.ugc@gmail.com</a></li>
+          <li><a href="https://instagram.com/ryalvz" target="_blank" rel="noopener"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7.3A4.7 4.7 0 1 0 12 16.7 4.7 4.7 0 0 0 12 7.3zm0 7.7a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm6-7.9a1.1 1.1 0 1 1-2.2 0 1.1 1.1 0 0 1 2.2 0zM21.9 8c-.1-1.6-.4-3-1.6-4.2S17.6 2.2 16 2.1C14.3 2 9.7 2 8 2.1c-1.6.1-3 .4-4.2 1.6S2.2 6.4 2.1 8C2 9.7 2 14.3 2.1 16c.1 1.6.4 3 1.6 4.2s2.6 1.5 4.2 1.6c1.7.1 6.3.1 8 0 1.6-.1 3-.4 4.2-1.6s1.5-2.6 1.6-4.2c.1-1.7.1-6.3 0-8zm-2.2 9.9a3.3 3.3 0 0 1-1.8 1.8c-1.3.5-4.3.4-5.9.4s-4.6.1-5.9-.4a3.3 3.3 0 0 1-1.8-1.8c-.5-1.3-.4-4.3-.4-5.9s-.1-4.6.4-5.9a3.3 3.3 0 0 1 1.8-1.8c1.3-.5 4.3-.4 5.9-.4s4.6-.1 5.9.4a3.3 3.3 0 0 1 1.8 1.8c.5 1.3.4 4.3.4 5.9s.1 4.6-.4 5.9z"/></svg></span>@ryalvz</a></li>
+          <li><a href="https://wa.me/5511913012249" target="_blank" rel="noopener"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2c-1.5 0-3-.4-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.4.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.4.1-.7.3-.2.3-.9.9-.9 2.2s.9 2.5 1 2.7c.1.2 1.8 2.8 4.4 3.9 1.6.7 2.3.8 3.1.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3z"/></svg></span>(11) 91301-2249</a></li>
+        </ul>
+        <p class="city"><svg width="18" height="18" viewBox="0 0 24 24" fill="#A8864A" aria-hidden="true"><path d="M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg> Vila Velha, ES · atendo marcas de todo o Brasil</p>
       </div>
-      <div class="contact-grid">
-        <!-- FORMULÁRIO: cada envio entra na sua base de marcas do admin (tabela marcas), como "Lead". -->
-        <div class="form dark reveal" id="form-box">
-          <form id="contact-form" novalidate>
-            <div class="field">
-              <label for="c-nome">Nome</label>
-              <input id="c-nome" name="nome" type="text" autocomplete="name" maxlength="120" required>
-            </div>
-            <div class="field">
-              <label for="c-marca">Marca ou empresa (opcional)</label>
-              <input id="c-marca" name="marca" type="text" autocomplete="organization" maxlength="120">
-            </div>
-            <div class="field">
-              <label for="c-email">E-mail</label>
-              <input id="c-email" name="email" type="email" autocomplete="email" maxlength="200" required>
-            </div>
-            <div class="field">
-              <label for="c-whats">WhatsApp (opcional)</label>
-              <input id="c-whats" name="whats" type="tel" autocomplete="tel" maxlength="30" placeholder="(11) 90000-0000">
-            </div>
-            <div class="field">
-              <label for="c-orc">Orçamento estimado</label>
-              <select id="c-orc" name="orcamento">
-                <option value="">Escolha uma opção</option>
-                <option>Até R$1 mil</option>
-                <option>R$1 mil a R$3 mil</option>
-                <option>Acima de R$3 mil</option>
-                <option>Ainda não sei</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="c-msg">Mensagem</label>
-              <textarea id="c-msg" name="mensagem" required maxlength="2500" placeholder="Conte sobre a marca, o produto e o prazo"></textarea>
-            </div>
-            <p class="form-erro" id="form-error" aria-live="assertive"></p>
-            <button class="btn btn-primary" type="submit">Enviar mensagem</button>
-          </form>
-        </div>
-
-        <div class="channels reveal">
-          <a class="channel" href="https://wa.me/5511913012249" target="_blank" rel="noopener">
-            <span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2c-1.5 0-3-.4-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.4.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.4.1-.7.3-.2.3-.9.9-.9 2.2s.9 2.5 1 2.7c.1.2 1.8 2.8 4.4 3.9 1.6.7 2.3.8 3.1.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3z"/></svg></span>
-            <span><b>WhatsApp</b><span>(11) 91301-2249</span></span>
-          </a>
-          <a class="channel" href="mailto:heyryan.ugc@gmail.com">
-            <span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm8 7.5L20 6.5V6H4v.5l8 5z"/></svg></span>
-            <span><b>E-mail</b><span>heyryan.ugc@gmail.com</span></span>
-          </a>
-          <a class="channel" href="https://instagram.com/ryalvz" target="_blank" rel="noopener">
-            <span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7.3A4.7 4.7 0 1 0 12 16.7 4.7 4.7 0 0 0 12 7.3zm0 7.7a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm6-7.9a1.1 1.1 0 1 1-2.2 0 1.1 1.1 0 0 1 2.2 0zM21.9 8c-.1-1.6-.4-3-1.6-4.2S17.6 2.2 16 2.1C14.3 2 9.7 2 8 2.1c-1.6.1-3 .4-4.2 1.6S2.2 6.4 2.1 8C2 9.7 2 14.3 2.1 16c.1 1.6.4 3 1.6 4.2s2.6 1.5 4.2 1.6c1.7.1 6.3.1 8 0 1.6-.1 3-.4 4.2-1.6s1.5-2.6 1.6-4.2c.1-1.7.1-6.3 0-8zm-2.2 9.9a3.3 3.3 0 0 1-1.8 1.8c-1.3.5-4.3.4-5.9.4s-4.6.1-5.9-.4a3.3 3.3 0 0 1-1.8-1.8c-.5-1.3-.4-4.3-.4-5.9s-.1-4.6.4-5.9a3.3 3.3 0 0 1 1.8-1.8c1.3-.5 4.3-.4 5.9-.4s4.6-.1 5.9.4a3.3 3.3 0 0 1 1.8 1.8c.5 1.3.4 4.3.4 5.9s.1 4.6-.4 5.9z"/></svg></span>
-            <span><b>Instagram</b><span>@ryalvz</span></span>
-          </a>
-          <p class="city">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="#A8864A" aria-hidden="true"><path d="M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg>
-            Vila Velha, ES · atendo marcas de todo o Brasil
-          </p>
-        </div>
+      <!-- FORMULÁRIO: cada envio entra no painel (Contatos pelo site) e avisa no celular -->
+      <div class="reveal" id="form-box">
+        <form id="contact-form" class="form-novo" novalidate>
+          <div class="campos-2">
+            <div class="field"><label for="c-nome">Nome</label><input id="c-nome" name="nome" type="text" autocomplete="name" maxlength="120" placeholder="Seu nome" required></div>
+            <div class="field"><label for="c-email">E-mail</label><input id="c-email" name="email" type="email" autocomplete="email" maxlength="200" placeholder="voce@marca.com" required></div>
+          </div>
+          <div class="campos-2">
+            <div class="field"><label for="c-marca">Marca / empresa</label><input id="c-marca" name="marca" type="text" autocomplete="organization" maxlength="120" placeholder="Nome da marca"></div>
+            <div class="field"><label for="c-whats">WhatsApp</label><input id="c-whats" name="whats" type="tel" autocomplete="tel" maxlength="30" placeholder="(11) 90000-0000"></div>
+          </div>
+          <div class="field"><label for="c-orc">Orçamento estimado</label><input id="c-orc" name="orcamento" type="text" maxlength="80" placeholder="Ex: R$ 1.000 a R$ 3.000"></div>
+          <div class="field"><label for="c-msg">Conta sobre o projeto</label><textarea id="c-msg" name="mensagem" required maxlength="2500" placeholder="Produto, formato, prazo, objetivo da campanha..."></textarea></div>
+          <p class="form-erro" id="form-error" aria-live="assertive"></p>
+          <button class="btn btn-enviar" type="submit">Enviar mensagem <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8"/></svg></button>
+        </form>
       </div>
     </div>
   </section>
@@ -1145,9 +1135,8 @@ const CASE = {
 // Quatro depoimentos (placeholders: troque pelo texto real de cada cliente)
 // Avaliações reais das marcas na plataforma SeuInfluencer (todas 5 estrelas)
 const TESTIMONIALS = [
-  // selo: aparece no lugar das estrelas quando o feedback veio fora da SeuInfluencer (sem nota)
-  { texto: "Adoramos os dois roteiros: a escrita está excelente, a direção de cena é muito bem pensada e a linha \"isso não é mágica. É Canva.\" é uma das melhores que recebemos até agora. Os vídeos ficaram ótimos e adoramos trabalhar com você.", nome: "Canva", empresa: "Equipe de marketing", logo: "fb-canva", selo: "Por e-mail" },
-  { texto: "Obrigada mesmo pela pontualidade. Estamos tentando adiantar o próximo roteiro.", nome: "Zapay", empresa: "App de IPVA e licenciamento", logo: "fb-zapay", selo: "Aprovado de primeira" },
+  // selo: aparece no lugar das estrelas. semNota: true esconde as estrelas (feedback que veio sem nota, fora da SeuInfluencer)
+  { texto: "Adoramos os dois roteiros: a escrita está excelente, a direção de cena é muito bem pensada e a linha \"isso não é mágica. É Canva.\" é uma das melhores que recebemos até agora. Os vídeos ficaram ótimos e adoramos trabalhar com você.", nome: "Canva", empresa: "Equipe de marketing", logo: "fb-canva", semNota: true },
   { texto: "Passando só para elogiar o seu vídeo. Ficou extremamente natural, cativante e com uma qualidade técnica excelente. Você conseguiu transmitir exatamente o tom leve e acolhedor que a gente buscava. Parabéns pelo profissionalismo e pelo talento! O material ficou impecável!", nome: "Zavi Agência", empresa: "Agência" },
   { texto: "Excelente profissional, muito empenhado e comprometido com o trabalho. Realizou todas as entregas dentro do prazo e com muita qualidade. Foi uma experiência sensacional e, com certeza, faremos novos trabalhos juntos!", logo: "fb-haag", nome: "Haag", empresa: "Moda" },
   { texto: "O Ryan é rápido, inteligente e muito criativo. Adoramos o seu conteúdo em nossa campanha.", logo: "fb-picnic", nome: "Picnic", empresa: "Marca parceira" },
@@ -1418,7 +1407,7 @@ $("#testimonials").innerHTML = TESTIMONIALS.map((t) => `
       ${t.logo ? `<span class="avatar com-logo" aria-hidden="true"><img src="logos/${t.logo}.png" alt="" loading="lazy"></span>` : `<span class="avatar" aria-hidden="true">${esc(t.nome.charAt(0))}</span>`}
       <span><b>${esc(t.nome)}</b><span>${esc(t.empresa)}</span></span>
     </figcaption>
-    ${t.selo ? `<div class="t-selo">${esc(t.selo)}</div>` : `<div class="estrelas" role="img" aria-label="Nota 5 de 5">★★★★★</div>`}
+    ${t.selo ? `<div class="t-selo">${esc(t.selo)}</div>` : t.semNota ? `<div class="t-espaco"></div>` : `<div class="estrelas" role="img" aria-label="Nota 5 de 5">★★★★★</div>`}
     <blockquote><p style="margin:0">${esc(t.texto)}</p></blockquote>
   </figure>`).join("");
 // Setas do carrossel de feedbacks
@@ -1514,7 +1503,7 @@ $("#contact-form").addEventListener("submit", async (e) => {
   const marca = f.marca.value.trim();
   const email = f.email.value.trim();
   const whats = f.whats.value.trim();
-  const orc = f.orcamento.value;
+  const orc = f.orcamento.value.trim().slice(0, 80);
   const msg = f.mensagem.value.trim();
   let bad = null;
   if (!nome) bad = f.nome; else if (!isEmail(email)) bad = f.email; else if (!msg) bad = f.mensagem;
@@ -1526,6 +1515,7 @@ $("#contact-form").addEventListener("submit", async (e) => {
   }
   $("#form-error").textContent = "";
   const btn = f.querySelector('button[type="submit"]');
+  const btnTexto = btn.innerHTML;
   btn.disabled = true;
   btn.textContent = "Enviando...";
   try {
@@ -1540,7 +1530,7 @@ $("#contact-form").addEventListener("submit", async (e) => {
     });
   } catch (_) {
     btn.disabled = false;
-    btn.textContent = "Enviar mensagem";
+    btn.innerHTML = btnTexto;
     $("#form-error").innerHTML = 'Não consegui enviar agora. Tente de novo ou me chame no <a href="https://wa.me/5511913012249" target="_blank" rel="noopener">WhatsApp</a>.';
     return;
   }
