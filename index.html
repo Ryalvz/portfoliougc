@@ -616,6 +616,28 @@
   .filter { background: rgba(246, 242, 235, .07); border: 1px solid rgba(246, 242, 235, .16); color: var(--parchment); padding: 11px 22px; font-weight: 500; font-size: 15px; }
   .filter:hover { background: rgba(246, 242, 235, .14); border-color: rgba(246, 242, 235, .3); }
   .filter[aria-pressed="true"] { background: var(--olive); border-color: var(--olive); color: #fff; font-weight: 600; box-shadow: 0 6px 16px rgba(0, 0, 0, .18); }
+  /* Serviços: texto e botão à esquerda, quatro objetivos em cartões à direita */
+  .serv-grid { display: grid; grid-template-columns: 1fr 1.15fr; gap: 56px; align-items: center; }
+  .serv-grid .btn { margin-top: 26px; }
+  .serv-grid .services { display: grid; grid-template-columns: 1fr 1fr; gap: 40px 22px; margin: 0; padding-top: 14px; }
+  .servico { position: relative; background: var(--paper); border: 1px solid var(--line); border-radius: 18px; padding: 34px 24px 24px; }
+  .servico-tag { position: absolute; top: 0; left: 50%; translate: -50% -50%; margin: 0; white-space: nowrap; background: var(--cobalt); color: var(--parchment); font-family: var(--body); font-size: 12px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; padding: 8px 18px; border-radius: 999px; }
+  .servico p { margin: 0; color: var(--muted); font-size: 15.5px; line-height: 1.65; }
+  @media (max-width: 899px) { .serv-grid { grid-template-columns: 1fr; gap: 48px; } }
+  @media (max-width: 560px) { .serv-grid .services { grid-template-columns: 1fr; gap: 36px; } }
+  /* Resultados no topo: texto à esquerda, vídeos à direita */
+  .resultados-topo { padding-top: 72px; }
+  .res-grid { display: grid; grid-template-columns: .8fr 1.6fr; gap: 48px; align-items: center; }
+  .res-grid .results { flex-wrap: nowrap; gap: 22px; }
+  .res-grid .result-v { width: auto; flex: 1 1 0; min-width: 0; }
+  .res-grid .result-v h4 { font-size: 19px; }
+  .res-grid .result-v .big { font-size: 25px; }
+  @media (max-width: 899px) {
+    .res-grid { grid-template-columns: 1fr; gap: 32px; }
+    .res-grid .results { overflow-x: auto; scroll-snap-type: x mandatory; margin-inline: -16px; padding: 4px 16px 10px; scrollbar-width: none; justify-content: flex-start; }
+    .res-grid .results::-webkit-scrollbar { display: none; }
+    .res-grid .result-v { flex: 0 0 72%; scroll-snap-align: center; }
+  }
 </style>
 
 </head>
@@ -684,6 +706,19 @@
     </div>
   </section>
 
+  <!-- ================= RESULTADOS (logo depois da capa) ================= -->
+  <section class="resultados-topo" id="resultados" aria-labelledby="results-title">
+    <div class="wrap res-grid">
+      <div class="reveal">
+        <span class="eyebrow">Conteúdos que deram resultado</span>
+        <h2 class="sec-title" id="results-title">Os vídeos que <em>mais renderam</em></h2>
+        <p class="sec-lead">Storytelling com verdade, quebra de padrão e roteiro que a marca aprova. Toque em um vídeo para assistir.</p>
+      </div>
+      <!-- Resultados: array RESULTS no script -->
+      <div class="results" id="results"></div>
+    </div>
+  </section>
+
   <!-- ================= 2. SOBRE MIM ================= -->
   <section id="sobre" aria-labelledby="sobre-title">
     <div class="wrap about-grid">
@@ -740,13 +775,16 @@
   <!-- ================= 5. COMO EU TE AJUDO ================= -->
   <section id="servicos" aria-labelledby="servicos-title">
     <div class="wrap">
-      <div class="reveal">
-        <span class="eyebrow">Serviços</span>
-        <h2 class="sec-title" id="servicos-title">O que eu <em>entrego</em> pra sua marca</h2>
-        <p class="sec-lead">Do vídeo avulso ao pacote do mês inteiro. Você escolhe o formato, eu entrego pronto para postar ou anunciar.</p>
+      <div class="serv-grid">
+        <div class="reveal">
+          <span class="eyebrow">Serviços</span>
+          <h2 class="sec-title" id="servicos-title">O que eu <em>entrego</em> pra sua marca</h2>
+          <p class="sec-lead">Cada formato tem um objetivo: anunciar, vender na loja ou construir marca. Me conta o seu que eu monto o combo certo pra você.</p>
+          <a class="btn btn-primary" href="#contato">Bora criar juntos &rarr;</a>
+        </div>
+        <!-- Os serviços vêm do array SERVICES no script, agrupados pelo objetivo da marca -->
+        <div class="services" id="services"></div>
       </div>
-      <!-- Os serviços vêm do array SERVICES no script -->
-      <div class="services" id="services"></div>
     </div>
   </section>
 
@@ -759,8 +797,6 @@
       </div>
       <!-- Métricas: array METRICS. Resultados: array RESULTS. Depoimentos: array TESTIMONIALS. -->
       <div class="metrics" id="metrics"></div>
-      <h3 class="sub-title reveal" id="results-title">Conteúdos que deram resultado</h3>
-      <div class="results" id="results"></div>
       <h3 class="sub-title reveal">O que as marcas dizem</h3>
       <div class="testi-carrossel reveal">
         <button class="testi-seta" type="button" data-dir="-1" aria-label="Feedbacks anteriores"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg></button>
@@ -975,12 +1011,10 @@ const WORKS = [
 
 // Seis serviços
 const SERVICES = [
-  { titulo: "Vídeo UGC",              texto: "Vídeo autêntico, roteirizado e gravado por mim, pronto para usar nas redes da sua marca." },
-  { titulo: "Corte para anúncio",     texto: "Versões com ganchos diferentes e formatos certos para você testar nos anúncios pagos." },
-  { titulo: "Fotos do produto",       texto: "Fotos em contexto real de uso, com luz bonita, para feed, site e e-commerce." },
-  { titulo: "Unboxing",               texto: "A primeira reação abrindo o produto, mostrando os detalhes que fazem a pessoa querer ter." },
-  { titulo: "Publicação no meu perfil", texto: "O conteúdo vai ao ar no meu Instagram e alcança quem já confia nas minhas indicações." },
-  { titulo: "Pacote mensal",          texto: "Uma leva de conteúdos todo mês, com calendário combinado e preço especial." }
+  { titulo: "Anúncios",      texto: "Vídeo UGC roteirizado e cortes com ganchos diferentes, prontos pra testar no Meta e no TikTok Ads." },
+  { titulo: "E-commerce",    texto: "Fotos do produto em uso, unboxing e roteiro e vídeo para TikTok Shop, pra sua loja vender todo dia." },
+  { titulo: "No meu perfil", texto: "Publicação no meu Instagram, falando com quem já confia nas minhas indicações." },
+  { titulo: "Recorrência",   texto: "Pacote mensal com calendário combinado, conteúdo toda semana e preço especial." }
 ];
 
 // Quatro métricas da seção de números. TROQUE os 0 pelos seus números reais.
@@ -997,6 +1031,7 @@ const METRICS = [
 const ST = "https://jlehawiwklvyvrzbfuiu.supabase.co/storage/v1/object/public/portfolio/";
 // Resultados: só o que é real (número da marca, aprovação ou elogio). video/capa: arquivos do Storage
 const RESULTS = [
+  { marca: "EITA Mentora Virtual", numero: "Vídeo mais aprovado", titulo: "pela marca na campanha", texto: "Verdade e storytelling: uma história real da minha vida", video: ST + "videos/canva-c911bd2eb816417aca1eeec774f1d39c.mp4", capa: ST + "capas/canva-c911bd2eb816417aca1eeec774f1d39c.jpg" },
   { marca: "Di Santinni", numero: "+2M", titulo: "de alcance em um vídeo", texto: "Quebra de padrão no Dia dos Namorados", video: ST + "videos/disantinni-namorados.mp4", capa: ST + "capas/disantinni-namorados.jpg" },
   { marca: "Canva", numero: "Roteiro elogiado", titulo: "pela equipe do Canva", texto: "\u201cUma das melhores linhas que recebemos até agora\u201d", video: ST + "videos/1791826892574-canva-ia.mp4", capa: ST + "capas/1791827002580-capa-canva.jpg" }
 ];
@@ -1203,10 +1238,9 @@ async function carregarTrabalhos() {
 }
 
 // Serviços
-$("#services").innerHTML = SERVICES.map((s, i) => `
-  <article class="service reveal">
-    <span class="service-num" aria-hidden="true">${String(i + 1).padStart(2, "0")}</span>
-    <h3>${esc(s.titulo)}</h3>
+$("#services").innerHTML = SERVICES.map((s) => `
+  <article class="servico reveal">
+    <h3 class="servico-tag">${esc(s.titulo)}</h3>
     <p>${esc(s.texto)}</p>
   </article>`).join("");
 
