@@ -4075,7 +4075,7 @@ async function enviarResposta(texto) {
 // Modelos de resposta rápida (dá para editar antes de mandar)
 function modelosResposta(email) {
   const marca = email.de.marca;
-  const site = "https://ryalvz.github.io/portfoliougc/";
+  const site = "https://ugc.ryalvz.com.br/";
   return [
     ["Pedir briefing", `Oi, tudo bem?\n\nObrigado pelo contato! Fiquei muito feliz com o interesse da ${marca}.\n\nPara eu montar uma proposta certinha, você consegue me mandar:\n- o briefing ou a ideia da campanha\n- quantos vídeos e em quais formatos\n- se é para uso orgânico ou anúncio (e por quanto tempo)\n- o prazo de entrega\n\nMeu portfólio está aqui: ${site}\n\nUm abraço,\nRyan Alves`],
     ["Mandar portfólio e valores", `Oi, tudo bem?\n\nObrigado por pensar em mim para essa campanha!\n\nSegue meu portfólio com os trabalhos mais recentes: ${site}\n\nMeus pacotes começam a partir de R$ ___ por vídeo, e o valor final depende da quantidade, do formato e do direito de uso. Se você me passar esses detalhes, eu mando a proposta fechada ainda hoje.\n\nUm abraço,\nRyan Alves`],
@@ -4592,7 +4592,7 @@ Abraço,
 Ryan Alves`;
 const pro = {
   envio: "gmail", escrita: "texto", publico: "selecionadas", pularRepetidos: true,
-  assunto: MODELO_ASSUNTO, texto: MODELO_TEXTO, html: "", botaoTexto: "Ver meu portfólio", botaoLink: "https://ryalvz.github.io/portfoliougc/",
+  assunto: MODELO_ASSUNTO, texto: MODELO_TEXTO, html: "", botaoTexto: "Ver meu portfólio", botaoLink: "https://ugc.ryalvz.com.br/",
   envios: null, optout: null, falta: [], carregando: false, carregado: false, buscaHist: "",
   testeFeito: "", filaPulados: [], sairConferido: false
 };
