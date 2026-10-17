@@ -1899,42 +1899,57 @@ const traduz = (t) => {
   for (const [re, fn] of EN_REGRAS) { const m = k.match(re); if (m) return t.replace(t.trim(), fn(m)); }
   return null;
 };
+// Guarda o texto original de tudo que foi traduzido, pra voltar pro português sem recarregar
+const origTexto = new Map(), origAttr = [];
+const trocaTexto = (n) => { const x = traduz(n.textContent); if (x != null && x !== n.textContent) { if (!origTexto.has(n)) origTexto.set(n, n.textContent); n.textContent = x; } };
 function traduzirTudo(raiz) {
   const w = document.createTreeWalker(raiz, NodeFilter.SHOW_TEXT, { acceptNode: (n) => (n.parentElement && /SCRIPT|STYLE/.test(n.parentElement.tagName) ? 2 : 1) });
-  let n; while ((n = w.nextNode())) { const x = traduz(n.textContent); if (x != null && x !== n.textContent) n.textContent = x; }
+  let n; while ((n = w.nextNode())) trocaTexto(n);
   (raiz.querySelectorAll ? raiz : document).querySelectorAll("[placeholder],[aria-label],[alt],[data-suffix]").forEach((e) => {
-    ["placeholder", "aria-label", "alt"].forEach((a) => { const v = e.getAttribute(a); const x = v && traduz(v); if (x != null && x !== v) e.setAttribute(a, x); });
-    if (e.dataset.suffix === " anos") e.dataset.suffix = " years";
+    ["placeholder", "aria-label", "alt"].forEach((a) => { const v = e.getAttribute(a); const x = v && traduz(v); if (x != null && x !== v) { origAttr.push([e, a, v]); e.setAttribute(a, x); } });
+    if (e.dataset.suffix === " anos") { origAttr.push([e, "data-suffix", " anos"]); e.dataset.suffix = " years"; }
   });
 }
 const LANG = (() => { try { return new URLSearchParams(location.search).get("lang") || localStorage.getItem("lang") || "pt"; } catch (_) { return "pt"; } })();
-let emIngles = false;
+// Troca os textos mantendo na tela exatamente o mesmo trecho que a pessoa estava vendo
+function semPular(fn) {
+  const ref = document.elementFromPoint(innerWidth / 2, Math.min(innerHeight - 1, 200));
+  const antes = ref ? ref.getBoundingClientRect().top : 0;
+  fn();
+  if (ref && scrollY > 0) { const d = ref.getBoundingClientRect().top - antes; if (d) window.scrollBy({ top: d, behavior: "instant" }); }
+}
+let emIngles = false, observador = null;
 function ativarIngles() {
   if (emIngles) return; emIngles = true;
   document.documentElement.lang = "en";
   document.title = "Ryan Alves | UGC Creator Portfolio";
-  // Guarda o que está no topo da tela e devolve pro mesmo lugar depois de trocar os textos
-  const ref = document.elementFromPoint(innerWidth / 2, Math.min(innerHeight - 1, 200));
-  const antes = ref ? ref.getBoundingClientRect().top : 0;
-  traduzirTudo(document.body);
-  if (ref && scrollY > 0) { const d = ref.getBoundingClientRect().top - antes; if (d) window.scrollBy({ top: d, behavior: "instant" }); }
+  semPular(() => traduzirTudo(document.body));
   let fila = [];
-  new MutationObserver((novas) => {
+  observador = new MutationObserver((novas) => {
     if (fila.length) { fila.push(...novas); return; }
     fila.push(...novas);
-    setTimeout(() => { const ms = fila; fila = []; ms.forEach((m) => { if (m.type === "characterData") { const x = traduz(m.target.textContent); if (x != null && x !== m.target.textContent) m.target.textContent = x; } else m.addedNodes.forEach((a) => { if (a.nodeType === 1) traduzirTudo(a); else if (a.nodeType === 3) { const x = traduz(a.textContent); if (x != null && x !== a.textContent) a.textContent = x; } }); }); }, 30);
-  }).observe(document.body, { childList: true, subtree: true, characterData: true });
+    setTimeout(() => { const ms = fila; fila = []; if (!emIngles) return; ms.forEach((m) => { if (m.type === "characterData") trocaTexto(m.target); else m.addedNodes.forEach((a) => { if (a.nodeType === 1) traduzirTudo(a); else if (a.nodeType === 3) trocaTexto(a); }); }); }, 30);
+  });
+  observador.observe(document.body, { childList: true, subtree: true, characterData: true });
+}
+function voltarPortugues() {
+  if (!emIngles) return; emIngles = false;
+  if (observador) observador.disconnect();
+  document.documentElement.lang = "pt-BR";
+  document.title = "Ryan Alves | Portfólio UGC Creator";
+  semPular(() => {
+    origTexto.forEach((t, n) => { n.textContent = t; }); origTexto.clear();
+    origAttr.reverse().forEach(([e, a, v]) => e.setAttribute(a, v)); origAttr.length = 0;
+  });
 }
 const marcarIdioma = (l) => document.querySelectorAll("[data-lang]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.lang === l));
 marcarIdioma(LANG);
-// Clicou: inglês traduz na hora, sem sair do lugar; português recarrega a página no mesmo ponto
-document.querySelectorAll("[data-lang]").forEach((b) => b.addEventListener("click", () => {
+document.querySelectorAll("[data-lang]").forEach((b) => b.addEventListener("click", (e) => {
+  e.preventDefault();
   const l = b.dataset.lang;
   try { localStorage.setItem("lang", l); } catch (_) {}
-  if (l === "en") { marcarIdioma("en"); ativarIngles(); return; }
-  if (!emIngles) { marcarIdioma("pt"); return; }
-  history.replaceState(null, "", location.pathname + location.hash);
-  location.reload();
+  marcarIdioma(l);
+  if (l === "en") ativarIngles(); else voltarPortugues();
 }));
 if (LANG === "en") ativarIngles();
 
