@@ -1299,7 +1299,7 @@ function desenharTrabalhos(lista) {
       const video = ehArquivoVideo(w.link);
       const titulo = w.titulo + (w.marca ? " · " + w.marca : "");
       const pilula = w.marca ? `<span class="work-pill">${esc(w.marca)}</span>` : "";
-      const info = `<div class="work-info"><h4>${esc(w.titulo)}</h4><span class="work-nicho">${esc(n.nome)}</span></div>`;
+      const info = `<div class="work-info"><h4>${esc(w.titulo)}</h4></div>`;
       // Vídeo do painel: toca no próprio card, sem abrir nada
       if (video) return `<article class="work work-v" data-titulo="${esc(titulo)}">
           <video src="${esc(w.link)}" ${w.capa ? `poster="${esc(w.capa)}"` : ""} playsinline preload="${w.capa ? "none" : "metadata"}" aria-label="Vídeo: ${esc(titulo)}"></video>
@@ -1937,7 +1937,7 @@ const EN = {
   "Receita com o BIC EZ Reach": "Recipe with BIC EZ Reach", "Carnaval com Ateliê": "Carnival with Ateliê", "Programa embaixador": "Ambassador program",
   "Receita com presunto": "Ham recipe", "Praticidade com os sanduíches": "Easy sandwiches", "Tecnologia que fixa o perfume": "Scent-locking technology",
   "Perfume para casa": "Home fragrance", "Novo isqueiro BIC EZ Reach": "New BIC EZ Reach lighter", "Lançamento Omo Ciclo Rápido": "Omo Quick Cycle launch",
-  "Moda tecnológica": "Tech fashion", "GRWM para joalheria": "Jewelry GRWM", "Natal com Lojas Torra": "Christmas with Lojas Torra", "Lançamento Mezul": "Mezul launch",
+  "Moda tecnológica": "Tech fashion", "GRWM para joalheria": "Jewelry GRWM", "Natal com Lojas Torra": "Christmas with Lojas Torra", "Lançamento Mezul": "Mezul launch", "Unboxing do colchão Emma": "Emma mattress unboxing",
   "Seguro viagem na prática": "Travel insurance in real life", "Figurinhas da Copa com Rexona": "World Cup stickers with Rexona",
   "Cueca da sorte": "Lucky underwear", "Plataforma que conecta marcas e creators": "The platform connecting brands and creators",
   "Sabão líquido Brilhante": "Brilhante liquid detergent"
