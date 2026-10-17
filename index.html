@@ -821,7 +821,7 @@
     <span class="bf-tag">Black Friday</span>
     <b class="bf-conta" id="bf-conta"></b>
     <span class="bf-msg" id="bf-msg">poucas vagas pra gravar em novembro</span>
-    <a class="bf-link" href="https://wa.me/5511913012249?text=Oi%20Ryan%2C%20quero%20reservar%20agenda%20pra%20Black%20Friday." target="_blank" rel="noopener">reservar agenda &rarr;</a>
+    <a class="bf-link" href="#contato" id="bf-reservar">reservar agenda &rarr;</a>
   </div>
   <div class="wrap">
     <a class="logo" href="#inicio">Ryan Alves</a>
@@ -984,7 +984,7 @@
       <!-- Métricas: array METRICS. Resultados: array RESULTS. Depoimentos: array TESTIMONIALS. -->
       <!-- Case em destaque: objeto CASE no script -->
       <article class="case reveal" id="case" aria-labelledby="case-title"></article>
-      <h3 class="sub-title reveal">O que dizem <em>sobre o meu trabalho</em></h3>
+      <h3 class="sub-title reveal">O que as <em>marcas dizem</em></h3>
       <div class="testi-carrossel reveal">
         <button class="testi-seta" type="button" data-dir="-1" aria-label="Feedbacks anteriores"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg></button>
         <div class="testimonials" id="testimonials" tabindex="0" aria-label="Feedbacks das marcas"></div>
@@ -1631,6 +1631,11 @@ $("#contact-form").addEventListener("submit", async (e) => {
 });
 
 /* ---------- Faixa da Black Friday ---------- */
+document.getElementById("bf-reservar").addEventListener("click", () => {
+  const msg = document.getElementById("c-msg");
+  if (msg && !msg.value.trim()) msg.value = document.documentElement.lang === "en" ? "Hi Ryan! I'd like to book a slot for Black Friday. " : "Oi Ryan! Quero reservar agenda pra Black Friday. ";
+  setTimeout(() => { const n = document.getElementById("c-nome"); if (n) n.focus({ preventScroll: true }); }, 700);
+});
 (() => {
   const BF = new Date(2026, 10, 27); // 27 de novembro de 2026
   const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
@@ -1858,7 +1863,7 @@ const EN = {
   "1,5M em 2 dias": "1.5M in 2 days",
   "Roteiro aprovado de primeira": "Script approved on the first try",
   "Entrega aprovada de primeira": "Delivery approved on the first try",
-  "O que as marcas dizem": "What brands say", "O que dizem": "What they say", "sobre o meu trabalho": "about my work",
+  "O que as marcas dizem": "What brands say", "O que as": "What", "marcas dizem": "brands say",
   "Equipe de marketing": "Marketing team", "Tecnologia": "Technology", "Agência": "Agency", "Moda ": "Fashion", "Marca parceira": "Partner brand", "Calçados": "Footwear",
   "Adoramos os dois roteiros: a escrita está excelente, a direção de cena é muito bem pensada e a linha \"isso não é mágica. É Canva.\" é uma das melhores que recebemos até agora. Os vídeos ficaram ótimos e adoramos trabalhar com você.": "We loved both scripts: the writing is excellent, the scene direction is very well thought out, and the line \"this isn't magic. It's Canva.\" is one of the best we've received so far. The videos turned out great and we loved working with you.",
   "Só passando pra agradecer demais pelo trabalho. Dá pra sentir a dedicação em cada detalhe, e a atenção e o carinho que você teve nos ajustes fez toda a diferença. Ficou exatamente como a gente precisava.": "Just stopping by to thank you so much for the work. You can feel the dedication in every detail, and the care you put into the revisions made all the difference. It turned out exactly as we needed.",
