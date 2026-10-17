@@ -732,6 +732,34 @@
   footer { border-top: 1px solid rgba(246, 242, 235, .1); }
   @media (max-width: 899px) { .contato-grid { grid-template-columns: 1fr; gap: 40px; } }
   @media (max-width: 560px) { .form-novo .campos-2 { grid-template-columns: 1fr; } .btn-enviar { width: 100%; justify-content: center; } }
+  /* Faixa da Black Friday + menu */
+  html.com-bf { --nav-h: 112px; }
+  .nav { display: flex; flex-direction: column; }
+  .nav .wrap { flex: 1; height: auto; }
+  .bf { height: 44px; flex: none; display: flex; align-items: center; justify-content: center; gap: 14px; padding: 0 16px; background: #D4AE62; color: var(--cobalt); font-size: 14.5px; white-space: nowrap; overflow: hidden; }
+  .bf[hidden] { display: none; }
+  .bf-tag { background: var(--cobalt); color: #F2D79A; font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; padding: 4px 10px; border-radius: 999px; }
+  .bf-conta { font-weight: 700; }
+  .bf-msg { opacity: .8; transition: opacity .3s; }
+  .bf-msg::before { content: "·"; margin-right: 14px; opacity: .6; }
+  .bf-link { color: var(--cobalt); font-weight: 700; font-size: 13.5px; text-decoration: none; margin-left: 10px; }
+  .bf-link:hover { text-decoration: underline; }
+  .nav-links { gap: 34px; }
+  .nav-links a { font-size: 12.5px; font-weight: 600; letter-spacing: 2.4px; text-transform: uppercase; color: rgba(43, 36, 28, .72); }
+  .nav-links a:hover, .nav-links a.active { color: var(--cobalt); }
+  .nav-cta { background: var(--cobalt); color: var(--parchment); text-decoration: none; font-weight: 600; font-size: 14px; padding: 12px 22px; border-radius: 6px; white-space: nowrap; transition: background .2s; }
+  .nav-cta:hover { background: #3A3027; }
+  @media (max-width: 899px) {
+    .nav-cta { display: none; }
+    .nav-links a { font-size: 14px; letter-spacing: 2px; }
+    .bf-msg { display: none; }
+    .bf { gap: 10px; font-size: 13px; }
+    .bf-link { margin-left: 0; font-size: 12.5px; }
+  }
+  @media (max-width: 420px) { .bf-tag { display: none; } }
+  /* Faixas inclinadas: o fundo de trás é das duas seções, sem frestas */
+  .faixa-wrap { position: relative; z-index: 3; padding: 14px 0; }
+  .faixa-wrap .faixa { margin: 0 -3vw; }
 </style>
 
 </head>
@@ -740,6 +768,13 @@
 
 <!-- ================= MENU FIXO ================= -->
 <header class="nav" id="topo">
+  <!-- Faixa da Black Friday: contagem regressiva automática, some sozinha depois da data -->
+  <div class="bf" id="bf" hidden>
+    <span class="bf-tag">Black Friday</span>
+    <b class="bf-conta" id="bf-conta"></b>
+    <span class="bf-msg" id="bf-msg">poucas vagas pra gravar em novembro</span>
+    <a class="bf-link" href="https://wa.me/5511913012249?text=Oi%20Ryan%2C%20quero%20reservar%20agenda%20pra%20Black%20Friday." target="_blank" rel="noopener">reservar agenda &rarr;</a>
+  </div>
   <div class="wrap">
     <a class="logo" href="#inicio">Ryan Alves</a>
     <button class="burger" id="burger" aria-label="Abrir menu" aria-expanded="false" aria-controls="menu">
@@ -748,13 +783,13 @@
     <nav aria-label="Menu principal">
       <ul class="nav-links" id="menu">
         <li><a href="#sobre">Sobre</a></li>
-        <li><a href="#destaques">Destaques</a></li>
         <li><a href="#trabalhos">Trabalhos</a></li>
         <li><a href="#servicos">Serviços</a></li>
         <li><a href="#numeros">Números</a></li>
         <li><a href="#contato">Contato</a></li>
       </ul>
     </nav>
+    <a class="nav-cta" href="#contato">Trabalhe comigo</a>
   </div>
 </header>
 
@@ -785,10 +820,9 @@
         </div>
       </div>
       <div class="hero-photo">
-        <!-- FOTO DA CAPA: o arquivo foto-ryan.webp fica na mesma pasta do index.html.
-             Para trocar, suba outra foto com o mesmo nome ou mude o src abaixo. -->
+        <!-- FOTO DA CAPA: o arquivo foto-capa.jpg fica na mesma pasta do index.html. -->
         <div class="media ratio-45">
-          <img src="foto-ryan.webp" alt="Ryan Alves de óculos escuros lendo jornal ao ar livre" width="1023" height="1537" style="object-position: center 35%" fetchpriority="high">
+          <img src="foto-capa.jpg" alt="Ryan Alves de blusa preta de gola alta, sentado, com a mão no queixo" width="1122" height="1402" style="object-position: center 30%" fetchpriority="high">
           <span class="badge">Em cartaz</span>
         </div>
       </div>
@@ -836,7 +870,9 @@
   </section>
 
   <!-- Faixa inclinada: quebra visual entre as seções -->
+  <div class="faixa-wrap" style="background: linear-gradient(var(--sand) 50%, var(--cobalt) 50%)">
   <div class="faixa" aria-hidden="true"><div class="faixa-trilho"><span>UGC Creator</span><i>•</i><span>Tech &amp; Lifestyle</span><i>•</i><span>@ryalvz</span><i>•</i><span>Roteiro que vende</span><i>•</i><span>UGC Creator</span><i>•</i><span>Tech &amp; Lifestyle</span><i>•</i><span>@ryalvz</span><i>•</i><span>Roteiro que vende</span><i>•</i><span>UGC Creator</span><i>•</i><span>Tech &amp; Lifestyle</span><i>•</i><span>@ryalvz</span><i>•</i><span>Roteiro que vende</span><i>•</i><span>UGC Creator</span><i>•</i><span>Tech &amp; Lifestyle</span><i>•</i><span>@ryalvz</span><i>•</i><span>Roteiro que vende</span><i>•</i><span>UGC Creator</span><i>•</i><span>Tech &amp; Lifestyle</span><i>•</i><span>@ryalvz</span><i>•</i><span>Roteiro que vende</span><i>•</i><span>UGC Creator</span><i>•</i><span>Tech &amp; Lifestyle</span><i>•</i><span>@ryalvz</span><i>•</i><span>Roteiro que vende</span><i>•</i></div></div>
+  </div>
 
   <!-- ================= 3. CONTEÚDOS DE DESTAQUE ================= -->
   <section id="destaques" aria-labelledby="destaques-title">
@@ -885,7 +921,9 @@
   </section>
 
   <!-- Faixa inclinada: quebra visual entre as seções -->
+  <div class="faixa-wrap" style="background: linear-gradient(var(--parchment) 50%, var(--sand) 50%)">
   <div class="faixa faixa-clara" aria-hidden="true"><div class="faixa-trilho"><span>UGC Creator</span><i>•</i><span>Tech &amp; Lifestyle</span><i>•</i><span>@ryalvz</span><i>•</i><span>Roteiro que vende</span><i>•</i><span>UGC Creator</span><i>•</i><span>Tech &amp; Lifestyle</span><i>•</i><span>@ryalvz</span><i>•</i><span>Roteiro que vende</span><i>•</i><span>UGC Creator</span><i>•</i><span>Tech &amp; Lifestyle</span><i>•</i><span>@ryalvz</span><i>•</i><span>Roteiro que vende</span><i>•</i><span>UGC Creator</span><i>•</i><span>Tech &amp; Lifestyle</span><i>•</i><span>@ryalvz</span><i>•</i><span>Roteiro que vende</span><i>•</i><span>UGC Creator</span><i>•</i><span>Tech &amp; Lifestyle</span><i>•</i><span>@ryalvz</span><i>•</i><span>Roteiro que vende</span><i>•</i><span>UGC Creator</span><i>•</i><span>Tech &amp; Lifestyle</span><i>•</i><span>@ryalvz</span><i>•</i><span>Roteiro que vende</span><i>•</i></div></div>
+  </div>
 
   <!-- ================= 6. NÚMEROS E DEPOIMENTOS ================= -->
   <section class="soft" id="numeros" aria-labelledby="numeros-title">
@@ -904,7 +942,6 @@
         <div class="testimonials" id="testimonials" tabindex="0" aria-label="Feedbacks das marcas"></div>
         <button class="testi-seta" type="button" data-dir="1" aria-label="Próximos feedbacks"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
       </div>
-      <p class="testi-fonte reveal">Avaliações de marcas na plataforma SeuInfluencer (todas com nota 5) e mensagens reais de clientes.</p>
     </div>
   </section>
 
@@ -1107,7 +1144,7 @@ const METRICS = [
 const ST = "https://jlehawiwklvyvrzbfuiu.supabase.co/storage/v1/object/public/portfolio/";
 // Resultados: só o que é real (número da marca, aprovação ou elogio). video/capa: arquivos do Storage
 const RESULTS = [
-  { marca: "EITA Mentora Virtual", rotulo: "Segundo a marca", valor: "Único creator", texto: "que realmente entendeu a proposta e tinha verdade pra falar sobre o tema.", video: ST + "videos/canva-c911bd2eb816417aca1eeec774f1d39c.mp4", capa: ST + "capas/canva-c911bd2eb816417aca1eeec774f1d39c.jpg" },
+  { marca: "EITA Mentora Virtual", rotulo: "Storytelling", valor: "História real", texto: "\u201cDá pra sentir a dedicação em cada detalhe. Ficou exatamente como a gente precisava.\u201d", video: ST + "videos/canva-c911bd2eb816417aca1eeec774f1d39c.mp4", capa: ST + "capas/canva-c911bd2eb816417aca1eeec774f1d39c.jpg" },
   { marca: "Di Santinni", rotulo: "Visualizações", valor: "2M", texto: "Quebra de padrão no Dia dos Namorados", video: ST + "videos/disantinni-namorados.mp4", capa: ST + "capas/disantinni-namorados.jpg" },
   { marca: "Canva", rotulo: "Roteiro", valor: "Elogiado", texto: "\u201cUma das melhores linhas que recebemos até agora\u201d", video: ST + "videos/1791826892574-canva-ia.mp4", capa: ST + "capas/1791827002580-capa-canva.jpg" }
 ];
@@ -1132,6 +1169,8 @@ const CASE = {
 const TESTIMONIALS = [
   // selo: aparece no lugar das estrelas. semNota: true esconde as estrelas (feedback que veio sem nota, fora da SeuInfluencer)
   { texto: "Adoramos os dois roteiros: a escrita está excelente, a direção de cena é muito bem pensada e a linha \"isso não é mágica. É Canva.\" é uma das melhores que recebemos até agora. Os vídeos ficaram ótimos e adoramos trabalhar com você.", nome: "Canva", empresa: "Equipe de marketing", logo: "fb-canva", semNota: true },
+  { texto: "Só passando pra agradecer demais pelo trabalho. Dá pra sentir a dedicação em cada detalhe, e a atenção e o carinho que você teve nos ajustes fez toda a diferença. Ficou exatamente como a gente precisava.", nome: "EITA Mentora Virtual", empresa: "Tecnologia", logo: "fb-mentora-virtual", semNota: true },
+  { texto: "Adorei sua forma de criar, e o conteúdo estava super alinhado com o que buscamos por aqui! Além de extremamente comunicativo, profissional e pontual, amamos a sua entrega e dedicação com o nosso conteúdo!", nome: "Shopping Light", empresa: "Shopping", logo: "fb-shopping-light", semNota: true },
   { texto: "Passando só para elogiar o seu vídeo. Ficou extremamente natural, cativante e com uma qualidade técnica excelente. Você conseguiu transmitir exatamente o tom leve e acolhedor que a gente buscava. Parabéns pelo profissionalismo e pelo talento! O material ficou impecável!", nome: "Zavi Agência", empresa: "Agência" },
   { texto: "Excelente profissional, muito empenhado e comprometido com o trabalho. Realizou todas as entregas dentro do prazo e com muita qualidade. Foi uma experiência sensacional e, com certeza, faremos novos trabalhos juntos!", logo: "fb-haag", nome: "Haag", empresa: "Moda" },
   { texto: "O Ryan é rápido, inteligente e muito criativo. Adoramos o seu conteúdo em nossa campanha.", logo: "fb-picnic", nome: "Picnic", empresa: "Marca parceira" },
@@ -1533,6 +1572,23 @@ $("#contact-form").addEventListener("submit", async (e) => {
   box.innerHTML = `<div class="success" tabindex="-1">${checkIcon}<h3>Mensagem enviada!</h3><p>Valeu, ${esc(nome.split(" ")[0])}! Eu respondo no seu e-mail em breve.</p></div>`;
   box.querySelector(".success").focus();
 });
+
+/* ---------- Faixa da Black Friday ---------- */
+(() => {
+  const BF = new Date(2026, 10, 27); // 27 de novembro de 2026
+  const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+  const dias = Math.round((BF - hoje) / 864e5);
+  if (dias < 0) return; // passou: a faixa não aparece
+  $("#bf-conta").textContent = dias === 0 ? "Hoje é Black Friday" : dias === 1 ? "Falta 1 dia pra Black Friday" : `Faltam ${dias} dias pra Black Friday`;
+  $("#bf").hidden = false;
+  document.documentElement.classList.add("com-bf");
+  const msgs = ["poucas vagas pra gravar em novembro", "vídeo de e-commerce que vende no dia", "roteiro pronto antes do pico"];
+  let i = 0;
+  if (!reduceMotion) setInterval(() => {
+    const m = $("#bf-msg"); m.style.opacity = 0;
+    setTimeout(() => { i = (i + 1) % msgs.length; m.textContent = msgs[i]; m.style.opacity = 1; }, 300);
+  }, 4000);
+})();
 
 /* ---------- Cards com vídeo: prévia e player ---------- */
 const videoModal = $("#video-modal");
