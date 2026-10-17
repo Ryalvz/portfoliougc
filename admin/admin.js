@@ -452,11 +452,13 @@ function desenharPortfolio(el) {
           ? `<tr><td colspan="8"><p class="vazio">Nenhum vídeo cadastrado. Clique em Adicionar vídeo e ele aparece no seu portfólio na hora.</p></td></tr>`
           : S.videos.filter((v) => !pf.nicho || v.nicho === pf.nicho).map(linhaVideo).join("")}</tbody>
       </table>
-    </div>`;
+    </div>
+    <div id="conteudo-site"></div>`;
 
   $("#add-video").addEventListener("click", () => formVideo(null, pf.nicho));
   $$("[data-pf-nicho]", el).forEach((b) => b.onclick = () => { pf.nicho = b.dataset.pfNicho; desenharPortfolio(el); });
   ligarContatosSite(el);
+  desenharConteudoSite($("#conteudo-site"));
   const corpo = $("#lista-videos");
   corpo.addEventListener("click", async (e) => {
     const tr = e.target.closest("tr[data-id]");
@@ -5627,4 +5629,189 @@ function desenharEditorModelo(el) {
     if (error) { avisar(traduzErro(error), true); return; }
     ctr.modelo.texto = texto; ctr.editando = false; avisar("Modelo salvo."); desenhar();
   };
+}
+
+/* =============================================================
+   CONTEÚDO DO SITE (tabela site_conteudo)
+   Feedbacks, carrossel de resultados, case em destaque e faixa da
+   Black Friday. O site lê daqui; se uma parte estiver vazia, ele usa
+   o que está escrito no index.html.
+   ============================================================= */
+const sc = { dados: null, erro: "" };
+const linhasDoTexto = (t) => String(t || "").split("\n").map((x) => x.trim()).filter(Boolean);
+const urlSite = (u) => (!u ? "" : /^https?:/i.test(u) ? u : "../" + u.replace(/^\.?\//, ""));
+
+async function carregarSiteConteudo() {
+  const { data, error } = await db.from("site_conteudo").select("chave,valor");
+  if (error) { sc.erro = traduzErro(error); sc.dados = {}; return; }
+  sc.erro = ""; sc.dados = Object.fromEntries(data.map((l) => [l.chave, l.valor]));
+}
+async function salvarSiteConteudo(chave, valor) {
+  const { error } = await db.from("site_conteudo").upsert({ chave, valor, atualizado_em: new Date().toISOString() });
+  if (error) { avisar(traduzErro(error), true); return false; }
+  sc.dados[chave] = valor;
+  return true;
+}
+
+async function desenharConteudoSite(el) {
+  if (!el) return;
+  if (!sc.dados) { el.innerHTML = `<p class="sub" style="margin-top:24px">Carregando o conteúdo do site...</p>`; await carregarSiteConteudo(); }
+  if (sc.erro) { el.innerHTML = `<div class="cartao" style="margin-top:24px"><h2>Conteúdo do site</h2><p class="sub">Não consegui ler o conteúdo do site: ${esc(sc.erro)}. Rode a parte 31 do banco.sql no Supabase.</p></div>`; return; }
+  const fb = sc.dados.feedbacks || [], rs = sc.dados.resultados || [], cs = sc.dados.case || {}, bf = sc.dados.black_friday || {};
+  const setas = (tipo, i, n) => `<button class="icone-btn" type="button" data-sc-sobe="${tipo}:${i}" ${i === 0 ? "disabled" : ""} aria-label="Subir">↑</button><button class="icone-btn" type="button" data-sc-desce="${tipo}:${i}" ${i === n - 1 ? "disabled" : ""} aria-label="Descer">↓</button>`;
+  const bfDias = bf.data ? Math.round((new Date(bf.data + "T00:00:00") - new Date(hojeISO() + "T00:00:00")) / 864e5) : null;
+  el.innerHTML = `
+    <div class="barra" style="margin-top:28px"><h2 style="margin:0">Conteúdo do site</h2><span class="sub">o que você mudar aqui aparece no portfólio na hora (em português e, se preencher, em inglês)</span></div>
+    <div class="sc-grade">
+      <div class="cartao">
+        <div class="barra"><h2 style="margin:0">Feedbacks</h2><span class="sub">${fb.length} no carrossel</span><span class="espaco"></span><button class="btn primario pequeno" type="button" data-sc-novo="feedbacks">${ic("mais")}Adicionar</button></div>
+        <ul class="sc-lista">${fb.map((t, i) => `<li>
+          <span class="sc-logo">${t.logo ? `<img src="${esc(urlSite(t.logo))}" alt="">` : esc((t.nome || "?").charAt(0))}</span>
+          <span class="sc-txt"><b>${esc(t.nome)}</b><small>${t.estrelas === false ? "sem estrelas" : "★★★★★"} · ${esc((t.texto || "").slice(0, 70))}${(t.texto || "").length > 70 ? "..." : ""}</small></span>
+          <span class="sc-acoes">${setas("feedbacks", i, fb.length)}<button class="icone-btn" type="button" data-sc-editar="feedbacks:${i}" aria-label="Editar">${ic("editar")}</button></span></li>`).join("") || `<li class="sub">Nenhum feedback ainda.</li>`}</ul>
+      </div>
+      <div class="cartao">
+        <div class="barra"><h2 style="margin:0">Os vídeos que mais renderam</h2><span class="sub">carrossel logo depois do Sobre</span><span class="espaco"></span><button class="btn primario pequeno" type="button" data-sc-novo="resultados">${ic("mais")}Adicionar</button></div>
+        <ul class="sc-lista">${rs.map((r, i) => `<li>
+          <span class="sc-logo sc-capa">${r.capa ? `<img src="${esc(r.capa)}" alt="">` : ""}</span>
+          <span class="sc-txt"><b>${esc(r.marca)}</b><small>${esc(r.rotulo || "")} · ${esc(r.valor || "")}</small></span>
+          <span class="sc-acoes">${setas("resultados", i, rs.length)}<button class="icone-btn" type="button" data-sc-editar="resultados:${i}" aria-label="Editar">${ic("editar")}</button></span></li>`).join("") || `<li class="sub">Nenhum vídeo no carrossel.</li>`}</ul>
+      </div>
+      <div class="cartao">
+        <div class="barra"><h2 style="margin:0">Case em destaque</h2><span class="espaco"></span><button class="btn pequeno" type="button" data-sc-case>${ic("editar")}Editar case</button></div>
+        <div class="sc-case">${cs.print ? `<img src="${esc(urlSite(cs.print))}" alt="">` : ""}<div><b>${esc(cs.marca || "Sem case")}</b><p class="sub" style="margin:4px 0 0">${esc(cs.titulo || "")}${cs.numero ? ` · ${esc(cs.numero)} ${esc(cs.rotulo || "")}` : ""}</p></div></div>
+      </div>
+      <div class="cartao">
+        <div class="barra"><h2 style="margin:0">Faixa da Black Friday</h2><span class="espaco"></span><button class="btn pequeno" type="button" data-sc-bf>${ic("editar")}Editar faixa</button></div>
+        <p class="sub" style="margin:0">${bf.ativo === false ? "Desligada." : !bf.data ? "Sem data." : bfDias < 0 ? "A data já passou, a faixa não aparece." : `Ligada: ${bfDias === 0 ? "hoje é o dia" : `faltam ${bfDias} dias`} (${dataBR(bf.data)}).`}</p>
+        ${(bf.frases || []).length ? `<ul class="sc-frases">${bf.frases.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+      </div>
+    </div>`;
+  const mover = async (alvo, passo) => {
+    const [tipo, i] = alvo.split(":"); const k = Number(i), lista = [...(sc.dados[tipo] || [])], j = k + passo;
+    if (j < 0 || j >= lista.length) return;
+    [lista[k], lista[j]] = [lista[j], lista[k]];
+    if (await salvarSiteConteudo(tipo, lista)) desenharConteudoSite(el);
+  };
+  $$("[data-sc-sobe]", el).forEach((b) => b.onclick = () => mover(b.dataset.scSobe, -1));
+  $$("[data-sc-desce]", el).forEach((b) => b.onclick = () => mover(b.dataset.scDesce, 1));
+  $$("[data-sc-novo]", el).forEach((b) => b.onclick = () => (b.dataset.scNovo === "feedbacks" ? formFeedbackSite(el, null) : formResultadoSite(el, null)));
+  $$("[data-sc-editar]", el).forEach((b) => b.onclick = () => { const [tipo, i] = b.dataset.scEditar.split(":"); tipo === "feedbacks" ? formFeedbackSite(el, Number(i)) : formResultadoSite(el, Number(i)); });
+  $("[data-sc-case]", el).onclick = () => formCaseSite(el);
+  $("[data-sc-bf]", el).onclick = () => formBlackFridaySite(el);
+}
+
+function formFeedbackSite(el, i) {
+  const lista = [...(sc.dados.feedbacks || [])], t = i == null ? { estrelas: true } : lista[i];
+  abrirForm({
+    titulo: i == null ? "Novo feedback" : `Feedback: ${t.nome}`,
+    valores: { ...t, estrelas: t.estrelas !== false },
+    campos: [
+      { n: "nome", r: "Marca", req: true },
+      { n: "empresa", r: "Segmento (embaixo do nome)", ph: "Ex: Tecnologia, Moda, Agência" },
+      { n: "texto", r: "O que a marca disse", t: "textarea", req: true },
+      { n: "logo_arq", r: "Logo da marca (opcional)", t: "file", accept: "image/png,image/jpeg,image/webp", ajuda: t.logo ? "Já tem logo. Escolha outra só se quiser trocar." : "PNG ou JPG, de preferência quadrada." },
+      { n: "estrelas", r: "Mostrar as 5 estrelas", t: "check" },
+      { n: "empresa_en", r: "Segmento em inglês (opcional)" },
+      { n: "texto_en", r: "O que a marca disse, em inglês (opcional)", t: "textarea", ajuda: "Aparece quando a pessoa escolhe EN no site. Se ficar vazio, mostra em português." }
+    ],
+    aoSalvar: async (d, status) => {
+      let logo = t.logo || "";
+      if (d.logo_arq) { status("Enviando a logo..."); logo = await enviarArquivo(d.logo_arq, "logos-feedback", d.nome); if (!logo) return false; }
+      const novo = { nome: d.nome, empresa: d.empresa || "", empresa_en: d.empresa_en || "", texto: d.texto, texto_en: d.texto_en || "", logo, estrelas: d.estrelas };
+      if (i == null) lista.unshift(novo); else lista[i] = novo;
+      const ok = await salvarSiteConteudo("feedbacks", lista);
+      if (ok) desenharConteudoSite(el);
+      return ok;
+    },
+    aoApagar: i == null ? null : async () => { lista.splice(i, 1); const ok = await salvarSiteConteudo("feedbacks", lista); if (ok) desenharConteudoSite(el); return ok; }
+  });
+}
+
+function formResultadoSite(el, i) {
+  const lista = [...(sc.dados.resultados || [])], r = i == null ? {} : lista[i];
+  const atual = S.videos.find((v) => v.link === r.video);
+  const opcoes = [["", "Escolha um vídeo do portfólio"], ...S.videos.filter((v) => v.link).map((v) => [String(v.id), `${v.marca ? v.marca + " · " : ""}${v.titulo}`])];
+  abrirForm({
+    titulo: i == null ? "Novo vídeo no carrossel" : `Carrossel: ${r.marca}`,
+    valores: { ...r, video_id: atual ? String(atual.id) : "" },
+    campos: [
+      { n: "video_id", r: "Vídeo", t: "select", op: opcoes, inteiro: true, ajuda: i != null && !atual ? "O vídeo atual não está na lista do portfólio. Escolha um para trocar, ou deixe como está." : "" },
+      { n: "marca", r: "Nome em cima do vídeo", ph: "Se ficar vazio, usa a marca do vídeo" },
+      { n: "rotulo", r: "Rótulo (à esquerda)", ph: "Ex: Visualizações, Roteiro" },
+      { n: "valor", r: "Resultado (à direita, grande)", ph: "Ex: 2M, Elogiado" },
+      { n: "texto", r: "Frase embaixo", t: "textarea" },
+      { n: "rotulo_en", r: "Rótulo em inglês (opcional)" },
+      { n: "valor_en", r: "Resultado em inglês (opcional)" },
+      { n: "texto_en", r: "Frase em inglês (opcional)", t: "textarea" }
+    ],
+    aoSalvar: async (d) => {
+      const v = S.videos.find((x) => String(x.id) === d.video_id);
+      if (!v && !r.video) { avisar("Escolha um vídeo.", true); return false; }
+      const novo = { marca: d.marca || (v && v.marca) || r.marca || "", rotulo: d.rotulo || "", rotulo_en: d.rotulo_en || "", valor: d.valor || "", valor_en: d.valor_en || "", texto: d.texto || "", texto_en: d.texto_en || "",
+        video: v ? v.link : r.video, capa: v ? (v.capa || "") : r.capa };
+      if (i == null) lista.push(novo); else lista[i] = novo;
+      const ok = await salvarSiteConteudo("resultados", lista);
+      if (ok) desenharConteudoSite(el);
+      return ok;
+    },
+    aoApagar: i == null ? null : async () => { lista.splice(i, 1); const ok = await salvarSiteConteudo("resultados", lista); if (ok) desenharConteudoSite(el); return ok; }
+  });
+}
+
+function formCaseSite(el) {
+  const c = sc.dados.case || {}, rt = c.roteiro || {};
+  abrirForm({
+    titulo: "Case em destaque",
+    valores: { ...c, selos: (c.selos || []).join("\n"), selos_en: (c.selos_en || []).join("\n"), gancho: rt.gancho, desenvolvimento: rt.desenvolvimento, cta: rt.cta },
+    campos: [
+      { n: "marca", r: "Marca", req: true },
+      { n: "titulo", r: "Título", req: true },
+      { n: "numero", r: "Número em destaque", ph: "Ex: 2M" },
+      { n: "rotulo", r: "Texto do lado do número", ph: "Ex: de views no Instagram" },
+      { n: "print_arq", r: "Print do resultado (opcional)", t: "file", accept: "image/png,image/jpeg,image/webp", ajuda: c.print ? "Já tem print. Escolha outro só se quiser trocar." : "" },
+      { n: "desafio", r: "O desafio", t: "textarea" },
+      { n: "ideia", r: "A ideia", t: "textarea" },
+      { n: "resultado", r: "O resultado", t: "textarea" },
+      { n: "selos", r: "Selos (um por linha)", t: "textarea", ph: "1,5M em 2 dias" },
+      { n: "gancho", r: "Roteiro: gancho (opcional)", t: "textarea" },
+      { n: "desenvolvimento", r: "Roteiro: desenvolvimento (opcional)", t: "textarea" },
+      { n: "cta", r: "Roteiro: CTA (opcional)", t: "textarea" },
+      { n: "titulo_en", r: "Título em inglês (opcional)" },
+      { n: "rotulo_en", r: "Texto do número em inglês (opcional)" },
+      { n: "desafio_en", r: "O desafio em inglês (opcional)", t: "textarea" },
+      { n: "ideia_en", r: "A ideia em inglês (opcional)", t: "textarea" },
+      { n: "resultado_en", r: "O resultado em inglês (opcional)", t: "textarea" },
+      { n: "selos_en", r: "Selos em inglês, na mesma ordem (opcional)", t: "textarea" }
+    ],
+    aoSalvar: async (d, status) => {
+      let print = c.print || "";
+      if (d.print_arq) { status("Enviando o print..."); print = await enviarArquivo(d.print_arq, "cases", d.marca); if (!print) return false; }
+      const novo = { marca: d.marca, titulo: d.titulo, titulo_en: d.titulo_en || "", numero: d.numero || "", rotulo: d.rotulo || "", rotulo_en: d.rotulo_en || "", print,
+        desafio: d.desafio || "", desafio_en: d.desafio_en || "", ideia: d.ideia || "", ideia_en: d.ideia_en || "", resultado: d.resultado || "", resultado_en: d.resultado_en || "",
+        selos: linhasDoTexto(d.selos), selos_en: linhasDoTexto(d.selos_en), roteiro: { gancho: d.gancho || "", desenvolvimento: d.desenvolvimento || "", cta: d.cta || "" } };
+      const ok = await salvarSiteConteudo("case", novo);
+      if (ok) desenharConteudoSite(el);
+      return ok;
+    }
+  });
+}
+
+function formBlackFridaySite(el) {
+  const b = sc.dados.black_friday || { ativo: true };
+  abrirForm({
+    titulo: "Faixa da Black Friday",
+    valores: { ...b, ativo: b.ativo !== false, frases: (b.frases || []).join("\n"), frases_en: (b.frases_en || []).join("\n") },
+    campos: [
+      { n: "ativo", r: "Mostrar a faixa no site", t: "check" },
+      { n: "data", r: "Dia da Black Friday", t: "date", ajuda: "A contagem é automática. Depois desse dia a faixa some sozinha." },
+      { n: "frases", r: "Frases que giram (uma por linha)", t: "textarea" },
+      { n: "frases_en", r: "Frases em inglês, na mesma ordem (opcional)", t: "textarea" }
+    ],
+    aoSalvar: async (d) => {
+      const ok = await salvarSiteConteudo("black_friday", { ativo: d.ativo, data: d.data || "", frases: linhasDoTexto(d.frases), frases_en: linhasDoTexto(d.frases_en) });
+      if (ok) desenharConteudoSite(el);
+      return ok;
+    }
+  });
 }

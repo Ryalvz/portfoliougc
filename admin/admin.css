@@ -1111,3 +1111,21 @@ dialog.janela-larga { width: min(760px, calc(100vw - 24px)); }
 .menu-marca small { font-family: "Montserrat", sans-serif; letter-spacing: 2.5px; }
 .menu-item[aria-current="page"] { box-shadow: inset 2px 0 0 var(--olive); }
 dialog { border-radius: 16px; }
+
+/* ---------- Conteúdo do site (feedbacks, resultados, case, Black Friday) ---------- */
+.sc-grade { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+.sc-grade .cartao { margin: 0; }
+.sc-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; max-height: 420px; overflow: auto; }
+.sc-lista li { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--parchment); }
+.sc-logo { width: 34px; height: 34px; flex: none; border-radius: 50%; background: #fff; border: 1px solid var(--line); display: grid; place-items: center; overflow: hidden; font-weight: 700; color: var(--cobalt); }
+.sc-logo img { width: 100%; height: 100%; object-fit: contain; }
+.sc-capa { border-radius: 6px; width: 30px; height: 44px; }
+.sc-capa img { object-fit: cover; }
+.sc-txt { flex: 1; min-width: 0; }
+.sc-txt b { display: block; font-size: 13px; }
+.sc-txt small { display: block; color: var(--muted); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sc-acoes { display: flex; gap: 2px; flex: none; }
+.sc-case { display: flex; gap: 12px; align-items: center; }
+.sc-case img { width: 56px; height: 84px; object-fit: cover; border-radius: 8px; }
+.sc-frases { margin: 8px 0 0; padding-left: 18px; font-size: 13px; color: var(--text); }
+@media (max-width: 1100px) { .sc-grade { grid-template-columns: 1fr; } }
