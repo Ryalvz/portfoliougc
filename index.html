@@ -589,8 +589,8 @@
   .brands-track ul { padding: 26px 0; align-items: center; }
   .brands-track li { padding: 0 34px; gap: 0; }
   .brands-track li::after { display: none; }
-  .brands-track img { display: block; height: 34px; width: auto; max-width: 170px; object-fit: contain; }
-  @media (max-width: 700px) { .brands-track li { padding: 0 22px; } .brands-track img { height: 26px; max-width: 130px; } }
+  .brands-track img { display: block; height: var(--h, 34px); width: auto; }
+  @media (max-width: 700px) { .brands-track li { padding: 0 22px; } .brands-track img { height: calc(var(--h, 34px) * .78); } }
   @media (prefers-reduced-motion: reduce) { .brands-track ul[aria-hidden] { display: none; } .brands-track ul { flex-wrap: wrap; justify-content: center; row-gap: 18px; } }
   /* Feedbacks com a logo da marca */
   .t-topo .avatar.com-logo { background: #fff; border: 1px solid var(--line); overflow: hidden; }
@@ -876,58 +876,58 @@ const HERO_STATS = [
 ];
 
 // Marcas da faixa da capa
-// Faixa de logos: das marcas mais conhecidas para as menos. [nome, arquivo em logos/]
+// Faixa de logos: das marcas mais conhecidas para as menos. [nome, arquivo em logos/, largura ÷ altura da imagem]
 const BRANDS = [
-  ["Mercado Livre", "mercado-livre"],
-  ["L'Oréal Paris", "loreal"],
-  ["Canva", "canva"],
-  ["OLX", "olx"],
-  ["Pantene", "pantene"],
-  ["Oral-B", "oral-b"],
-  ["Rexona", "rexona"],
-  ["Hellmann's", "hellmanns"],
-  ["Sadia", "sadia"],
-  ["Mentos", "mentos"],
-  ["BIC", "bic"],
-  ["Omo", "omo"],
-  ["Downy", "downy"],
-  ["Tupperware", "tupperware"],
-  ["Jean Paul Gaultier", "jean-paul-gaultier"],
-  ["Veja", "veja"],
-  ["Piraquê", "piraque"],
-  ["Lojas Torra", "torra"],
-  ["Unopar", "unopar"],
-  ["Open English", "open-english"],
-  ["Lalamove", "lalamove"],
-  ["Panini", "panini"],
-  ["Alpecin", "alpecin"],
-  ["Neoenergia", "neoenergia"],
-  ["Iracema", "iracema"],
-  ["Coala", "coala"],
-  ["Di Santinni", "di-santinni"],
-  ["Matrix", "matrix"],
-  ["Beautyfair", "beautyfair"],
-  ["Zapay", "zapay"],
-  ["Zap", "zap"],
-  ["Brilhante", "brilhante"],
-  ["Emma", "emma"],
-  ["Skala", "skala"],
-  ["Frooty", "frooty"],
-  ["Ateliê", "atelie"],
-  ["Picnic", "picnic"],
-  ["Bagaggio", "bagaggio"],
-  ["Mezul", "mezul"],
-  ["Haag", "haag"],
-  ["Zorba", "zorba"],
-  ["Quadrix", "quadrix"],
-  ["Share Living", "share-living"],
-  ["Smart Gr", "smart-gr"],
-  ["Seu Influencer", "seu-influencer"],
-  ["Meu Anel Joias", "meu-anel"],
-  ["Método Polvo", "metodo-polvo"],
-  ["Passageiro de Primeira", "passageiro-de-primeira"],
-  ["Mentora Virtual", "mentora-virtual"],
-  ["Shopping Light", "shopping-light"]
+  ["Mercado Livre", "mercado-livre", 4.00],
+  ["L'Oréal Paris", "loreal", 3.71],
+  ["Canva", "canva", 3.09],
+  ["OLX", "olx", 1.90],
+  ["Pantene", "pantene", 5.85],
+  ["Oral-B", "oral-b", 3.71],
+  ["Rexona", "rexona", 1.17],
+  ["Hellmann's", "hellmanns", 1.99],
+  ["Sadia", "sadia", 1.98],
+  ["Mentos", "mentos", 5.71],
+  ["BIC", "bic", 3.25],
+  ["Omo", "omo", 1.86],
+  ["Downy", "downy", 1.68],
+  ["Tupperware", "tupperware", 5.78],
+  ["Jean Paul Gaultier", "jean-paul-gaultier", 2.64],
+  ["Veja", "veja", 1.04],
+  ["Piraquê", "piraque", 1.00],
+  ["Lojas Torra", "torra", 2.16],
+  ["Unopar", "unopar", 3.77],
+  ["Open English", "open-english", 2.58],
+  ["Lalamove", "lalamove", 3.59],
+  ["Panini", "panini", 4.34],
+  ["Alpecin", "alpecin", 1.74],
+  ["Neoenergia", "neoenergia", 1.08],
+  ["Iracema", "iracema", 3.20],
+  ["Coala", "coala", 2.67],
+  ["Di Santinni", "di-santinni", 3.82],
+  ["Matrix", "matrix", 5.16],
+  ["Beautyfair", "beautyfair", 3.55],
+  ["Zapay", "zapay", 3.82],
+  ["Zap", "zap", 2.24],
+  ["Brilhante", "brilhante", 3.80],
+  ["Emma", "emma", 4.07],
+  ["Skala", "skala", 3.36],
+  ["Frooty", "frooty", 1.73],
+  ["Ateliê", "atelie", 1.79],
+  ["Picnic", "picnic", 3.02],
+  ["Bagaggio", "bagaggio", 6.96],
+  ["Mezul", "mezul", 5.71],
+  ["Haag", "haag", 4.01],
+  ["Zorba", "zorba", 2.56],
+  ["Quadrix", "quadrix", 4.02],
+  ["Share Living", "share-living", 2.80],
+  ["Smart Gr", "smart-gr", 4.89],
+  ["Seu Influencer", "seu-influencer", 1.14],
+  ["Meu Anel Joias", "meu-anel", 2.11],
+  ["Método Polvo", "metodo-polvo", 0.84],
+  ["Passageiro de Primeira", "passageiro-de-primeira", 5.27],
+  ["Mentora Virtual", "mentora-virtual", 2.93],
+  ["Shopping Light", "shopping-light", 1.91]
 ];
 
 // Três vídeos de destaque.
@@ -1011,7 +1011,9 @@ $("#hero-stats").innerHTML = HERO_STATS.map((s) =>
 ).join("");
 
 // Faixa de marcas (duplicada para o movimento contínuo)
-const brandList = (hidden) => `<ul${hidden ? ' aria-hidden="true"' : ""}>${BRANDS.map(([nome, arq]) => `<li><img src="logos/${arq}.png" alt="${hidden ? "" : esc(nome)}" loading="lazy" decoding="async"></li>`).join("")}</ul>`;
+// Tamanho ótico igual: cada logo ocupa a mesma área, então logo alta e estreita fica mais alta e logo comprida fica mais baixa
+const alturaLogo = (prop) => Math.min(56, Math.max(24, Math.sqrt(4050 / prop)));
+const brandList = (hidden) => `<ul${hidden ? ' aria-hidden="true"' : ""}>${BRANDS.map(([nome, arq, prop]) => { const h = alturaLogo(prop); return `<li><img src="logos/${arq}.png" alt="${hidden ? "" : esc(nome)}" width="${Math.round(h * prop)}" height="${Math.round(h)}" style="--h:${h.toFixed(1)}px" decoding="async"></li>`; }).join("")}</ul>`;
 $("#brands-track").innerHTML = brandList(false) + brandList(true);
 
 // Seções sem dados reais ficam escondidas (nada de "Marca 01" no ar)
