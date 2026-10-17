@@ -674,6 +674,37 @@
   .faixa-clara .faixa-trilho { animation-direction: reverse; }
   .faixa-trilho i { font-style: normal; opacity: .6; font-size: 14px; }
   @media (max-width: 700px) { .faixa { padding: 11px 0; } .faixa-trilho { font-size: 17px; } }
+  /* Carrossel dos resultados, estilo vitrine */
+  .res-carrossel .results { height: 760px; }
+  .res-carrossel .result-v { width: 330px; margin-left: -165px; }
+  .result-v h4 { font-family: var(--head); font-weight: 700; font-size: 22px; letter-spacing: .5px; text-transform: uppercase; margin: 0 0 16px; color: var(--cobalt); }
+  .result-v[data-pos="-1"], .result-v[data-pos="1"] { opacity: .35; filter: blur(3px) saturate(.7); }
+  .result-v[data-pos="-1"] { transform: translateX(-72%) scale(.84); }
+  .result-v[data-pos="1"] { transform: translateX(72%) scale(.84); }
+  .result-video { border-radius: 20px; }
+  .result-video video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .result-v[data-pos="0"] .result-play { opacity: 0; transition: opacity .25s; }
+  .result-v[data-pos="0"] .result-video:hover .result-play { opacity: 1; }
+  .result-som { position: absolute; left: 50%; bottom: 14px; translate: -50% 0; padding: 6px 12px; border-radius: 999px; background: rgba(24, 19, 14, .55); color: #fff; font-size: 12px; font-weight: 600; letter-spacing: .3px; backdrop-filter: blur(4px); opacity: 0; transition: opacity .3s; }
+  .result-v[data-pos="0"] .result-som { opacity: 1; }
+  .result-linha { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); text-align: left; }
+  .result-linha span, .result-linha b, .result-som { white-space: nowrap; }
+  .result-linha span { font-size: 12px; font-weight: 600; letter-spacing: 1.6px; text-transform: uppercase; color: var(--muted); }
+  .result-linha b { font-family: var(--head); font-weight: 700; font-size: 28px; color: var(--cobalt); line-height: 1; }
+  .result-v p { text-align: left; margin-top: 8px; }
+  .result-v:not([data-pos="0"]) .result-linha, .result-v:not([data-pos="0"]) p { opacity: 0; }
+  .result-linha { transition: opacity .3s; }
+  .res-seta { top: 300px; }
+  @media (max-width: 899px) {
+    .res-carrossel .results { height: 650px; }
+    .res-carrossel .result-v { width: 250px; margin-left: -125px; }
+    .result-v h4 { font-size: 17px; }
+    .result-v[data-pos="-1"] { transform: translateX(-64%) scale(.78); }
+    .result-v[data-pos="1"] { transform: translateX(64%) scale(.78); }
+    .result-linha b { font-size: 19px; }
+    .result-linha span { font-size: 10.5px; letter-spacing: 1.2px; }
+    .res-seta { top: 230px; }
+  }
 </style>
 
 </head>
@@ -1089,9 +1120,9 @@ const METRICS = [
 const ST = "https://jlehawiwklvyvrzbfuiu.supabase.co/storage/v1/object/public/portfolio/";
 // Resultados: só o que é real (número da marca, aprovação ou elogio). video/capa: arquivos do Storage
 const RESULTS = [
-  { marca: "EITA Mentora Virtual", numero: "Vídeo mais aprovado", titulo: "pela marca na campanha", texto: "Verdade e storytelling: uma história real da minha vida", video: ST + "videos/canva-c911bd2eb816417aca1eeec774f1d39c.mp4", capa: ST + "capas/canva-c911bd2eb816417aca1eeec774f1d39c.jpg" },
-  { marca: "Di Santinni", numero: "+2M", titulo: "de views em um vídeo", texto: "Quebra de padrão no Dia dos Namorados", video: ST + "videos/disantinni-namorados.mp4", capa: ST + "capas/disantinni-namorados.jpg" },
-  { marca: "Canva", numero: "Roteiro elogiado", titulo: "pela equipe do Canva", texto: "\u201cUma das melhores linhas que recebemos até agora\u201d", video: ST + "videos/1791826892574-canva-ia.mp4", capa: ST + "capas/1791827002580-capa-canva.jpg" }
+  { marca: "EITA Mentora Virtual", rotulo: "Na campanha", valor: "Mais aprovado", texto: "Verdade e storytelling: uma história real da minha vida", video: ST + "videos/canva-c911bd2eb816417aca1eeec774f1d39c.mp4", capa: ST + "capas/canva-c911bd2eb816417aca1eeec774f1d39c.jpg" },
+  { marca: "Di Santinni", rotulo: "Visualizações", valor: "2M", texto: "Quebra de padrão no Dia dos Namorados", video: ST + "videos/disantinni-namorados.mp4", capa: ST + "capas/disantinni-namorados.jpg" },
+  { marca: "Canva", rotulo: "Roteiro", valor: "Elogiado", texto: "\u201cUma das melhores linhas que recebemos até agora\u201d", video: ST + "videos/1791826892574-canva-ia.mp4", capa: ST + "capas/1791827002580-capa-canva.jpg" }
 ];
 
 // Case em destaque. PREENCHA os campos vazios ("") com o texto real:
@@ -1325,12 +1356,12 @@ $("#metrics").innerHTML = METRICS.map((m) => `
 $("#results").innerHTML = RESULTS.map((r) => `
   <article class="result-v">
     <h4>${esc(r.marca)}</h4>
-    <button class="result-video work-video" type="button" data-video="${esc(r.video)}" data-title="${esc(r.marca)}" aria-label="Assistir o vídeo da ${esc(r.marca)}">
-      <img src="${esc(r.capa)}" alt="" loading="lazy">
+    <button class="result-video work-video" type="button" data-video="${esc(r.video)}" data-title="${esc(r.marca)}" aria-label="Assistir o vídeo da ${esc(r.marca)} com som">
+      <video muted playsinline loop preload="none" poster="${esc(r.capa)}" src="${esc(r.video)}"></video>
       <span class="result-play" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></span>
+      <span class="result-som" aria-hidden="true">toque para ouvir</span>
     </button>
-    <div class="big">${esc(r.numero)}</div>
-    <div class="what">${esc(r.titulo)}</div>
+    <div class="result-linha"><span>${esc(r.rotulo)}</span><b>${esc(r.valor)}</b></div>
     <p>${esc(r.texto)}</p>
   </article>`).join("");
 // Carrossel dos resultados: um no centro, os vizinhos menores atrás. Clicar num de trás traz ele pro centro
@@ -1343,7 +1374,11 @@ $("#results").innerHTML = RESULTS.map((r) => `
     c.setAttribute("aria-hidden", d !== 0);
     c.querySelector("button").tabIndex = d === 0 ? 0 : -1;
   });
-  const ir = (passo) => { atual = (atual + passo + n) % n; pos(); };
+  const vids = cards.map((c) => c.querySelector("video"));
+  let naTela = false;
+  const tocar = () => vids.forEach((v, k) => { if (naTela && k === atual && !reduceMotion) v.play().catch(() => {}); else v.pause(); });
+  if ("IntersectionObserver" in window) new IntersectionObserver((en) => { naTela = en[0].isIntersecting; tocar(); }, { threshold: .35 }).observe(caixa);
+  const ir = (passo) => { atual = (atual + passo + n) % n; pos(); tocar(); };
   // Clique num card de trás: só gira (não abre o vídeo)
   caixa.addEventListener("click", (e) => {
     const c = e.target.closest(".result-v");
@@ -1517,7 +1552,7 @@ function ligarCardsVideo() {
   document.querySelectorAll(".work-video:not([data-ligado])").forEach((card) => {
     card.dataset.ligado = "1";
     const preview = card.querySelector("video");
-    if (preview && !reduceMotion) {
+    if (preview && !reduceMotion && !card.classList.contains("result-video")) {
       card.addEventListener("mouseenter", () => { preview.play().then(() => card.classList.add("playing")).catch(() => {}); });
       card.addEventListener("mouseleave", () => { preview.pause(); card.classList.remove("playing"); });
     }
