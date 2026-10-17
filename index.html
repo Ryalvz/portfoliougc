@@ -783,6 +783,8 @@
   @media (min-width: 900px) and (max-width: 1099px) { .row .row-scroller { grid-auto-columns: calc((100% - 60px) / 4); gap: 20px; } }
   /* Vídeos dos nichos um pouco maiores (continua 5 por tela, com borda) */
   #trabalhos .wrap { max-width: 1440px; }
+  /* A capa não passa de 900px de altura (no celular a "altura da tela" fica enorme) */
+  .hero { min-height: min(100vh, 900px); min-height: min(100svh, 900px); }
 </style>
 
 </head>
