@@ -1900,11 +1900,9 @@ function traduzirTudo(raiz) {
   });
 }
 const LANG = (() => { try { return new URLSearchParams(location.search).get("lang") || localStorage.getItem("lang") || "pt"; } catch (_) { return "pt"; } })();
-document.querySelectorAll("[data-lang]").forEach((b) => {
-  b.setAttribute("aria-pressed", b.dataset.lang === LANG);
-  b.addEventListener("click", () => { try { localStorage.setItem("lang", b.dataset.lang); } catch (_) {} const u = new URL(location.href); u.searchParams.delete("lang"); location.href = u.pathname + u.hash; });
-});
-if (LANG === "en") {
+let emIngles = false;
+function ativarIngles() {
+  if (emIngles) return; emIngles = true;
   document.documentElement.lang = "en";
   document.title = "Ryan Alves | UGC Creator Portfolio";
   traduzirTudo(document.body);
@@ -1915,6 +1913,18 @@ if (LANG === "en") {
     setTimeout(() => { const ms = fila; fila = []; ms.forEach((m) => { if (m.type === "characterData") { const x = traduz(m.target.textContent); if (x != null && x !== m.target.textContent) m.target.textContent = x; } else m.addedNodes.forEach((a) => { if (a.nodeType === 1) traduzirTudo(a); else if (a.nodeType === 3) { const x = traduz(a.textContent); if (x != null && x !== a.textContent) a.textContent = x; } }); }); }, 30);
   }).observe(document.body, { childList: true, subtree: true, characterData: true });
 }
+const marcarIdioma = (l) => document.querySelectorAll("[data-lang]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.lang === l));
+marcarIdioma(LANG);
+// Clicou: inglês traduz na hora, sem sair do lugar; português recarrega a página no mesmo ponto
+document.querySelectorAll("[data-lang]").forEach((b) => b.addEventListener("click", () => {
+  const l = b.dataset.lang;
+  try { localStorage.setItem("lang", l); } catch (_) {}
+  if (l === "en") { marcarIdioma("en"); ativarIngles(); return; }
+  if (!emIngles) { marcarIdioma("pt"); return; }
+  history.replaceState(null, "", location.pathname + location.hash);
+  location.reload();
+}));
+if (LANG === "en") ativarIngles();
 
 </script>
 </body>
