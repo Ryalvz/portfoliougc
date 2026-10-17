@@ -760,6 +760,11 @@
   /* Faixas inclinadas: o fundo de trás é das duas seções, sem frestas */
   .faixa-wrap { position: relative; z-index: 3; padding: 14px 0; }
   .faixa-wrap .faixa { margin: 0 -3vw; }
+  /* Vídeo do carrossel tocando com som: etiqueta discreta, sem contorno escuro ao clicar */
+  .result-video:focus { outline: none; }
+  .result-video:focus-visible { outline: 2px solid var(--olive); outline-offset: 4px; }
+  .result-v.com-som .result-som { opacity: 0; }
+  .result-v.com-som .result-video:hover .result-som { opacity: 1; }
 </style>
 
 </head>
@@ -1383,7 +1388,7 @@ $("#metrics").innerHTML = METRICS.map((m) => `
 $("#results").innerHTML = RESULTS.map((r) => `
   <article class="result-v">
     <h4>${esc(r.marca)}</h4>
-    <button class="result-video work-video" type="button" data-video="${esc(r.video)}" data-title="${esc(r.marca)}" aria-label="Assistir o vídeo da ${esc(r.marca)} com som">
+    <button class="result-video" type="button" aria-label="Ouvir o vídeo da ${esc(r.marca)} com som">
       <video muted playsinline loop preload="none" poster="${esc(r.capa)}" src="${esc(r.video)}"></video>
       <span class="result-play" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></span>
       <span class="result-som" aria-hidden="true">toque para ouvir</span>
@@ -1405,7 +1410,20 @@ $("#results").innerHTML = RESULTS.map((r) => `
   let naTela = false;
   const tocar = () => vids.forEach((v, k) => { if (naTela && k === atual && !reduceMotion) v.play().catch(() => {}); else v.pause(); });
   if ("IntersectionObserver" in window) new IntersectionObserver((en) => { naTela = en[0].isIntersecting; tocar(); }, { threshold: .35 }).observe(caixa);
-  const ir = (passo) => { atual = (atual + passo + n) % n; pos(); tocar(); };
+  // O vídeo do centro roda aqui mesmo: 1º toque liga o som do começo, depois pausa e continua
+  const etiqueta = (k) => { const v = vids[k], et = cards[k].querySelector(".result-som"); et.textContent = v.muted ? "toque para ouvir" : v.paused ? "toque para continuar" : "toque para pausar"; cards[k].classList.toggle("com-som", !v.muted && !v.paused); };
+  const silenciar = () => vids.forEach((v, k) => { if (!v.muted) { v.muted = true; etiqueta(k); } });
+  caixa.addEventListener("click", (e) => {
+    const b = e.target.closest(".result-v[data-pos='0'] .result-video");
+    if (!b) return;
+    const v = vids[atual];
+    if (v.muted) { v.muted = false; v.currentTime = 0; v.play().catch(() => {}); }
+    else if (v.paused) v.play().catch(() => {});
+    else v.pause();
+    etiqueta(atual);
+  });
+  vids.forEach((v, k) => { v.addEventListener("play", () => etiqueta(k)); v.addEventListener("pause", () => etiqueta(k)); });
+  const ir = (passo) => { silenciar(); atual = (atual + passo + n) % n; pos(); tocar(); };
   // Clique num card de trás: só gira (não abre o vídeo)
   caixa.addEventListener("click", (e) => {
     const c = e.target.closest(".result-v");
