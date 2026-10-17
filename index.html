@@ -863,9 +863,9 @@
         <h1 id="hero-title">Ryan <span>Alves</span></h1>
         <p class="hero-sub">Vendi por 12 anos antes de gravar o primeiro vídeo. Por isso cada roteiro começa pela objeção do seu cliente, não pela câmera.</p>
         <div class="hero-btns">
-          <a class="btn btn-primary" href="https://wa.me/5511913012249?text=Oi%20Ryan%2C%20vi%20seu%20portf%C3%B3lio%20e%20quero%20conversar%20sobre%20UGC%20para%20a%20minha%20marca." target="_blank" rel="noopener">
-            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm4.5 12.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.4.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.4.1-.7.3-.2.3-.9.9-.9 2.2s.9 2.5 1 2.7c.1.2 1.8 2.8 4.4 3.9 1.6.7 2.3.8 3.1.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3z"/></svg>
-            Falar no WhatsApp
+          <a class="btn btn-primary" href="#contato" data-ir-form>
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm0 2v.5l8 5 8-5V6H4zm16 2.8-8 5-8-5V18h16V8.8z"/></svg>
+            Quero um orçamento
           </a>
           <a class="btn btn-ghost" href="#trabalhos">
             <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
@@ -1647,6 +1647,9 @@ $("#contact-form").addEventListener("submit", async (e) => {
 });
 
 /* ---------- Faixa da Black Friday ---------- */
+document.querySelectorAll("[data-ir-form]").forEach((b) => b.addEventListener("click", () => {
+  setTimeout(() => { const n = document.getElementById("c-nome"); if (n) n.focus({ preventScroll: true }); }, 700);
+}));
 document.getElementById("bf-reservar").addEventListener("click", () => {
   const msg = document.getElementById("c-msg");
   if (msg && !msg.value.trim()) msg.value = document.documentElement.lang === "en" ? "Hi Ryan! I'd like to book a slot for Black Friday. " : "Oi Ryan! Quero reservar agenda pra Black Friday. ";
@@ -1824,7 +1827,7 @@ const EN = {
   "Trabalhe comigo": "Work with me",
   "Creator · Tech & Lifestyle": "Creator · Tech & Lifestyle",
   "Vendi por 12 anos antes de gravar o primeiro vídeo. Por isso cada roteiro começa pela objeção do seu cliente, não pela câmera.": "I spent 12 years in sales before filming my first video. That's why every script starts with your customer's objections, not the camera.",
-  "Falar no WhatsApp": "Chat on WhatsApp",
+  "Falar no WhatsApp": "Chat on WhatsApp", "Quero um orçamento": "Get a quote",
   "Ver os trabalhos": "See my work",
   "em vendas B2B": "in B2B sales",
   "de views em um vídeo · Di Santinni": "views on one video · Di Santinni",
