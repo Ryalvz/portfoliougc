@@ -411,7 +411,7 @@
   .form { border-radius: var(--radius); padding: 28px; box-shadow: 14px 14px 0 var(--olive); }
   .field { margin-bottom: 18px; }
   .field label { display: block; font-weight: 600; margin-bottom: 6px; font-size: 15px; }
-  .field input, .field textarea {
+  .field input, .field textarea, .field select {
     width: 100%; background: var(--parchment); color: var(--cobalt); border: 2px solid transparent; border-radius: 4px; padding: 13px 14px; font-size: 16px;
     transition: border-color .2s;
   }
@@ -566,7 +566,7 @@
 
   /* Contato */
   .form { box-shadow: 0 30px 70px rgba(43, 36, 28, .22); border-radius: 20px; }
-  .field input, .field textarea { border-radius: 10px; }
+  .field input, .field textarea, .field select { border-radius: 10px; }
   .channel { border-radius: 14px; border-width: 1px; background: var(--paper); }
   .channel:hover { border-color: var(--olive); }
   .channel .ico { background: var(--cobalt); }
@@ -638,6 +638,19 @@
     .res-grid .results::-webkit-scrollbar { display: none; }
     .res-grid .result-v { flex: 0 0 72%; scroll-snap-align: center; }
   }
+  /* Case em destaque: print do insight ao lado da história */
+  .case { display: grid; grid-template-columns: minmax(0, 300px) 1fr; gap: 48px; align-items: center; margin: 64px 0 8px; background: var(--paper); border: 1px solid var(--line); border-radius: 22px; padding: 34px; }
+  .case-print { margin: 0; }
+  .case-print img { width: 100%; display: block; border-radius: 16px; box-shadow: 0 18px 40px rgba(43, 36, 28, .16); }
+  .case-txt h3 { font-size: clamp(26px, 3vw, 36px); margin: 10px 0 8px; }
+  .case-num { margin: 0 0 18px; color: var(--muted); }
+  .case-num b { font-family: var(--head); font-size: 44px; font-weight: 500; color: var(--olive); margin-right: 6px; vertical-align: -4px; }
+  .case-txt h4 { font-family: var(--body); font-size: 12px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--olive); margin: 20px 0 6px; }
+  .case-txt p { margin: 0; }
+  .case-roteiro { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; counter-reset: passo; }
+  .case-roteiro li { display: grid; grid-template-columns: 150px 1fr; gap: 12px; padding: 12px 14px; border-radius: 12px; background: var(--sand); }
+  @media (max-width: 760px) { .case { grid-template-columns: 1fr; padding: 22px; gap: 26px; } .case-print { max-width: 260px; margin: 0 auto; } .case-roteiro li { grid-template-columns: 1fr; gap: 2px; } }
+  .field select { appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%23A8864A%27 stroke-width=%272%27%3E%3Cpath d=%27m6 9 6 6 6-6%27/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; background-size: 18px; padding-right: 42px; cursor: pointer; }
 </style>
 
 </head>
@@ -686,7 +699,7 @@
         <!-- Números da capa: o valor final já fica escrito aqui (o script só anima quando aparece na tela) -->
         <div class="hero-stats" id="hero-stats">
           <div><strong data-count="12" data-suffix=" anos">12 anos</strong><span>em vendas B2B</span></div>
-          <div><strong data-count="2" data-suffix="M+">2M+</strong><span>de alcance em um vídeo · Di Santinni</span></div>
+          <div><strong data-count="2" data-suffix="M+">2M+</strong><span>de views em um vídeo · Di Santinni</span></div>
           <div><strong data-count="72" data-suffix="h">72h</strong><span>para entregar, roteiro aprovado antes</span></div>
         </div>
       </div>
@@ -797,6 +810,8 @@
       </div>
       <!-- Métricas: array METRICS. Resultados: array RESULTS. Depoimentos: array TESTIMONIALS. -->
       <div class="metrics" id="metrics"></div>
+      <!-- Case em destaque: objeto CASE no script -->
+      <article class="case reveal" id="case" aria-labelledby="case-title"></article>
       <h3 class="sub-title reveal">O que as marcas dizem</h3>
       <div class="testi-carrossel reveal">
         <button class="testi-seta" type="button" data-dir="-1" aria-label="Feedbacks anteriores"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg></button>
@@ -834,6 +849,16 @@
             <div class="field">
               <label for="c-whats">WhatsApp (opcional)</label>
               <input id="c-whats" name="whats" type="tel" autocomplete="tel" maxlength="30" placeholder="(11) 90000-0000">
+            </div>
+            <div class="field">
+              <label for="c-orc">Orçamento estimado</label>
+              <select id="c-orc" name="orcamento">
+                <option value="">Escolha uma opção</option>
+                <option>Até R$1 mil</option>
+                <option>R$1 mil a R$3 mil</option>
+                <option>Acima de R$3 mil</option>
+                <option>Ainda não sei</option>
+              </select>
             </div>
             <div class="field">
               <label for="c-msg">Mensagem</label>
@@ -1020,7 +1045,7 @@ const SERVICES = [
 // Quatro métricas da seção de números. TROQUE os 0 pelos seus números reais.
 const METRICS = [
   { valor: 50, prefixo: "+", sufixo: "",      rotulo: "marcas atendidas" },
-  { valor: 2,  prefixo: "+", sufixo: "M",     rotulo: "de alcance em um único vídeo" },
+  { valor: 2,  prefixo: "+", sufixo: "M",     rotulo: "de views em um único vídeo" },
   { valor: 12, prefixo: "",  sufixo: " anos", rotulo: "em vendas antes do UGC" },
   { valor: 5,  prefixo: "",  sufixo: "",      rotulo: "nichos atendidos" }
 ];
@@ -1032,9 +1057,22 @@ const ST = "https://jlehawiwklvyvrzbfuiu.supabase.co/storage/v1/object/public/po
 // Resultados: só o que é real (número da marca, aprovação ou elogio). video/capa: arquivos do Storage
 const RESULTS = [
   { marca: "EITA Mentora Virtual", numero: "Vídeo mais aprovado", titulo: "pela marca na campanha", texto: "Verdade e storytelling: uma história real da minha vida", video: ST + "videos/canva-c911bd2eb816417aca1eeec774f1d39c.mp4", capa: ST + "capas/canva-c911bd2eb816417aca1eeec774f1d39c.jpg" },
-  { marca: "Di Santinni", numero: "+2M", titulo: "de alcance em um vídeo", texto: "Quebra de padrão no Dia dos Namorados", video: ST + "videos/disantinni-namorados.mp4", capa: ST + "capas/disantinni-namorados.jpg" },
+  { marca: "Di Santinni", numero: "+2M", titulo: "de views em um vídeo", texto: "Quebra de padrão no Dia dos Namorados", video: ST + "videos/disantinni-namorados.mp4", capa: ST + "capas/disantinni-namorados.jpg" },
   { marca: "Canva", numero: "Roteiro elogiado", titulo: "pela equipe do Canva", texto: "\u201cUma das melhores linhas que recebemos até agora\u201d", video: ST + "videos/1791826892574-canva-ia.mp4", capa: ST + "capas/1791827002580-capa-canva.jpg" }
 ];
+
+// Case em destaque. PREENCHA os campos vazios ("") com o texto real:
+// enquanto um campo estiver vazio, a parte dele simplesmente não aparece no site.
+const CASE = {
+  marca: "Di Santinni",
+  titulo: "Quebra de padrão no Dia dos Namorados",
+  numero: "2M",
+  rotulo: "de views no Instagram",
+  print: "cases/disantinni-2mi.jpg",
+  desafio: "",          // PREENCHA: o que a marca precisava (ex: vender o chinelo no Dia dos Namorados)
+  ideia: "Fugir do óbvio que todo mundo posta no Dia dos Namorados e quebrar o padrão logo no primeiro segundo.", // CONFIRA
+  roteiro: { gancho: "", desenvolvimento: "", cta: "" } // PREENCHA: as falas ou a ideia de cada parte
+};
 
 // Quatro depoimentos (placeholders: troque pelo texto real de cada cliente)
 // Avaliações reais das marcas na plataforma SeuInfluencer (todas 5 estrelas)
@@ -1263,6 +1301,20 @@ $("#results").innerHTML = RESULTS.map((r) => `
     <p>${esc(r.texto)}</p>
   </article>`).join("");
 
+(() => {
+  const c = CASE, partes = [["Gancho", c.roteiro.gancho], ["Desenvolvimento", c.roteiro.desenvolvimento], ["CTA", c.roteiro.cta]].filter(([, t]) => t);
+  $("#case").innerHTML = `
+    <figure class="case-print"><img src="${esc(c.print)}" alt="Print do Instagram: ${esc(c.numero)} de views no vídeo da ${esc(c.marca)}" loading="lazy"></figure>
+    <div class="case-txt">
+      <span class="eyebrow">Case ${esc(c.marca)}</span>
+      <h3 id="case-title">${esc(c.titulo)}</h3>
+      <p class="case-num"><b>${esc(c.numero)}</b> ${esc(c.rotulo)}</p>
+      ${c.desafio ? `<h4>O desafio</h4><p>${esc(c.desafio)}</p>` : ""}
+      ${c.ideia ? `<h4>A ideia</h4><p>${esc(c.ideia)}</p>` : ""}
+      ${partes.length ? `<h4>O roteiro</h4><ol class="case-roteiro">${partes.map(([n, t]) => `<li><b>${n}</b><span>${esc(t)}</span></li>`).join("")}</ol>` : ""}
+    </div>`;
+})();
+
 $("#testimonials").innerHTML = TESTIMONIALS.map((t) => `
   <figure class="testimonial">
     <figcaption class="t-topo">
@@ -1365,6 +1417,7 @@ $("#contact-form").addEventListener("submit", async (e) => {
   const marca = f.marca.value.trim();
   const email = f.email.value.trim();
   const whats = f.whats.value.trim();
+  const orc = f.orcamento.value;
   const msg = f.mensagem.value.trim();
   let bad = null;
   if (!nome) bad = f.nome; else if (!isEmail(email)) bad = f.email; else if (!msg) bad = f.mensagem;
@@ -1385,7 +1438,8 @@ $("#contact-form").addEventListener("submit", async (e) => {
       marca: marca ? marca.slice(0, 150) : null,
       email: email.slice(0, 200),
       whats: whats ? whats.slice(0, 40) : null,
-      mensagem: msg.slice(0, 3000)
+      // O orçamento vai na primeira linha da mensagem (aparece no painel e no aviso do celular)
+      mensagem: ((orc ? `Orçamento estimado: ${orc}\n\n` : "") + msg).slice(0, 3000)
     });
   } catch (_) {
     btn.disabled = false;
@@ -1460,7 +1514,17 @@ function closeModal() {
   document.body.style.overflow = "";
   if (lastFocus && lastFocus.focus) lastFocus.focus();
 }
-setTimeout(openModal, 7000);
+// Abre quando a pessoa passa da seção de trabalhos, ou quando o mouse sai pelo topo da janela (computador)
+if ("IntersectionObserver" in window) {
+  const kitObs = new IntersectionObserver((entries) => {
+    if (entries.some((en) => en.isIntersecting)) { kitObs.disconnect(); setTimeout(openModal, 1200); }
+  });
+  kitObs.observe($("#servicos"));
+}
+if (window.matchMedia("(pointer: fine) and (min-width: 900px)").matches) {
+  const saida = (e) => { if (!e.relatedTarget && e.clientY <= 0) { document.removeEventListener("mouseout", saida); openModal(); } };
+  setTimeout(() => document.addEventListener("mouseout", saida), 4000);
+}
 
 modal.addEventListener("click", (e) => { if (e.target.closest("[data-close]")) closeModal(); });
 document.addEventListener("keydown", (e) => {
