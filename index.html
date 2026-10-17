@@ -807,6 +807,7 @@
   .nav nav { position: absolute; left: 50%; transform: translateX(-50%); }
   .nav-links { justify-content: center; }
   .lang { margin-left: auto; }
+  .sub-title em { font-style: italic; color: var(--olive); font-weight: 400; }
 </style>
 
 </head>
@@ -983,7 +984,7 @@
       <!-- Métricas: array METRICS. Resultados: array RESULTS. Depoimentos: array TESTIMONIALS. -->
       <!-- Case em destaque: objeto CASE no script -->
       <article class="case reveal" id="case" aria-labelledby="case-title"></article>
-      <h3 class="sub-title reveal">O que as marcas dizem</h3>
+      <h3 class="sub-title reveal">O que dizem <em>sobre o trabalho</em></h3>
       <div class="testi-carrossel reveal">
         <button class="testi-seta" type="button" data-dir="-1" aria-label="Feedbacks anteriores"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg></button>
         <div class="testimonials" id="testimonials" tabindex="0" aria-label="Feedbacks das marcas"></div>
@@ -1215,9 +1216,9 @@ const CASE = {
 // Avaliações reais das marcas na plataforma SeuInfluencer (todas 5 estrelas)
 const TESTIMONIALS = [
   // selo: aparece no lugar das estrelas. semNota: true esconde as estrelas (feedback que veio sem nota, fora da SeuInfluencer)
-  { texto: "Adoramos os dois roteiros: a escrita está excelente, a direção de cena é muito bem pensada e a linha \"isso não é mágica. É Canva.\" é uma das melhores que recebemos até agora. Os vídeos ficaram ótimos e adoramos trabalhar com você.", nome: "Canva", empresa: "Equipe de marketing", logo: "fb-canva", semNota: true },
-  { texto: "Só passando pra agradecer demais pelo trabalho. Dá pra sentir a dedicação em cada detalhe, e a atenção e o carinho que você teve nos ajustes fez toda a diferença. Ficou exatamente como a gente precisava.", nome: "EITA Mentora Virtual", empresa: "Tecnologia", logo: "fb-mentora-virtual", semNota: true },
-  { texto: "Adorei sua forma de criar, e o conteúdo estava super alinhado com o que buscamos por aqui! Além de extremamente comunicativo, profissional e pontual, amamos a sua entrega e dedicação com o nosso conteúdo!", nome: "Shopping Light", empresa: "Shopping", logo: "fb-shopping-light", semNota: true },
+  { texto: "Adoramos os dois roteiros: a escrita está excelente, a direção de cena é muito bem pensada e a linha \"isso não é mágica. É Canva.\" é uma das melhores que recebemos até agora. Os vídeos ficaram ótimos e adoramos trabalhar com você.", nome: "Canva", empresa: "Equipe de marketing", logo: "fb-canva" },
+  { texto: "Só passando pra agradecer demais pelo trabalho. Dá pra sentir a dedicação em cada detalhe, e a atenção e o carinho que você teve nos ajustes fez toda a diferença. Ficou exatamente como a gente precisava.", nome: "EITA Mentora Virtual", empresa: "Tecnologia", logo: "fb-mentora-virtual" },
+  { texto: "Adorei sua forma de criar, e o conteúdo estava super alinhado com o que buscamos por aqui! Além de extremamente comunicativo, profissional e pontual, amamos a sua entrega e dedicação com o nosso conteúdo!", nome: "Shopping Light", empresa: "Shopping", logo: "fb-shopping-light" },
   { texto: "Passando só para elogiar o seu vídeo. Ficou extremamente natural, cativante e com uma qualidade técnica excelente. Você conseguiu transmitir exatamente o tom leve e acolhedor que a gente buscava. Parabéns pelo profissionalismo e pelo talento! O material ficou impecável!", nome: "Zavi Agência", empresa: "Agência" },
   { texto: "Excelente profissional, muito empenhado e comprometido com o trabalho. Realizou todas as entregas dentro do prazo e com muita qualidade. Foi uma experiência sensacional e, com certeza, faremos novos trabalhos juntos!", logo: "fb-haag", nome: "Haag", empresa: "Moda" },
   { texto: "O Ryan é rápido, inteligente e muito criativo. Adoramos o seu conteúdo em nossa campanha.", logo: "fb-picnic", nome: "Picnic", empresa: "Marca parceira" },
@@ -1857,7 +1858,7 @@ const EN = {
   "1,5M em 2 dias": "1.5M in 2 days",
   "Roteiro aprovado de primeira": "Script approved on the first try",
   "Entrega aprovada de primeira": "Delivery approved on the first try",
-  "O que as marcas dizem": "What brands say",
+  "O que as marcas dizem": "What brands say", "O que dizem": "What they say", "sobre o trabalho": "about the work",
   "Equipe de marketing": "Marketing team", "Tecnologia": "Technology", "Agência": "Agency", "Moda ": "Fashion", "Marca parceira": "Partner brand", "Calçados": "Footwear",
   "Adoramos os dois roteiros: a escrita está excelente, a direção de cena é muito bem pensada e a linha \"isso não é mágica. É Canva.\" é uma das melhores que recebemos até agora. Os vídeos ficaram ótimos e adoramos trabalhar com você.": "We loved both scripts: the writing is excellent, the scene direction is very well thought out, and the line \"this isn't magic. It's Canva.\" is one of the best we've received so far. The videos turned out great and we loved working with you.",
   "Só passando pra agradecer demais pelo trabalho. Dá pra sentir a dedicação em cada detalhe, e a atenção e o carinho que você teve nos ajustes fez toda a diferença. Ficou exatamente como a gente precisava.": "Just stopping by to thank you so much for the work. You can feel the dedication in every detail, and the care you put into the revisions made all the difference. It turned out exactly as we needed.",
