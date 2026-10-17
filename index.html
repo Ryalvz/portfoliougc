@@ -628,15 +628,29 @@
   /* Resultados no topo: texto à esquerda, vídeos à direita */
   .resultados-topo { padding-top: 72px; }
   .res-grid { display: grid; grid-template-columns: .8fr 1.6fr; gap: 48px; align-items: center; }
-  .res-grid .results { flex-wrap: nowrap; gap: 22px; }
-  .res-grid .result-v { width: auto; flex: 1 1 0; min-width: 0; }
-  .res-grid .result-v h4 { font-size: 19px; }
-  .res-grid .result-v .big { font-size: 25px; }
+  /* Carrossel dos resultados */
+  .res-carrossel { position: relative; }
+  .res-carrossel .results { position: relative; display: block; height: 700px; }
+  .res-carrossel .result-v { position: absolute; left: 50%; top: 0; width: 290px; margin-left: -145px; transition: transform .5s cubic-bezier(.2,.7,.2,1), opacity .5s, filter .5s; cursor: pointer; }
+  .result-v[data-pos="0"] { transform: none; z-index: 3; }
+  .result-v[data-pos="-1"] { transform: translateX(-72%) scale(.78); opacity: .45; filter: blur(1.5px); z-index: 2; }
+  .result-v[data-pos="1"] { transform: translateX(72%) scale(.78); opacity: .45; filter: blur(1.5px); z-index: 2; }
+  .result-v[data-pos="fora"] { transform: scale(.6); opacity: 0; pointer-events: none; }
+  .result-v[data-pos="-1"]:hover, .result-v[data-pos="1"]:hover { opacity: .7; filter: none; }
+  .result-v:not([data-pos="0"]) .big, .result-v:not([data-pos="0"]) .what, .result-v:not([data-pos="0"]) p { opacity: 0; }
+  .result-v .big, .result-v .what, .result-v p { transition: opacity .3s; }
+  .res-seta { position: absolute; top: 260px; z-index: 4; width: 46px; height: 46px; border-radius: 50%; border: 0; display: grid; place-items: center; background: var(--paper); color: var(--cobalt); box-shadow: 0 6px 18px rgba(43, 36, 28, .16); cursor: pointer; }
+  .res-seta svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; }
+  .res-seta[data-res="-1"] { left: 0; }
+  .res-seta[data-res="1"] { right: 0; }
   @media (max-width: 899px) {
-    .res-grid { grid-template-columns: 1fr; gap: 32px; }
-    .res-grid .results { overflow-x: auto; scroll-snap-type: x mandatory; margin-inline: -16px; padding: 4px 16px 10px; scrollbar-width: none; justify-content: flex-start; }
-    .res-grid .results::-webkit-scrollbar { display: none; }
-    .res-grid .result-v { flex: 0 0 72%; scroll-snap-align: center; }
+    .res-grid { grid-template-columns: 1fr; gap: 28px; }
+    .res-carrossel .results { height: 660px; }
+    .result-v h4 { font-size: 19px; white-space: nowrap; }
+    .res-carrossel .result-v { width: 240px; margin-left: -120px; }
+    .result-v[data-pos="-1"] { transform: translateX(-62%) scale(.74); }
+    .result-v[data-pos="1"] { transform: translateX(62%) scale(.74); }
+    .res-seta { top: 200px; width: 40px; height: 40px; }
   }
   /* Case em destaque: print do insight ao lado da história */
   .case { display: grid; grid-template-columns: minmax(0, 300px) 1fr; gap: 48px; align-items: center; margin: 64px 0 8px; background: var(--paper); border: 1px solid var(--line); border-radius: 22px; padding: 34px; }
@@ -651,6 +665,15 @@
   .case-roteiro li { display: grid; grid-template-columns: 150px 1fr; gap: 12px; padding: 12px 14px; border-radius: 12px; background: var(--sand); }
   @media (max-width: 760px) { .case { grid-template-columns: 1fr; padding: 22px; gap: 26px; } .case-print { max-width: 260px; margin: 0 auto; } .case-roteiro li { grid-template-columns: 1fr; gap: 2px; } }
   .field select { appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%23A8864A%27 stroke-width=%272%27%3E%3Cpath d=%27m6 9 6 6 6-6%27/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; background-size: 18px; padding-right: 42px; cursor: pointer; }
+  /* Quebra entre seções: fundos alternados e faixa inclinada */
+  main { overflow-x: clip; }
+  .soft { background: var(--sand); }
+  .faixa { position: relative; z-index: 3; margin: -22px -3vw; padding: 15px 0; background: var(--cobalt); color: var(--parchment); transform: rotate(-2deg); overflow: hidden; box-shadow: 0 10px 30px rgba(24, 19, 14, .18); }
+  .faixa-clara { background: var(--olive); color: #fff; transform: rotate(1.6deg); }
+  .faixa-trilho { display: flex; width: max-content; gap: 22px; align-items: center; animation: marquee 60s linear infinite; font-family: var(--head); font-style: italic; font-size: 21px; white-space: nowrap; }
+  .faixa-clara .faixa-trilho { animation-direction: reverse; }
+  .faixa-trilho i { font-style: normal; opacity: .6; font-size: 14px; }
+  @media (max-width: 700px) { .faixa { padding: 11px 0; } .faixa-trilho { font-size: 17px; } }
 </style>
 
 </head>
@@ -720,15 +743,19 @@
   </section>
 
   <!-- ================= RESULTADOS (logo depois da capa) ================= -->
-  <section class="resultados-topo" id="resultados" aria-labelledby="results-title">
+  <section class="resultados-topo soft" id="resultados" aria-labelledby="results-title">
     <div class="wrap res-grid">
       <div class="reveal">
         <span class="eyebrow">Conteúdos que deram resultado</span>
         <h2 class="sec-title" id="results-title">Os vídeos que <em>mais renderam</em></h2>
         <p class="sec-lead">Storytelling com verdade, quebra de padrão e roteiro que a marca aprova. Toque em um vídeo para assistir.</p>
       </div>
-      <!-- Resultados: array RESULTS no script -->
-      <div class="results" id="results"></div>
+      <!-- Resultados: array RESULTS no script. Carrossel: o do centro em destaque, os outros atrás -->
+      <div class="res-carrossel reveal">
+        <button class="res-seta" type="button" data-res="-1" aria-label="Resultado anterior"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg></button>
+        <div class="results" id="results" aria-live="polite"></div>
+        <button class="res-seta" type="button" data-res="1" aria-label="Próximo resultado"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
+      </div>
     </div>
   </section>
 
@@ -754,6 +781,9 @@
       </div>
     </div>
   </section>
+
+  <!-- Faixa inclinada: quebra visual entre as seções -->
+  <div class="faixa" aria-hidden="true"><div class="faixa-trilho"><span>UGC Creator</span><i>•</i><span>Tech &amp; Lifestyle</span><i>•</i><span>@ryalvz</span><i>•</i><span>Roteiro que vende</span><i>•</i><span>UGC Creator</span><i>•</i><span>Tech &amp; Lifestyle</span><i>•</i><span>@ryalvz</span><i>•</i><span>Roteiro que vende</span><i>•</i><span>UGC Creator</span><i>•</i><span>Tech &amp; Lifestyle</span><i>•</i><span>@ryalvz</span><i>•</i><span>Roteiro que vende</span><i>•</i><span>UGC Creator</span><i>•</i><span>Tech &amp; Lifestyle</span><i>•</i><span>@ryalvz</span><i>•</i><span>Roteiro que vende</span><i>•</i><span>UGC Creator</span><i>•</i><span>Tech &amp; Lifestyle</span><i>•</i><span>@ryalvz</span><i>•</i><span>Roteiro que vende</span><i>•</i><span>UGC Creator</span><i>•</i><span>Tech &amp; Lifestyle</span><i>•</i><span>@ryalvz</span><i>•</i><span>Roteiro que vende</span><i>•</i></div></div>
 
   <!-- ================= 3. CONTEÚDOS DE DESTAQUE ================= -->
   <section id="destaques" aria-labelledby="destaques-title">
@@ -800,6 +830,9 @@
       </div>
     </div>
   </section>
+
+  <!-- Faixa inclinada: quebra visual entre as seções -->
+  <div class="faixa faixa-clara" aria-hidden="true"><div class="faixa-trilho"><span>UGC Creator</span><i>•</i><span>Tech &amp; Lifestyle</span><i>•</i><span>@ryalvz</span><i>•</i><span>Roteiro que vende</span><i>•</i><span>UGC Creator</span><i>•</i><span>Tech &amp; Lifestyle</span><i>•</i><span>@ryalvz</span><i>•</i><span>Roteiro que vende</span><i>•</i><span>UGC Creator</span><i>•</i><span>Tech &amp; Lifestyle</span><i>•</i><span>@ryalvz</span><i>•</i><span>Roteiro que vende</span><i>•</i><span>UGC Creator</span><i>•</i><span>Tech &amp; Lifestyle</span><i>•</i><span>@ryalvz</span><i>•</i><span>Roteiro que vende</span><i>•</i><span>UGC Creator</span><i>•</i><span>Tech &amp; Lifestyle</span><i>•</i><span>@ryalvz</span><i>•</i><span>Roteiro que vende</span><i>•</i><span>UGC Creator</span><i>•</i><span>Tech &amp; Lifestyle</span><i>•</i><span>@ryalvz</span><i>•</i><span>Roteiro que vende</span><i>•</i></div></div>
 
   <!-- ================= 6. NÚMEROS E DEPOIMENTOS ================= -->
   <section class="soft" id="numeros" aria-labelledby="numeros-title">
@@ -1290,7 +1323,7 @@ $("#metrics").innerHTML = METRICS.map((m) => `
   </div>`).join("");
 
 $("#results").innerHTML = RESULTS.map((r) => `
-  <article class="result-v reveal">
+  <article class="result-v">
     <h4>${esc(r.marca)}</h4>
     <button class="result-video work-video" type="button" data-video="${esc(r.video)}" data-title="${esc(r.marca)}" aria-label="Assistir o vídeo da ${esc(r.marca)}">
       <img src="${esc(r.capa)}" alt="" loading="lazy">
@@ -1300,6 +1333,29 @@ $("#results").innerHTML = RESULTS.map((r) => `
     <div class="what">${esc(r.titulo)}</div>
     <p>${esc(r.texto)}</p>
   </article>`).join("");
+// Carrossel dos resultados: um no centro, os vizinhos menores atrás. Clicar num de trás traz ele pro centro
+(() => {
+  const caixa = $("#results"), cards = [...caixa.children], n = cards.length;
+  let atual = 0;
+  const pos = () => cards.forEach((c, k) => {
+    let d = (k - atual + n) % n; if (d > n / 2) d -= n;
+    c.dataset.pos = Math.abs(d) > 1 ? "fora" : String(d);
+    c.setAttribute("aria-hidden", d !== 0);
+    c.querySelector("button").tabIndex = d === 0 ? 0 : -1;
+  });
+  const ir = (passo) => { atual = (atual + passo + n) % n; pos(); };
+  // Clique num card de trás: só gira (não abre o vídeo)
+  caixa.addEventListener("click", (e) => {
+    const c = e.target.closest(".result-v");
+    if (c && c.dataset.pos !== "0") { e.stopPropagation(); e.preventDefault(); ir(Number(c.dataset.pos) || 1); }
+  }, true);
+  document.querySelectorAll("[data-res]").forEach((b) => b.addEventListener("click", () => ir(Number(b.dataset.res))));
+  let x0 = null;
+  caixa.addEventListener("touchstart", (e) => { x0 = e.touches[0].clientX; }, { passive: true });
+  caixa.addEventListener("touchend", (e) => { if (x0 == null) return; const dx = e.changedTouches[0].clientX - x0; if (Math.abs(dx) > 40) ir(dx < 0 ? 1 : -1); x0 = null; });
+  if (n < 2) document.querySelectorAll("[data-res]").forEach((b) => (b.hidden = true));
+  pos();
+})();
 
 (() => {
   const c = CASE, partes = [["Gancho", c.roteiro.gancho], ["Desenvolvimento", c.roteiro.desenvolvimento], ["CTA", c.roteiro.cta]].filter(([, t]) => t);
