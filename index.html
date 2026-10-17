@@ -2,7 +2,8 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- No celular o site abre igual ao do computador, só que menor (como o da Lara) -->
+<meta name="viewport" content="width=1280">
 <title>Ryan Alves | Portfólio UGC Creator</title>
 <meta name="description" content="Portfólio UGC de Ryan Alves: vídeos autênticos para marcas de tecnologia, autocuidado, alimentos, casa e moda masculina que querem vender mais nas redes.">
 <meta name="theme-color" content="#F6F2EB">
@@ -780,6 +781,8 @@
   @media (min-width: 1100px) { .row .row-scroller { grid-auto-columns: calc((100% - 80px) / 5); gap: 20px; } }
   @media (min-width: 1100px) { .work-v .work-info h4 { font-size: 18px; } .work-v .work-info { padding: 0 14px 14px; } }
   @media (min-width: 900px) and (max-width: 1099px) { .row .row-scroller { grid-auto-columns: calc((100% - 60px) / 4); gap: 20px; } }
+  /* Vídeos dos nichos um pouco maiores (continua 5 por tela, com borda) */
+  #trabalhos .wrap { max-width: 1440px; }
 </style>
 
 </head>
@@ -1798,7 +1801,7 @@ const EN = {
   "Escolha o nicho e": "Pick a niche and",
   "dá o play.": "hit play.",
   "Vídeos reais, feitos para marcas reais. Toque em qualquer um para assistir com som.": "Real videos made for real brands. Tap any of them to watch with sound.",
-  "Todos": "All", "Beleza & Cuidados": "Beauty & Care", "Gastronomia": "Food", "Casa": "Home", "Moda": "Fashion",
+  "Todos": "All", "Beleza & Cuidados": "Beauty & Care", "Beleza": "Beauty", "Cuidados": "Care", "Gastronomia": "Food", "Casa": "Home", "Moda": "Fashion",
   "Apps, serviços e gadgets usados no dia a dia": "Apps, services and gadgets for everyday life",
   "Cabelo, pele e barba sem complicação": "Hair, skin and beard made simple",
   "Receitas e lanches que dão vontade na hora": "Recipes and snacks that make you hungry",
@@ -1910,7 +1913,11 @@ function ativarIngles() {
   if (emIngles) return; emIngles = true;
   document.documentElement.lang = "en";
   document.title = "Ryan Alves | UGC Creator Portfolio";
+  // Guarda o que está no topo da tela e devolve pro mesmo lugar depois de trocar os textos
+  const ref = document.elementFromPoint(innerWidth / 2, Math.min(innerHeight - 1, 200));
+  const antes = ref ? ref.getBoundingClientRect().top : 0;
   traduzirTudo(document.body);
+  if (ref && scrollY > 0) { const d = ref.getBoundingClientRect().top - antes; if (d) window.scrollBy({ top: d, behavior: "instant" }); }
   let fila = [];
   new MutationObserver((novas) => {
     if (fila.length) { fila.push(...novas); return; }
