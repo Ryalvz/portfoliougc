@@ -595,6 +595,8 @@
   /* Feedbacks com a logo da marca */
   .t-topo .avatar.com-logo { background: #fff; border: 1px solid var(--line); overflow: hidden; }
   .t-topo .avatar.com-logo img { width: 100%; height: 100%; object-fit: contain; }
+  /* Selo dos feedbacks que vieram por e-mail ou mensagem */
+  .t-selo { display: inline-block; margin: 16px 0 12px; padding: 4px 12px; border-radius: 999px; border: 1px solid var(--olive); color: var(--olive); font-size: 12px; font-weight: 600; letter-spacing: .6px; text-transform: uppercase; }
 </style>
 
 </head>
@@ -742,7 +744,7 @@
         <div class="testimonials" id="testimonials" tabindex="0" aria-label="Feedbacks das marcas"></div>
         <button class="testi-seta" type="button" data-dir="1" aria-label="Próximos feedbacks"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
       </div>
-      <p class="testi-fonte reveal">Avaliações reais de marcas na plataforma SeuInfluencer, todas com nota 5.</p>
+      <p class="testi-fonte reveal">Avaliações de marcas na plataforma SeuInfluencer (todas com nota 5) e mensagens reais de clientes.</p>
     </div>
   </section>
 
@@ -981,6 +983,9 @@ const RESULTS = [
 // Quatro depoimentos (placeholders: troque pelo texto real de cada cliente)
 // Avaliações reais das marcas na plataforma SeuInfluencer (todas 5 estrelas)
 const TESTIMONIALS = [
+  // selo: aparece no lugar das estrelas quando o feedback veio fora da SeuInfluencer (sem nota)
+  { texto: "Adoramos os dois roteiros: a escrita está excelente, a direção de cena é muito bem pensada e a linha \"isso não é mágica. É Canva.\" é uma das melhores que recebemos até agora. Os vídeos ficaram ótimos e adoramos trabalhar com você.", nome: "Canva", empresa: "Equipe de marketing", logo: "fb-canva", selo: "Por e-mail" },
+  { texto: "Obrigada mesmo pela pontualidade. Estamos tentando adiantar o próximo roteiro.", nome: "Zapay", empresa: "App de IPVA e licenciamento", logo: "fb-zapay", selo: "Aprovado de primeira" },
   { texto: "Passando só para elogiar o seu vídeo. Ficou extremamente natural, cativante e com uma qualidade técnica excelente. Você conseguiu transmitir exatamente o tom leve e acolhedor que a gente buscava. Parabéns pelo profissionalismo e pelo talento! O material ficou impecável!", nome: "Zavi Agência", empresa: "Agência" },
   { texto: "Excelente profissional, muito empenhado e comprometido com o trabalho. Realizou todas as entregas dentro do prazo e com muita qualidade. Foi uma experiência sensacional e, com certeza, faremos novos trabalhos juntos!", logo: "fb-haag", nome: "Haag", empresa: "Moda" },
   { texto: "O Ryan é rápido, inteligente e muito criativo. Adoramos o seu conteúdo em nossa campanha.", logo: "fb-picnic", nome: "Picnic", empresa: "Marca parceira" },
@@ -1208,7 +1213,7 @@ $("#testimonials").innerHTML = TESTIMONIALS.map((t) => `
       ${t.logo ? `<span class="avatar com-logo" aria-hidden="true"><img src="logos/${t.logo}.png" alt="" loading="lazy"></span>` : `<span class="avatar" aria-hidden="true">${esc(t.nome.charAt(0))}</span>`}
       <span><b>${esc(t.nome)}</b><span>${esc(t.empresa)}</span></span>
     </figcaption>
-    <div class="estrelas" role="img" aria-label="Nota 5 de 5">★★★★★</div>
+    ${t.selo ? `<div class="t-selo">${esc(t.selo)}</div>` : `<div class="estrelas" role="img" aria-label="Nota 5 de 5">★★★★★</div>`}
     <blockquote><p style="margin:0">${esc(t.texto)}</p></blockquote>
   </figure>`).join("");
 // Setas do carrossel de feedbacks
