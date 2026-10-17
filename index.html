@@ -787,6 +787,25 @@
   .hero { min-height: min(100vh, 900px); min-height: min(100svh, 900px); }
   /* Vídeo do carrossel ocupa o card inteiro */
   .result-video { display: block; width: 100%; padding: 0; border: 0; background: #2B241C; cursor: pointer; font: inherit; color: inherit; }
+  /* Página mais enxuta: menos espaço entre as seções */
+  section { padding: 64px 0; }
+  .hero { min-height: 0 !important; padding-top: calc(var(--nav-h) + 28px); }
+  .hero-photo .media { max-height: 560px; }
+  .brands { margin-top: 40px; }
+  .about-grid { grid-template-columns: 340px 1fr; gap: 56px; max-width: 1040px; margin: 0 auto; }
+  .resultados-topo { padding-top: 56px; }
+  .res-carrossel .results { height: 690px; }
+  .res-carrossel .result-v { width: 300px; margin-left: -150px; }
+  .res-seta { top: 270px; }
+  .row { margin-top: 26px; }
+  .sub-title { margin: 40px 0 16px; }
+  .case { margin: 32px 0 0; padding: 28px; }
+  .contato-novo { padding: 64px 0; }
+  .serv-grid { gap: 48px; }
+  /* Menu: nome à esquerda, links no centro, idioma e botão à direita */
+  .nav nav { flex: 1; display: flex; justify-content: center; }
+  .nav-links { justify-content: center; }
+  .lang { margin-left: 0; }
 </style>
 
 </head>
