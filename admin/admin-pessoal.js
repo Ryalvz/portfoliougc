@@ -675,9 +675,12 @@ const MESES_ABREV = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "se
 // O sinal de menos só conta colado no valor ("−R$ 50,00", "-50,00"); "Loja - R$ 50,00" é só separador
 const RE_VALOR = /([-−–])?(?:R\$\s?)?([-−–])?(\d{1,3}(?:\.\d{3})*,\d{2})(?!\d)/g;
 const valorBR = (s) => Number(String(s).replace(/\./g, "").replace(",", "."));
-const RE_CREDITO = /pagamento|pgto|estorno|cr[eé]dito|reembolso|devolu|desconto|cashback/i;
+// Pagamento da própria fatura: não entra na conta. Estorno e crédito entram negativos (abatem a compra).
+const RE_PAGAMENTO = /pagamento|pagto|pgto|deb\.?\s?aut|d[eé]bito autom/i;
+const RE_CREDITO = /estorno|reembolso|devolu|cashback|cr[eé]dito/i;
 
-// Lê uma linha "15/09 LOJA 03/10 123,45", "15 SET Loja - Parcela 3/10 R$ 123,45" ou "15 de set. 2026 Loja (Parcela 03 de 10) R$ 123,45"
+// Lê uma linha "15/09 LOJA 03/10 123,45", "15 SET Loja - Parcela 3/10 R$ 123,45" ou "15 de set. 2026 Loja (Parcela 03 de 10) R$ 123,45".
+// Vale o primeiro valor da linha: o que vem depois é de outra coluna do PDF (limites, taxas...)
 function lerLinhaFatura(t, mesFatura) {
   let s = t.trim(), dia, mes, ano;
   let m = s.match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\s+/);
@@ -690,13 +693,17 @@ function lerLinhaFatura(t, mesFatura) {
   s = s.slice(m[0].length);
   const valores = [...s.matchAll(RE_VALOR)];
   if (!valores.length) return null;
-  const ult = valores[valores.length - 1];
-  let valor = valorBR(ult[3]);
-  const negativo = !!(ult[1] || ult[2]);
-  s = (s.slice(0, ult.index) + s.slice(ult.index + ult[0].length)).replace(/\s*R\$\s*$/, "");
+  let v = valores[0];
+  // Compra em dólar: "10,00 52,30" (US$ e R$ lado a lado) vale o segundo
+  if (valores[1] && /^\s*$/.test(s.slice(v.index + v[0].length, valores[1].index))) v = valores[1];
+  const valor = valorBR(v[3]);
+  const depois = s.slice(v.index + v[0].length);
+  const antes = s.slice(0, v.index);
+  const negativo = !!(v[1] || v[2]) || /^\s*-(\s|$)/.test(depois) || /\+\s?(R\$\s?)?$/.test(antes);
+  s = antes.replace(/[+\-–]?\s*R\$\s*$/, "");
   // Parcela
   let k = 0, n = 0;
-  const pp = [/\(?\s*parc(?:ela)?\.?\s*(\d{1,2})\s*(?:\/|de)\s*(\d{1,2})\s*\)?/i, /\(\s*(\d{1,2})\s*de\s*(\d{1,2})\s*\)/i, /(?:^|\s)(\d{1,2})\/(\d{1,2})(?=\s*$|\s)/];
+  const pp = [/\(?\s*parc(?:ela)?\.?\s*(\d{1,2})\s*(?:\/|de)\s*(\d{1,2})\s*\)?/i, /\(\s*(\d{1,2})\s*de\s*(\d{1,2})\s*\)/i, /(?<=^|[\sA-Za-z*])(\d{2})\/(\d{2})(?=\s|$)/, /(?:^|\s)(\d{1})\/(\d{1,2})(?=\s|$)/];
   for (const re of pp) {
     const x = s.match(re);
     if (x && +x[1] >= 1 && +x[2] >= 2 && +x[1] <= +x[2] && +x[2] <= 99) { k = +x[1]; n = +x[2]; s = s.replace(x[0], " "); break; }
@@ -705,8 +712,22 @@ function lerLinhaFatura(t, mesFatura) {
   if (!desc || !valor) return null;
   if (!ano) { const [fa, fm] = mesFatura.split("-").map(Number); ano = mes > fm ? fa - 1 : fa; }
   if (ano < 100) ano += 2000;
-  const credito = negativo || RE_CREDITO.test(desc);
-  return { data: `${ano}-${pad(mes)}-${pad(dia)}`, desc, k: n ? k : 1, n: n || 1, valor, credito };
+  const pagamento = RE_PAGAMENTO.test(desc);
+  const credito = pagamento || negativo || RE_CREDITO.test(desc);
+  return { data: `${ano}-${pad(mes)}-${pad(dia)}`, desc, k: n ? k : 1, n: n || 1, valor, credito, pagamento };
+}
+// Junta as linhas da fatura. "Compras de Diego O P Moreira R$ 1.019,38" (cartão adicional do Nubank)
+// marca as compras seguintes com o nome da pessoa, até o próximo título.
+function itensDasLinhas(linhas, mesFatura) {
+  let dono = "";
+  const r = [];
+  linhas.forEach((l) => {
+    const tit = l.match(/^([A-Za-zÀ-ú .']+?)\s+[-−]?R\$\s?[\d.]+,\d{2}$/);
+    if (tit) { const c = tit[1].match(/^compras de\s+(\S+)/i); dono = c ? c[1][0].toUpperCase() + c[1].slice(1).toLowerCase() : ""; return; }
+    const x = lerLinhaFatura(l, mesFatura);
+    if (x) { if (dono) x.donoSugerido = dono; r.push(x); }
+  });
+  return r;
 }
 
 function lerCsv(texto) {
@@ -743,7 +764,8 @@ function itensDoCsv(texto, mesFatura) {
     const x = lerLinhaFatura(`${data.slice(8)}/${data.slice(5, 7)}/${data.slice(0, 4)} ${String(l[iDesc] || "").trim()} ${Math.abs(v).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, mesFatura);
     if (!x) return null;
     // No CSV do Nubank, pagamento vem negativo; em outros bancos, a compra vem negativa
-    x.credito = RE_CREDITO.test(x.desc) || (v < 0 && linhas.slice(1).filter((y) => num(y[iVal]) > 0).length > linhas.length / 2);
+    x.pagamento = RE_PAGAMENTO.test(x.desc);
+    x.credito = x.pagamento || RE_CREDITO.test(x.desc) || (v < 0 && linhas.slice(1).filter((y) => num(y[iVal]) > 0).length > linhas.length / 2);
     return x;
   }).filter(Boolean);
 }
@@ -757,16 +779,20 @@ function infoDaFatura(texto) {
     let aa = +(v[3] || v[5]); if (aa < 100) aa += 2000;
     if (mm >= 1 && mm <= 12) mes = `${aa}-${pad(mm)}`;
   }
+  if (!mes) {
+    const v2 = t.match(/vencimento[\s\S]{0,80}?(\d{2})\/(\d{2})\/(\d{4})/i);
+    if (v2 && +v2[2] >= 1 && +v2[2] <= 12) mes = `${v2[3]}-${v2[2]}`;
+  }
   const tot = t.match(/total (?:da fatura|a pagar|desta fatura|da sua fatura)[^0-9]{0,40}(\d{1,3}(?:\.\d{3})*,\d{2})/i);
   const baixo = semAcento(t);
-  const cartao = P.cartoes.find((c) => baixo.includes(semAcento(c.nome)));
+  const cartao = P.cartoes.find((c) => new RegExp(`\\b${semAcento(c.nome).replace(/[^a-z0-9 ]/g, "")}\\b`).test(baixo));
   return { mes, total: tot ? valorBR(tot[1]) : 0, cartao: cartao ? String(cartao.id) : "" };
 }
 
 const baseDesc = (s) => semAcento(s).replace(/[^a-z0-9]+/g, " ").trim();
 function chaveCompra(x, cartao, mes, ordem) {
-  if (x.n > 1) return `p|${cartao}|${baseDesc(x.desc)}|${x.valor.toFixed(2)}|${x.n}|${somaMes(mes, -(x.k - 1))}`;
-  return `a|${cartao}|${mes}|${x.data || ""}|${baseDesc(x.desc)}|${x.valor.toFixed(2)}|${ordem}`;
+  if (x.n > 1) return `p|${cartao}|${baseDesc(x.desc)}|${(x.credito ? -x.valor : x.valor).toFixed(2)}|${x.n}|${somaMes(mes, -(x.k - 1))}`;
+  return `a|${cartao}|${mes}|${x.data || ""}|${baseDesc(x.desc)}|${(x.credito ? -x.valor : x.valor).toFixed(2)}|${ordem}`;
 }
 
 function abrirImportarFatura() {
@@ -801,11 +827,18 @@ function abrirImportarFatura() {
     return igual.length ? nomePessoa(igual[igual.length - 1].dono || "") : "";
   };
   const prepararItens = (lista) => {
+    // Várias parcelas da mesma compra cobradas juntas (ex.: 1/5 a 5/5 no mesmo dia) viram lançamentos à vista
+    const grupos = {};
+    lista.forEach((x) => { if (x.n > 1) { const g = `${x.data}|${baseDesc(x.desc)}|${x.n}`; (grupos[g] = grupos[g] || new Set()).add(x.k); } });
+    lista.forEach((x) => {
+      const g = grupos[`${x.data}|${baseDesc(x.desc)}|${x.n}`];
+      if (x.n > 1 && g && g.size >= 3 && Math.max(...g) === x.n) { x.desc = `${x.desc} (parcela ${x.k}/${x.n} cobrada junto)`; x.k = 1; x.n = 1; }
+    });
     const ordens = {};
     st.itens = lista.map((x) => {
       const o = `${x.data}|${baseDesc(x.desc)}|${x.valor}`;
       ordens[o] = (ordens[o] || 0) + 1;
-      return { ...x, ordem: ordens[o], incluir: !x.credito, dono: "" };
+      return { ...x, ordem: ordens[o], incluir: !x.pagamento, dono: "" };
     });
     recalcular(true);
   };
@@ -813,7 +846,7 @@ function abrirImportarFatura() {
     st.itens.forEach((x) => {
       x.chave = chaveCompra(x, st.cartao, st.mes, x.ordem);
       x.existe = P.compras.find((c) => c.chave === x.chave) || null;
-      if (novosDonos) x.dono = x.existe ? nomePessoa(x.existe.dono || "") : donoAnterior(x);
+      if (novosDonos) x.dono = x.existe ? nomePessoa(x.existe.dono || "") : (x.donoSugerido || donoAnterior(x));
     });
     pintar();
   };
@@ -821,7 +854,7 @@ function abrirImportarFatura() {
     const rev = $("#imp-rev", d);
     if (!st.itens.length) { rev.innerHTML = st.arquivo ? `<p class="aviso-falta">Não achei compras neste arquivo. Se for PDF escaneado (imagem), baixe a fatura em CSV no app do banco ou lance as parcelas à mão.</p>` : ""; $("#imp-salvar", d).disabled = true; return; }
     const inc = st.itens.filter((x) => x.incluir);
-    const soma = inc.reduce((s, x) => s + x.valor, 0);
+    const soma = inc.reduce((s, x) => s + (x.credito ? -x.valor : x.valor), 0);
     const novos = inc.filter((x) => !x.existe).length;
     rev.innerHTML = `
       <div class="pf-imp-resumo">
@@ -840,12 +873,12 @@ function abrirImportarFatura() {
       ${st.itens.map((x, i) => `<tr class="${x.credito ? "pf-credito" : ""} ${x.existe ? "pf-existe" : ""}">
         <td><input type="checkbox" data-inc="${i}" ${x.incluir ? "checked" : ""} aria-label="Incluir"></td>
         <td>${dataBR(x.data)}</td>
-        <td>${esc(x.desc)}${x.credito ? ` <span class="pilula p-parada">pagamento ou crédito</span>` : ""}${x.existe ? ` <span class="pilula p-pago">já salva</span>` : ""}</td>
+        <td>${esc(x.desc)}${x.pagamento ? ` <span class="pilula p-parada">pagamento da fatura</span>` : x.credito ? ` <span class="pilula p-pago">estorno ou crédito</span>` : ""}${x.existe ? ` <span class="pilula p-pago">já salva</span>` : ""}</td>
         <td>${x.n > 1 ? `${x.k}/${x.n}` : "à vista"}</td>
-        <td>${real(x.valor)}</td>
+        <td>${x.credito ? "−" : ""}${real(x.valor)}</td>
         <td><input class="campo" data-dono="${i}" list="imp-pessoas" value="${esc(x.dono)}" placeholder="Eu" style="min-width:120px"></td></tr>`).join("")}
       </tbody></table></div>
-      <p class="sub">Parcelado: salvo uma vez com todas as parcelas; na fatura do mês que vem ele é reconhecido e não duplica. Pagamentos e créditos já vêm desmarcados.</p>`;
+      <p class="sub">Parcelado: salvo uma vez com todas as parcelas; na fatura do mês que vem ele é reconhecido e não duplica. Pagamentos da fatura já vêm desmarcados; estornos entram negativos e abatem a compra.</p>`;
     $("#imp-salvar", d).disabled = !inc.length;
     $$("[data-inc]", rev).forEach((c) => c.onchange = () => { st.itens[c.dataset.inc].incluir = c.checked; pintar(); });
     $$("[data-dono]", rev).forEach((c) => c.oninput = () => { st.itens[c.dataset.dono].dono = c.value; });
@@ -886,7 +919,7 @@ function abrirImportarFatura() {
         if (info.cartao) { st.cartao = info.cartao; $("#imp-cartao", d).value = info.cartao; }
         st.total = info.total;
         st.linhas = linhas;
-        lista = linhas.map((l) => lerLinhaFatura(l, st.mes)).filter(Boolean);
+        lista = itensDasLinhas(linhas, st.mes);
       } else {
         st.csv = true;
         st.texto = await arq.text();
@@ -907,7 +940,7 @@ function abrirImportarFatura() {
   $("#imp-mes", d).onchange = (e) => {
     st.mes = e.target.value || hoje;
     // A data das compras sem ano depende do mês da fatura: relê
-    if (st.linhas) { const donos = new Map(st.itens.map((x) => [x.desc + x.valor, x.dono])); prepararItens(st.linhas.map((l) => lerLinhaFatura(l, st.mes)).filter(Boolean)); st.itens.forEach((x) => { const dn = donos.get(x.desc + x.valor); if (dn != null) x.dono = dn; }); pintar(); }
+    if (st.linhas) { const donos = new Map(st.itens.map((x) => [x.desc + x.valor, x.dono])); prepararItens(itensDasLinhas(st.linhas, st.mes)); st.itens.forEach((x) => { const dn = donos.get(x.desc + x.valor); if (dn != null) x.dono = dn; }); pintar(); }
     else if (st.csv) prepararItens(itensDoCsv(st.texto, st.mes));
     else recalcular(false);
   };
@@ -916,7 +949,7 @@ function abrirImportarFatura() {
     const linhas = st.itens.filter((x) => x.incluir).map((x) => ({
       cartao_id: st.cartao ? Number(st.cartao) : null,
       descricao: x.desc,
-      valor_parcela: r2(x.valor),
+      valor_parcela: r2(x.credito ? -x.valor : x.valor),
       parcelas: x.n,
       primeiro_mes: somaMes(st.mes, -(x.k - 1)) + "-01",
       data_compra: x.data,
