@@ -1191,3 +1191,54 @@ dialog.pf-janela { width: min(900px, calc(100vw - 24px)); }
 .pf-barras { height: 210px; }
 .pf-barras .par-barras { height: auto; flex: 1; min-height: 0; }
 .pf-barras .valor-barra { min-height: 14px; }
+
+/* Próximas faturas (PF) */
+.pf-vista { background: #D9CCB8; }
+.pf-outros { background: repeating-linear-gradient(135deg, #B9B3AA 0 3px, #DDD8D0 3px 6px); }
+.pf-faturas { border-top: 4px solid #C9A464; }
+.pf-fat-topo { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.pf-fat-topo > div { background: var(--parchment); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; }
+.pf-fat-topo span { display: block; font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
+.pf-fat-topo strong { display: block; font-size: 22px; color: var(--cobalt); margin: 2px 0; font-variant-numeric: tabular-nums; }
+.pf-fat-topo small { color: var(--muted); font-size: 11.5px; }
+.pf-fat-topo .pf-fat-total { background: var(--cobalt); border-color: var(--cobalt); }
+.pf-fat-topo .pf-fat-total span, .pf-fat-topo .pf-fat-total small { color: rgba(246, 242, 235, .75); }
+.pf-fat-topo .pf-fat-total strong { color: var(--parchment); }
+.pf-fat-linhas { display: grid; gap: 12px; }
+.pf-fat-linha { display: grid; grid-template-columns: 110px 1fr auto; grid-template-rows: auto auto; gap: 2px 12px; align-items: center; cursor: default; }
+.pf-fat-linha > b { font-size: 14px; color: var(--cobalt); }
+.pf-fat-linha > small { grid-column: 1; grid-row: 2; color: var(--muted); font-size: 11px; }
+.pf-fat-trilho { grid-column: 2; grid-row: 1 / span 2; display: flex; gap: 2px; height: 22px; background: var(--tint); border-radius: 6px; overflow: hidden; }
+.pf-fat-trilho i { display: block; height: 100%; min-width: 3px; }
+.pf-fat-valores { grid-column: 3; grid-row: 1 / span 2; font-size: 12.5px; color: var(--muted); text-align: right; white-space: nowrap; }
+.pf-fat-valores strong { color: var(--text); font-size: 14px; }
+.pf-escada-tit { font-size: 13px; margin: 18px 0 4px; color: var(--cobalt); }
+.pf-escada { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 4px; height: 130px; align-items: end; border-bottom: 1px solid var(--line); }
+.pf-degrau { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: 3px; border: 0; background: none; padding: 0; cursor: pointer; font: inherit; color: inherit; min-width: 0; border-radius: 4px 4px 0 0; }
+.pf-degrau:hover, .pf-degrau.foco { background: var(--tint); }
+.pf-degrau i { display: block; width: 60%; max-width: 26px; background: #C9A464; border-radius: 4px 4px 0 0; min-height: 2px; }
+.pf-degrau.foco i { background: var(--cobalt); }
+.pf-degrau span { font-size: 10px; color: var(--muted); padding-bottom: 4px; }
+.pf-degrau.foco span { color: var(--cobalt); font-weight: 700; }
+@media (max-width: 620px) {
+  .pf-fat-linha { grid-template-columns: 1fr auto; }
+  .pf-fat-trilho { grid-column: 1 / -1; grid-row: 3; }
+  .pf-fat-valores { grid-column: 2; grid-row: 1 / span 2; }
+  .pf-fat-topo strong { font-size: 18px; }
+  .pf-degrau span { font-size: 8px; }
+}
+
+/* + Gasto */
+.fab-gasto { position: fixed; right: 18px; bottom: calc(18px + env(safe-area-inset-bottom)); z-index: 60; display: none; align-items: center; gap: 6px; padding: 12px 18px; border: 0; border-radius: 999px; background: var(--cobalt); color: var(--parchment); font: inherit; font-weight: 700; font-size: 15px; box-shadow: 0 8px 22px rgba(43, 36, 28, .28); cursor: pointer; }
+.liberado .fab-gasto { display: inline-flex; }
+.fab-gasto .i { width: 18px; height: 18px; }
+.fab-gasto:hover { filter: brightness(1.15); }
+dialog.pf-janela-rapida { width: min(460px, calc(100vw - 20px)); }
+.pf-rapido { display: grid; gap: 8px; }
+.pf-rapido-valor { display: flex; align-items: baseline; gap: 6px; border-bottom: 2px solid var(--cobalt); padding: 4px 2px; margin-bottom: 4px; }
+.pf-rapido-valor span { font-size: 22px; font-weight: 700; color: var(--muted); }
+.pf-rapido-valor input { border: 0; background: none; font: inherit; font-size: 38px; font-weight: 700; color: var(--cobalt); width: 100%; outline: none; padding: 0; }
+.pf-rapido-rot { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); margin-top: 4px; }
+.pf-rapido-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip-grande { border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 9px 14px; font: inherit; font-size: 14px; font-weight: 600; color: var(--text); cursor: pointer; }
+.chip-grande[aria-pressed="true"] { background: var(--cobalt); border-color: var(--cobalt); color: var(--parchment); }
