@@ -13,7 +13,7 @@
    ============================================================= */
 Object.assign(ESQUEMA, {
   pf_cartoes: ["id", "nome", "vence_dia", "fecha_dia", "limite", "ordem"],
-  pf_contas: ["id", "nome", "valor", "dia", "categoria", "inicio", "fim", "obs"],
+  pf_contas: ["id", "nome", "valor", "dia", "categoria", "inicio", "fim", "obs", "no_cartao"],
   pf_compras: ["id", "criado_em", "cartao_id", "descricao", "valor_parcela", "parcelas", "primeiro_mes", "data_compra", "dono", "categoria", "origem", "chave"],
   pf_recebimentos: ["id", "pessoa", "valor", "data", "obs"],
   pf_entradas: ["id", "data", "valor", "descricao", "origem"],
@@ -57,7 +57,9 @@ const cfg = (k, padrao = 0) => (P.config[k] == null || P.config[k] === "" ? padr
 
 /* ---------- Contas ---------- */
 const contaAtiva = (c, k) => (!c.inicio || mesDe(c.inicio) <= k) && (!c.fim || mesDe(c.fim) >= k);
-const fixasNo = (k) => P.contas.filter((c) => contaAtiva(c, k)).reduce((s, c) => s + n2(c.valor), 0);
+// Conta paga no cartão já entra na fatura (no dia a dia): não soma de novo
+const fixasNo = (k) => P.contas.filter((c) => contaAtiva(c, k) && !c.no_cartao).reduce((s, c) => s + n2(c.valor), 0);
+const RECORRENTE = 60; // compra "parcelada" em 60x ou mais = valor mensal sem fim (ex.: a parte de alguém numa conta)
 // Índice da parcela (0 = primeira) que cai no mês k, ou -1
 const idxParcela = (c, k) => { const i = difMes(mesDe(c.primeiro_mes), k); return i >= 0 && i < Number(c.parcelas || 1) ? i : -1; };
 const ultimoMes = (c) => somaMes(mesDe(c.primeiro_mes), Number(c.parcelas || 1) - 1);
@@ -123,8 +125,15 @@ function projecao(meses = 12, extra = null) {
 }
 
 /* ---------- Quem me deve ---------- */
+// A cobrança começa no mês em que você passou a anotar (parcelas antigas já foram acertadas por fora)
+function inicioCobranca() {
+  const fixo = cfg("inicio_cobranca", "");
+  if (fixo) return mesDe(fixo);
+  const meses = P.compras.filter((c) => !ehMinha(c) && c.criado_em).map((c) => mesDe(c.criado_em)).sort();
+  return meses[0] || mesHojePF();
+}
 function devedores() {
-  const hoje = mesHojePF();
+  const hoje = mesHojePF(), inicio = inicioCobranca(), ate = somaMes(hoje, 12);
   const mapa = new Map();
   const pega = (nome) => {
     const k = chavePessoa(nome);
@@ -136,7 +145,8 @@ function devedores() {
     p.compras.push(c);
     for (let i = 0; i < Number(c.parcelas || 1); i++) {
       const k = somaMes(mesDe(c.primeiro_mes), i);
-      if (k <= hoje) p.devido += n2(c.valor_parcela); else p.futuro += n2(c.valor_parcela);
+      if (k < inicio) continue;
+      if (k <= hoje) p.devido += n2(c.valor_parcela); else if (k <= ate) p.futuro += n2(c.valor_parcela);
     }
   });
   P.receb.forEach((r) => { const p = pega(r.pessoa); p.pago += n2(r.valor); p.receb.push(r); });
@@ -201,7 +211,7 @@ function pfVisao(el) {
   const restante = P.compras.filter(ehMinha).filter(parcelado).reduce((s, c) => {
     let t = 0; for (let i = 0; i < Number(c.parcelas); i++) { if (somaMes(mesDe(c.primeiro_mes), i) >= hoje) t += n2(c.valor_parcela); } return s + t;
   }, 0);
-  const fimParcelas = P.compras.filter(parcelado).map(ultimoMes).filter((k) => k >= hoje).sort().pop();
+  const fimParcelas = P.compras.filter((c) => parcelado(c) && Number(c.parcelas) < RECORRENTE).map(ultimoMes).filter((k) => k >= hoje).sort().pop();
   const reserva = n2(cfg("reserva")), metaMeses = Number(cfg("reserva_meses", 3)) || 3;
   const metaReserva = metaMeses * (fixasNo(hoje) + dia.v);
   const vazio = !P.contas.length && !P.compras.length && !P.entradas.length;
@@ -248,7 +258,7 @@ function pfVisao(el) {
 function cartaoLiberacao() {
   const hoje = mesHojePF();
   const porMes = new Map();
-  P.compras.filter(parcelado).forEach((c) => {
+  P.compras.filter((c) => parcelado(c) && Number(c.parcelas) < RECORRENTE).forEach((c) => {
     const fim = ultimoMes(c);
     if (fim < hoje) return;
     if (!porMes.has(fim)) porMes.set(fim, { v: 0, eu: 0, itens: [] });
@@ -300,6 +310,9 @@ function cartaoPlano(proj, dev, x) {
   // 1. Juros e encargos nas últimas faturas
   const juros = P.compras.filter((c) => /juros|multa|encargo|rotativ|mora\b|atraso|iof\W*(?:de\W*)?(?:financ|rotativ|parcelamento)/i.test(c.descricao) && mesDe(c.primeiro_mes) >= somaMes(hoje, -3) && mesDe(c.primeiro_mes) <= hoje).reduce((s, c) => s + n2(c.valor_parcela), 0);
   if (juros > 0) itens.push({ nivel: "critico", t: "Pare de pagar juros", d: `Nas últimas faturas foram ${real(juros)} de juros, multa ou encargos. Isso vem antes de tudo: pague sempre a fatura inteira e nunca o mínimo. Se não fechar, um parcelamento da fatura costuma ter juros menores que o rotativo; compare o CET antes de aceitar.` });
+  // Parcelamento feito pelo banco (Nubank "Parcelamento de Compra", parcelamento de fatura): tem juros e IOF embutidos
+  const comJuros = P.compras.filter((c) => /parcelamento de (compra|fatura)|parcelado f[aá]cil|parc\.? fatura/i.test(c.descricao) && idxParcela(c, hoje) >= 0);
+  if (comJuros.length) itens.push({ nivel: "alerta", t: `Parcelamentos com juros: ${real(comJuros.reduce((s, c) => s + n2(c.valor_parcela), 0))} neste mês`, d: `${comJuros.map((c) => esc(c.descricao.replace(/^parcelamento de compra\s*/i, "").replace(/"/g, ""))).join(", ")}. Quando o banco parcela uma compra ou a fatura, vem juros e IOF embutidos. Não faça novos: se precisar parcelar, prefira o parcelado sem juros da loja.` });
   // 2. O mês atual
   if (atual.renda && atual.sobra < 0) {
     const cobrar = dev.reduce((s, p) => s + Math.max(0, p.falta), 0);
@@ -378,7 +391,7 @@ function pfCompras(el) {
       return `<tr class="clicavel" data-id="${c.id}"><td><b>${esc(c.descricao)}</b>${c.data_compra ? `<br><small class="sub">${dataBR(c.data_compra)}</small>` : ""}</td>
         <td>${esc(nomeCartao(c.cartao_id))}</td>
         <td>${ehMinha(c) ? "Eu" : `<span class="pilula p-pendente">${esc(nomePessoa(c.dono))}</span>`}</td>
-        <td>${n === 1 ? "à vista" : i >= 0 ? `${i + 1}/${n}` : mesDe(c.primeiro_mes) > hoje ? `começa ${nomeMes(mesDe(c.primeiro_mes), true)}` : `acabou (${n}x)`}</td>
+        <td>${n === 1 ? "à vista" : n >= RECORRENTE ? "todo mês" : i >= 0 ? `${i + 1}/${n}` : mesDe(c.primeiro_mes) > hoje ? `começa ${nomeMes(mesDe(c.primeiro_mes), true)}` : `acabou (${n}x)`}</td>
         <td>${real(c.valor_parcela)}</td><td>${real(falta)}</td><td>${nomeMes(ultimoMes(c), true)}</td></tr>`; }).join("") || `<tr><td colspan="7" class="vazio">Nada por aqui. Importe a fatura ou lance uma compra parcelada.</td></tr>`}</tbody></table></div>
     <p class="contagem">${qtd(lista.length, "compra", "compras")}</p>`;
   $("#pf-f-cartao", el).onchange = (e) => { pfx.cartao = e.target.value; desenhar(); };
@@ -451,16 +464,16 @@ function pfDevem(el) {
   const dev = devedores();
   const hoje = mesHojePF();
   el.innerHTML = `
-    <div class="barra"><p class="sub" style="margin:0">Cada compra marcada com o nome de alguém entra aqui. "Já venceu" soma as parcelas das faturas até ${nomeMes(hoje)}.</p><span class="espaco"></span>
+    <div class="barra"><p class="sub" style="margin:0">Cada compra marcada com o nome de alguém entra aqui. "Já venceu" soma as parcelas das faturas de ${nomeMes(inicioCobranca())} até ${nomeMes(hoje)}; "Próximos 12 meses" é o que ainda vai cair.</p><span class="espaco"></span>
       <button class="btn primario" type="button" id="pf-novo-receb">${ic("mais")}Registrar pagamento</button></div>
     ${dev.length ? `<div class="pf-pessoas">${dev.map((p) => {
       const abertas = p.compras.filter((c) => ultimoMes(c) >= hoje);
-      const msg = `Oi, ${p.nome.split(" ")[0]}! Passando o resumo do cartão: ${abertas.map((c) => { const i = idxParcela(c, hoje); return `${c.descricao}${Number(c.parcelas) > 1 && i >= 0 ? ` (${i + 1}/${c.parcelas})` : ""} ${real(c.valor_parcela)}`; }).join("; ")}. Em aberto até agora: ${real(Math.max(0, p.falta))}. Consegue me mandar até o vencimento?`;
+      const msg = `Oi, ${p.nome.split(" ")[0]}! Passando o resumo do cartão: ${abertas.map((c) => { const i = idxParcela(c, hoje); return `${c.descricao}${Number(c.parcelas) > 1 && Number(c.parcelas) < RECORRENTE && i >= 0 ? ` (${i + 1}/${c.parcelas})` : ""} ${real(c.valor_parcela)}`; }).join("; ")}. Em aberto até agora: ${real(Math.max(0, p.falta))}. Consegue me mandar até o vencimento?`;
       return `<div class="cartao pf-pessoa ${p.falta > 0 ? "atrasado" : ""}">
         <div class="barra" style="margin:0 0 6px"><h2 style="margin:0">${esc(p.nome)}</h2><span class="espaco"></span>
           ${p.falta > 0 ? `<span class="pilula p-vencido">deve ${real(p.falta)}</span>` : p.falta < 0 ? `<span class="pilula p-pago">pagou ${real(-p.falta)} adiantado</span>` : `<span class="pilula p-pago">em dia</span>`}</div>
-        <div class="pf-nums"><span>Já venceu<b>${real(p.devido)}</b></span><span>Já pagou<b>${real(p.pago)}</b></span><span>Ainda vai vencer<b>${real(p.futuro)}</b></span></div>
-        <ul class="pf-mini">${abertas.slice(0, 8).map((c) => { const i = idxParcela(c, hoje); return `<li><span>${esc(c.descricao)}</span><small>${Number(c.parcelas) > 1 ? (i >= 0 ? `${i + 1}/${c.parcelas}` : `até ${nomeMes(ultimoMes(c), true)}`) : "à vista"}</small><b>${real(c.valor_parcela)}</b></li>`; }).join("")}</ul>
+        <div class="pf-nums"><span>Já venceu<b>${real(p.devido)}</b></span><span>Já pagou<b>${real(p.pago)}</b></span><span>Próximos 12 meses<b>${real(p.futuro)}</b></span></div>
+        <ul class="pf-mini">${abertas.slice(0, 8).map((c) => { const i = idxParcela(c, hoje); return `<li><span>${esc(c.descricao)}</span><small>${Number(c.parcelas) >= RECORRENTE ? "todo mês" : Number(c.parcelas) > 1 ? (i >= 0 ? `${i + 1}/${c.parcelas}` : `até ${nomeMes(ultimoMes(c), true)}`) : "à vista"}</small><b>${real(c.valor_parcela)}</b></li>`; }).join("")}</ul>
         ${p.receb.length ? `<p class="sub" style="margin:6px 0 0">Último pagamento: ${real(p.receb[0].valor)} em ${dataBR(p.receb[0].data)}</p>` : ""}
         <div class="barra" style="margin:10px 0 0">
           <button class="btn" type="button" data-receb="${esc(p.nome)}">${ic("check")}Recebi</button>
@@ -501,10 +514,10 @@ function pfContas(el) {
   const hoje = mesHojePF();
   const ativas = P.contas.filter((c) => contaAtiva(c, hoje)).sort((a, b) => n2(b.valor) - n2(a.valor));
   const outras = P.contas.filter((c) => !contaAtiva(c, hoje)).sort((a, b) => String(a.inicio || "").localeCompare(String(b.inicio || "")));
-  const linha = (c) => `<tr class="clicavel" data-id="${c.id}"><td><b>${esc(c.nome)}</b>${c.obs ? `<br><small class="sub">${esc(c.obs)}</small>` : ""}</td><td>${esc(c.categoria || "")}</td><td>${c.dia ? `dia ${c.dia}` : ""}</td><td>${real(c.valor)}</td>
+  const linha = (c) => `<tr class="clicavel" data-id="${c.id}"><td><b>${esc(c.nome)}</b>${c.no_cartao ? ` <span class="pilula p-status">no cartão</span>` : ""}${c.obs ? `<br><small class="sub">${esc(c.obs)}</small>` : ""}</td><td>${esc(c.categoria || "")}</td><td>${c.dia ? `dia ${c.dia}` : ""}</td><td>${real(c.valor)}</td>
     <td>${c.inicio && mesDe(c.inicio) > hoje ? `começa ${nomeMes(mesDe(c.inicio), true)}` : ""}${c.fim ? `${c.inicio && mesDe(c.inicio) > hoje ? ", " : ""}até ${nomeMes(mesDe(c.fim), true)}` : (c.inicio && mesDe(c.inicio) > hoje ? "" : "sem data pra acabar")}</td></tr>`;
   el.innerHTML = `
-    <div class="barra"><p class="sub" style="margin:0">Total por mês agora: <b>${real(fixasNo(hoje))}</b></p><span class="espaco"></span>
+    <div class="barra"><p class="sub" style="margin:0">Total por mês fora do cartão: <b>${real(fixasNo(hoje))}</b>${ativas.some((c) => c.no_cartao) ? ` · no cartão: ${real(ativas.filter((c) => c.no_cartao).reduce((s, c) => s + n2(c.valor), 0))} (já conta na fatura)` : ""}</p><span class="espaco"></span>
       <button class="btn primario" type="button" id="pf-nova-conta">${ic("mais")}Conta fixa</button></div>
     <div class="tabela-caixa"><table><thead><tr><th>Conta</th><th>Categoria</th><th>Vence</th><th>Valor</th><th>Período</th></tr></thead>
     <tbody id="pf-contas">${ativas.map(linha).join("") || `<tr><td colspan="5" class="vazio">Nenhuma conta fixa cadastrada.</td></tr>`}
@@ -526,6 +539,7 @@ function formContaPF(c) {
       { n: "categoria", r: "Categoria", lista: ["Moradia", "Saúde", "Seguro", "Internet e celular", "Impostos", "Transporte", "Assinaturas", "Família", "Outros"] },
       { n: "inicio", r: "Começa em", t: "month", ajuda: "Vazio = já está valendo." },
       { n: "fim", r: "Acaba em", t: "month", ajuda: "Vazio = sem data pra acabar." },
+      { n: "no_cartao", r: "Pago no cartão de crédito (já aparece na fatura, não soma de novo)", t: "check", inteiro: true },
       { n: "obs", r: "Observação", inteiro: true }
     ],
     valores: c ? { ...c, inicio: mesDe(c.inicio), fim: mesDe(c.fim) } : {},
