@@ -976,3 +976,18 @@ end $$;
 
 -- 32b. Conta fixa paga no cartão: já aparece na fatura, então não soma de novo
 alter table public.pf_contas add column if not exists no_cartao boolean not null default false;
+
+
+-- -------------------------------------------------------------
+-- 33. AVISOS DO BOT DE GASTOS NO TELEGRAM
+-- Todo dia às 21h (Brasília): fatura vencendo em 2 dias, lembrete
+-- de lançar gastos e, no domingo, o resumo da semana.
+-- O ajudante "gastos" só manda para o chat conectado pelo painel.
+-- -------------------------------------------------------------
+select cron.unschedule('gastos-diario') where exists (select 1 from cron.job where jobname = 'gastos-diario');
+select cron.schedule('gastos-diario', '0 0 * * *', $$
+  select net.http_post(
+    url := 'https://jlehawiwklvyvrzbfuiu.supabase.co/functions/v1/gastos',
+    headers := '{"Content-Type": "application/json", "apikey": "sb_publishable_oZdhIWRB1gBabQH4xRJ2Xg__F8Lq0V0"}'::jsonb,
+    body := '{"tipo": "diario"}'::jsonb)
+$$);
