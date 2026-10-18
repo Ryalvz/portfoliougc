@@ -462,7 +462,8 @@ function pfGastos(el) {
   const teto = n2(cfg("teto_mes"));
   // Por categoria (só o que é seu)
   const cats = {};
-  meus.forEach((c) => { const t = categoriaDe(c); cats[t] = (cats[t] || 0) + n2(c.valor_parcela) * Number(c.parcelas || 1); });
+  // Só o à vista: é o que o teto e as metas medem (as parceladas já estão em Parcelas)
+  meus.filter((c) => !parcelado(c)).forEach((c) => { const t = categoriaDe(c); cats[t] = (cats[t] || 0) + n2(c.valor_parcela); });
   const listaCats = Object.entries(cats).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
   const maxCat = Math.max(1, ...listaCats.map(([, v]) => v));
   // Agrupado por dia, mais recente primeiro
@@ -485,7 +486,7 @@ function pfGastos(el) {
     ${teto ? `<div class="pf-teto"><i style="width:${Math.min(100, (vista / teto) * 100)}%" class="${vista > teto ? "estourou" : vista > teto * 0.8 ? "perto" : ""}"></i></div>` : ""}
     <div class="grade-fin pf-gastos-grade">
       <div class="cartao">
-        <div class="barra" style="margin-bottom:6px"><h2 style="margin:0">Onde foi o seu dinheiro</h2><span class="espaco"></span><button class="btn" type="button" id="g-metas">${ic("editar")}Metas</button></div>
+        <div class="barra" style="margin-bottom:6px"><h2 style="margin:0">Onde foi o seu dinheiro <span class="sub">(à vista)</span></h2><span class="espaco"></span><button class="btn" type="button" id="g-metas">${ic("editar")}Metas</button></div>
         ${listaCats.length ? `<div class="lista-barras">${listaCats.map(([t, v]) => { const meta = n2(metasCat()[t]); const passou = meta && v > meta; const escala = Math.max(maxCat, ...Object.values(metasCat()).map(Number)); return `<div class="linha-barra"><span class="lb-nome">${esc(t)}</span><span class="lb-trilho pf-trilho-meta"><i style="width:${(v / escala) * 100}%;background:${passou ? "var(--red)" : "#C9A464"}"></i>${meta ? `<em style="left:${(meta / escala) * 100}%"></em>` : ""}</span><span class="lb-valor">${real(v)}${meta ? `<small>de ${real(meta)}</small>` : ""}</span>${passou ? `<span class="lb-extra">passou ${real(v - meta)} da meta</span>` : ""}</div>`; }).join("")}</div>
         <p class="sub" style="margin-top:8px">O tracinho em cada barra é a meta da categoria. Vermelho = passou.</p>` : `<p class="vazio">Nenhum gasto seu neste mês ainda.</p>`}
         ${teto ? "" : `<p class="sub" style="margin-top:10px">Dica: defina um teto em Ajustes e acompanhe aqui quanto ainda dá pra gastar.</p>`}
