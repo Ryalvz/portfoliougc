@@ -434,14 +434,23 @@ const CATEGORIAS_GASTO = [
   ["Lazer", /sympla|ingresso|cinema|sesc|show|teatro|bilhet/i]
 ];
 const categoriaDe = (c) => c.categoria || (CATEGORIAS_GASTO.find(([, re]) => re.test(c.descricao)) || ["Outros"])[0];
-const diaDaCompra = (c) => String(c.data_compra || c.primeiro_mes).slice(0, 10);
+// Mês em que a compra foi feita. Parcelada: a 1ª parcela cai no mês da compra ou no seguinte;
+// se a data não bate com isso (o Nubank põe a data do começo da fatura), vale o mês antes da 1ª parcela.
+function mesDaCompra(c) {
+  const dm = c.data_compra ? mesDe(c.data_compra) : "";
+  if (!parcelado(c)) return dm || mesDe(c.primeiro_mes);
+  const pm = mesDe(c.primeiro_mes);
+  return dm && (dm === pm || dm === somaMes(pm, -1)) ? dm : somaMes(pm, -1);
+}
+const dataAproximada = (c) => parcelado(c) && mesDaCompra(c) !== mesDe(c.data_compra || "");
+const diaDaCompra = (c) => (dataAproximada(c) ? mesDaCompra(c) + "-01" : String(c.data_compra || c.primeiro_mes).slice(0, 10));
 const DIAS_SEMANA_PF = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
 function pfGastos(el) {
   const hoje = mesHojePF();
   const meses = Array.from({ length: 4 }, (_, i) => somaMes(hoje, i - 3));
   if (!meses.includes(pfx.mesGasto)) pfx.mesGasto = hoje;
   const k = pfx.mesGasto;
-  let lista = P.compras.filter((c) => mesDe(diaDaCompra(c)) === k && Number(c.parcelas) < RECORRENTE);
+  let lista = P.compras.filter((c) => mesDaCompra(c) === k && Number(c.parcelas) < RECORRENTE);
   const doMes = lista.slice();
   if (pfx.gCartao) lista = lista.filter((c) => (pfx.gCartao === "pix" ? !c.cartao_id : String(c.cartao_id) === pfx.gCartao));
   if (pfx.gDono === "eu") lista = lista.filter(ehMinha); else if (pfx.gDono === "outros") lista = lista.filter((c) => !ehMinha(c));
@@ -484,7 +493,7 @@ function pfGastos(el) {
           <div class="pf-dia-topo"><b>${DIAS_SEMANA_PF[dt.getDay()]}, ${dt.getDate()} de ${MESES_LONGOS[dt.getMonth()].toLowerCase()}</b><span>${real(total(l.filter(ehMinha)))}</span></div>
           ${l.map((c) => `<button type="button" class="pf-gasto" data-g-id="${c.id}">
             <span class="pf-gasto-nome">${esc(c.descricao)}${c.origem === "rapido" ? ` <i class="pf-tag">lançado por você</i>` : ""}</span>
-            <span class="pf-gasto-info">${esc(nomeCartao(c.cartao_id))}${parcelado(c) ? ` · ${c.parcelas}x de ${real(c.valor_parcela)}` : ""}${ehMinha(c) ? "" : ` · <b>${esc(nomePessoa(c.dono))}</b>`} · ${esc(categoriaDe(c))}</span>
+            <span class="pf-gasto-info">${esc(nomeCartao(c.cartao_id))}${parcelado(c) ? ` · ${c.parcelas}x de ${real(c.valor_parcela)}${dataAproximada(c) ? ", dia aproximado" : ""}` : ""}${ehMinha(c) ? "" : ` · <b>${esc(nomePessoa(c.dono))}</b>`} · ${esc(categoriaDe(c))}</span>
             <strong class="${n2(c.valor_parcela) < 0 ? "pf-credito-v" : ""}">${real(n2(c.valor_parcela) * Number(c.parcelas || 1))}</strong>
           </button>`).join("")}</div>`; }).join("") : `<p class="vazio">Nenhum gasto em ${MESES_LONGOS[Number(k.slice(5)) - 1].toLowerCase()}${pfx.gCartao || pfx.gDono ? " com esse filtro" : ""}. Lance pelo botão + Gasto ou pelo Telegram.</p>`}
       </div>
