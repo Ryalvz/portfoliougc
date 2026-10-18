@@ -897,3 +897,79 @@ create policy "site le" on public.site_conteudo for select to anon, authenticate
 drop policy if exists "dono grava" on public.site_conteudo;
 create policy "dono grava" on public.site_conteudo
   for all to authenticated using (public.eh_admin()) with check (public.eh_admin());
+
+
+-- -------------------------------------------------------------
+-- 32. FINANCEIRO PESSOAL (PF)
+-- A parte "Pessoal" do Financeiro. Só o seu login lê e grava.
+-- pf_cartoes:      seus cartões e o dia de vencimento
+-- pf_contas:       contas fixas (plano de saúde, apê, internet...)
+--                  inicio/fim: de quando até quando (vazio = sempre)
+-- pf_compras:      cada compra do cartão. parcelas = 1 é à vista.
+--                  primeiro_mes: o mês da fatura (dia 1) em que caiu
+--                  a parcela 1. dono vazio = sua; com nome = de quem
+--                  pegou o cartão emprestado. chave evita repetir
+--                  a mesma compra quando você importa a fatura.
+-- pf_recebimentos: o que cada pessoa te devolveu
+-- pf_entradas:     o dinheiro que entrou na sua conta pessoal
+-- pf_config:       salário fixo, reserva atual, meta da reserva
+-- -------------------------------------------------------------
+create table if not exists public.pf_cartoes (
+  id         bigint generated always as identity primary key,
+  nome       text not null,
+  vence_dia  integer check (vence_dia between 1 and 31),
+  fecha_dia  integer check (fecha_dia between 1 and 31),
+  limite     numeric(12, 2) check (limite >= 0),
+  ordem      integer not null default 0
+);
+create table if not exists public.pf_contas (
+  id         bigint generated always as identity primary key,
+  nome       text not null,
+  valor      numeric(12, 2) not null default 0 check (valor >= 0),
+  dia        integer check (dia between 1 and 31),
+  categoria  text,
+  inicio     date,
+  fim        date,
+  obs        text
+);
+create table if not exists public.pf_compras (
+  id             bigint generated always as identity primary key,
+  criado_em      timestamptz not null default now(),
+  cartao_id      bigint references public.pf_cartoes (id) on delete set null,
+  descricao      text not null,
+  valor_parcela  numeric(12, 2) not null default 0,
+  parcelas       integer not null default 1 check (parcelas between 1 and 120),
+  primeiro_mes   date not null,
+  data_compra    date,
+  dono           text,
+  categoria      text,
+  origem         text not null default 'manual',
+  chave          text unique
+);
+create table if not exists public.pf_recebimentos (
+  id      bigint generated always as identity primary key,
+  pessoa  text not null,
+  valor   numeric(12, 2) not null default 0 check (valor >= 0),
+  data    date not null default current_date,
+  obs     text
+);
+create table if not exists public.pf_entradas (
+  id         bigint generated always as identity primary key,
+  data       date not null default current_date,
+  valor      numeric(12, 2) not null default 0 check (valor >= 0),
+  descricao  text,
+  origem     text
+);
+create table if not exists public.pf_config (
+  chave  text primary key,
+  valor  jsonb not null
+);
+do $$
+declare t text;
+begin
+  foreach t in array array['pf_cartoes', 'pf_contas', 'pf_compras', 'pf_recebimentos', 'pf_entradas', 'pf_config'] loop
+    execute format('alter table public.%I enable row level security', t);
+    execute format('drop policy if exists "dono faz tudo" on public.%I', t);
+    execute format('create policy "dono faz tudo" on public.%I for all to authenticated using (public.eh_admin()) with check (public.eh_admin())', t);
+  end loop;
+end $$;
