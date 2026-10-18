@@ -1242,3 +1242,11 @@ dialog.pf-janela-rapida { width: min(460px, calc(100vw - 20px)); }
 .pf-rapido-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip-grande { border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 9px 14px; font: inherit; font-size: 14px; font-weight: 600; color: var(--text); cursor: pointer; }
 .chip-grande[aria-pressed="true"] { background: var(--cobalt); border-color: var(--cobalt); color: var(--parchment); }
+.tg-passos { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 12px; }
+.tg-passos li { display: grid; grid-template-columns: 28px 1fr; gap: 10px; align-items: start; }
+.tg-passos li > b { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--tint-2); color: var(--cobalt); font-size: 13px; }
+.tg-passos li.feito > b { background: var(--green-bg); color: var(--green); }
+.tg-passos li.feito > b .i { width: 15px; height: 15px; }
+.tg-passos strong { display: block; font-size: 14px; margin-bottom: 2px; }
+.tg-passos p { margin: 0 0 6px; font-size: 13px; color: var(--muted); line-height: 1.5; }
+.tg-passos code, .pf-plano code, #tg-corpo code { background: var(--tint); padding: 1px 5px; border-radius: 4px; font-size: 12px; }

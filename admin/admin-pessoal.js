@@ -180,6 +180,7 @@ function desenharPessoal(el) {
     <div class="barra">
       ${chipsVisaoFin()}
       <span class="espaco"></span>
+      <button class="btn" type="button" id="pf-telegram">${ic("enviar")}Telegram</button>
       <button class="btn" type="button" id="pf-simular">${ic("grafico")}Simular compra</button>
       <button class="btn" type="button" id="pf-ajustes">${ic("editar")}Ajustes</button>
       <button class="btn primario" type="button" id="pf-importar">${ic("subir")}Importar fatura</button>
@@ -194,6 +195,7 @@ function desenharPessoal(el) {
   });
   $("#pf-importar", el).onclick = () => abrirImportarFatura();
   $("#pf-simular", el).onclick = () => abrirSimulador();
+  $("#pf-telegram", el).onclick = () => abrirTelegram();
   $("#pf-ajustes", el).onclick = () => formAjustesPF();
   const corpo = $("#pf-corpo", el);
   ({ visao: pfVisao, compras: pfCompras, devem: pfDevem, contas: pfContas, entradas: pfEntradas })[pfx.sub](corpo);
@@ -1120,6 +1122,48 @@ async function abrirGastoRapido() {
     if (abaAtual === "financeiro" || abaAtual === "inicio") desenhar();
   };
 }
+/* ---------- Bot do Telegram (Edge Function "gastos") ---------- */
+const COFRE = "https://supabase.com/dashboard/project/jlehawiwklvyvrzbfuiu/functions/secrets";
+async function chamarGastos(acao) {
+  const { data, error } = await db.functions.invoke("gastos", { body: { acao } });
+  if (error) {
+    let msg = error.message || "";
+    try { const j = await error.context.json(); msg = j.erro || msg; } catch (_) {}
+    return { erro: /not found|404|failed to send/i.test(msg) ? "O ajudante gastos ainda não foi publicado no Supabase." : msg };
+  }
+  return data || {};
+}
+async function abrirTelegram() {
+  const d = abrirJanelaSimples("Lançar gastos pelo Telegram", `<div id="tg-corpo"><p class="vazio">Conferindo o bot...</p></div>`, `<button type="button" class="btn" data-fechar>Fechar</button>`);
+  $$("[data-fechar]", d).forEach((b) => b.onclick = () => d.close());
+  const pintar = (st) => {
+    const passo = (feito, n, t, corpo) => `<li class="${feito ? "feito" : ""}"><b>${feito ? ic("check") : n}</b><div><strong>${t}</strong>${corpo}</div></li>`;
+    const temToken = st && !st.semToken && !(st.erro && /token/i.test(st.erro)) && !(st.erro && /publicado/.test(st.erro));
+    $("#tg-corpo", d).innerHTML = `
+      ${st && st.erro && !/TELEGRAM_TOKEN|publicado/.test(st.erro) ? `<p class="aviso-falta">${esc(st.erro)}</p>` : ""}
+      <ol class="tg-passos">
+        ${passo(temToken, 1, "Criar o bot", `<p>No Telegram, abra o <a href="https://t.me/BotFather" target="_blank" rel="noopener">@BotFather</a>, mande <code>/newbot</code>, dê um nome (ex.: Gastos Ryan) e um usuário terminando em <i>bot</i>. Ele te dá um <b>token</b>.</p>`)}
+        ${passo(temToken, 2, "Guardar o token no cofre do Supabase", `<p>Em <a href="${COFRE}" target="_blank" rel="noopener">Edge Functions &gt; Secrets</a>, clique em <i>Add new secret</i>: nome <code>TELEGRAM_TOKEN</code>, valor o token. Ninguém mais vê esse valor, nem eu.</p>`)}
+        ${passo(st && st.ia, 3, "Ler foto da nota (opcional)", `<p>${st && st.ia ? `Ligado: as fotos são lidas pelo ${st.ia === "gemini" ? "Gemini" : "Claude"}.` : `Para o bot ler fotos, guarde no mesmo cofre <code>GEMINI_API_KEY</code> (grátis, pegue em <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>) ou <code>ANTHROPIC_API_KEY</code> (pago, centavos por foto). Sem isso, o bot funciona só por texto.`}</p>`)}
+        ${passo(st && st.conectado, 4, "Conectar o seu Telegram", st && st.conectado ? `<p>Conectado ao bot <b>@${esc(st.bot || "")}</b>. Mande <code>/ajuda</code> pra ele ver os exemplos.</p><button class="btn" type="button" id="tg-desconectar">Desconectar</button>`
+          : `<p>Toque no botão, abra o Telegram e aperte <b>Começar</b>. Só o seu chat fica autorizado.</p><button class="btn primario" type="button" id="tg-conectar" ${temToken ? "" : "disabled"}>${ic("enviar")}Conectar meu Telegram</button><div id="tg-link"></div>`)}
+      </ol>
+      <p class="sub">Exemplos: <code>45,90 ifood nubank</code> · <code>300 tênis bradesco 3x</code> · <code>30 uber nubank diego</code> · foto da nota com a legenda <code>diego</code>.</p>`;
+    const con = $("#tg-conectar", d);
+    if (con) con.onclick = async () => {
+      con.disabled = true; con.textContent = "Ligando o bot...";
+      const r = await chamarGastos("conectar");
+      if (r.erro) { avisar(r.erro, true); pintar(r); return; }
+      $("#tg-link", d).innerHTML = `<a class="btn primario" href="${esc(r.link)}" target="_blank" rel="noopener" style="margin-top:8px">${ic("link")}Abrir @${esc(r.bot)} no Telegram</a><p class="sub">Depois de apertar Começar no Telegram, volte aqui e toque em Conferir.</p><button class="btn" type="button" id="tg-conferir">Conferir</button>`;
+      con.remove();
+      $("#tg-conferir", d).onclick = async () => pintar(await chamarGastos("status"));
+    };
+    const des = $("#tg-desconectar", d);
+    if (des) des.onclick = async () => { if (await confirmar("Desconectar o Telegram? O bot para de aceitar suas mensagens.", "Desconectar")) { await chamarGastos("desconectar"); pintar(await chamarGastos("status")); } };
+  };
+  pintar(await chamarGastos("status"));
+}
+
 // Botão flutuante em todas as abas, e o endereço #gasto abre direto nele (atalho na tela do iPhone)
 (function botaoGasto() {
   const b = document.createElement("button");
