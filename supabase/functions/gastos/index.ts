@@ -4,7 +4,7 @@
 //   texto:  "45,90 ifood nubank"   "120 mercado bradesco 3x"   "30 uber do diego"
 //   foto da nota, com legenda opcional dizendo cartão/pessoa/parcelas
 //           (ex.: "diego", "inter 2x"). A foto é lida por uma IA.
-//   /desfazer  apaga o último lançamento
+//   "errado" ou o botão Desfazer apagam o último lançamento
 //   /resumo    mostra o que já está na próxima fatura de cada cartão
 // Cada gasto entra em pf_compras (origem "rapido"), na fatura certa
 // pelo dia de fechamento do cartão. Quando a fatura for importada no
@@ -93,7 +93,7 @@ function mesFatura(cartao: any, iso: string) {
 /* ---------- Entender o texto ---------- */
 const semAcento = (t: string) => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 const capitalizar = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
-const PALAVRAS_VAZIAS = new Set(["do", "da", "de", "dos", "das", "no", "na", "em", "pra", "pro", "para", "com", "reais", "real", "r$", "rs", "o", "a", "um", "uma", "gastei", "paguei", "comprei", "e"]);
+const PALAVRAS_VAZIAS = new Set(["do", "da", "de", "dos", "das", "no", "na", "em", "pra", "pro", "para", "com", "reais", "real", "r$", "r", "rs", "o", "a", "um", "uma", "gastei", "paguei", "comprei", "e"]);
 const EU = new Set(["eu", "mim", "meu", "minha", "meus", "minhas"]);
 function valorDe(t: string) {
   const m = t.match(/^r?\$?(\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?|\d+(?:[.,]\d{1,2})?)$/i);
@@ -106,7 +106,13 @@ function valorDe(t: string) {
 function entender(texto: string, cartoes: any[], pessoas: string[]) {
   const r: any = { valor: 0, cartao: undefined, n: 1, dono: undefined, desc: "" };
   const sobra: string[] = [];
-  const palavras = String(texto || "").replace(/\n/g, " ").split(/\s+/).filter(Boolean);
+  let t = String(texto || "").replace(/\n/g, " ");
+  // Parcelas por extenso: "à vista", "em 3x", "3 vezes", "3 parcelas", "parcelado em 3"
+  const VISTA = /(^|\s)(?:[àáa]\s?vista|avista)(?=$|\s|[!.,;?])/gi;
+  if (VISTA.test(t)) { r.n = 1; t = t.replace(VISTA, " "); }
+  const ext = t.match(/\b(?:em\s+)?(\d{1,2})\s*(?:x|vezes|parcelas)\b/i) || t.match(/\bparcelad[oa]\s+em\s+(\d{1,2})\b/i);
+  if (ext) { r.n = Math.max(1, Math.min(48, Number(ext[1]))); t = t.replace(ext[0], " "); }
+  const palavras = t.split(/\s+/).filter(Boolean);
   for (let i = 0; i < palavras.length; i++) {
     const p = palavras[i], s = semAcento(p).replace(/[.,;:!?]+$/, "");
     const x = s.match(/^(\d{1,2})\s*x$/);
@@ -123,7 +129,8 @@ function entender(texto: string, cartoes: any[], pessoas: string[]) {
       const nome = semAcento(palavras[i + 1]).replace(/[^a-z]/g, "");
       if (nome && !EU.has(nome) && nome.length > 2 && /^[A-ZÀ-Ú]/.test(palavras[i + 1])) { r.dono = capitalizar(nome); i++; continue; }
     }
-    if (!PALAVRAS_VAZIAS.has(s)) sobra.push(p);
+    const limpa = p.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "");
+    if (limpa && !PALAVRAS_VAZIAS.has(semAcento(limpa))) sobra.push(limpa);
   }
   r.desc = sobra.join(" ").trim();
   if (r.desc) r.desc = capitalizar(r.desc);
@@ -162,8 +169,19 @@ async function lerFoto(b64: string, mime: string) {
 }
 
 /* ---------- Telegram ---------- */
-async function enviar(chat: number, texto: string) {
-  await fetch(`${TG}/sendMessage`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: chat, text: texto }) });
+async function enviar(chat: number, texto: string, botoes?: { text: string; callback_data: string }[]) {
+  await tg("sendMessage", { chat_id: chat, text: texto, ...(botoes ? { reply_markup: { inline_keyboard: [botoes] } } : {}) });
+}
+async function tg(metodo: string, corpo: unknown) {
+  return await (await fetch(`${TG}/${metodo}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) })).json();
+}
+// Apaga lançamentos feitos pelo bot (só os que ainda não viraram linha da fatura)
+async function apagarLancamentos(ids: number[]) {
+  if (!ids.length) return [];
+  const { data } = await db.from("pf_compras").select("id,descricao,valor_parcela,parcelas,origem").in("id", ids);
+  const vivos = (data || []).filter((c: any) => c.origem === "rapido");
+  if (vivos.length) await db.from("pf_compras").delete().in("id", vivos.map((c: any) => c.id));
+  return vivos;
 }
 async function baixarFoto(fileId: string) {
   const f = await (await fetch(`${TG}/getFile?file_id=${fileId}`)).json();
@@ -176,13 +194,14 @@ async function baixarFoto(fileId: string) {
 
 const AJUDA = `Como lançar um gasto:
 • Texto: 45,90 ifood nubank
-• Parcelado: 300 tênis bradesco 3x
+• Parcelado: 300 tênis bradesco 3x (ou "em 3 vezes")
 • De outra pessoa: 30 uber nubank diego
 • Pix ou débito: 12 padaria pix
 • Foto da nota, com legenda opcional (ex.: "diego", "inter 2x")
 
 Sem cartão na mensagem, vai no último que você usou.
-/desfazer apaga o último lançamento
+Pode mandar vários de uma vez, um por linha.
+Errou? Toque em Desfazer, ou mande "errado".
 /resumo mostra a próxima fatura de cada cartão`;
 
 async function tratarMensagem(msg: any) {
@@ -211,14 +230,13 @@ async function tratarMensagem(msg: any) {
 
   if (/^\/(ajuda|help)/i.test(texto)) { await enviar(chat, AJUDA); return; }
 
-  if (/^\/desfazer/i.test(texto)) {
-    const id = await lerCfg("telegram_ultimo_id");
-    if (!id) { await enviar(chat, "Não tenho nenhum lançamento recente pra desfazer."); return; }
-    const { data: c } = await db.from("pf_compras").select("id,descricao,valor_parcela,parcelas,origem").eq("id", id).maybeSingle();
-    if (!c || c.origem !== "rapido") { await enviar(chat, "Esse lançamento já foi trocado pela fatura ou apagado."); await gravarCfg("telegram_ultimo_id", null); return; }
-    await db.from("pf_compras").delete().eq("id", id);
+  if (/^\/?(desfazer|desfaz|errado|errada|errei|apaga|apagar|apague|cancela|cancelar|deleta|deletar|remove|remover)\b/i.test(semAcento(texto)) && texto.length < 30) {
+    const ult = await lerCfg("telegram_ultimo_id");
+    const ids = (Array.isArray(ult) ? ult : ult ? [ult] : []).map(Number);
+    const apagados = await apagarLancamentos(ids);
     await gravarCfg("telegram_ultimo_id", null);
-    await enviar(chat, `Apaguei: ${c.descricao}, ${real(Number(c.valor_parcela) * Number(c.parcelas))}.`);
+    if (!apagados.length) { await enviar(chat, "Não tenho nenhum lançamento recente pra desfazer."); return; }
+    await enviar(chat, `Apaguei ↩️\n${apagados.map((c: any) => `${c.descricao}: ${real(Number(c.valor_parcela) * Number(c.parcelas))}`).join("\n")}`);
     return;
   }
 
@@ -240,40 +258,66 @@ async function tratarMensagem(msg: any) {
     return;
   }
 
-  // Lançar
-  const e = entender(texto, cartoes || [], pessoas);
+  // Lançar: cada linha com valor vira um gasto; linhas sem valor (ex.: "nubank") valem para todas
+  const linhasTexto = texto.split(/\n+/).map((l) => l.trim()).filter(Boolean);
+  const comValor = linhasTexto.filter((l) => entender(l, cartoes || [], pessoas).valor);
+  const partes = comValor.length >= 2 ? comValor : [texto];
+  const extra = comValor.length >= 2 ? linhasTexto.filter((l) => !comValor.includes(l)).join(" ") : "";
+  const itens = partes.map((l) => {
+    const e = entender(l, cartoes || [], pessoas);
+    if (extra) { const x = entender(extra, cartoes || [], pessoas); if (e.cartao === undefined) e.cartao = x.cartao; if (e.dono === undefined) e.dono = x.dono; if (e.n === 1) e.n = x.n; }
+    return e;
+  });
   let data = hojeBR();
   if (msg.photo?.length) {
+    const e = itens[0];
     const foto = msg.photo[msg.photo.length - 1];
     let lido: any = null;
     try {
       const { b64, mime } = await baixarFoto(foto.file_id);
       lido = await lerFoto(b64, mime);
     } catch (err) { await enviar(chat, "Não consegui ler a foto (" + String((err as Error).message || err).slice(0, 120) + "). Manda o valor por texto, ex.: 45,90 ifood"); return; }
-    if (lido === null) { await enviar(chat, "Ainda não tenho uma IA ligada pra ler fotos. Peça pra configurar a chave GEMINI_API_KEY no Supabase. Enquanto isso, manda por texto: 45,90 ifood"); return; }
+    if (lido === null) { await enviar(chat, "Ainda não tenho uma IA ligada pra ler fotos. Enquanto isso, manda por texto: 45,90 ifood"); return; }
     if (!e.valor) e.valor = Number(lido.valor_total) || 0;
     if (!e.desc && lido.estabelecimento) e.desc = String(lido.estabelecimento).slice(0, 60);
     if (e.n === 1 && Number(lido.parcelas) > 1) e.n = Math.min(48, Number(lido.parcelas));
     if (lido.data && /^\d{4}-\d{2}-\d{2}$/.test(lido.data) && Math.abs(Date.parse(lido.data) - Date.parse(data)) < 40 * 864e5) data = lido.data;
   }
-  if (!e.valor) { await enviar(chat, "Não entendi o valor. Exemplo: 45,90 ifood nubank\n\n/ajuda mostra tudo que eu entendo."); return; }
-  if (!e.desc) e.desc = "Gasto";
+  if (!itens.some((e) => e.valor)) { await enviar(chat, "Não achei o valor. Exemplos:\n45,90 ifood nubank\n300 tênis bradesco 3x\n\n/ajuda mostra tudo que eu entendo."); return; }
 
   // Sem cartão na mensagem: o último usado
-  let cartao = e.cartao;
-  if (cartao === undefined) {
-    const ult = await lerCfg("telegram_ultimo_cartao");
-    cartao = ult === "pix" ? null : (cartoes || []).find((c: any) => String(c.id) === String(ult)) || (cartoes || [])[0] || null;
+  const ult = await lerCfg("telegram_ultimo_cartao");
+  const padrao = ult === "pix" ? null : (cartoes || []).find((c: any) => String(c.id) === String(ult)) || (cartoes || [])[0] || null;
+  const ids: number[] = [], linhas: string[] = [];
+  let ultimoCartao: any = padrao, semNome = false;
+  for (const e of itens.filter((x) => x.valor)) {
+    const cartao = e.cartao === undefined ? padrao : e.cartao;
+    if (!e.desc) { e.desc = "Gasto"; semNome = true; }
+    const k = mesFatura(cartao, data);
+    const { data: novo, error } = await db.from("pf_compras").insert({
+      cartao_id: cartao ? cartao.id : null, descricao: e.desc, valor_parcela: Math.round((e.valor / e.n) * 100) / 100, parcelas: e.n,
+      primeiro_mes: k + "-01", data_compra: data, dono: e.dono || null, origem: "rapido",
+    }).select("id").single();
+    if (error) { await enviar(chat, "Não consegui salvar: " + error.message); return; }
+    ids.push(novo.id);
+    ultimoCartao = cartao;
+    linhas.push(`${e.desc}: ${real(e.valor)}${e.n > 1 ? ` em ${e.n}x de ${real(e.valor / e.n)}` : " à vista"}\n${cartao ? `${cartao.nome}, fatura de ${nomeMes(k)}` : "Pix/débito"}${e.dono ? ` · de ${e.dono}` : ""}`);
   }
-  const k = mesFatura(cartao, data);
-  const { data: novo, error } = await db.from("pf_compras").insert({
-    cartao_id: cartao ? cartao.id : null, descricao: e.desc, valor_parcela: Math.round((e.valor / e.n) * 100) / 100, parcelas: e.n,
-    primeiro_mes: k + "-01", data_compra: data, dono: e.dono || null, origem: "rapido",
-  }).select("id").single();
-  if (error) { await enviar(chat, "Não consegui salvar: " + error.message); return; }
-  await gravarCfg("telegram_ultimo_id", novo.id);
-  await gravarCfg("telegram_ultimo_cartao", cartao ? cartao.id : "pix");
-  await enviar(chat, `Lancei ✅\n${e.desc}: ${real(e.valor)}${e.n > 1 ? ` em ${e.n}x de ${real(e.valor / e.n)}` : ""}\n${cartao ? `${cartao.nome}, fatura de ${nomeMes(k)}` : "Pix/débito"}${e.dono ? `\nDe: ${e.dono}` : ""}\n\nErrado? /desfazer`);
+  await gravarCfg("telegram_ultimo_id", ids);
+  await gravarCfg("telegram_ultimo_cartao", ultimoCartao ? ultimoCartao.id : "pix");
+  await enviar(chat, `Lancei ✅\n\n${linhas.join("\n\n")}${semNome ? `\n\nDica: diga onde foi, ex.: "700 mercado"` : ""}`, [{ text: ids.length > 1 ? `↩️ Desfazer os ${ids.length}` : "↩️ Desfazer", callback_data: "undo:" + ids.join(",") }]);
+}
+
+// Toque no botão "Desfazer"
+async function tratarBotao(cb: any) {
+  const chat = cb.message?.chat?.id;
+  const conectado = await lerCfg("telegram_chat");
+  if (!chat || String(conectado) !== String(chat)) { await tg("answerCallbackQuery", { callback_query_id: cb.id, text: "Este bot é particular." }); return; }
+  const m = String(cb.data || "").match(/^undo:([\d,]+)$/);
+  if (!m) { await tg("answerCallbackQuery", { callback_query_id: cb.id }); return; }
+  const apagados = await apagarLancamentos(m[1].split(",").map(Number));
+  await tg("answerCallbackQuery", { callback_query_id: cb.id, text: apagados.length ? "Apagado" : "Já tinha sido apagado" });
+  await tg("editMessageText", { chat_id: chat, message_id: cb.message.message_id, text: (cb.message.text || "") .replace(/^Lancei ✅/, "Apagado ↩️") + (apagados.length ? "" : "\n\n(já tinha sido apagado)") });
 }
 
 Deno.serve(async (req) => {
@@ -289,6 +333,7 @@ Deno.serve(async (req) => {
       const upd = await req.json();
       const msg = upd.message; // mensagem editada não lança de novo
       if (msg) await tratarMensagem(msg);
+      else if (upd.callback_query) await tratarBotao(upd.callback_query);
     } catch (err) { console.error(err); }
     return new Response("ok");
   }
@@ -301,12 +346,10 @@ Deno.serve(async (req) => {
     const eu = await (await fetch(`${TG}/getMe`)).json();
     if (!eu.ok) return resposta({ erro: "O token do Telegram não funcionou. Confira o TELEGRAM_TOKEN no Supabase." });
     const ia = Deno.env.get("GEMINI_API_KEY") ? "gemini" : Deno.env.get("ANTHROPIC_API_KEY") ? "claude" : null;
+    // Liga (ou atualiza) o endereço que o Telegram chama a cada mensagem
+    const w = await tg("setWebhook", { url: `${URL_BANCO}/functions/v1/gastos`, secret_token: await segredoWebhook(), allowed_updates: ["message", "callback_query"] });
+    if (!w.ok) return resposta({ erro: "Não deu para ligar o bot: " + (w.description || "") });
     if (corpo.acao === "conectar") {
-      const w = await (await fetch(`${TG}/setWebhook`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: `${URL_BANCO}/functions/v1/gastos`, secret_token: await segredoWebhook(), allowed_updates: ["message"] }),
-      })).json();
-      if (!w.ok) return resposta({ erro: "Não deu para ligar o bot: " + (w.description || "") });
       const codigo = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
       await gravarCfg("telegram_codigo", codigo);
       return resposta({ ok: true, bot: eu.result.username, link: `https://t.me/${eu.result.username}?start=${codigo}`, conectado: !!(await lerCfg("telegram_chat")), ia });
