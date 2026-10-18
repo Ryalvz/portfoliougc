@@ -435,7 +435,7 @@ const CATEGORIAS_GASTO = [
 ];
 const categoriaDe = (c) => c.categoria || (CATEGORIAS_GASTO.find(([, re]) => re.test(c.descricao)) || ["Outros"])[0];
 const diaDaCompra = (c) => String(c.data_compra || c.primeiro_mes).slice(0, 10);
-const DIAS_SEMANA = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
+const DIAS_SEMANA_PF = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
 function pfGastos(el) {
   const hoje = mesHojePF();
   const meses = Array.from({ length: 4 }, (_, i) => somaMes(hoje, i - 3));
@@ -481,7 +481,7 @@ function pfGastos(el) {
       <div class="cartao">
         <div class="barra" style="margin-bottom:6px"><h2 style="margin:0">Dia a dia</h2><span class="espaco"></span><button class="btn" type="button" id="g-novo">${ic("mais")}Gasto</button></div>
         ${Object.keys(dias).length ? Object.keys(dias).sort().reverse().map((d) => { const dt = deISO(d); const l = dias[d]; return `<div class="pf-dia">
-          <div class="pf-dia-topo"><b>${DIAS_SEMANA[dt.getDay()]}, ${dt.getDate()} de ${MESES_LONGOS[dt.getMonth()].toLowerCase()}</b><span>${real(total(l.filter(ehMinha)))}</span></div>
+          <div class="pf-dia-topo"><b>${DIAS_SEMANA_PF[dt.getDay()]}, ${dt.getDate()} de ${MESES_LONGOS[dt.getMonth()].toLowerCase()}</b><span>${real(total(l.filter(ehMinha)))}</span></div>
           ${l.map((c) => `<button type="button" class="pf-gasto" data-g-id="${c.id}">
             <span class="pf-gasto-nome">${esc(c.descricao)}${c.origem === "rapido" ? ` <i class="pf-tag">lançado por você</i>` : ""}</span>
             <span class="pf-gasto-info">${esc(nomeCartao(c.cartao_id))}${parcelado(c) ? ` · ${c.parcelas}x de ${real(c.valor_parcela)}` : ""}${ehMinha(c) ? "" : ` · <b>${esc(nomePessoa(c.dono))}</b>`} · ${esc(categoriaDe(c))}</span>
