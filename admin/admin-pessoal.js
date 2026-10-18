@@ -433,6 +433,8 @@ const CATEGORIAS_GASTO = [
   ["Saúde e farmácia", /hospital|drogasil|drogaria|farma|saude|sa[uú]de|clinica|lab/i],
   ["Lazer", /sympla|ingresso|cinema|sesc|show|teatro|bilhet/i]
 ];
+const METAS_PADRAO = { "Mercado e padaria": 700, "Transporte": 300, "Restaurantes e delivery": 300, "Assinaturas": 300, "Compras online": 100, "Saúde e farmácia": 300, "Lazer": 100, "Outros": 300 };
+const metasCat = () => ({ ...METAS_PADRAO, ...(P.config.metas_categoria || {}) });
 const categoriaDe = (c) => c.categoria || (CATEGORIAS_GASTO.find(([, re]) => re.test(c.descricao)) || ["Outros"])[0];
 // Mês em que a compra foi feita. Parcelada: a 1ª parcela cai no mês da compra ou no seguinte;
 // se a data não bate com isso (o Nubank põe a data do começo da fatura), vale o mês antes da 1ª parcela.
@@ -483,8 +485,9 @@ function pfGastos(el) {
     ${teto ? `<div class="pf-teto"><i style="width:${Math.min(100, (vista / teto) * 100)}%" class="${vista > teto ? "estourou" : vista > teto * 0.8 ? "perto" : ""}"></i></div>` : ""}
     <div class="grade-fin pf-gastos-grade">
       <div class="cartao">
-        <h2>Onde foi o seu dinheiro</h2>
-        ${listaCats.length ? `<div class="lista-barras">${listaCats.map(([t, v]) => `<div class="linha-barra"><span class="lb-nome">${esc(t)}</span><span class="lb-trilho"><i style="width:${(v / maxCat) * 100}%;background:#C9A464"></i></span><span class="lb-valor">${real(v)}</span></div>`).join("")}</div>` : `<p class="vazio">Nenhum gasto seu neste mês ainda.</p>`}
+        <div class="barra" style="margin-bottom:6px"><h2 style="margin:0">Onde foi o seu dinheiro</h2><span class="espaco"></span><button class="btn" type="button" id="g-metas">${ic("editar")}Metas</button></div>
+        ${listaCats.length ? `<div class="lista-barras">${listaCats.map(([t, v]) => { const meta = n2(metasCat()[t]); const passou = meta && v > meta; const escala = Math.max(maxCat, ...Object.values(metasCat()).map(Number)); return `<div class="linha-barra"><span class="lb-nome">${esc(t)}</span><span class="lb-trilho pf-trilho-meta"><i style="width:${(v / escala) * 100}%;background:${passou ? "var(--red)" : "#C9A464"}"></i>${meta ? `<em style="left:${(meta / escala) * 100}%"></em>` : ""}</span><span class="lb-valor">${real(v)}${meta ? `<small>de ${real(meta)}</small>` : ""}</span>${passou ? `<span class="lb-extra">passou ${real(v - meta)} da meta</span>` : ""}</div>`; }).join("")}</div>
+        <p class="sub" style="margin-top:8px">O tracinho em cada barra é a meta da categoria. Vermelho = passou.</p>` : `<p class="vazio">Nenhum gasto seu neste mês ainda.</p>`}
         ${teto ? "" : `<p class="sub" style="margin-top:10px">Dica: defina um teto em Ajustes e acompanhe aqui quanto ainda dá pra gastar.</p>`}
       </div>
       <div class="cartao">
@@ -502,6 +505,17 @@ function pfGastos(el) {
   $("#g-cartao", el).onchange = (e) => { pfx.gCartao = e.target.value; desenhar(); };
   $("#g-dono", el).onchange = (e) => { pfx.gDono = e.target.value; desenhar(); };
   $("#g-novo", el).onclick = () => abrirGastoRapido();
+  $("#g-metas", el).onclick = () => {
+    const m = metasCat();
+    const campos = Object.keys(METAS_PADRAO).map((t, i) => ({ n: "m" + i, r: t + " (R$ por mês)", t: "number" }));
+    const valores = {}; Object.keys(METAS_PADRAO).forEach((t, i) => { valores["m" + i] = m[t]; });
+    abrirForm({ titulo: "Metas por categoria", campos, valores, aoSalvar: async (d) => {
+      const novo = {}; Object.keys(METAS_PADRAO).forEach((t, i) => { novo[t] = Number(d["m" + i]) || 0; });
+      const { error } = await db.from("pf_config").upsert({ chave: "metas_categoria", valor: novo }, { onConflict: "chave" });
+      if (error) { avisar(traduzErro(error), true); return false; }
+      await recarregarPF(); return true;
+    } });
+  };
   $$("[data-g-id]", el).forEach((b) => b.onclick = () => formCompraPF(P.compras.find((c) => String(c.id) === b.dataset.gId)));
 }
 

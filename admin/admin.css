@@ -1267,3 +1267,5 @@ dialog.pf-janela-rapida { width: min(460px, calc(100vw - 20px)); }
 .pf-gasto strong { grid-column: 2; grid-row: 1 / span 2; align-self: center; font-variant-numeric: tabular-nums; }
 .pf-credito-v { color: var(--green); }
 .pf-tag { font-style: normal; font-size: 10.5px; font-weight: 600; background: var(--olive-tint); color: #5e5a3a; padding: 1px 6px; border-radius: 999px; margin-left: 4px; }
+.pf-trilho-meta { position: relative; overflow: visible; }
+.pf-trilho-meta em { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--text); opacity: .6; border-radius: 1px; }
