@@ -973,3 +973,6 @@ begin
     execute format('create policy "dono faz tudo" on public.%I for all to authenticated using (public.eh_admin()) with check (public.eh_admin())', t);
   end loop;
 end $$;
+
+-- 32b. Conta fixa paga no cartão: já aparece na fatura, então não soma de novo
+alter table public.pf_contas add column if not exists no_cartao boolean not null default false;
