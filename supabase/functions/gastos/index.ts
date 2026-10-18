@@ -17,6 +17,8 @@
 // "Verify JWT" fica DESLIGADO: o Telegram não manda login. A segurança é:
 //   o Telegram assina cada mensagem com um segredo (derivado do token) e
 //   o bot só responde ao chat que você conectou pelo painel.
+// tipo "diario" (relógio, 21h): fatura vencendo em 2 dias, lembrete de lançar e,
+//   no domingo, o resumo da semana. Um por dia, só para o seu chat.
 // acao "status" / "conectar" (painel, só o seu login): liga o webhook e
 //   gera o código para conectar seu Telegram.
 // =============================================================
@@ -88,6 +90,65 @@ function mesFatura(cartao: any, iso: string) {
   if (fecha <= 0) fecha += 30;
   const mesFecha = d < fecha ? k : somaMes(k, 1);
   return vence > fecha ? mesFecha : somaMes(mesFecha, 1);
+}
+
+/* ---------- Teto do mês e metas por categoria (mesma regra do painel) ---------- */
+const CATEGORIAS: [string, RegExp][] = [
+  ["Restaurantes e delivery", /ifd|ifood|restaurante|trattoria|cafe\b|caf[eé]|parrilla|lanche|pizza|burger|bar\b|padoca|food|sushi|churras|almo[cç]o|jantar/i],
+  ["Mercado e padaria", /mercad|extra\b|extra-|oxxo|carrefour|assai|atacad|padaria|\bpao\b|p[aã]o\b|hortifruti|market|distribuidora|super/i],
+  ["Transporte", /\b99\b|99\*|uber|jet patin|patinete|turbi|metro|metr[oô]|tembici|rentcars|posto|combust|gasolina|estacion|onibus|[oô]nibus|taxi|t[aá]xi/i],
+  ["Compras online", /tiktok|shopee|aliexpress|mercadoli|mp\*|amazon(?! prime)|shein|magalu|magazine/i],
+  ["Assinaturas", /apple|totalpass|hubla|prime|netflix|spotify|youtube|google|icloud|vivo|loga|claro|tim\b/i],
+  ["Saúde e farmácia", /hospital|drogasil|drogaria|farma|saude|sa[uú]de|clinica|cl[ií]nica|lab|rem[eé]dio/i],
+  ["Lazer", /sympla|ingresso|cinema|sesc|show|teatro|bilhet/i],
+];
+const categoriaDe = (c: any) => c.categoria || (CATEGORIAS.find(([, re]) => re.test(c.descricao)) || ["Outros"])[0];
+const EMOJI: Record<string, string> = { "Restaurantes e delivery": "🍔", "Mercado e padaria": "🛒", "Transporte": "🚗", "Compras online": "📦", "Assinaturas": "🔁", "Saúde e farmácia": "💊", "Lazer": "🎟️", "Outros": "🧾" };
+const mesDe = (iso: string) => String(iso || "").slice(0, 7);
+function mesDaCompra(c: any) {
+  const dm = c.data_compra ? mesDe(c.data_compra) : "";
+  if (Number(c.parcelas) <= 1) return dm || mesDe(c.primeiro_mes);
+  const pm = mesDe(c.primeiro_mes);
+  return dm && (dm === pm || dm === somaMes(pm, -1)) ? dm : somaMes(pm, -1);
+}
+// Quanto do à vista seu já foi no mês, no total e por categoria
+async function situacaoMes(k: string) {
+  const { data } = await db.from("pf_compras").select("descricao,valor_parcela,parcelas,primeiro_mes,data_compra,dono,categoria").is("dono", null).eq("parcelas", 1);
+  const lista = (data || []).filter((c: any) => mesDaCompra(c) === k);
+  const porCat: Record<string, number> = {};
+  let total = 0;
+  lista.forEach((c: any) => { const v = Number(c.valor_parcela) || 0; total += v; const t = categoriaDe(c); porCat[t] = (porCat[t] || 0) + v; });
+  return { total, porCat };
+}
+const diasAteFim = (iso: string) => { const [a, m, d] = iso.split("-").map(Number); return new Date(a, m, 0).getDate() - d + 1; };
+// Linhas de aviso depois de um lançamento: teto do mês, faixas de 50/80/100% e metas das categorias mexidas
+async function avisosDoMes(novos: any[]) {
+  const teto = Number(await lerCfg("teto_mes")) || 0;
+  const metas = (await lerCfg("metas_categoria")) || {};
+  const hoje = hojeBR(), k = hoje.slice(0, 7);
+  const { total, porCat } = await situacaoMes(k);
+  const L: string[] = [];
+  const vistaNovos = novos.filter((e) => e.n === 1 && !e.dono && mesDe(e.data) === k).reduce((s, e) => s + e.valor, 0);
+  if (teto) {
+    const p = Math.round((total / teto) * 100), antes = total - vistaNovos;
+    const resta = teto - total, dias = diasAteFim(hoje);
+    L.push(`📊 ${capitalizar(nomeMes(k))}: ${real(total)} de ${real(teto)} (${p}%)`);
+    if (resta > 0) L.push(`Ainda dá ${real(resta)}, uns ${real(resta / dias)} por dia até o fim do mês.`);
+    const faixa = (x: number) => (x >= teto ? 100 : x >= teto * 0.8 ? 80 : x >= teto * 0.5 ? 50 : 0);
+    if (faixa(total) > faixa(antes)) {
+      if (faixa(total) === 100) L.push(`🚨 Estourou o teto em ${real(total - teto)}. Daqui até o fim do mês, só o essencial: mercado, remédio e transporte.`);
+      else if (faixa(total) === 80) L.push(`⚠️ Passou de 80% do teto. Segura o que dá pra adiar.`);
+      else L.push(`🟡 Metade do teto já foi.`);
+    }
+  }
+  const cats = [...new Set(novos.filter((e) => e.n === 1 && !e.dono).map((e) => categoriaDe({ descricao: e.desc })))];
+  cats.forEach((t) => {
+    const meta = Number(metas[t]) || 0, v = porCat[t] || 0;
+    if (meta && v >= meta * 0.8) L.push(`${EMOJI[t] || "•"} ${t}: ${real(v)} de ${real(meta)} no mês${v > meta ? `, passou ${real(v - meta)}` : ", quase no limite"}.`);
+  });
+  const parc = novos.filter((e) => e.n > 1 && !e.dono);
+  if (parc.length) L.push(`⚠️ Compra parcelada nova: o plano é não parcelar nada até as parcelas caírem. Isso soma ${real(parc.reduce((s, e) => s + e.valor / e.n, 0))} por mês nas próximas faturas.`);
+  return L;
 }
 
 /* ---------- Entender o texto ---------- */
@@ -288,7 +349,7 @@ async function tratarMensagem(msg: any) {
   // Sem cartão na mensagem: o último usado
   const ult = await lerCfg("telegram_ultimo_cartao");
   const padrao = ult === "pix" ? null : (cartoes || []).find((c: any) => String(c.id) === String(ult)) || (cartoes || [])[0] || null;
-  const ids: number[] = [], linhas: string[] = [];
+  const ids: number[] = [], linhas: string[] = [], novos: any[] = [];
   let ultimoCartao: any = padrao, semNome = false;
   for (const e of itens.filter((x) => x.valor)) {
     const cartao = e.cartao === undefined ? padrao : e.cartao;
@@ -300,12 +361,15 @@ async function tratarMensagem(msg: any) {
     }).select("id").single();
     if (error) { await enviar(chat, "Não consegui salvar: " + error.message); return; }
     ids.push(novo.id);
+    novos.push({ ...e, data });
     ultimoCartao = cartao;
     linhas.push(`${e.desc}: ${real(e.valor)}${e.n > 1 ? ` em ${e.n}x de ${real(e.valor / e.n)}` : " à vista"}\n${cartao ? `${cartao.nome}, fatura de ${nomeMes(k)}` : "Pix/débito"}${e.dono ? ` · de ${e.dono}` : ""}`);
   }
   await gravarCfg("telegram_ultimo_id", ids);
   await gravarCfg("telegram_ultimo_cartao", ultimoCartao ? ultimoCartao.id : "pix");
-  await enviar(chat, `Lancei ✅\n\n${linhas.join("\n\n")}${semNome ? `\n\nDica: diga onde foi, ex.: "700 mercado"` : ""}`, [{ text: ids.length > 1 ? `↩️ Desfazer os ${ids.length}` : "↩️ Desfazer", callback_data: "undo:" + ids.join(",") }]);
+  let avisos: string[] = [];
+  try { avisos = await avisosDoMes(novos); } catch (err) { console.error(err); }
+  await enviar(chat, `Lancei ✅\n\n${linhas.join("\n\n")}${semNome ? `\n\nDica: diga onde foi, ex.: "700 mercado"` : ""}${avisos.length ? "\n\n" + avisos.join("\n") : ""}`, [{ text: ids.length > 1 ? `↩️ Desfazer os ${ids.length}` : "↩️ Desfazer", callback_data: "undo:" + ids.join(",") }]);
 }
 
 // Toque no botão "Desfazer"
@@ -318,6 +382,52 @@ async function tratarBotao(cb: any) {
   const apagados = await apagarLancamentos(m[1].split(",").map(Number));
   await tg("answerCallbackQuery", { callback_query_id: cb.id, text: apagados.length ? "Apagado" : "Já tinha sido apagado" });
   await tg("editMessageText", { chat_id: chat, message_id: cb.message.message_id, text: (cb.message.text || "") .replace(/^Lancei ✅/, "Apagado ↩️") + (apagados.length ? "" : "\n\n(já tinha sido apagado)") });
+}
+
+/* ---------- Avisos por conta própria (relógio do Supabase, todo dia às 21h) ---------- */
+async function avisosDiarios() {
+  const chat = await lerCfg("telegram_chat");
+  if (!chat) return { pulado: "telegram não conectado" };
+  const hoje = hojeBR();
+  const ja = (await lerCfg("telegram_avisos")) || {};
+  if (ja.dia === hoje) return { pulado: "já avisou hoje" };
+  const msgs: string[] = [];
+  const { data: cartoes } = await db.from("pf_cartoes").select("id,nome,vence_dia");
+  const { data: compras } = await db.from("pf_compras").select("cartao_id,descricao,valor_parcela,parcelas,primeiro_mes,dono,origem,criado_em,data_compra,categoria");
+  const parcelaNo = (x: any, k: string) => { const i = (Number(k.slice(0, 4)) - Number(x.primeiro_mes.slice(0, 4))) * 12 + (Number(k.slice(5, 7)) - Number(x.primeiro_mes.slice(5, 7))); return i >= 0 && i < Number(x.parcelas) ? Number(x.valor_parcela) : 0; };
+  // 1. Fatura vencendo em 2 dias (com quanto cada pessoa precisa te mandar)
+  const [a, m, d] = hoje.split("-").map(Number);
+  const em2 = new Date(a, m - 1, d + 2);
+  const k2 = `${em2.getFullYear()}-${pad(em2.getMonth() + 1)}`;
+  (cartoes || []).forEach((c: any) => {
+    if (Number(c.vence_dia) !== em2.getDate()) return;
+    let eu = 0; const outros: Record<string, number> = {};
+    (compras || []).forEach((x: any) => { if (String(x.cartao_id) !== String(c.id)) return; const v = parcelaNo(x, k2); if (!v) return; if (x.dono) outros[x.dono] = (outros[x.dono] || 0) + v; else eu += v; });
+    const tot = eu + Object.values(outros).reduce((s, v) => s + v, 0);
+    if (tot <= 0) return;
+    msgs.push(`💳 A fatura do ${c.nome} vence em 2 dias (dia ${c.vence_dia}): ${real(tot)} até agora.${Object.keys(outros).length ? `\nCobre antes: ${Object.entries(outros).map(([n, v]) => `${n} ${real(v)}`).join(", ")}.` : ""}\nPague o valor inteiro, nunca o mínimo.`);
+  });
+  // 2. Lembrete de lançar (se nada foi lançado hoje nem ontem)
+  const ontem = new Date(a, m - 1, d - 1).toLocaleDateString("sv-SE");
+  const lancouRecente = (compras || []).some((x: any) => x.origem === "rapido" && String(x.criado_em).slice(0, 10) >= ontem);
+  if (!lancouRecente && (!ja.lembrou || ja.lembrou < ontem)) { msgs.push("📝 Não vi gasto lançado ontem nem hoje. Lembrou de lançar? Manda aqui mesmo, ex.: 32 uber"); ja.lembrou = hoje; }
+  // 3. Domingo: resumo da semana
+  if (new Date(a, m - 1, d).getDay() === 0) {
+    const k = hoje.slice(0, 7);
+    const teto = Number(await lerCfg("teto_mes")) || 0;
+    const metas = (await lerCfg("metas_categoria")) || {};
+    const { total, porCat } = await situacaoMes(k);
+    const semana = new Date(a, m - 1, d - 6).toLocaleDateString("sv-SE");
+    const daSemana = (compras || []).filter((x: any) => !x.dono && Number(x.parcelas) === 1 && String(x.data_compra || "") >= semana && String(x.data_compra || "") <= hoje).reduce((s: number, x: any) => s + Number(x.valor_parcela), 0);
+    const top = Object.entries(porCat).sort((x, y) => y[1] - x[1]).slice(0, 3);
+    const prox = somaMes(k, 1);
+    const parcProx = (compras || []).filter((x: any) => !x.dono).reduce((s: number, x: any) => s + (Number(x.parcelas) > 1 && Number(x.parcelas) < 60 ? parcelaNo(x, prox) : 0), 0);
+    msgs.push(`🗓️ Resumo da semana\n\nGastos à vista na semana: ${real(daSemana)}\nNo mês: ${real(total)}${teto ? ` de ${real(teto)} (${Math.round((total / teto) * 100)}%)${teto > total ? `, ainda dá ${real(teto - total)}` : `, passou ${real(total - teto)}`}` : ""}\n\nOnde mais foi:\n${top.map(([t, v]) => `${EMOJI[t] || "•"} ${t}: ${real(v)}${metas[t] ? ` (meta ${real(Number(metas[t]))})` : ""}`).join("\n") || "nada lançado ainda"}\n\nSuas parcelas na fatura de ${nomeMes(prox)}: ${real(parcProx)}`);
+  }
+  ja.dia = hoje;
+  await gravarCfg("telegram_avisos", ja);
+  for (const t of msgs) await enviar(Number(chat), t);
+  return { ok: true, enviados: msgs.length };
 }
 
 Deno.serve(async (req) => {
@@ -338,9 +448,12 @@ Deno.serve(async (req) => {
     return new Response("ok");
   }
 
-  // Painel
   let corpo: any = {};
   try { corpo = await req.json(); } catch (_) { /* vazio */ }
+  // Relógio do Supabase: no máximo uma rodada de avisos por dia, só para o chat conectado
+  if (corpo.tipo === "diario") { try { return resposta(await avisosDiarios()); } catch (err) { return resposta({ erro: String((err as Error).message || err) }, 500); } }
+
+  // Painel
   if (!(await ehOAdmin(req))) return resposta({ erro: "Só o dono do painel pode usar. Saia e entre de novo." }, 401);
   try {
     const eu = await (await fetch(`${TG}/getMe`)).json();
