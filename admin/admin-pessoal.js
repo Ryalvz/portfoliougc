@@ -20,9 +20,9 @@ Object.assign(ESQUEMA, {
   pf_config: ["chave", "valor"]
 });
 const P = { ok: false, carregando: null, cartoes: [], contas: [], compras: [], receb: [], entradas: [], config: {} };
-const pfx = { sub: "visao", cartao: "", dono: "", soAtivas: true, mesFat: "" };
+const pfx = { sub: "visao", cartao: "", dono: "", tipo: "parceladas", mesFat: "", mesGasto: "", gDono: "", gCartao: "" };
 try { pfx.sub = localStorage.getItem("pf-sub") || "visao"; } catch (_) {}
-const SUBS_PF = [["visao", "Visão geral"], ["compras", "Cartões e compras"], ["devem", "Quem me deve"], ["contas", "Contas fixas"], ["entradas", "Entradas"]];
+const SUBS_PF = [["visao", "Visão geral"], ["gastos", "Gastos do mês"], ["compras", "Parcelas"], ["devem", "Quem me deve"], ["contas", "Contas fixas"], ["entradas", "Entradas"]];
 
 /* ---------- Meses como "2026-10" ---------- */
 const mesDe = (iso) => String(iso || "").slice(0, 7);
@@ -198,7 +198,7 @@ function desenharPessoal(el) {
   $("#pf-telegram", el).onclick = () => abrirTelegram();
   $("#pf-ajustes", el).onclick = () => formAjustesPF();
   const corpo = $("#pf-corpo", el);
-  ({ visao: pfVisao, compras: pfCompras, devem: pfDevem, contas: pfContas, entradas: pfEntradas })[pfx.sub](corpo);
+  ({ visao: pfVisao, gastos: pfGastos, compras: pfCompras, devem: pfDevem, contas: pfContas, entradas: pfEntradas })[pfx.sub](corpo);
   ligarDicas(el);
 }
 
@@ -332,7 +332,7 @@ function cartaoLiberacao() {
       <b>${nomeMes(k, true)}</b>
       <span>${g.itens.map((c) => esc(c.descricao) + (ehMinha(c) ? "" : ` <em>(${esc(nomePessoa(c.dono))})</em>`)).join(", ")}</span>
       <strong>−${real(g.v)}</strong><small>a partir de ${nomeMes(somaMes(k, 1), true)}, ${real(acumulado)}/mês a menos</small></li>`; }).join("")}</ul>`
-      : `<p class="vazio">Nenhuma compra parcelada cadastrada. Importe a fatura ou lance uma compra em Cartões e compras.</p>`}
+      : `<p class="vazio">Nenhuma compra parcelada cadastrada. Importe a fatura ou lance uma compra em Parcelas.</p>`}
   </div>`;
 }
 
@@ -423,7 +423,80 @@ function cartaoPlano(proj, dev, x) {
     <p class="sub">Organização e planejamento com os seus números, não é recomendação de investimento.</p></div>`;
 }
 
-/* ---------- Cartões e compras ---------- */
+/* ---------- Gastos do mês: tudo o que você comprou no mês, dia a dia ---------- */
+const CATEGORIAS_GASTO = [
+  ["Restaurantes e delivery", /ifd|ifood|restaurante|trattoria|cafe\b|caf[eé]|parrilla|lanche|pizza|burger|bar\b|padoca|food|sushi|churras/i],
+  ["Mercado e padaria", /mercad|extra\b|extra-|oxxo|carrefour|assai|atacad|padaria|\bpao\b|hortifruti|market|distribuidora|super/i],
+  ["Transporte", /\b99\b|99\*|uber|jet patin|turbi|metro|tembici|rentcars|posto|combust|estacion|onibus|taxi/i],
+  ["Compras online", /tiktok|shopee|aliexpress|mercadoli|mp\*|amazon(?! prime)|shein|magalu|magazine/i],
+  ["Assinaturas", /apple|totalpass|hubla|prime|netflix|spotify|youtube|google|icloud|vivo|loga|claro|tim\b/i],
+  ["Saúde e farmácia", /hospital|drogasil|drogaria|farma|saude|sa[uú]de|clinica|lab/i],
+  ["Lazer", /sympla|ingresso|cinema|sesc|show|teatro|bilhet/i]
+];
+const categoriaDe = (c) => c.categoria || (CATEGORIAS_GASTO.find(([, re]) => re.test(c.descricao)) || ["Outros"])[0];
+const diaDaCompra = (c) => String(c.data_compra || c.primeiro_mes).slice(0, 10);
+const DIAS_SEMANA = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
+function pfGastos(el) {
+  const hoje = mesHojePF();
+  const meses = Array.from({ length: 4 }, (_, i) => somaMes(hoje, i - 3));
+  if (!meses.includes(pfx.mesGasto)) pfx.mesGasto = hoje;
+  const k = pfx.mesGasto;
+  let lista = P.compras.filter((c) => mesDe(diaDaCompra(c)) === k && Number(c.parcelas) < RECORRENTE);
+  const doMes = lista.slice();
+  if (pfx.gCartao) lista = lista.filter((c) => (pfx.gCartao === "pix" ? !c.cartao_id : String(c.cartao_id) === pfx.gCartao));
+  if (pfx.gDono === "eu") lista = lista.filter(ehMinha); else if (pfx.gDono === "outros") lista = lista.filter((c) => !ehMinha(c));
+  const total = (l) => l.reduce((s, c) => s + n2(c.valor_parcela) * Number(c.parcelas || 1), 0);
+  const meus = doMes.filter(ehMinha);
+  const vista = total(meus.filter((c) => !parcelado(c))), novasParc = total(meus.filter(parcelado)), dosOutros = total(doMes.filter((c) => !ehMinha(c)));
+  const teto = n2(cfg("teto_mes"));
+  // Por categoria (só o que é seu)
+  const cats = {};
+  meus.forEach((c) => { const t = categoriaDe(c); cats[t] = (cats[t] || 0) + n2(c.valor_parcela) * Number(c.parcelas || 1); });
+  const listaCats = Object.entries(cats).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+  const maxCat = Math.max(1, ...listaCats.map(([, v]) => v));
+  // Agrupado por dia, mais recente primeiro
+  const dias = {};
+  lista.forEach((c) => { (dias[diaDaCompra(c)] = dias[diaDaCompra(c)] || []).push(c); });
+  const nomeCartao = (id) => (P.cartoes.find((c) => String(c.id) === String(id)) || {}).nome || "Pix/débito";
+  el.innerHTML = `
+    <div class="barra">
+      <div class="chips" role="tablist" aria-label="Mês">${meses.map((m) => `<button class="chip" type="button" data-g-mes="${m}" aria-pressed="${m === k}">${MESES_LONGOS[Number(m.slice(5)) - 1]}</button>`).join("")}</div>
+      <span class="espaco"></span>
+      <select class="campo" id="g-cartao" aria-label="Cartão"><option value="">Todos os cartões</option>${P.cartoes.map((c) => `<option value="${c.id}" ${pfx.gCartao === String(c.id) ? "selected" : ""}>${esc(c.nome)}</option>`).join("")}<option value="pix" ${pfx.gCartao === "pix" ? "selected" : ""}>Pix/débito</option></select>
+      <select class="campo" id="g-dono" aria-label="De quem"><option value="">Meus e dos outros</option><option value="eu" ${pfx.gDono === "eu" ? "selected" : ""}>Só os meus</option><option value="outros" ${pfx.gDono === "outros" ? "selected" : ""}>Só dos outros</option></select>
+    </div>
+    <div class="pf-fat-topo">
+      <div><span>Seus gastos à vista</span><strong>${real(vista)}</strong><small>comprados em ${MESES_LONGOS[Number(k.slice(5)) - 1].toLowerCase()}</small></div>
+      <div><span>Compras parceladas novas</span><strong>${real(novasParc)}</strong><small>valor total, você paga aos poucos</small></div>
+      <div><span>De outras pessoas</span><strong>${real(dosOutros)}</strong><small>no seu cartão</small></div>
+      ${teto ? `<div class="pf-fat-total"><span>Teto do mês</span><strong>${real(Math.max(0, teto - vista))}</strong><small>${vista > teto ? `passou ${real(vista - teto)} do teto` : `ainda dá pra gastar, de ${real(teto)}`}</small></div>` : ""}
+    </div>
+    ${teto ? `<div class="pf-teto"><i style="width:${Math.min(100, (vista / teto) * 100)}%" class="${vista > teto ? "estourou" : vista > teto * 0.8 ? "perto" : ""}"></i></div>` : ""}
+    <div class="grade-fin pf-gastos-grade">
+      <div class="cartao">
+        <h2>Onde foi o seu dinheiro</h2>
+        ${listaCats.length ? `<div class="lista-barras">${listaCats.map(([t, v]) => `<div class="linha-barra"><span class="lb-nome">${esc(t)}</span><span class="lb-trilho"><i style="width:${(v / maxCat) * 100}%;background:#C9A464"></i></span><span class="lb-valor">${real(v)}</span></div>`).join("")}</div>` : `<p class="vazio">Nenhum gasto seu neste mês ainda.</p>`}
+        ${teto ? "" : `<p class="sub" style="margin-top:10px">Dica: defina um teto em Ajustes e acompanhe aqui quanto ainda dá pra gastar.</p>`}
+      </div>
+      <div class="cartao">
+        <div class="barra" style="margin-bottom:6px"><h2 style="margin:0">Dia a dia</h2><span class="espaco"></span><button class="btn" type="button" id="g-novo">${ic("mais")}Gasto</button></div>
+        ${Object.keys(dias).length ? Object.keys(dias).sort().reverse().map((d) => { const dt = deISO(d); const l = dias[d]; return `<div class="pf-dia">
+          <div class="pf-dia-topo"><b>${DIAS_SEMANA[dt.getDay()]}, ${dt.getDate()} de ${MESES_LONGOS[dt.getMonth()].toLowerCase()}</b><span>${real(total(l.filter(ehMinha)))}</span></div>
+          ${l.map((c) => `<button type="button" class="pf-gasto" data-g-id="${c.id}">
+            <span class="pf-gasto-nome">${esc(c.descricao)}${c.origem === "rapido" ? ` <i class="pf-tag">lançado por você</i>` : ""}</span>
+            <span class="pf-gasto-info">${esc(nomeCartao(c.cartao_id))}${parcelado(c) ? ` · ${c.parcelas}x de ${real(c.valor_parcela)}` : ""}${ehMinha(c) ? "" : ` · <b>${esc(nomePessoa(c.dono))}</b>`} · ${esc(categoriaDe(c))}</span>
+            <strong class="${n2(c.valor_parcela) < 0 ? "pf-credito-v" : ""}">${real(n2(c.valor_parcela) * Number(c.parcelas || 1))}</strong>
+          </button>`).join("")}</div>`; }).join("") : `<p class="vazio">Nenhum gasto em ${MESES_LONGOS[Number(k.slice(5)) - 1].toLowerCase()}${pfx.gCartao || pfx.gDono ? " com esse filtro" : ""}. Lance pelo botão + Gasto ou pelo Telegram.</p>`}
+      </div>
+    </div>`;
+  $$("[data-g-mes]", el).forEach((b) => b.onclick = () => { pfx.mesGasto = b.dataset.gMes; desenhar(); });
+  $("#g-cartao", el).onchange = (e) => { pfx.gCartao = e.target.value; desenhar(); };
+  $("#g-dono", el).onchange = (e) => { pfx.gDono = e.target.value; desenhar(); };
+  $("#g-novo", el).onclick = () => abrirGastoRapido();
+  $$("[data-g-id]", el).forEach((b) => b.onclick = () => formCompraPF(P.compras.find((c) => String(c.id) === b.dataset.gId)));
+}
+
+/* ---------- Parcelas (cartões e compras) ---------- */
 function pfCompras(el) {
   const hoje = mesHojePF();
   const pessoas = pessoasConhecidas();
@@ -432,14 +505,17 @@ function pfCompras(el) {
   if (pfx.dono === "eu") lista = lista.filter(ehMinha);
   else if (pfx.dono === "outros") lista = lista.filter((c) => !ehMinha(c));
   else if (pfx.dono) lista = lista.filter((c) => chavePessoa(c.dono) === pfx.dono);
-  if (pfx.soAtivas) lista = lista.filter((c) => ultimoMes(c) >= hoje);
+  // Parceladas ainda rodando (padrão), parceladas que já acabaram, ou tudo (inclui à vista)
+  if (pfx.tipo === "parceladas") lista = lista.filter((c) => parcelado(c) && ultimoMes(c) >= hoje);
+  else if (pfx.tipo === "acabaram") lista = lista.filter((c) => parcelado(c) && ultimoMes(c) < hoje);
+  const porMes = lista.filter((c) => idxParcela(c, hoje) >= 0).reduce((s, c) => s + n2(c.valor_parcela), 0);
   lista.sort((a, b) => (ultimoMes(a) < ultimoMes(b) ? -1 : ultimoMes(a) > ultimoMes(b) ? 1 : n2(b.valor_parcela) - n2(a.valor_parcela)));
   const nomeCartao = (id) => (P.cartoes.find((c) => String(c.id) === String(id)) || {}).nome || "";
   el.innerHTML = `
     <div class="barra">
       <select class="campo" id="pf-f-cartao" aria-label="Cartão"><option value="">Todos os cartões</option>${P.cartoes.map((c) => `<option value="${c.id}" ${pfx.cartao === String(c.id) ? "selected" : ""}>${esc(c.nome)}</option>`).join("")}</select>
       <select class="campo" id="pf-f-dono" aria-label="De quem"><option value="">Todas as compras</option><option value="eu" ${pfx.dono === "eu" ? "selected" : ""}>Só as minhas</option><option value="outros" ${pfx.dono === "outros" ? "selected" : ""}>Só de outras pessoas</option>${pessoas.map((p) => `<option value="${esc(chavePessoa(p))}" ${pfx.dono === chavePessoa(p) ? "selected" : ""}>${esc(p)}</option>`).join("")}</select>
-      <label class="check"><input type="checkbox" id="pf-f-ativas" ${pfx.soAtivas ? "checked" : ""}> Só o que ainda tem parcela</label>
+      <div class="chips" role="tablist" aria-label="Quais compras">${[["parceladas", "Parcelas rodando"], ["acabaram", "Já acabaram"], ["todas", "Tudo, com à vista"]].map(([k, n]) => `<button class="chip" type="button" data-pf-tipo="${k}" aria-pressed="${pfx.tipo === k}">${n}</button>`).join("")}</div>
       <span class="espaco"></span>
       <button class="btn" type="button" data-novo-cartao>${ic("mais")}Cartão</button>
       <button class="btn primario" type="button" id="pf-nova-compra">${ic("mais")}Compra parcelada</button>
@@ -453,10 +529,10 @@ function pfCompras(el) {
         <td>${ehMinha(c) ? "Eu" : `<span class="pilula p-pendente">${esc(nomePessoa(c.dono))}</span>`}</td>
         <td>${n === 1 ? "à vista" : n >= RECORRENTE ? "todo mês" : i >= 0 ? `${i + 1}/${n}` : mesDe(c.primeiro_mes) > hoje ? `começa ${nomeMes(mesDe(c.primeiro_mes), true)}` : `acabou (${n}x)`}</td>
         <td>${real(c.valor_parcela)}</td><td>${real(falta)}</td><td>${nomeMes(ultimoMes(c), true)}</td></tr>`; }).join("") || `<tr><td colspan="7" class="vazio">Nada por aqui. Importe a fatura ou lance uma compra parcelada.</td></tr>`}</tbody></table></div>
-    <p class="contagem">${qtd(lista.length, "compra", "compras")}</p>`;
+    <p class="contagem">${qtd(lista.length, "compra", "compras")} · ${real(porMes)} neste mês${pfx.tipo === "parceladas" ? ". As compras à vista ficam em <b>Gastos do mês</b>." : ""}</p>`;
   $("#pf-f-cartao", el).onchange = (e) => { pfx.cartao = e.target.value; desenhar(); };
   $("#pf-f-dono", el).onchange = (e) => { pfx.dono = e.target.value; desenhar(); };
-  $("#pf-f-ativas", el).onchange = (e) => { pfx.soAtivas = e.target.checked; desenhar(); };
+  $$("[data-pf-tipo]", el).forEach((b) => b.onclick = () => { pfx.tipo = b.dataset.pfTipo; desenhar(); });
   $("#pf-nova-compra", el).onclick = () => formCompraPF();
   ligarCartoes(el);
   $("#pf-lista", el).addEventListener("click", (e) => {
@@ -661,9 +737,10 @@ function formAjustesPF() {
       { n: "salario", r: "Salário fixo que você se paga (R$/mês)", t: "number", ajuda: "Vazio = usa a média do que entrou na conta." },
       { n: "reserva", r: "Quanto você tem guardado hoje (R$)", t: "number" },
       { n: "reserva_meses", r: "Meta da reserva (meses de custo)", t: "number", ajuda: "3 é um bom começo; 6 é o ideal pra renda que varia." },
-      { n: "dia_a_dia", r: "Gasto do dia a dia por mês (R$)", t: "number", ajuda: "Vazio = calcula pela média das faturas importadas." }
+      { n: "teto_mes", r: "Teto de gastos à vista por mês (R$)", t: "number", ajuda: "Aparece como uma barra em Gastos do mês. Vazio = sem teto." },
+      { n: "dia_a_dia", r: "Gasto do dia a dia por mês, para a projeção (R$)", t: "number", ajuda: "Vazio = calcula pela média das faturas importadas." }
     ],
-    valores: { salario: cfg("salario", ""), reserva: cfg("reserva", ""), reserva_meses: cfg("reserva_meses", 3), dia_a_dia: cfg("dia_a_dia", "") },
+    valores: { salario: cfg("salario", ""), reserva: cfg("reserva", ""), reserva_meses: cfg("reserva_meses", 3), teto_mes: cfg("teto_mes", ""), dia_a_dia: cfg("dia_a_dia", "") },
     aoSalvar: async (d) => {
       const linhas = Object.entries(d).map(([chave, v]) => ({ chave, valor: v || 0 }));
       const { error } = await db.from("pf_config").upsert(linhas, { onConflict: "chave" });
@@ -877,7 +954,7 @@ function abrirImportarFatura() {
   d.addEventListener("close", () => d.classList.remove("janela-larga", "pf-janela"), { once: true });
   d.innerHTML = `<div class="janela-topo"><h3>Importar fatura do cartão</h3><button type="button" class="icone-btn" data-fechar aria-label="Fechar">${ic("fechar")}</button></div>
     <div class="janela-corpo">
-      ${P.cartoes.length ? "" : `<p class="aviso-falta">Cadastre um cartão antes (botão Cartão, em Cartões e compras). Dá para importar assim mesmo, sem cartão.</p>`}
+      ${P.cartoes.length ? "" : `<p class="aviso-falta">Cadastre um cartão antes (botão Cartão, em Parcelas). Dá para importar assim mesmo, sem cartão.</p>`}
       <div class="form-grade">
         <div class="inteiro"><label for="imp-arq">Arquivo da fatura (PDF ou CSV)</label><input class="campo arquivo" id="imp-arq" type="file" accept=".pdf,.csv,.txt,application/pdf,text/csv">
           <small class="ajuda">O arquivo é lido aqui no seu navegador e não é enviado pra lugar nenhum. Só as compras que você confirmar são salvas.</small></div>
