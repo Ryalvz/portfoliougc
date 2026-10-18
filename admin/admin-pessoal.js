@@ -1,0 +1,934 @@
+/* =============================================================
+   ADMIN, PARTE 3: FINANCEIRO PESSOAL (PF)
+   A chave "Pessoal" no topo do Financeiro. Junta cartões, compras
+   parceladas (suas e de quem pegou o cartão emprestado), contas
+   fixas e o que entra na conta, e calcula:
+     - os próximos 12 meses: quanto já está comprometido e quanto sobra
+     - quando cada parcela acaba e quanto libera
+     - quem te deve e quanto
+     - um plano de ação com os seus números
+   A fatura (PDF ou CSV) é lida aqui no navegador: o arquivo não
+   sobe para lugar nenhum, só as compras que você confirmar vão
+   para o banco. Usa as funções do admin.js (carregado antes).
+   ============================================================= */
+Object.assign(ESQUEMA, {
+  pf_cartoes: ["id", "nome", "vence_dia", "fecha_dia", "limite", "ordem"],
+  pf_contas: ["id", "nome", "valor", "dia", "categoria", "inicio", "fim", "obs"],
+  pf_compras: ["id", "criado_em", "cartao_id", "descricao", "valor_parcela", "parcelas", "primeiro_mes", "data_compra", "dono", "categoria", "origem", "chave"],
+  pf_recebimentos: ["id", "pessoa", "valor", "data", "obs"],
+  pf_entradas: ["id", "data", "valor", "descricao", "origem"],
+  pf_config: ["chave", "valor"]
+});
+const P = { ok: false, carregando: null, cartoes: [], contas: [], compras: [], receb: [], entradas: [], config: {} };
+const pfx = { sub: "visao", cartao: "", dono: "", soAtivas: true };
+try { pfx.sub = localStorage.getItem("pf-sub") || "visao"; } catch (_) {}
+const SUBS_PF = [["visao", "Visão geral"], ["compras", "Cartões e compras"], ["devem", "Quem me deve"], ["contas", "Contas fixas"], ["entradas", "Entradas"]];
+
+/* ---------- Meses como "2026-10" ---------- */
+const mesDe = (iso) => String(iso || "").slice(0, 7);
+const mesHojePF = () => mesDe(hojeISO());
+function somaMes(k, n) { const [a, m] = k.split("-").map(Number); const d = new Date(a, m - 1 + n, 1); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; }
+function difMes(de, ate) { const [a1, m1] = de.split("-").map(Number); const [a2, m2] = ate.split("-").map(Number); return (a2 - a1) * 12 + (m2 - m1); }
+const nomeMes = (k, curto) => { const [a, m] = k.split("-").map(Number); return curto ? `${MESES_CURTOS[m - 1]}/${String(a).slice(2)}` : `${MESES_LONGOS[m - 1]} de ${a}`; };
+const r2 = (v) => Math.round(v * 100) / 100;
+
+/* ---------- Carregar ---------- */
+async function carregarPF(forcar) {
+  if (P.ok && !forcar) return;
+  if (P.carregando && !forcar) return P.carregando;
+  P.carregando = (async () => {
+    const [cartoes, contas, compras, receb, entradas, config] = await Promise.all([
+      ler("pf_cartoes", (q, c) => (c.includes("ordem") ? q.order("ordem").order("id") : q)),
+      ler("pf_contas", (q, c) => (c.includes("id") ? q.order("id") : q)),
+      ler("pf_compras", (q, c) => (c.includes("id") ? q.order("id").limit(10000) : q)),
+      ler("pf_recebimentos", (q, c) => (c.includes("data") ? q.order("data", { ascending: false }) : q)),
+      ler("pf_entradas", (q, c) => (c.includes("data") ? q.order("data", { ascending: false }) : q)),
+      ler("pf_config")
+    ]);
+    Object.assign(P, { cartoes, contas, compras, receb, entradas, ok: true });
+    P.config = {};
+    config.forEach((c) => { P.config[c.chave] = c.valor; });
+  })();
+  await P.carregando;
+  P.carregando = null;
+}
+async function recarregarPF() { await carregarPF(true); desenhar(); }
+const cfg = (k, padrao = 0) => (P.config[k] == null || P.config[k] === "" ? padrao : P.config[k]);
+
+/* ---------- Contas ---------- */
+const contaAtiva = (c, k) => (!c.inicio || mesDe(c.inicio) <= k) && (!c.fim || mesDe(c.fim) >= k);
+const fixasNo = (k) => P.contas.filter((c) => contaAtiva(c, k)).reduce((s, c) => s + n2(c.valor), 0);
+// Índice da parcela (0 = primeira) que cai no mês k, ou -1
+const idxParcela = (c, k) => { const i = difMes(mesDe(c.primeiro_mes), k); return i >= 0 && i < Number(c.parcelas || 1) ? i : -1; };
+const ultimoMes = (c) => somaMes(mesDe(c.primeiro_mes), Number(c.parcelas || 1) - 1);
+const ehMinha = (c) => !String(c.dono || "").trim();
+const parcelado = (c) => Number(c.parcelas) > 1;
+const nomePessoa = (s) => String(s || "").trim().replace(/\s+/g, " ");
+const chavePessoa = (s) => semAcento(nomePessoa(s));
+
+function cartaoNo(k, filtro = () => true) {
+  const r = { parcEu: 0, avEu: 0, outros: 0 };
+  P.compras.forEach((c) => {
+    if (!filtro(c) || idxParcela(c, k) < 0) return;
+    const v = n2(c.valor_parcela);
+    if (!ehMinha(c)) r.outros += v; else if (parcelado(c)) r.parcEu += v; else r.avEu += v;
+  });
+  return r;
+}
+// Meses com fatura importada ou compra à vista lançada
+const mesesComAvulsos = () => [...new Set(P.compras.filter((c) => !parcelado(c)).map((c) => mesDe(c.primeiro_mes)))].sort();
+// Gasto do dia a dia (compras à vista suas): o que você definiu nos ajustes, senão a média das 3 últimas faturas
+function diaADiaEstimado() {
+  const fixo = n2(cfg("dia_a_dia"));
+  if (fixo > 0) return { v: fixo, fonte: "o valor que você definiu nos ajustes" };
+  const hoje = mesHojePF();
+  const meses = mesesComAvulsos().filter((k) => k <= hoje).slice(-3);
+  if (!meses.length) return { v: 0, fonte: "" };
+  const v = meses.reduce((s, k) => s + cartaoNo(k).avEu, 0) / meses.length;
+  return { v, fonte: `média das compras à vista ${meses.length === 1 ? "da última fatura" : `das últimas ${meses.length} faturas`}` };
+}
+function diaADiaNo(k, est) {
+  const hoje = mesHojePF();
+  const real_ = cartaoNo(k).avEu;
+  if (k < hoje) return real_;
+  if (k === hoje) return Math.max(real_, est);
+  return est;
+}
+const entradasNo = (k) => P.entradas.filter((e) => mesDe(e.data) === k).reduce((s, e) => s + n2(e.valor), 0);
+const pjNo = (k) => { const [a, m] = k.split("-").map(Number); return entrouEm(a, m); };
+// Renda usada na projeção
+function rendaPrevista() {
+  const sal = n2(cfg("salario"));
+  if (sal > 0) return { v: sal, fonte: "o salário fixo que você definiu" };
+  const hoje = mesHojePF();
+  const meses = [...new Set(P.entradas.map((e) => mesDe(e.data)))].filter((k) => k < hoje).sort().slice(-3);
+  if (meses.length) return { v: meses.reduce((s, k) => s + entradasNo(k), 0) / meses.length, fonte: `média das entradas ${meses.length === 1 ? "do último mês" : `dos últimos ${meses.length} meses`}` };
+  const pj = [1, 2, 3].map((i) => pjNo(somaMes(hoje, -i)));
+  if (pj.some(Boolean)) return { v: pj.reduce((s, v) => s + v, 0) / 3, fonte: "média do que entrou na empresa nos últimos 3 meses" };
+  return { v: 0, fonte: "" };
+}
+
+function projecao(meses = 12, extra = null) {
+  const hoje = mesHojePF();
+  const renda = rendaPrevista(), dia = diaADiaEstimado();
+  return Array.from({ length: meses }, (_, i) => {
+    const k = somaMes(hoje, i);
+    const c = cartaoNo(k);
+    const fixas = fixasNo(k), dd = diaADiaNo(k, dia.v);
+    let parc = c.parcEu;
+    if (extra && k >= extra.inicio && difMes(extra.inicio, k) < extra.n) parc += extra.v;
+    const gasto = fixas + parc + dd;
+    return { k, renda: renda.v, fixas, parc, dd, outros: c.outros, gasto, sobra: renda.v - gasto };
+  });
+}
+
+/* ---------- Quem me deve ---------- */
+function devedores() {
+  const hoje = mesHojePF();
+  const mapa = new Map();
+  const pega = (nome) => {
+    const k = chavePessoa(nome);
+    if (!mapa.has(k)) mapa.set(k, { nome: nomePessoa(nome), devido: 0, futuro: 0, pago: 0, compras: [], receb: [] });
+    return mapa.get(k);
+  };
+  P.compras.filter((c) => !ehMinha(c)).forEach((c) => {
+    const p = pega(c.dono);
+    p.compras.push(c);
+    for (let i = 0; i < Number(c.parcelas || 1); i++) {
+      const k = somaMes(mesDe(c.primeiro_mes), i);
+      if (k <= hoje) p.devido += n2(c.valor_parcela); else p.futuro += n2(c.valor_parcela);
+    }
+  });
+  P.receb.forEach((r) => { const p = pega(r.pessoa); p.pago += n2(r.valor); p.receb.push(r); });
+  return [...mapa.values()].map((p) => ({ ...p, falta: r2(p.devido - p.pago) })).sort((a, b) => b.falta - a.falta || b.futuro - a.futuro);
+}
+const pessoasConhecidas = () => [...new Set([...P.compras.filter((c) => !ehMinha(c)).map((c) => nomePessoa(c.dono)), ...P.receb.map((r) => nomePessoa(r.pessoa))])].sort(ordenaTexto);
+
+/* ---------- Tela ---------- */
+function chipsVisaoFin() {
+  return `<div class="chips" role="tablist" aria-label="Qual financeiro">
+    <button class="chip" type="button" data-visao-fin="pj" aria-pressed="${fin.visao !== "pf"}">Empresa</button>
+    <button class="chip" type="button" data-visao-fin="pf" aria-pressed="${fin.visao === "pf"}">Pessoal</button></div>`;
+}
+function ligarVisaoFin(el) {
+  $$("[data-visao-fin]", el).forEach((b) => b.onclick = () => {
+    fin.visao = b.dataset.visaoFin;
+    try { localStorage.setItem("fin-visao", fin.visao); } catch (_) {}
+    desenhar();
+  });
+}
+
+function desenharPessoal(el) {
+  if (!P.ok) {
+    el.innerHTML = `<div class="barra">${chipsVisaoFin()}</div><p class="vazio">Carregando seu financeiro pessoal...</p>`;
+    ligarVisaoFin(el);
+    carregarPF().then(() => { if (abaAtual === "financeiro" && fin.visao === "pf") desenhar(); });
+    return;
+  }
+  if (!SUBS_PF.some(([k]) => k === pfx.sub)) pfx.sub = "visao";
+  el.innerHTML = `
+    <div class="barra">
+      ${chipsVisaoFin()}
+      <span class="espaco"></span>
+      <button class="btn" type="button" id="pf-simular">${ic("grafico")}Simular compra</button>
+      <button class="btn" type="button" id="pf-ajustes">${ic("editar")}Ajustes</button>
+      <button class="btn primario" type="button" id="pf-importar">${ic("subir")}Importar fatura</button>
+    </div>
+    <div class="subabas" role="tablist">${SUBS_PF.map(([k, n]) => `<button class="subaba" type="button" role="tab" data-pf-sub="${k}" aria-selected="${pfx.sub === k}">${n}</button>`).join("")}</div>
+    <div id="pf-corpo"></div>`;
+  ligarVisaoFin(el);
+  $$("[data-pf-sub]", el).forEach((b) => b.onclick = () => {
+    pfx.sub = b.dataset.pfSub;
+    try { localStorage.setItem("pf-sub", pfx.sub); } catch (_) {}
+    desenhar();
+  });
+  $("#pf-importar", el).onclick = () => abrirImportarFatura();
+  $("#pf-simular", el).onclick = () => abrirSimulador();
+  $("#pf-ajustes", el).onclick = () => formAjustesPF();
+  const corpo = $("#pf-corpo", el);
+  ({ visao: pfVisao, compras: pfCompras, devem: pfDevem, contas: pfContas, entradas: pfEntradas })[pfx.sub](corpo);
+  ligarDicas(el);
+}
+
+/* ---------- Visão geral ---------- */
+function pfVisao(el) {
+  const hoje = mesHojePF();
+  const proj = projecao(12);
+  const atual = proj[0];
+  const renda = rendaPrevista(), dia = diaADiaEstimado();
+  const dev = devedores();
+  const aReceber = dev.reduce((s, p) => s + Math.max(0, p.falta), 0);
+  const restante = P.compras.filter(ehMinha).filter(parcelado).reduce((s, c) => {
+    let t = 0; for (let i = 0; i < Number(c.parcelas); i++) { if (somaMes(mesDe(c.primeiro_mes), i) >= hoje) t += n2(c.valor_parcela); } return s + t;
+  }, 0);
+  const fimParcelas = P.compras.filter(parcelado).map(ultimoMes).filter((k) => k >= hoje).sort().pop();
+  const reserva = n2(cfg("reserva")), metaMeses = Number(cfg("reserva_meses", 3)) || 3;
+  const metaReserva = metaMeses * (fixasNo(hoje) + dia.v);
+  const vazio = !P.contas.length && !P.compras.length && !P.entradas.length;
+
+  const maxV = Math.max(1, ...proj.map((m) => Math.max(m.gasto, m.renda)));
+  const grafico = `<div class="barras-mes pf-barras" role="img" aria-label="Gastos comprometidos e renda nos próximos 12 meses">
+    ${proj.map((m) => `<div class="grupo-mes ${m.k === hoje ? "hoje" : ""}" data-dica="<b>${nomeMes(m.k)}</b><br>Contas fixas: ${real(m.fixas)}<br>Suas parcelas: ${real(m.parc)}<br>Dia a dia${m.k > hoje ? " (estimado)" : ""}: ${real(m.dd)}<br>Renda prevista: ${real(m.renda)}<br><b>${m.sobra >= 0 ? "Sobra" : "Falta"}: ${real(Math.abs(m.sobra))}</b>${m.outros ? `<br>+ ${real(m.outros)} de outras pessoas no seu cartão` : ""}">
+      <b class="valor-barra ${m.sobra < 0 ? "neg" : ""}">${privado ? "" : (m.sobra < 0 ? "−" : "+") + Math.round(Math.abs(m.sobra)).toLocaleString("pt-BR")}</b>
+      <div class="par-barras"><div class="pf-pilha" style="height:${(m.gasto / maxV) * 100}%">
+        ${[["pf-dd", m.dd], ["pf-parc", m.parc], ["pf-fixas", m.fixas]].filter((x) => x[1] > 0).map(([c, v]) => `<i class="${c}" style="flex:${v}"></i>`).join("")}
+      </div>${m.renda ? `<em class="m-meta pf-renda" style="bottom:${(m.renda / maxV) * 100}%"></em>` : ""}</div>
+      <span>${nomeMes(m.k, true)}</span>
+    </div>`).join("")}
+  </div>`;
+
+  el.innerHTML = `
+    ${vazio ? `<div class="cartao pf-comeco"><h2>Comece por aqui</h2><ol>
+      <li>Em <b>Ajustes</b>, diga quanto você tem guardado hoje e, se quiser, um salário fixo pra você.</li>
+      <li>Cadastre seus cartões e as <b>contas fixas</b>.</li>
+      <li>Clique em <b>Importar fatura</b> e escolha o PDF (ou CSV) da fatura de cada cartão. Marque o nome de quem é cada compra que não é sua.</li></ol></div>` : ""}
+    <div class="kpis">
+      <div class="kpi ${atual.sobra < 0 ? "alerta" : ""}"><span>${atual.sobra < 0 ? "Falta" : "Sobra"} em ${MESES_LONGOS[Number(hoje.slice(5)) - 1].toLowerCase()}</span><strong>${real(Math.abs(atual.sobra))}</strong><small>renda ${real(atual.renda)} menos ${real(atual.gasto)}</small></div>
+      <div class="kpi"><span>Comprometido no mês</span><strong>${real(atual.fixas + atual.parc)}</strong><small>${real(atual.fixas)} fixas + ${real(atual.parc)} parcelas</small></div>
+      <div class="kpi"><span>Parcelas a pagar</span><strong>${real(restante)}</strong><small>${fimParcelas ? `a última acaba em ${nomeMes(fimParcelas, true)}` : "nenhuma parcela sua"}</small></div>
+      <div class="kpi ${aReceber > 0 ? "alerta" : ""}"><span>Te devem</span><strong>${real(aReceber)}</strong><small>${dev.filter((p) => p.falta > 0).length ? qtd(dev.filter((p) => p.falta > 0).length, "pessoa", "pessoas") + " com valor vencido" : "ninguém atrasado"}</small></div>
+      <div class="kpi"><span>Reserva</span><strong>${real(reserva)}</strong><small>meta ${real(metaReserva)} (${metaMeses} meses)</small></div>
+    </div>
+    <div class="grade-fin">
+      <div class="cartao">
+        <div class="barra" style="margin-bottom:4px"><h2 style="margin:0">Próximos 12 meses</h2><span class="espaco"></span>
+          <span class="legenda" style="margin:0"><span><i class="leg-pf pf-fixas"></i>Contas fixas</span><span><i class="leg-pf pf-parc"></i>Parcelas</span><span><i class="leg-pf pf-dd"></i>Dia a dia</span><span><i class="leg-meta"></i>Renda</span></span></div>
+        <p class="sub" style="margin:0 0 4px">o número em cima de cada mês é o que sobra (ou falta). Renda: ${renda.fonte ? esc(renda.fonte) : "ainda sem dado, lance suas entradas ou um salário fixo nos ajustes"}. Dia a dia: ${dia.fonte ? esc(dia.fonte) : "importe uma fatura para estimar"}.</p>
+        ${grafico}
+      </div>
+      ${cartaoPlano(proj, dev, { reserva, metaReserva, metaMeses, dia, renda, restante, fimParcelas })}
+    </div>
+    <div class="grade-fin">
+      ${cartaoLiberacao()}
+      ${cartaoCartoes()}
+    </div>`;
+  ligarCartoes(el);
+}
+
+function cartaoLiberacao() {
+  const hoje = mesHojePF();
+  const porMes = new Map();
+  P.compras.filter(parcelado).forEach((c) => {
+    const fim = ultimoMes(c);
+    if (fim < hoje) return;
+    if (!porMes.has(fim)) porMes.set(fim, { v: 0, eu: 0, itens: [] });
+    const g = porMes.get(fim); g.v += n2(c.valor_parcela); if (ehMinha(c)) g.eu += n2(c.valor_parcela); g.itens.push(c);
+  });
+  const lista = [...porMes].sort((a, b) => (a[0] < b[0] ? -1 : 1)).slice(0, 10);
+  let acumulado = 0;
+  return `<div class="cartao"><h2>Quando as parcelas acabam</h2>
+    <p class="sub" style="margin:-6px 0 8px">a última parcela cai no mês indicado. No mês seguinte esse valor sai da fatura.</p>
+    ${lista.length ? `<ul class="pf-libera">${lista.map(([k, g]) => { acumulado += g.v; return `<li>
+      <b>${nomeMes(k, true)}</b>
+      <span>${g.itens.map((c) => esc(c.descricao) + (ehMinha(c) ? "" : ` <em>(${esc(nomePessoa(c.dono))})</em>`)).join(", ")}</span>
+      <strong>−${real(g.v)}</strong><small>a partir de ${nomeMes(somaMes(k, 1), true)}, ${real(acumulado)}/mês a menos</small></li>`; }).join("")}</ul>`
+      : `<p class="vazio">Nenhuma compra parcelada cadastrada. Importe a fatura ou lance uma compra em Cartões e compras.</p>`}
+  </div>`;
+}
+
+function faturaCartaoNo(cartao, k) { const c = cartaoNo(k, (x) => String(x.cartao_id) === String(cartao.id)); return c.parcEu + c.avEu + c.outros; }
+function presoNoLimite(cartao) {
+  const hoje = mesHojePF();
+  return P.compras.filter((c) => String(c.cartao_id) === String(cartao.id) && parcelado(c)).reduce((s, c) => {
+    let t = 0; for (let i = 0; i < Number(c.parcelas); i++) { if (somaMes(mesDe(c.primeiro_mes), i) > hoje) t += n2(c.valor_parcela); } return s + t;
+  }, 0);
+}
+function cartaoCartoes() {
+  const hoje = mesHojePF();
+  return `<div class="cartao"><div class="barra" style="margin-bottom:6px"><h2 style="margin:0">Cartões</h2><span class="espaco"></span><button class="btn" type="button" data-novo-cartao>${ic("mais")}Cartão</button></div>
+    ${P.cartoes.length ? `<div class="pf-cartoes">${P.cartoes.map((c) => {
+      const agora = faturaCartaoNo(c, hoje), prox = faturaCartaoNo(c, somaMes(hoje, 1)), preso = presoNoLimite(c);
+      return `<button type="button" class="pf-cartao" data-cartao="${c.id}">
+        <b>${esc(c.nome)}</b><small>${c.vence_dia ? `vence dia ${c.vence_dia}` : "sem dia de vencimento"}</small>
+        <span>Fatura de ${MESES_CURTOS[Number(hoje.slice(5)) - 1].toLowerCase()}: <strong>${real(agora)}</strong></span>
+        <span>Já previsto no próximo mês: <strong>${real(prox)}</strong></span>
+        <span>${c.limite ? `Limite preso em parcelas: ${real(preso)} de ${real(c.limite)}` : `Preso em parcelas futuras: ${real(preso)}`}</span>
+        ${c.limite ? `<i class="pf-trilho"><i style="width:${Math.min(100, (preso / n2(c.limite)) * 100)}%"></i></i>` : ""}
+      </button>`; }).join("")}</div>` : `<p class="vazio">Cadastre seus cartões para separar as faturas.</p>`}
+  </div>`;
+}
+function ligarCartoes(el) {
+  $$("[data-novo-cartao]", el).forEach((b) => b.onclick = () => formCartaoPF());
+  $$("[data-cartao]", el).forEach((b) => b.onclick = () => formCartaoPF(P.cartoes.find((c) => String(c.id) === b.dataset.cartao)));
+}
+
+/* ---------- Plano de ação ---------- */
+function cartaoPlano(proj, dev, x) {
+  const hoje = mesHojePF();
+  const itens = [];
+  const atual = proj[0];
+  // 1. Juros e encargos nas últimas faturas
+  const juros = P.compras.filter((c) => /juros|multa|encargo|rotativ|mora\b|atraso|iof\W*(?:de\W*)?(?:financ|rotativ|parcelamento)/i.test(c.descricao) && mesDe(c.primeiro_mes) >= somaMes(hoje, -3) && mesDe(c.primeiro_mes) <= hoje).reduce((s, c) => s + n2(c.valor_parcela), 0);
+  if (juros > 0) itens.push({ nivel: "critico", t: "Pare de pagar juros", d: `Nas últimas faturas foram ${real(juros)} de juros, multa ou encargos. Isso vem antes de tudo: pague sempre a fatura inteira e nunca o mínimo. Se não fechar, um parcelamento da fatura costuma ter juros menores que o rotativo; compare o CET antes de aceitar.` });
+  // 2. O mês atual
+  if (atual.renda && atual.sobra < 0) {
+    const cobrar = dev.reduce((s, p) => s + Math.max(0, p.falta), 0);
+    itens.push({ nivel: "critico", t: `Este mês faltam ${real(-atual.sobra)}`, d: `${cobrar > 0 ? `Comece cobrando os ${real(cobrar)} que te devem (aba Quem me deve). ` : ""}Depois corte do dia a dia, que é o único gasto que dá para mexer agora${x.dia.v ? ` (está em ${real(x.dia.v)} por mês)` : ""}.` });
+  }
+  // 3. Congelar parcelas novas
+  if (atual.renda) {
+    const neg = proj.map((m) => m.sobra < 0);
+    const ultNeg = neg.lastIndexOf(true);
+    if (ultNeg === -1) itens.push({ nivel: "ok", t: "Os próximos 12 meses fecham no positivo", d: "Mesmo assim, segure parcelamentos novos: use o Simular compra antes de parcelar qualquer coisa." });
+    else if (ultNeg < proj.length - 1) itens.push({ nivel: "alerta", t: `Nada parcelado novo até ${nomeMes(proj[ultNeg + 1].k)}`, d: `É o primeiro mês em que a conta fecha e continua fechando. Cada parcela nova empurra essa data pra frente.` });
+    else {
+      const ultimo = proj[proj.length - 1];
+      itens.push({ nivel: "critico", t: "Mesmo com as parcelas acabando, a conta não fecha", d: `Em ${nomeMes(ultimo.k)} ainda faltam ${real(-ultimo.sobra)}. Ou a renda sobe esse valor, ou as contas fixas e o dia a dia descem. Nenhuma parcela nova até isso mudar.` });
+    }
+  } else itens.push({ nivel: "alerta", t: "Falta a sua renda", d: "Lance o que entrou na conta nos últimos meses (aba Entradas) ou defina um salário fixo em Ajustes. Sem isso não dá para saber quanto sobra." });
+  // 4. Salário fixo (renda instável)
+  const pj = Array.from({ length: 6 }, (_, i) => pjNo(somaMes(hoje, -(i + 1)))).filter((v) => v > 0).sort((a, b) => a - b);
+  const custoVida = fixasNo(hoje) + x.dia.v;
+  if (!n2(cfg("salario"))) {
+    const pior = pj.length >= 3 ? (pj[0] + pj[1] + pj[2]) / 3 : 0;
+    itens.push({ nivel: "", t: "Pague um salário fixo pra você", d: `Sua renda da internet varia muito, então o pessoal não pode depender do mês bom. Defina um valor fixo que passa da empresa pra sua conta todo mês${custoVida ? ` (seu custo de vida hoje é ${real(custoVida)} sem as parcelas, ${real(custoVida + atual.parc)} com elas)` : ""}. O que entrar acima fica guardado na empresa pra cobrir mês fraco.${pior ? ` Nos 3 piores dos últimos 6 meses entrou em média ${real(pior)} na empresa: um salário seguro fica perto disso.` : ""} Coloque o valor em Ajustes.` });
+  }
+  // 5. Cartão emprestado
+  if (dev.length) {
+    const atrasados = dev.filter((p) => p.falta > 0);
+    itens.push({ nivel: atrasados.length ? "alerta" : "", t: "Cartão emprestado: cada um paga até o seu vencimento", d: `${atrasados.length ? `${atrasados.map((p) => `${esc(p.nome)} (${real(p.falta)})`).join(", ")} ${atrasados.length === 1 ? "está" : "estão"} com valor vencido. ` : ""}Combine que a parte de cada pessoa cai na sua conta antes do dia do vencimento da fatura. Enquanto a reserva estiver zerada, evite emprestar o cartão pra compras novas.` });
+  }
+  // 6. Contas que mudam no futuro (ex.: apê depois das chaves)
+  const mudancas = [];
+  for (let i = 1; i <= 72; i++) {
+    const k = somaMes(hoje, i), d = fixasNo(k) - fixasNo(somaMes(k, -1));
+    if (d > 50) mudancas.push({ k, d, i });
+  }
+  mudancas.slice(0, 2).forEach((m) => {
+    const guardar = Math.ceil((m.d * 12) / m.i / 10) * 10;
+    itens.push({ nivel: "", t: `Em ${nomeMes(m.k)} suas contas fixas sobem ${real(m.d)} por mês`, d: `Guardando ${real(guardar)} por mês daqui até lá, você junta o primeiro ano dessa diferença. O valor que for liberando das parcelas pode ir direto pra isso.` });
+  });
+  // 7. Reserva
+  if (x.metaReserva > 0 && x.reserva < x.metaReserva) {
+    itens.push({ nivel: "", t: `Reconstruir a reserva: faltam ${real(x.metaReserva - x.reserva)}`, d: `A meta é ${x.metaMeses} meses de contas fixas + dia a dia. Cada parcela que acaba libera dinheiro: mande esse valor pra reserva em vez de gastar${x.fimParcelas ? `. Quando a última parcela acabar (${nomeMes(x.fimParcelas, true)}), isso acelera bastante` : ""}.` });
+  }
+  return `<div class="cartao pf-plano"><h2>Plano de ação</h2>
+    <ol>${itens.map((it) => `<li class="pf-${it.nivel || "normal"}"><b>${it.t}</b><p>${it.d}</p></li>`).join("")}</ol>
+    <p class="sub">Organização e planejamento com os seus números, não é recomendação de investimento.</p></div>`;
+}
+
+/* ---------- Cartões e compras ---------- */
+function pfCompras(el) {
+  const hoje = mesHojePF();
+  const pessoas = pessoasConhecidas();
+  let lista = P.compras.slice();
+  if (pfx.cartao) lista = lista.filter((c) => String(c.cartao_id) === pfx.cartao);
+  if (pfx.dono === "eu") lista = lista.filter(ehMinha);
+  else if (pfx.dono === "outros") lista = lista.filter((c) => !ehMinha(c));
+  else if (pfx.dono) lista = lista.filter((c) => chavePessoa(c.dono) === pfx.dono);
+  if (pfx.soAtivas) lista = lista.filter((c) => ultimoMes(c) >= hoje);
+  lista.sort((a, b) => (ultimoMes(a) < ultimoMes(b) ? -1 : ultimoMes(a) > ultimoMes(b) ? 1 : n2(b.valor_parcela) - n2(a.valor_parcela)));
+  const nomeCartao = (id) => (P.cartoes.find((c) => String(c.id) === String(id)) || {}).nome || "";
+  el.innerHTML = `
+    <div class="barra">
+      <select class="campo" id="pf-f-cartao" aria-label="Cartão"><option value="">Todos os cartões</option>${P.cartoes.map((c) => `<option value="${c.id}" ${pfx.cartao === String(c.id) ? "selected" : ""}>${esc(c.nome)}</option>`).join("")}</select>
+      <select class="campo" id="pf-f-dono" aria-label="De quem"><option value="">Todas as compras</option><option value="eu" ${pfx.dono === "eu" ? "selected" : ""}>Só as minhas</option><option value="outros" ${pfx.dono === "outros" ? "selected" : ""}>Só de outras pessoas</option>${pessoas.map((p) => `<option value="${esc(chavePessoa(p))}" ${pfx.dono === chavePessoa(p) ? "selected" : ""}>${esc(p)}</option>`).join("")}</select>
+      <label class="check"><input type="checkbox" id="pf-f-ativas" ${pfx.soAtivas ? "checked" : ""}> Só o que ainda tem parcela</label>
+      <span class="espaco"></span>
+      <button class="btn" type="button" data-novo-cartao>${ic("mais")}Cartão</button>
+      <button class="btn primario" type="button" id="pf-nova-compra">${ic("mais")}Compra parcelada</button>
+    </div>
+    <div class="tabela-caixa"><table><thead><tr><th>Compra</th><th>Cartão</th><th>De quem</th><th>Parcela agora</th><th>Valor da parcela</th><th>Falta pagar</th><th>Última</th></tr></thead>
+    <tbody id="pf-lista">${lista.map((c) => {
+      const i = idxParcela(c, hoje), n = Number(c.parcelas);
+      let falta = 0; for (let j = 0; j < n; j++) if (somaMes(mesDe(c.primeiro_mes), j) >= hoje) falta += n2(c.valor_parcela);
+      return `<tr class="clicavel" data-id="${c.id}"><td><b>${esc(c.descricao)}</b>${c.data_compra ? `<br><small class="sub">${dataBR(c.data_compra)}</small>` : ""}</td>
+        <td>${esc(nomeCartao(c.cartao_id))}</td>
+        <td>${ehMinha(c) ? "Eu" : `<span class="pilula p-pendente">${esc(nomePessoa(c.dono))}</span>`}</td>
+        <td>${n === 1 ? "à vista" : i >= 0 ? `${i + 1}/${n}` : mesDe(c.primeiro_mes) > hoje ? `começa ${nomeMes(mesDe(c.primeiro_mes), true)}` : `acabou (${n}x)`}</td>
+        <td>${real(c.valor_parcela)}</td><td>${real(falta)}</td><td>${nomeMes(ultimoMes(c), true)}</td></tr>`; }).join("") || `<tr><td colspan="7" class="vazio">Nada por aqui. Importe a fatura ou lance uma compra parcelada.</td></tr>`}</tbody></table></div>
+    <p class="contagem">${qtd(lista.length, "compra", "compras")}</p>`;
+  $("#pf-f-cartao", el).onchange = (e) => { pfx.cartao = e.target.value; desenhar(); };
+  $("#pf-f-dono", el).onchange = (e) => { pfx.dono = e.target.value; desenhar(); };
+  $("#pf-f-ativas", el).onchange = (e) => { pfx.soAtivas = e.target.checked; desenhar(); };
+  $("#pf-nova-compra", el).onclick = () => formCompraPF();
+  ligarCartoes(el);
+  $("#pf-lista", el).addEventListener("click", (e) => {
+    const tr = e.target.closest("tr[data-id]");
+    if (tr) formCompraPF(P.compras.find((c) => String(c.id) === tr.dataset.id));
+  });
+}
+
+function formCompraPF(c) {
+  const hoje = mesHojePF();
+  const novo = !c;
+  abrirForm({
+    titulo: novo ? "Nova compra parcelada" : "Editar compra",
+    tabela: "pf_compras",
+    campos: [
+      { n: "descricao", r: "O que foi", req: true, inteiro: true },
+      { n: "cartao_id", r: "Cartão", t: "select", op: [["", "Sem cartão"], ...P.cartoes.map((x) => [String(x.id), x.nome])] },
+      { n: "dono", r: "De quem é", lista: pessoasConhecidas(), ph: "vazio = sua", ajuda: "Deixe vazio se a compra é sua." },
+      { n: "valor_parcela", r: "Valor de cada parcela (R$)", t: "number", req: true },
+      { n: "parcelas", r: "Quantas parcelas no total", t: "number", req: true },
+      ...(novo ? [{ n: "agora", r: "Qual parcela vem na fatura deste mês", t: "number", livre: true, ajuda: "Ex.: se este mês vem a 3/10, digite 3. Se ainda não começou, digite 0." }]
+        : [{ n: "primeiro_mes", r: "Mês da fatura da 1ª parcela", t: "month" }]),
+      { n: "data_compra", r: "Data da compra", t: "date" },
+      { n: "categoria", r: "Categoria", lista: ["Casa", "Mercado", "Saúde", "Transporte", "Roupas", "Eletrônicos", "Lazer", "Trabalho", "Outros"] }
+    ],
+    valores: c ? { ...c, cartao_id: c.cartao_id == null ? "" : String(c.cartao_id), primeiro_mes: mesDe(c.primeiro_mes) } : { parcelas: "", agora: 1, cartao_id: P.cartoes[0] ? String(P.cartoes[0].id) : "" },
+    aoSalvar: async (d) => {
+      const n = Math.max(1, Math.round(d.parcelas || 1));
+      let primeiro;
+      if (novo) { const agora = Math.max(0, Math.round(d.agora || 0)); primeiro = somaMes(hoje, agora ? -(agora - 1) : 1); }
+      else primeiro = d.primeiro_mes || mesDe(c.primeiro_mes);
+      const dados = { descricao: d.descricao, cartao_id: d.cartao_id ? Number(d.cartao_id) : null, dono: d.dono ? nomePessoa(d.dono) : null, valor_parcela: d.valor_parcela, parcelas: n, primeiro_mes: primeiro + "-01", data_compra: d.data_compra, categoria: d.categoria };
+      if (novo) dados.origem = "manual";
+      const ok = await gravar("pf_compras", dados, c ? c.id : null);
+      if (ok) await recarregarPF();
+      return ok;
+    },
+    aoApagar: c ? async () => { const ok = await apagarLinha("pf_compras", c.id); if (ok) await recarregarPF(); return ok; } : null
+  });
+}
+
+function formCartaoPF(c) {
+  abrirForm({
+    titulo: c ? "Editar cartão" : "Novo cartão",
+    tabela: "pf_cartoes",
+    campos: [
+      { n: "nome", r: "Nome", req: true, lista: ["Nubank", "Bradesco", "Inter", "Itaú", "Santander", "C6", "Caixa", "Banco do Brasil"] },
+      { n: "vence_dia", r: "Dia do vencimento", t: "number" },
+      { n: "fecha_dia", r: "Dia do fechamento", t: "number" },
+      { n: "limite", r: "Limite (R$)", t: "number" }
+    ],
+    valores: c || {},
+    aoSalvar: async (d) => {
+      const dados = { nome: d.nome, vence_dia: d.vence_dia || null, fecha_dia: d.fecha_dia || null, limite: d.limite || null };
+      const ok = await gravar("pf_cartoes", dados, c ? c.id : null);
+      if (ok) await recarregarPF();
+      return ok;
+    },
+    aoApagar: c ? async () => { const ok = await apagarLinha("pf_cartoes", c.id); if (ok) await recarregarPF(); return ok; } : null
+  });
+}
+
+/* ---------- Quem me deve ---------- */
+function pfDevem(el) {
+  const dev = devedores();
+  const hoje = mesHojePF();
+  el.innerHTML = `
+    <div class="barra"><p class="sub" style="margin:0">Cada compra marcada com o nome de alguém entra aqui. "Já venceu" soma as parcelas das faturas até ${nomeMes(hoje)}.</p><span class="espaco"></span>
+      <button class="btn primario" type="button" id="pf-novo-receb">${ic("mais")}Registrar pagamento</button></div>
+    ${dev.length ? `<div class="pf-pessoas">${dev.map((p) => {
+      const abertas = p.compras.filter((c) => ultimoMes(c) >= hoje);
+      const msg = `Oi, ${p.nome.split(" ")[0]}! Passando o resumo do cartão: ${abertas.map((c) => { const i = idxParcela(c, hoje); return `${c.descricao}${Number(c.parcelas) > 1 && i >= 0 ? ` (${i + 1}/${c.parcelas})` : ""} ${real(c.valor_parcela)}`; }).join("; ")}. Em aberto até agora: ${real(Math.max(0, p.falta))}. Consegue me mandar até o vencimento?`;
+      return `<div class="cartao pf-pessoa ${p.falta > 0 ? "atrasado" : ""}">
+        <div class="barra" style="margin:0 0 6px"><h2 style="margin:0">${esc(p.nome)}</h2><span class="espaco"></span>
+          ${p.falta > 0 ? `<span class="pilula p-vencido">deve ${real(p.falta)}</span>` : p.falta < 0 ? `<span class="pilula p-pago">pagou ${real(-p.falta)} adiantado</span>` : `<span class="pilula p-pago">em dia</span>`}</div>
+        <div class="pf-nums"><span>Já venceu<b>${real(p.devido)}</b></span><span>Já pagou<b>${real(p.pago)}</b></span><span>Ainda vai vencer<b>${real(p.futuro)}</b></span></div>
+        <ul class="pf-mini">${abertas.slice(0, 8).map((c) => { const i = idxParcela(c, hoje); return `<li><span>${esc(c.descricao)}</span><small>${Number(c.parcelas) > 1 ? (i >= 0 ? `${i + 1}/${c.parcelas}` : `até ${nomeMes(ultimoMes(c), true)}`) : "à vista"}</small><b>${real(c.valor_parcela)}</b></li>`; }).join("")}</ul>
+        ${p.receb.length ? `<p class="sub" style="margin:6px 0 0">Último pagamento: ${real(p.receb[0].valor)} em ${dataBR(p.receb[0].data)}</p>` : ""}
+        <div class="barra" style="margin:10px 0 0">
+          <button class="btn" type="button" data-receb="${esc(p.nome)}">${ic("check")}Recebi</button>
+          <a class="btn" href="https://wa.me/?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">${ic("whats")}Cobrar no WhatsApp</a>
+          <button class="btn" type="button" data-hist="${esc(p.nome)}">Ver pagamentos</button>
+        </div></div>`; }).join("")}</div>`
+      : `<p class="vazio">Ninguém te deve nada por aqui. Quando importar a fatura, escreva o nome da pessoa nas compras que não são suas.</p>`}`;
+  $("#pf-novo-receb", el).onclick = () => formRecebPF();
+  $$("[data-receb]", el).forEach((b) => b.onclick = () => formRecebPF(null, b.dataset.receb, Math.max(0, (dev.find((p) => p.nome === b.dataset.receb) || {}).falta || 0)));
+  $$("[data-hist]", el).forEach((b) => b.onclick = () => {
+    const p = dev.find((x) => x.nome === b.dataset.hist);
+    const d = abrirJanelaSimples(`Pagamentos de ${esc(p.nome)}`, p.receb.length ? `<ul class="pf-mini">${p.receb.map((r) => `<li><span>${dataBR(r.data)}${r.obs ? ` · ${esc(r.obs)}` : ""}</span><b>${real(r.valor)}</b><button class="icone-btn" type="button" data-edita-receb="${r.id}" aria-label="Editar">${ic("editar")}</button></li>`).join("")}</ul>` : `<p class="vazio">Nenhum pagamento registrado.</p>`);
+    $$("[data-edita-receb]", d).forEach((x) => x.onclick = () => formRecebPF(P.receb.find((r) => String(r.id) === x.dataset.editaReceb)));
+  });
+}
+function formRecebPF(r, pessoa, valor) {
+  abrirForm({
+    titulo: r ? "Editar pagamento" : "Registrar pagamento recebido",
+    tabela: "pf_recebimentos",
+    campos: [
+      { n: "pessoa", r: "Quem pagou", req: true, lista: pessoasConhecidas() },
+      { n: "valor", r: "Valor (R$)", t: "number", req: true },
+      { n: "data", r: "Data", t: "date", req: true },
+      { n: "obs", r: "Observação", inteiro: true }
+    ],
+    valores: r || { pessoa: pessoa || "", valor: valor ? r2(valor) : "", data: hojeISO() },
+    aoSalvar: async (d) => {
+      const ok = await gravar("pf_recebimentos", { ...d, pessoa: nomePessoa(d.pessoa) }, r ? r.id : null);
+      if (ok) await recarregarPF();
+      return ok;
+    },
+    aoApagar: r ? async () => { const ok = await apagarLinha("pf_recebimentos", r.id); if (ok) await recarregarPF(); return ok; } : null
+  });
+}
+
+/* ---------- Contas fixas ---------- */
+function pfContas(el) {
+  const hoje = mesHojePF();
+  const ativas = P.contas.filter((c) => contaAtiva(c, hoje)).sort((a, b) => n2(b.valor) - n2(a.valor));
+  const outras = P.contas.filter((c) => !contaAtiva(c, hoje)).sort((a, b) => String(a.inicio || "").localeCompare(String(b.inicio || "")));
+  const linha = (c) => `<tr class="clicavel" data-id="${c.id}"><td><b>${esc(c.nome)}</b>${c.obs ? `<br><small class="sub">${esc(c.obs)}</small>` : ""}</td><td>${esc(c.categoria || "")}</td><td>${c.dia ? `dia ${c.dia}` : ""}</td><td>${real(c.valor)}</td>
+    <td>${c.inicio && mesDe(c.inicio) > hoje ? `começa ${nomeMes(mesDe(c.inicio), true)}` : ""}${c.fim ? `${c.inicio && mesDe(c.inicio) > hoje ? ", " : ""}até ${nomeMes(mesDe(c.fim), true)}` : (c.inicio && mesDe(c.inicio) > hoje ? "" : "sem data pra acabar")}</td></tr>`;
+  el.innerHTML = `
+    <div class="barra"><p class="sub" style="margin:0">Total por mês agora: <b>${real(fixasNo(hoje))}</b></p><span class="espaco"></span>
+      <button class="btn primario" type="button" id="pf-nova-conta">${ic("mais")}Conta fixa</button></div>
+    <div class="tabela-caixa"><table><thead><tr><th>Conta</th><th>Categoria</th><th>Vence</th><th>Valor</th><th>Período</th></tr></thead>
+    <tbody id="pf-contas">${ativas.map(linha).join("") || `<tr><td colspan="5" class="vazio">Nenhuma conta fixa cadastrada.</td></tr>`}
+    ${outras.length ? `<tr><th colspan="5">Futuras ou encerradas</th></tr>${outras.map(linha).join("")}` : ""}</tbody></table></div>`;
+  $("#pf-nova-conta", el).onclick = () => formContaPF();
+  $("#pf-contas", el).addEventListener("click", (e) => {
+    const tr = e.target.closest("tr[data-id]");
+    if (tr) formContaPF(P.contas.find((c) => String(c.id) === tr.dataset.id));
+  });
+}
+function formContaPF(c) {
+  abrirForm({
+    titulo: c ? "Editar conta fixa" : "Nova conta fixa",
+    tabela: "pf_contas",
+    campos: [
+      { n: "nome", r: "Conta", req: true, inteiro: true },
+      { n: "valor", r: "Valor por mês (R$)", t: "number", req: true },
+      { n: "dia", r: "Dia do vencimento", t: "number" },
+      { n: "categoria", r: "Categoria", lista: ["Moradia", "Saúde", "Seguro", "Internet e celular", "Impostos", "Transporte", "Assinaturas", "Família", "Outros"] },
+      { n: "inicio", r: "Começa em", t: "month", ajuda: "Vazio = já está valendo." },
+      { n: "fim", r: "Acaba em", t: "month", ajuda: "Vazio = sem data pra acabar." },
+      { n: "obs", r: "Observação", inteiro: true }
+    ],
+    valores: c ? { ...c, inicio: mesDe(c.inicio), fim: mesDe(c.fim) } : {},
+    aoSalvar: async (d) => {
+      const dados = { ...d, dia: d.dia || null, inicio: d.inicio ? d.inicio + "-01" : null, fim: d.fim ? d.fim + "-01" : null };
+      const ok = await gravar("pf_contas", dados, c ? c.id : null);
+      if (ok) await recarregarPF();
+      return ok;
+    },
+    aoApagar: c ? async () => { const ok = await apagarLinha("pf_contas", c.id); if (ok) await recarregarPF(); return ok; } : null
+  });
+}
+
+/* ---------- Entradas ---------- */
+function pfEntradas(el) {
+  const hoje = mesHojePF();
+  const meses = Array.from({ length: 6 }, (_, i) => somaMes(hoje, -(5 - i)));
+  const maxV = Math.max(1, ...meses.map((k) => Math.max(entradasNo(k), pjNo(k))));
+  el.innerHTML = `
+    <div class="barra"><p class="sub" style="margin:0">O que caiu na sua conta pessoal. A renda da projeção usa ${esc(rendaPrevista().fonte || "estes valores")}.</p><span class="espaco"></span>
+      <button class="btn primario" type="button" id="pf-nova-entrada">${ic("mais")}Entrada</button></div>
+    <div class="cartao"><div class="barra" style="margin-bottom:4px"><h2 style="margin:0">Últimos 6 meses</h2><span class="espaco"></span>
+      <span class="legenda" style="margin:0"><span><i class="leg-fat"></i>Entrou na conta pessoal</span><span><i class="leg-rec"></i>Entrou na empresa</span></span></div>
+      <div class="barras-mes" style="grid-template-columns:repeat(6,minmax(0,1fr))">${meses.map((k) => `<div class="grupo-mes ${k === hoje ? "hoje" : ""}" data-dica="<b>${nomeMes(k)}</b><br>Conta pessoal: ${real(entradasNo(k))}<br>Empresa: ${real(pjNo(k))}">
+        <div class="par-barras"><i class="b-fat" style="height:${(entradasNo(k) / maxV) * 100}%"></i><i class="b-rec" style="height:${(pjNo(k) / maxV) * 100}%"></i></div><span>${nomeMes(k, true)}</span></div>`).join("")}</div></div>
+    <div class="tabela-caixa"><table><thead><tr><th>Data</th><th>Descrição</th><th>Origem</th><th>Valor</th></tr></thead>
+    <tbody id="pf-entradas">${P.entradas.map((e) => `<tr class="clicavel" data-id="${e.id}"><td>${dataBR(e.data)}</td><td>${esc(e.descricao || "")}</td><td>${esc(e.origem || "")}</td><td>${real(e.valor)}</td></tr>`).join("") || `<tr><td colspan="4" class="vazio">Nenhuma entrada lançada.</td></tr>`}</tbody></table></div>`;
+  $("#pf-nova-entrada", el).onclick = () => formEntradaPF();
+  $("#pf-entradas", el).addEventListener("click", (e) => {
+    const tr = e.target.closest("tr[data-id]");
+    if (tr) formEntradaPF(P.entradas.find((x) => String(x.id) === tr.dataset.id));
+  });
+}
+function formEntradaPF(e) {
+  abrirForm({
+    titulo: e ? "Editar entrada" : "Nova entrada",
+    tabela: "pf_entradas",
+    campos: [
+      { n: "data", r: "Data", t: "date", req: true },
+      { n: "valor", r: "Valor (R$)", t: "number", req: true },
+      { n: "descricao", r: "Descrição", inteiro: true },
+      { n: "origem", r: "Origem", lista: ["Salário da empresa", "TikTok Shop", "Publi", "Freela", "Devolução de empréstimo", "Outro"] }
+    ],
+    valores: e || { data: hojeISO() },
+    aoSalvar: async (d) => {
+      const ok = await gravar("pf_entradas", d, e ? e.id : null);
+      if (ok) await recarregarPF();
+      return ok;
+    },
+    aoApagar: e ? async () => { const ok = await apagarLinha("pf_entradas", e.id); if (ok) await recarregarPF(); return ok; } : null
+  });
+}
+
+/* ---------- Ajustes ---------- */
+function formAjustesPF() {
+  abrirForm({
+    titulo: "Ajustes do financeiro pessoal",
+    campos: [
+      { n: "salario", r: "Salário fixo que você se paga (R$/mês)", t: "number", ajuda: "Vazio = usa a média do que entrou na conta." },
+      { n: "reserva", r: "Quanto você tem guardado hoje (R$)", t: "number" },
+      { n: "reserva_meses", r: "Meta da reserva (meses de custo)", t: "number", ajuda: "3 é um bom começo; 6 é o ideal pra renda que varia." },
+      { n: "dia_a_dia", r: "Gasto do dia a dia por mês (R$)", t: "number", ajuda: "Vazio = calcula pela média das faturas importadas." }
+    ],
+    valores: { salario: cfg("salario", ""), reserva: cfg("reserva", ""), reserva_meses: cfg("reserva_meses", 3), dia_a_dia: cfg("dia_a_dia", "") },
+    aoSalvar: async (d) => {
+      const linhas = Object.entries(d).map(([chave, v]) => ({ chave, valor: v || 0 }));
+      const { error } = await db.from("pf_config").upsert(linhas, { onConflict: "chave" });
+      if (error) { avisar(traduzErro(error), true); return false; }
+      await recarregarPF();
+      return true;
+    }
+  });
+}
+
+/* ---------- Simular compra ---------- */
+function abrirSimulador() {
+  const hoje = mesHojePF();
+  const d = abrirJanelaSimples("Simular uma compra parcelada", `
+    <div class="form-grade">
+      <div><label for="sim-v">Valor total (R$)</label><input class="campo" id="sim-v" type="number" step="any" min="0" placeholder="600"></div>
+      <div><label for="sim-n">Em quantas vezes</label><input class="campo" id="sim-n" type="number" min="1" max="48" value="6"></div>
+      <div><label for="sim-ini">1ª parcela na fatura de</label><input class="campo" id="sim-ini" type="month" value="${somaMes(hoje, 1)}"></div>
+    </div>
+    <div id="sim-res" style="margin-top:12px"><p class="vazio">Digite o valor para ver o impacto nos próximos meses.</p></div>`, `<button class="btn" type="button" data-fechar>Fechar</button>`);
+  $$("[data-fechar]", d).forEach((b) => b.onclick = () => d.close());
+  const calc = () => {
+    const v = Number(String($("#sim-v", d).value).replace(",", ".")) || 0, n = Math.max(1, Math.round(Number($("#sim-n", d).value) || 1));
+    const ini = $("#sim-ini", d).value || somaMes(hoje, 1);
+    if (!v) { $("#sim-res", d).innerHTML = `<p class="vazio">Digite o valor para ver o impacto nos próximos meses.</p>`; return; }
+    const antes = projecao(12), depois = projecao(12, { inicio: ini, n, v: v / n });
+    const viraram = depois.filter((m, i) => m.sobra < 0 && antes[i].sobra >= 0);
+    const piores = depois.filter((m) => m.sobra < 0);
+    const veredito = !rendaPrevista().v ? `<p class="aviso-falta">Sem renda cadastrada não dá para avaliar. Lance suas entradas ou um salário fixo nos ajustes.</p>`
+      : viraram.length ? `<p class="pf-veredito ruim"><b>Não compensa agora.</b> Essa compra faz ${qtd(viraram.length, "mês", "meses")} ficar no negativo (${viraram.map((m) => nomeMes(m.k, true)).join(", ")}).</p>`
+      : piores.length ? `<p class="pf-veredito ruim"><b>Segure.</b> Esses meses já estão no negativo e a compra aumenta o buraco.</p>`
+      : `<p class="pf-veredito bom"><b>Cabe.</b> A conta continua fechando em todos os meses, mas a sobra diminui ${real(v / n)} por ${qtd(n, "mês", "meses")}.</p>`;
+    $("#sim-res", d).innerHTML = `${veredito}<p class="sub">${n}x de ${real(v / n)}</p>
+      <div class="tabela-caixa"><table><thead><tr><th>Mês</th><th>Sobra hoje</th><th>Com a compra</th></tr></thead><tbody>
+      ${depois.map((m, i) => `<tr><td>${nomeMes(m.k, true)}</td><td class="${antes[i].sobra < 0 ? "neg" : ""}">${real(antes[i].sobra)}</td><td class="${m.sobra < 0 ? "neg" : ""}"><b>${real(m.sobra)}</b></td></tr>`).join("")}
+      </tbody></table></div>`;
+  };
+  $$("input", d).forEach((i) => i.addEventListener("input", calc));
+  $("#sim-v", d).focus();
+}
+
+/* =============================================================
+   IMPORTAR FATURA (PDF ou CSV)
+   O arquivo é lido aqui mesmo no navegador. Cada linha com data e
+   valor vira uma compra; "Parcela 3/10", "03/10" ou "3 de 10"
+   viram parcelamento. Na revisão você marca de quem é cada uma.
+   ============================================================= */
+const PDFJS = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/";
+let pdfjsPronto = null;
+function carregarPdfjs() {
+  if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  if (!pdfjsPronto) pdfjsPronto = new Promise((ok, falha) => {
+    const s = document.createElement("script");
+    s.src = PDFJS + "pdf.min.js";
+    s.onload = () => { window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS + "pdf.worker.min.js"; ok(window.pdfjsLib); };
+    s.onerror = () => { pdfjsPronto = null; falha(new Error("Não deu para carregar o leitor de PDF. Confira a internet.")); };
+    document.head.appendChild(s);
+  });
+  return pdfjsPronto;
+}
+// Junta os pedaços de texto do PDF em linhas, pela altura na página
+async function linhasDoPdf(buffer, senha) {
+  const lib = await carregarPdfjs();
+  const doc = await lib.getDocument({ data: buffer, password: senha || undefined }).promise;
+  const linhas = [];
+  for (let p = 1; p <= doc.numPages; p++) {
+    const pag = await doc.getPage(p);
+    const tc = await pag.getTextContent();
+    const grupos = [];
+    tc.items.forEach((it) => {
+      if (!it.str || !it.str.trim()) return;
+      const y = it.transform[5], x = it.transform[4];
+      let g = grupos.find((gg) => Math.abs(gg.y - y) <= 2.5);
+      if (!g) { g = { y, itens: [] }; grupos.push(g); }
+      g.itens.push({ x, s: it.str });
+    });
+    grupos.sort((a, b) => b.y - a.y).forEach((g) => linhas.push(g.itens.sort((a, b) => a.x - b.x).map((i) => i.s.trim()).join(" ").replace(/\s+/g, " ").trim()));
+  }
+  return linhas;
+}
+
+const MESES_ABREV = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+// O sinal de menos só conta colado no valor ("−R$ 50,00", "-50,00"); "Loja - R$ 50,00" é só separador
+const RE_VALOR = /([-−–])?(?:R\$\s?)?([-−–])?(\d{1,3}(?:\.\d{3})*,\d{2})(?!\d)/g;
+const valorBR = (s) => Number(String(s).replace(/\./g, "").replace(",", "."));
+const RE_CREDITO = /pagamento|pgto|estorno|cr[eé]dito|reembolso|devolu|desconto|cashback/i;
+
+// Lê uma linha "15/09 LOJA 03/10 123,45", "15 SET Loja - Parcela 3/10 R$ 123,45" ou "15 de set. 2026 Loja (Parcela 03 de 10) R$ 123,45"
+function lerLinhaFatura(t, mesFatura) {
+  let s = t.trim(), dia, mes, ano;
+  let m = s.match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\s+/);
+  if (m) { dia = +m[1]; mes = +m[2]; ano = m[3] ? +m[3] : null; }
+  else {
+    m = s.match(/^(\d{1,2})\s+(?:de\s+)?(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)[a-zç]*\.?(?:\s+(?:de\s+)?(\d{4}))?\s+/i);
+    if (m) { dia = +m[1]; mes = MESES_ABREV.indexOf(m[2].toLowerCase()) + 1; ano = m[3] ? +m[3] : null; }
+  }
+  if (!m || mes < 1 || mes > 12 || dia < 1 || dia > 31) return null;
+  s = s.slice(m[0].length);
+  const valores = [...s.matchAll(RE_VALOR)];
+  if (!valores.length) return null;
+  const ult = valores[valores.length - 1];
+  let valor = valorBR(ult[3]);
+  const negativo = !!(ult[1] || ult[2]);
+  s = (s.slice(0, ult.index) + s.slice(ult.index + ult[0].length)).replace(/\s*R\$\s*$/, "");
+  // Parcela
+  let k = 0, n = 0;
+  const pp = [/\(?\s*parc(?:ela)?\.?\s*(\d{1,2})\s*(?:\/|de)\s*(\d{1,2})\s*\)?/i, /\(\s*(\d{1,2})\s*de\s*(\d{1,2})\s*\)/i, /(?:^|\s)(\d{1,2})\/(\d{1,2})(?=\s*$|\s)/];
+  for (const re of pp) {
+    const x = s.match(re);
+    if (x && +x[1] >= 1 && +x[2] >= 2 && +x[1] <= +x[2] && +x[2] <= 99) { k = +x[1]; n = +x[2]; s = s.replace(x[0], " "); break; }
+  }
+  const desc = s.replace(/[•*]{2,}\s*\d{4}/g, " ").replace(/\b(?:USD|US\$)\s?[\d.,]+/gi, " ").replace(/\s[-–]\s*$/, "").replace(/\s+/g, " ").replace(/^[\s\-–:]+|[\s\-–:]+$/g, "").trim();
+  if (!desc || !valor) return null;
+  if (!ano) { const [fa, fm] = mesFatura.split("-").map(Number); ano = mes > fm ? fa - 1 : fa; }
+  if (ano < 100) ano += 2000;
+  const credito = negativo || RE_CREDITO.test(desc);
+  return { data: `${ano}-${pad(mes)}-${pad(dia)}`, desc, k: n ? k : 1, n: n || 1, valor, credito };
+}
+
+function lerCsv(texto) {
+  const sep = (texto.split(/\r?\n/)[0].match(/;/g) || []).length > (texto.split(/\r?\n/)[0].match(/,/g) || []).length ? ";" : ",";
+  const linhas = [];
+  let cel = "", lin = [], aspas = false;
+  for (let i = 0; i < texto.length; i++) {
+    const ch = texto[i];
+    if (aspas) { if (ch === '"' && texto[i + 1] === '"') { cel += '"'; i++; } else if (ch === '"') aspas = false; else cel += ch; continue; }
+    if (ch === '"') aspas = true;
+    else if (ch === sep) { lin.push(cel); cel = ""; }
+    else if (ch === "\n" || ch === "\r") { if (ch === "\r" && texto[i + 1] === "\n") i++; lin.push(cel); linhas.push(lin); lin = []; cel = ""; }
+    else cel += ch;
+  }
+  if (cel || lin.length) { lin.push(cel); linhas.push(lin); }
+  return linhas.filter((l) => l.some((c) => c.trim()));
+}
+function itensDoCsv(texto, mesFatura) {
+  const linhas = lerCsv(texto.replace(/^﻿/, ""));
+  if (!linhas.length) return [];
+  const cab = linhas[0].map(semAcento);
+  const col = (re) => cab.findIndex((c) => re.test(c));
+  let iData = col(/^(date|data)/), iDesc = col(/title|descri|estabelec|lancamento|historico|nome/), iVal = col(/amount|valor/);
+  const temCab = iData >= 0 && iVal >= 0;
+  if (!temCab) { iData = 0; iDesc = 1; iVal = linhas[0].length - 1; }
+  const num = (s) => { s = String(s).replace(/R\$|\s/g, ""); if (s.includes(",") && s.includes(".")) return s.lastIndexOf(",") > s.lastIndexOf(".") ? valorBR(s) : Number(s.replace(/,/g, "")); if (s.includes(",")) return valorBR(s); return Number(s); };
+  return linhas.slice(temCab ? 1 : 0).map((l) => {
+    const dt = String(l[iData] || "").trim();
+    let data = null, m;
+    if ((m = dt.match(/^(\d{4})-(\d{2})-(\d{2})/))) data = `${m[1]}-${m[2]}-${m[3]}`;
+    else if ((m = dt.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/))) data = `${m[3].length === 2 ? "20" + m[3] : m[3]}-${pad(m[2])}-${pad(m[1])}`;
+    const v = num(l[iVal]);
+    if (!data || !isFinite(v) || !v) return null;
+    const x = lerLinhaFatura(`${data.slice(8)}/${data.slice(5, 7)}/${data.slice(0, 4)} ${String(l[iDesc] || "").trim()} ${Math.abs(v).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, mesFatura);
+    if (!x) return null;
+    // No CSV do Nubank, pagamento vem negativo; em outros bancos, a compra vem negativa
+    x.credito = RE_CREDITO.test(x.desc) || (v < 0 && linhas.slice(1).filter((y) => num(y[iVal]) > 0).length > linhas.length / 2);
+    return x;
+  }).filter(Boolean);
+}
+
+function infoDaFatura(texto) {
+  const t = texto.replace(/\s+/g, " ");
+  let mes = "";
+  const v = t.match(/vencimento[^0-9]{0,40}(\d{1,2})(?:\/(\d{1,2})\/(\d{2,4})|\s+(?:de\s+)?(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)[a-zç]*\.?\s+(?:de\s+)?(\d{4}))/i);
+  if (v) {
+    const mm = v[2] ? +v[2] : MESES_ABREV.indexOf(v[4].toLowerCase()) + 1;
+    let aa = +(v[3] || v[5]); if (aa < 100) aa += 2000;
+    if (mm >= 1 && mm <= 12) mes = `${aa}-${pad(mm)}`;
+  }
+  const tot = t.match(/total (?:da fatura|a pagar|desta fatura|da sua fatura)[^0-9]{0,40}(\d{1,3}(?:\.\d{3})*,\d{2})/i);
+  const baixo = semAcento(t);
+  const cartao = P.cartoes.find((c) => baixo.includes(semAcento(c.nome)));
+  return { mes, total: tot ? valorBR(tot[1]) : 0, cartao: cartao ? String(cartao.id) : "" };
+}
+
+const baseDesc = (s) => semAcento(s).replace(/[^a-z0-9]+/g, " ").trim();
+function chaveCompra(x, cartao, mes, ordem) {
+  if (x.n > 1) return `p|${cartao}|${baseDesc(x.desc)}|${x.valor.toFixed(2)}|${x.n}|${somaMes(mes, -(x.k - 1))}`;
+  return `a|${cartao}|${mes}|${x.data || ""}|${baseDesc(x.desc)}|${x.valor.toFixed(2)}|${ordem}`;
+}
+
+function abrirImportarFatura() {
+  const hoje = mesHojePF();
+  const st = { itens: [], mes: hoje, cartao: P.cartoes[0] ? String(P.cartoes[0].id) : "", total: 0, arquivo: null, buffer: null, texto: "", csv: false };
+  const d = janela();
+  d.classList.add("janela-larga", "pf-janela");
+  d.addEventListener("close", () => d.classList.remove("janela-larga", "pf-janela"), { once: true });
+  d.innerHTML = `<div class="janela-topo"><h3>Importar fatura do cartão</h3><button type="button" class="icone-btn" data-fechar aria-label="Fechar">${ic("fechar")}</button></div>
+    <div class="janela-corpo">
+      ${P.cartoes.length ? "" : `<p class="aviso-falta">Cadastre um cartão antes (botão Cartão, em Cartões e compras). Dá para importar assim mesmo, sem cartão.</p>`}
+      <div class="form-grade">
+        <div class="inteiro"><label for="imp-arq">Arquivo da fatura (PDF ou CSV)</label><input class="campo arquivo" id="imp-arq" type="file" accept=".pdf,.csv,.txt,application/pdf,text/csv">
+          <small class="ajuda">O arquivo é lido aqui no seu navegador e não é enviado pra lugar nenhum. Só as compras que você confirmar são salvas.</small></div>
+        <div id="imp-senha-caixa" class="inteiro" hidden><label for="imp-senha">Este PDF tem senha</label>
+          <div class="barra" style="margin:0"><input class="campo" id="imp-senha" type="password" autocomplete="off" style="flex:1"><button class="btn" type="button" id="imp-abrir">Abrir</button></div>
+          <small class="ajuda">Digite a senha do PDF (no Bradesco costuma ser parte do CPF). Ela não é guardada.</small></div>
+        <div><label for="imp-cartao">Cartão</label><select class="campo" style="width:100%" id="imp-cartao"><option value="">Sem cartão</option>${P.cartoes.map((c) => `<option value="${c.id}">${esc(c.nome)}</option>`).join("")}</select></div>
+        <div><label for="imp-mes">Fatura que vence em</label><input class="campo" id="imp-mes" type="month" value="${hoje}"></div>
+      </div>
+      <div id="imp-rev"></div>
+    </div>
+    <div class="janela-pe"><button type="button" class="btn" data-fechar>Cancelar</button><button type="button" class="btn primario" id="imp-salvar" disabled>Salvar compras</button></div>`;
+  $$("[data-fechar]", d).forEach((b) => b.onclick = () => d.close());
+  $("#imp-cartao", d).value = st.cartao;
+  d.showModal();
+
+  const pessoas = () => pessoasConhecidas();
+  const donoAnterior = (x) => {
+    const b = baseDesc(x.desc);
+    const igual = P.compras.filter((c) => baseDesc(c.descricao) === b && (!st.cartao || String(c.cartao_id) === st.cartao));
+    return igual.length ? nomePessoa(igual[igual.length - 1].dono || "") : "";
+  };
+  const prepararItens = (lista) => {
+    const ordens = {};
+    st.itens = lista.map((x) => {
+      const o = `${x.data}|${baseDesc(x.desc)}|${x.valor}`;
+      ordens[o] = (ordens[o] || 0) + 1;
+      return { ...x, ordem: ordens[o], incluir: !x.credito, dono: "" };
+    });
+    recalcular(true);
+  };
+  const recalcular = (novosDonos) => {
+    st.itens.forEach((x) => {
+      x.chave = chaveCompra(x, st.cartao, st.mes, x.ordem);
+      x.existe = P.compras.find((c) => c.chave === x.chave) || null;
+      if (novosDonos) x.dono = x.existe ? nomePessoa(x.existe.dono || "") : donoAnterior(x);
+    });
+    pintar();
+  };
+  const pintar = () => {
+    const rev = $("#imp-rev", d);
+    if (!st.itens.length) { rev.innerHTML = st.arquivo ? `<p class="aviso-falta">Não achei compras neste arquivo. Se for PDF escaneado (imagem), baixe a fatura em CSV no app do banco ou lance as parcelas à mão.</p>` : ""; $("#imp-salvar", d).disabled = true; return; }
+    const inc = st.itens.filter((x) => x.incluir);
+    const soma = inc.reduce((s, x) => s + x.valor, 0);
+    const novos = inc.filter((x) => !x.existe).length;
+    rev.innerHTML = `
+      <div class="pf-imp-resumo">
+        <span><b>${st.itens.length}</b> lançamentos lidos</span>
+        <span><b>${real(soma)}</b> marcados${st.total ? ` (a fatura diz ${real(st.total)}${Math.abs(st.total - soma) > 1 ? ", confira" : ""})` : ""}</span>
+        <span><b>${novos}</b> novos, ${inc.length - novos} já estavam salvos</span>
+      </div>
+      <div class="barra" style="margin:8px 0">
+        <label class="check"><input type="checkbox" id="imp-todos" ${inc.length === st.itens.length ? "checked" : ""}> Todos</label>
+        <span class="espaco"></span>
+        <input class="campo" id="imp-lote" list="imp-pessoas" placeholder="Nome da pessoa" style="max-width:180px">
+        <button class="btn" type="button" id="imp-aplicar">Pôr nas marcadas sem nome</button>
+      </div>
+      <datalist id="imp-pessoas">${pessoas().map((p) => `<option value="${esc(p)}">`).join("")}</datalist>
+      <div class="tabela-caixa pf-imp-tabela"><table><thead><tr><th></th><th>Data</th><th>Compra</th><th>Parcela</th><th>Valor</th><th>De quem (vazio = sua)</th></tr></thead><tbody>
+      ${st.itens.map((x, i) => `<tr class="${x.credito ? "pf-credito" : ""} ${x.existe ? "pf-existe" : ""}">
+        <td><input type="checkbox" data-inc="${i}" ${x.incluir ? "checked" : ""} aria-label="Incluir"></td>
+        <td>${dataBR(x.data)}</td>
+        <td>${esc(x.desc)}${x.credito ? ` <span class="pilula p-parada">pagamento ou crédito</span>` : ""}${x.existe ? ` <span class="pilula p-pago">já salva</span>` : ""}</td>
+        <td>${x.n > 1 ? `${x.k}/${x.n}` : "à vista"}</td>
+        <td>${real(x.valor)}</td>
+        <td><input class="campo" data-dono="${i}" list="imp-pessoas" value="${esc(x.dono)}" placeholder="Eu" style="min-width:120px"></td></tr>`).join("")}
+      </tbody></table></div>
+      <p class="sub">Parcelado: salvo uma vez com todas as parcelas; na fatura do mês que vem ele é reconhecido e não duplica. Pagamentos e créditos já vêm desmarcados.</p>`;
+    $("#imp-salvar", d).disabled = !inc.length;
+    $$("[data-inc]", rev).forEach((c) => c.onchange = () => { st.itens[c.dataset.inc].incluir = c.checked; pintar(); });
+    $$("[data-dono]", rev).forEach((c) => c.oninput = () => { st.itens[c.dataset.dono].dono = c.value; });
+    $("#imp-todos", rev).onchange = (e) => { st.itens.forEach((x) => { x.incluir = e.target.checked; }); pintar(); };
+    $("#imp-aplicar", rev).onclick = () => {
+      const nome = nomePessoa($("#imp-lote", rev).value);
+      // Só nas linhas marcadas que ainda não têm nome; para trocar uma, edite na própria linha
+      const alvo = st.itens.filter((x) => x.incluir && !x.dono);
+      if (!nome) { avisar("Digite o nome da pessoa.", true); return; }
+      alvo.forEach((x) => { x.dono = nome; });
+      pintar();
+    };
+  };
+
+  const processar = async (senha) => {
+    const arq = st.arquivo;
+    const rev = $("#imp-rev", d);
+    rev.innerHTML = `<p class="vazio">Lendo a fatura...</p>`;
+    try {
+      let lista;
+      if (/\.pdf$/i.test(arq.name) || arq.type === "application/pdf") {
+        if (!st.buffer) st.buffer = await arq.arrayBuffer();
+        let linhas;
+        try { linhas = await linhasDoPdf(st.buffer.slice(0), senha); }
+        catch (e) {
+          if (e && e.name === "PasswordException") {
+            $("#imp-senha-caixa", d).hidden = false;
+            rev.innerHTML = senha ? `<p class="aviso-falta">Senha errada. Tente de novo.</p>` : "";
+            $("#imp-senha", d).focus();
+            return;
+          }
+          throw e;
+        }
+        $("#imp-senha-caixa", d).hidden = true;
+        st.texto = linhas.join("\n");
+        const info = infoDaFatura(st.texto);
+        if (info.mes) { st.mes = info.mes; $("#imp-mes", d).value = info.mes; }
+        if (info.cartao) { st.cartao = info.cartao; $("#imp-cartao", d).value = info.cartao; }
+        st.total = info.total;
+        st.linhas = linhas;
+        lista = linhas.map((l) => lerLinhaFatura(l, st.mes)).filter(Boolean);
+      } else {
+        st.csv = true;
+        st.texto = await arq.text();
+        const info = infoDaFatura(arq.name + " " + st.texto.slice(0, 500));
+        if (info.cartao) { st.cartao = info.cartao; $("#imp-cartao", d).value = info.cartao; }
+        lista = itensDoCsv(st.texto, st.mes);
+      }
+      prepararItens(lista);
+    } catch (e) {
+      console.error(e);
+      rev.innerHTML = `<p class="aviso-falta">Não consegui ler este arquivo (${esc(e.message || e)}). Tente o CSV da fatura, que quase todo banco oferece.</p>`;
+    }
+  };
+  $("#imp-arq", d).onchange = (e) => { st.arquivo = e.target.files[0] || null; st.buffer = null; if (st.arquivo) processar(); };
+  $("#imp-abrir", d).onclick = () => processar($("#imp-senha", d).value);
+  $("#imp-senha", d).onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); processar(e.target.value); } };
+  $("#imp-cartao", d).onchange = (e) => { st.cartao = e.target.value; recalcular(false); };
+  $("#imp-mes", d).onchange = (e) => {
+    st.mes = e.target.value || hoje;
+    // A data das compras sem ano depende do mês da fatura: relê
+    if (st.linhas) { const donos = new Map(st.itens.map((x) => [x.desc + x.valor, x.dono])); prepararItens(st.linhas.map((l) => lerLinhaFatura(l, st.mes)).filter(Boolean)); st.itens.forEach((x) => { const dn = donos.get(x.desc + x.valor); if (dn != null) x.dono = dn; }); pintar(); }
+    else if (st.csv) prepararItens(itensDoCsv(st.texto, st.mes));
+    else recalcular(false);
+  };
+  $("#imp-salvar", d).onclick = async () => {
+    const btn = $("#imp-salvar", d);
+    const linhas = st.itens.filter((x) => x.incluir).map((x) => ({
+      cartao_id: st.cartao ? Number(st.cartao) : null,
+      descricao: x.desc,
+      valor_parcela: r2(x.valor),
+      parcelas: x.n,
+      primeiro_mes: somaMes(st.mes, -(x.k - 1)) + "-01",
+      data_compra: x.data,
+      dono: nomePessoa(x.dono) || null,
+      origem: "fatura",
+      chave: x.chave
+    }));
+    btn.disabled = true; btn.textContent = "Salvando...";
+    const { error } = await db.from("pf_compras").upsert(linhas, { onConflict: "chave" });
+    btn.disabled = false; btn.textContent = "Salvar compras";
+    if (error) { avisar(traduzErro(error), true); return; }
+    d.close();
+    avisar(`${linhas.length} compras salvas.`);
+    await recarregarPF();
+  };
+}
+
+window.__adminPessoal = true;

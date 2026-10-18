@@ -30,7 +30,7 @@ const htmlSeguro = (s) => esc(s).replace(/&lt;(\/?)(b|em|strong|i|br)&gt;/g, "<$
   document.documentElement.classList.add("liberado");
   db.auth.onAuthStateChange((evento) => { if (evento === "SIGNED_OUT") location.replace("../login/"); });
   // A parte de estratégia do Instagram fica em admin-estrategia.js: espera ela carregar
-  if (!window.__adminEstrategia) await new Promise((ok) => window.addEventListener("load", ok, { once: true }));
+  if (!window.__adminEstrategia || !window.__adminPessoal) await new Promise((ok) => window.addEventListener("load", ok, { once: true }));
   iniciar(sessao);
 })();
 
@@ -2412,7 +2412,8 @@ const fechado = (c) => ["producao", "dinheiro"].includes(grupoDe(c.status));
 const STATUS_FILTRO = [...STATUS_CONTRATO.filter((s) => s !== "Pago" && grupoDe(s) !== "fora"), "Vencido", "Pago", "Perdida", "Cancelado"];
 const MESES_CURTOS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 const MESES_LONGOS = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
-const fin = { ano: new Date().getFullYear(), mes: new Date().getMonth() + 1, busca: "", status: "", ordem: "recente" };
+const fin = { ano: new Date().getFullYear(), mes: new Date().getMonth() + 1, busca: "", status: "", ordem: "recente", visao: "pj" };
+try { fin.visao = localStorage.getItem("fin-visao") === "pf" ? "pf" : "pj"; } catch (_) {}
 
 const n2 = (v) => Number(v) || 0;
 const recebidoDe = (c) => n2(c.parcela1) + n2(c.parcela2);
@@ -2695,6 +2696,8 @@ function insightsDoAno(funil) {
 }
 
 function desenharFinanceiro(el) {
+  // A chave Empresa | Pessoal: a parte pessoal fica em admin-pessoal.js
+  if (fin.visao === "pf" && typeof desenharPessoal === "function") return desenharPessoal(el);
   const todos = S.contratos;
   const anos = [...new Set([new Date().getFullYear(), ...todos.map((c) => Number(c.ano)).filter(Boolean)])].sort((a, b) => b - a);
   if (!anos.includes(fin.ano)) fin.ano = anos[0];
@@ -2775,6 +2778,7 @@ function desenharFinanceiro(el) {
 
   el.innerHTML = `
     <div class="barra">
+      ${typeof chipsVisaoFin === "function" ? chipsVisaoFin() : ""}
       <select class="campo" id="fin-ano" aria-label="Ano">${anos.map((a) => `<option ${a === fin.ano ? "selected" : ""}>${a}</option>`).join("")}</select>
       <select class="campo" id="fin-mes" aria-label="Mês"><option value="0">Ano todo</option>${MESES_LONGOS.map((m, i) => `<option value="${i + 1}" ${fin.mes === i + 1 ? "selected" : ""}>${m}</option>`).join("")}</select>
       <span class="espaco"></span>
@@ -2905,6 +2909,7 @@ function desenharFinanceiro(el) {
     });
   });
   $("#add-contrato").onclick = () => formContrato();
+  if (typeof ligarVisaoFin === "function") ligarVisaoFin(el);
   ligarCartaoTtk(el);
   $("#lista-contratos").addEventListener("click", (e) => {
     const tr = e.target.closest("tr[data-id]");
