@@ -1188,3 +1188,6 @@ td.neg { color: var(--red); }
 dialog.pf-janela { width: min(900px, calc(100vw - 24px)); }
 .barra > label.check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
 @media (max-width: 620px) { .pf-nums { grid-template-columns: 1fr 1fr 1fr; } .pf-libera li { grid-template-columns: 50px 1fr auto; } }
+.pf-barras { height: 210px; }
+.pf-barras .par-barras { height: auto; flex: 1; min-height: 0; }
+.pf-barras .valor-barra { min-height: 14px; }

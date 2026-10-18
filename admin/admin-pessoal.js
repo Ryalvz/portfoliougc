@@ -222,7 +222,7 @@ function pfVisao(el) {
       <li>Em <b>Ajustes</b>, diga quanto você tem guardado hoje e, se quiser, um salário fixo pra você.</li>
       <li>Cadastre seus cartões e as <b>contas fixas</b>.</li>
       <li>Clique em <b>Importar fatura</b> e escolha o PDF (ou CSV) da fatura de cada cartão. Marque o nome de quem é cada compra que não é sua.</li></ol></div>` : ""}
-    <div class="kpis">
+    <div class="faixa-kpi">
       <div class="kpi ${atual.sobra < 0 ? "alerta" : ""}"><span>${atual.sobra < 0 ? "Falta" : "Sobra"} em ${MESES_LONGOS[Number(hoje.slice(5)) - 1].toLowerCase()}</span><strong>${real(Math.abs(atual.sobra))}</strong><small>renda ${real(atual.renda)} menos ${real(atual.gasto)}</small></div>
       <div class="kpi"><span>Comprometido no mês</span><strong>${real(atual.fixas + atual.parc)}</strong><small>${real(atual.fixas)} fixas + ${real(atual.parc)} parcelas</small></div>
       <div class="kpi"><span>Parcelas a pagar</span><strong>${real(restante)}</strong><small>${fimParcelas ? `a última acaba em ${nomeMes(fimParcelas, true)}` : "nenhuma parcela sua"}</small></div>
@@ -305,8 +305,11 @@ function cartaoPlano(proj, dev, x) {
     const cobrar = dev.reduce((s, p) => s + Math.max(0, p.falta), 0);
     itens.push({ nivel: "critico", t: `Este mês faltam ${real(-atual.sobra)}`, d: `${cobrar > 0 ? `Comece cobrando os ${real(cobrar)} que te devem (aba Quem me deve). ` : ""}Depois corte do dia a dia, que é o único gasto que dá para mexer agora${x.dia.v ? ` (está em ${real(x.dia.v)} por mês)` : ""}.` });
   }
+  // Sem fatura ainda: a projeção só tem as contas fixas
+  const semFatura = !P.compras.length;
+  if (semFatura) itens.push({ nivel: "alerta", t: "Importe as faturas dos cartões", d: `Por enquanto a conta só tem as contas fixas. Sem as faturas${P.cartoes.length ? ` (${P.cartoes.map((c) => esc(c.nome)).join(", ")})` : ""}, faltam as parcelas e o gasto do dia a dia, então a sobra que aparece aqui está maior do que a real.` });
   // 3. Congelar parcelas novas
-  if (atual.renda) {
+  if (atual.renda && !semFatura) {
     const neg = proj.map((m) => m.sobra < 0);
     const ultNeg = neg.lastIndexOf(true);
     if (ultNeg === -1) itens.push({ nivel: "ok", t: "Os próximos 12 meses fecham no positivo", d: "Mesmo assim, segure parcelamentos novos: use o Simular compra antes de parcelar qualquer coisa." });
@@ -315,7 +318,7 @@ function cartaoPlano(proj, dev, x) {
       const ultimo = proj[proj.length - 1];
       itens.push({ nivel: "critico", t: "Mesmo com as parcelas acabando, a conta não fecha", d: `Em ${nomeMes(ultimo.k)} ainda faltam ${real(-ultimo.sobra)}. Ou a renda sobe esse valor, ou as contas fixas e o dia a dia descem. Nenhuma parcela nova até isso mudar.` });
     }
-  } else itens.push({ nivel: "alerta", t: "Falta a sua renda", d: "Lance o que entrou na conta nos últimos meses (aba Entradas) ou defina um salário fixo em Ajustes. Sem isso não dá para saber quanto sobra." });
+  } else if (!atual.renda) itens.push({ nivel: "alerta", t: "Falta a sua renda", d: "Lance o que entrou na conta nos últimos meses (aba Entradas) ou defina um salário fixo em Ajustes. Sem isso não dá para saber quanto sobra." });
   // 4. Salário fixo (renda instável)
   const pj = Array.from({ length: 6 }, (_, i) => pjNo(somaMes(hoje, -(i + 1)))).filter((v) => v > 0).sort((a, b) => a - b);
   const custoVida = fixasNo(hoje) + x.dia.v;
