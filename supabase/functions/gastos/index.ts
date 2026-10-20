@@ -168,6 +168,20 @@ function entender(texto: string, cartoes: any[], pessoas: string[]) {
   const r: any = { valor: 0, cartao: undefined, n: 1, dono: undefined, desc: "" };
   const sobra: string[] = [];
   let t = String(texto || "").replace(/\n/g, " ");
+  // Aviso de compra do banco ("COMPRA APROVADA NO CARTAO FINAL 0240 EM 19/10/2026 12:28 NO VALOR DE R$ 252,50 EM 3 X LOJA"):
+  // o final do cartão, a data e o horário não são o valor; o valor é o que vem depois do R$
+  t = t.replace(/(?:para o |no |do )?cart[aã]o(?: de cr[eé]dito)?(?: com)? final\s*\d{4}/gi, " ")
+    .replace(/\bCART[OÕ]ES\s*:/gi, " ") // "BRADESCO CARTOES:" fica só "BRADESCO", que vira o cartão
+    .replace(/\bcompra(?:\s+no\s+cr[eé]dito)?\s+(?:de\s+)?aprovada\b|\bcompra aprovada\b|\bcompra de\b|\baprovada\b/gi, " ");
+  const dt = t.match(/\b(\d{2})\/(\d{2})(?:\/(\d{2,4}))?\b/);
+  if (dt && Number(dt[2]) >= 1 && Number(dt[2]) <= 12) {
+    const ano = dt[3] ? (dt[3].length === 2 ? "20" + dt[3] : dt[3]) : hojeBR().slice(0, 4);
+    r.data = `${ano}-${dt[2]}-${dt[1]}`;
+    t = t.replace(dt[0], " ");
+  }
+  t = t.replace(/\b\d{1,2}:\d{2}(?::\d{2})?\b/g, " ");
+  const rs = t.match(/(?:\b(?:no\s+)?valor(?:\s+de)?\s*)?r\$\s*(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?|\d+(?:[.,]\d{1,2})?)/i) || t.match(/\b(?:no\s+)?valor(?:\s+de)?\s+(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?|\d+(?:,\d{1,2})?)/i);
+  if (rs) { r.valor = valorDe(rs[1]); t = t.replace(rs[0], " "); }
   // Parcelas por extenso: "à vista", "em 3x", "3 vezes", "3 parcelas", "parcelado em 3"
   const VISTA = /(^|\s)(?:[àáa]\s?vista|avista)(?=$|\s|[!.,;?])/gi;
   if (VISTA.test(t)) { r.n = 1; t = t.replace(VISTA, " "); }
@@ -208,13 +222,35 @@ async function lerFoto(b64: string, mime: string) {
   const claude = Deno.env.get("ANTHROPIC_API_KEY");
   let texto = "";
   if (gemini) {
-    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${gemini}`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contents: [{ parts: [{ text: PEDIDO_FOTO }, { inline_data: { mime_type: mime, data: b64 } }] }], generationConfig: { responseMimeType: "application/json", temperature: 0 } }),
-    });
-    const j = await r.json();
-    texto = j?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-    if (!r.ok) throw new Error("Gemini: " + (j?.error?.message || r.status));
+    // O Google aposenta modelos de tempos em tempos: tenta o que funcionou da última vez, o "flash mais novo"
+    // e, se nenhum servir, pergunta ao Google quais existem e escolhe o flash de versão mais alta.
+    const corpo = JSON.stringify({ contents: [{ parts: [{ text: PEDIDO_FOTO }, { inline_data: { mime_type: mime, data: b64 } }] }], generationConfig: { responseMimeType: "application/json", temperature: 0 } });
+    const tentar = async (modelo: string) => {
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${gemini}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: corpo });
+      const j = await r.json();
+      return { ok: r.ok, texto: j?.candidates?.[0]?.content?.parts?.[0]?.text || "", erro: j?.error?.message || String(r.status) };
+    };
+    const salvo = String((await lerCfg("gemini_modelo")) || "");
+    const fila = [...new Set([salvo, "gemini-flash-latest"].filter(Boolean))];
+    let ultimoErro = "";
+    for (let rodada = 0; rodada < 2 && !texto; rodada++) {
+      for (const modelo of fila) {
+        const r = await tentar(modelo);
+        if (r.ok) { texto = r.texto; if (modelo !== salvo) await gravarCfg("gemini_modelo", modelo); break; }
+        ultimoErro = r.erro;
+      }
+      if (texto || rodada) break;
+      const lista = await (await fetch(`https://generativelanguage.googleapis.com/v1beta/models?pageSize=200&key=${gemini}`)).json();
+      const versao = (n: string) => Number((n.match(/gemini-(\d+(?:\.\d+)?)/) || [])[1] || 0);
+      const nomes = (lista?.models || [])
+        .filter((m: any) => (m.supportedGenerationMethods || []).includes("generateContent"))
+        .map((m: any) => String(m.name).replace(/^models\//, ""))
+        .filter((n: string) => /^gemini-[\d.]+-flash/.test(n) && !/lite|image|tts|live|audio|thinking|exp/.test(n))
+        .sort((a: string, b: string) => versao(b) - versao(a) || Number(/preview/.test(a)) - Number(/preview/.test(b)));
+      fila.splice(0, fila.length, ...nomes.slice(0, 4));
+      if (!fila.length) break;
+    }
+    if (!texto) throw new Error("Gemini: " + ultimoErro);
   } else if (claude) {
     const r = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -354,14 +390,15 @@ async function tratarMensagem(msg: any) {
   for (const e of itens.filter((x) => x.valor)) {
     const cartao = e.cartao === undefined ? padrao : e.cartao;
     if (!e.desc) { e.desc = "Gasto"; semNome = true; }
-    const k = mesFatura(cartao, data);
+    const dia = e.data && /^\d{4}-\d{2}-\d{2}$/.test(e.data) && Math.abs(Date.parse(e.data) - Date.parse(data)) < 60 * 864e5 ? e.data : data;
+    const k = mesFatura(cartao, dia);
     const { data: novo, error } = await db.from("pf_compras").insert({
       cartao_id: cartao ? cartao.id : null, descricao: e.desc, valor_parcela: Math.round((e.valor / e.n) * 100) / 100, parcelas: e.n,
-      primeiro_mes: k + "-01", data_compra: data, dono: e.dono || null, origem: "rapido",
+      primeiro_mes: k + "-01", data_compra: dia, dono: e.dono || null, origem: "rapido",
     }).select("id").single();
     if (error) { await enviar(chat, "Não consegui salvar: " + error.message); return; }
     ids.push(novo.id);
-    novos.push({ ...e, data });
+    novos.push({ ...e, data: dia });
     ultimoCartao = cartao;
     linhas.push(`${e.desc}: ${real(e.valor)}${e.n > 1 ? ` em ${e.n}x de ${real(e.valor / e.n)}` : " à vista"}\n${cartao ? `${cartao.nome}, fatura de ${nomeMes(k)}` : "Pix/débito"}${e.dono ? ` · de ${e.dono}` : ""}`);
   }
