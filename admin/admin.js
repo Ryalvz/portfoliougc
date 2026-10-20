@@ -926,7 +926,9 @@ function pintarBarraSelecao() {
   const sel = S.marcas.filter((m) => m.selecionada).length;
   const doFiltro = listaMarcasVisivel.filter((m) => primeiroEmail(m) && !m.selecionada);
   caixa.innerHTML = `<span class="barra-selecao-n">${ic("check")}<b>${plural(sel, "marca selecionada", "marcas selecionadas")}</b></span>
-    ${doFiltro.length ? `<button type="button" class="link-btn" data-sel-todas>Selecionar as ${num(doFiltro.length)} com e-mail que estão aparecendo</button>` : ""}
+    ${doFiltro.length ? (filtroMarcas.nicho && filtroMarcas.nicho !== "★" && !filtroMarcas.busca && !filtroMarcas.situacao
+      ? `<button type="button" class="btn pequeno" data-sel-todas>${ic("check")}Selecionar todas as marcas de ${esc(filtroMarcas.nicho)} com e-mail (${num(doFiltro.length)})</button>`
+      : `<button type="button" class="link-btn" data-sel-todas>Selecionar as ${num(doFiltro.length)} com e-mail que estão aparecendo</button>`) : ""}
     ${sel ? `<button type="button" class="link-btn" data-sel-limpar>Limpar seleção</button>` : ""}
     <span class="espaco"></span>
     ${sel ? `<button type="button" class="btn pequeno primario" data-ir-prosp>${ic("email")}Ir para Prospecção</button>` : `<small class="sub">Marque as caixinhas para escolher pra quem mandar o e-mail.</small>`}`;
@@ -4686,12 +4688,12 @@ const temProspeccao = () => temCampo("marcas", "selecionada");
 
 /* ---------- Montar o e-mail ---------- */
 function textoParaHTML(t) {
-  const linkar = (s) => s.replace(/(https?:\/\/[^\s<]+[^\s<.,;:!?)\]])/g, '<a href="$1" style="color:#1F3FC3;">$1</a>');
+  const linkar = (s) => s.replace(/(https?:\/\/[^\s<]+[^\s<.,;:!?)\]])/g, '<a href="$1" style="color:#8A6B33;">$1</a>');
   return String(t || "").trim().split(/\n\s*\n/).map((p) => `<p style="margin:0 0 14px;">${linkar(esc(p)).replace(/\n/g, "<br>")}</p>`).join("\n      ");
 }
 function montarEmailHTML({ texto, botaoTexto, botaoLink }) {
   const botao = botaoTexto && /^https?:\/\//.test(botaoLink || "")
-    ? `<p style="margin:24px 0 8px;"><a href="${esc(botaoLink)}" style="display:inline-block;background:#1F3FC3;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;padding:12px 24px;border-radius:8px;">${esc(botaoTexto)}</a></p>` : "";
+    ? `<p style="margin:24px 0 8px;"><a href="${esc(botaoLink)}" style="display:inline-block;background:#2B241C;color:#F6F2EB;text-decoration:none;font-weight:bold;font-size:15px;padding:13px 26px;border-radius:999px;">${esc(botaoTexto)}</a></p>` : "";
   return `<!doctype html>
 <html lang="pt-BR">
   <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>
@@ -4727,14 +4729,19 @@ function opcoesPublico() {
   const ordem = SITUACOES.map((x) => x[0]);
   sits.sort((a, b) => (ordem.indexOf(a) + 1 || 99) - (ordem.indexOf(b) + 1 || 99));
   const plurais = { lead: "Só os leads", conversando: "Só quem está conversando", cliente: "Só quem já é cliente", parada: "Só as paradas" };
+  // Grupos por nicho (ex.: "Só as marcas de Moda"), com quantas têm e-mail
+  const nichos = {};
+  S.marcas.filter((m) => !m.exemplo && m.nicho && primeiroEmail(m)).forEach((m) => { nichos[m.nicho] = (nichos[m.nicho] || 0) + 1; });
+  const porNicho = Object.entries(nichos).sort((a, b) => b[1] - a[1]).map(([n, q]) => ["nicho:" + n, `Só as marcas de ${n} (${q} com e-mail)`]);
   return [["selecionadas", "Só as marcas que eu selecionei"], ["teste", "Só pra mim (teste)"], ["todas", "Todas as marcas com e-mail"]]
+    .concat(porNicho)
     .concat(sits.map((s) => ["sit:" + s, plurais[s] || `Só: ${nomeSituacao(s)}`]));
 }
 // Devolve quem recebe e quantas ficaram de fora (sem e-mail, repetido, descadastro, já recebeu)
 function destinatariosDe(publico) {
   if (publico === "teste") return { lista: [{ email: EMAIL_PROPOSTAS, nome: "Natura", marca: "Natura", marca_id: null }], semEmail: 0, repetidos: 0, descadastrados: 0, jaReceberam: 0, total: 1 };
   const marcas = S.marcas.filter((m) => !m.exemplo && (
-    publico === "selecionadas" ? m.selecionada : publico === "todas" ? true : publico.startsWith("sit:") ? m.situacao === publico.slice(4) : false));
+    publico === "selecionadas" ? m.selecionada : publico === "todas" ? true : publico.startsWith("sit:") ? m.situacao === publico.slice(4) : publico.startsWith("nicho:") ? m.nicho === publico.slice(6) : false));
   const fora = new Set((pro.optout || []).map((x) => x.email));
   const ja = new Set((pro.envios || []).filter((x) => x.status === "ok" && x.assunto === pro.assunto).map((x) => x.email.toLowerCase()));
   const vistos = new Set();
