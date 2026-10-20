@@ -102,11 +102,12 @@ const pjNo = (k) => { const [a, m] = k.split("-").map(Number); return entrouEm(a
 function rendaPrevista() {
   const sal = n2(cfg("salario"));
   if (sal > 0) return { v: sal, fonte: "o salário fixo que você definiu" };
+  // Sua renda é o que entra pelo trabalho (Financeiro da empresa: contratos + TikTok Shop), média dos 3 últimos meses completos
   const hoje = mesHojePF();
+  const pj = [1, 2, 3].map((i) => pjNo(somaMes(hoje, -i)));
+  if (pj.some(Boolean)) return { v: pj.reduce((s, v) => s + v, 0) / 3, fonte: "média do que entrou pelo seu trabalho nos 3 últimos meses (Financeiro da empresa)" };
   const meses = [...new Set(P.entradas.map((e) => mesDe(e.data)))].filter((k) => k < hoje).sort().slice(-3);
   if (meses.length) return { v: meses.reduce((s, k) => s + entradasNo(k), 0) / meses.length, fonte: `média das entradas ${meses.length === 1 ? "do último mês" : `dos últimos ${meses.length} meses`}` };
-  const pj = [1, 2, 3].map((i) => pjNo(somaMes(hoje, -i)));
-  if (pj.some(Boolean)) return { v: pj.reduce((s, v) => s + v, 0) / 3, fonte: "média do que entrou na empresa nos últimos 3 meses" };
   return { v: 0, fonte: "" };
 }
 
