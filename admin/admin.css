@@ -1307,3 +1307,23 @@ dialog.pf-janela-rapida { width: min(460px, calc(100vw - 20px)); }
 .pf-degrau-area i { width: 100% !important; max-width: none !important; }
 .pf-degrau-area em { position: absolute; left: -30%; right: -30%; height: 0; border-top: 2px dashed var(--red); opacity: .7; }
 .pf-escada { height: 150px; }
+/* Plano da semana: três Cs */
+.p-conhecer { background: #E8EEF6; color: #2D4A6E; }
+.p-conectar { background: var(--olive-tint); color: #6B5326; }
+.p-converter { background: var(--green-bg); color: var(--green); }
+.pl-cs { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; margin: 0 0 12px; }
+.pl-cs .sub { font-size: 12px; }
+.pl-contexto { margin-bottom: 14px; }
+.pl-contexto .pro-titulo { margin-bottom: 2px; }
+/* Portfólio: curadoria */
+.cur-grade { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+.cur-bloco { border: 1px solid var(--line); border-radius: var(--radius); background: var(--parchment); padding: 10px 12px; display: grid; gap: 4px; align-content: start; }
+.cur-bloco h3 { margin: 0 0 2px; font-size: 13.5px; }
+.cur-bloco ol { margin: 0; padding-left: 18px; display: grid; gap: 3px; font-size: 12.5px; }
+.cur-bloco li b { float: right; font-weight: 700; color: var(--cobalt); margin-left: 6px; }
+.cur-bloco small { color: var(--muted); font-size: 11.5px; line-height: 1.45; }
+.cur-n { font-size: 28px; font-weight: 700; color: var(--cobalt); margin: 0; }
+.ret-mini { display: inline-block; width: 60px; height: 6px; border-radius: 3px; background: var(--tint); overflow: hidden; vertical-align: middle; margin-right: 6px; }
+.ret-mini i { display: block; height: 100%; background: #C9A464; }
+.ret-mini.boa i { background: var(--green); }
+.ret-mini.baixa i { background: var(--red); }

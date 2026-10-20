@@ -1346,4 +1346,86 @@ async function pintarRankingVideos(caixa) {
   $$("[data-rank-dias]", caixa).forEach((b) => b.onclick = () => { rankV.dias = Number(b.dataset.rankDias); try { localStorage.setItem("rank-dias", String(rankV.dias)); } catch (_) {} pintarRankingVideos(caixa); });
 }
 
+/* =============================================================
+   CURADORIA DO PORTFÓLIO (Portfólio > Vídeos e curadoria)
+   Por vídeo: quantos plays com som, quanto assistem e se vão até o
+   fim. Mostra o que está prendendo, o que ninguém abre e o que as
+   pessoas largam no começo, e pode reordenar cada nicho.
+   ============================================================= */
+const vstat = { dias: 30, mapa: null, total: 0, lidoEm: 0, diasLidos: 0, carregando: false };
+try { vstat.dias = Number(localStorage.getItem("cur-dias")) || 30; } catch (_) {}
+function statsVideosPortfolio(aoCarregar) {
+  const velho = Date.now() - vstat.lidoEm > 5 * 60000 || vstat.diasLidos !== vstat.dias;
+  if ((vstat.mapa === null || velho) && !vstat.carregando) {
+    vstat.carregando = true;
+    const desde = new Date(Date.now() - vstat.dias * 864e5).toISOString();
+    db.from("video_views").select("video_id,segundos,duracao").gte("criado_em", desde).not("video_id", "is", null).limit(10000).then(({ data, error }) => {
+      vstat.carregando = false;
+      if (error) { vstat.erro = error.message; vstat.mapa = new Map(); }
+      else {
+        const m = new Map();
+        (data || []).forEach((l) => {
+          const k = String(l.video_id);
+          if (!m.has(k)) m.set(k, { plays: 0, seg: 0, dur: 0, completos: 0 });
+          const g = m.get(k); g.plays++; g.seg += n2(l.segundos);
+          if (l.duracao) { g.dur = Math.max(g.dur, n2(l.duracao)); if (n2(l.segundos) >= n2(l.duracao) * 0.9) g.completos++; }
+        });
+        m.forEach((g) => { g.media = g.seg / g.plays; g.pct = g.dur ? Math.min(100, Math.round((g.media / g.dur) * 100)) : null; });
+        vstat.mapa = m; vstat.total = (data || []).length; vstat.erro = null;
+      }
+      vstat.lidoEm = Date.now(); vstat.diasLidos = vstat.dias;
+      if (aoCarregar) aoCarregar();
+    });
+  }
+  return vstat.mapa;
+}
+function cartaoCuradoria(st) {
+  const chips = `<div class="chips" role="tablist" aria-label="Período">${[[7, "7 dias"], [30, "30 dias"], [90, "90 dias"]].map(([d, n]) => `<button class="chip" type="button" data-cur-dias="${d}" aria-pressed="${vstat.dias === d}">${n}</button>`).join("")}</div>`;
+  const topo = `<div class="barra" style="margin-bottom:6px"><h2 style="margin:0">Curadoria do portfólio</h2><span class="espaco"></span>${chips}</div>`;
+  if (!st) return `<div class="cartao cur">${topo}<p class="vazio">Lendo quem assistiu o quê...</p></div>`;
+  if (vstat.erro) return `<div class="cartao cur">${topo}<p class="aviso-falta">${/does not exist|schema cache/i.test(vstat.erro) ? "Falta criar a tabela video_views (banco.sql, parte 34)." : esc(vstat.erro)}</p></div>`;
+  const noAr = S.videos.filter((v) => v.visivel !== false);
+  const com = noAr.map((v) => ({ v, e: st.get(String(v.id)) })).filter((x) => x.e);
+  const nome = (v) => `${esc(v.titulo)}${v.marca ? ` <span class="sub">${esc(v.marca)}</span>` : ""}`;
+  const lista = (arr, f) => arr.length ? `<ol>${arr.map((x) => `<li>${nome(x.v)}<b>${f(x)}</b></li>`).join("")}</ol>` : `<p class="sub">Nada ainda.</p>`;
+  const mais = [...com].sort((a, b) => b.e.plays - a.e.plays).slice(0, 3);
+  const prendem = com.filter((x) => x.e.plays >= 2 && x.e.pct != null).sort((a, b) => b.e.pct - a.e.pct).slice(0, 3);
+  const largam = com.filter((x) => x.e.plays >= 2 && x.e.pct != null && x.e.pct < 25).sort((a, b) => a.e.pct - b.e.pct).slice(0, 4);
+  const ninguem = noAr.filter((v) => !st.get(String(v.id)));
+  const poucoDado = vstat.total < 15;
+  return `<div class="cartao cur">${topo}
+    <p class="sub" style="margin:0 0 10px">${vstat.total ? `${vstat.total} ${vstat.total === 1 ? "play" : "plays"} com som nos últimos ${vstat.dias} dias.` : `Nenhum play com som nos últimos ${vstat.dias} dias.`} Os vídeos que você assiste no seu navegador não contam.${poucoDado ? " <b>Ainda é pouco dado:</b> use como pista, não como verdade. Fica mais confiável a partir de uns 15 plays." : ""}</p>
+    <div class="cur-grade">
+      <div class="cur-bloco"><h3>🔥 Mais assistidos</h3>${lista(mais, (x) => `${x.e.plays} plays`)}</div>
+      <div class="cur-bloco"><h3>⏱️ Prendem até o fim</h3>${lista(prendem, (x) => `${x.e.pct}% assistido`)}<small>Bons para ir para o começo do nicho.</small></div>
+      <div class="cur-bloco"><h3>⚠️ Largam no começo</h3>${lista(largam, (x) => `${x.e.pct}%`)}<small>Menos de 25% assistido: o gancho ou a capa não seguram. Troque a capa ou tire do topo.</small></div>
+      <div class="cur-bloco"><h3>😴 Ninguém deu play</h3><p class="cur-n">${ninguem.length}</p><small>${ninguem.length ? "Vídeos que ninguém abriu no período. Se continuar assim, troque a capa ou tire do site." : "Todo vídeo no ar teve play."}</small></div>
+    </div>
+    <div class="barra" style="margin:12px 0 0">
+      <span class="sub">Quem visita vê primeiro os 3 primeiros vídeos de cada nicho.</span><span class="espaco"></span>
+      <button class="btn" type="button" id="cur-ordenar" ${com.length < 3 || poucoDado ? "disabled title=\"Precisa de mais plays para valer a pena\"" : ""}>${ic("grafico")}Pôr na frente os que mais prendem</button>
+    </div>
+  </div>`;
+}
+function ligarCuradoria(el, redesenhar) {
+  $$("[data-cur-dias]", el).forEach((b) => b.onclick = () => { vstat.dias = Number(b.dataset.curDias); try { localStorage.setItem("cur-dias", String(vstat.dias)); } catch (_) {} vstat.mapa = null; redesenhar(); });
+  const ord = $("#cur-ordenar", el);
+  if (ord) ord.onclick = async () => {
+    if (!vstat.mapa || !(await confirmar("Reordenar os vídeos de cada nicho: os que as pessoas mais assistem e assistem até o fim vão para a frente. Os sem play ficam no fim, na ordem de hoje. Continuar?", "Reordenar"))) return;
+    // Nota de cada vídeo = plays x quanto assistem (retenção pesa mais que só abrir)
+    const nota = (v) => { const e = vstat.mapa.get(String(v.id)); return e ? e.plays * ((e.pct == null ? 30 : e.pct) / 100 + 0.2) : -1; };
+    const nova = [];
+    [...new Set(S.videos.map((v) => v.nicho))].forEach((n) => {
+      const doNicho = S.videos.filter((v) => v.nicho === n).map((v, i) => ({ v, i, s: nota(v) }));
+      doNicho.sort((a, b) => (b.s - a.s) || (a.i - b.i));
+      doNicho.forEach((x) => nova.push(x.v));
+    });
+    ord.disabled = true; ord.textContent = "Reordenando...";
+    let erros = 0;
+    for (let i = 0; i < nova.length; i++) if (Number(nova[i].ordem) !== i) { if (!(await gravar("videos", { ordem: i }, nova[i].id))) erros++; }
+    await recarregar("videos");
+    avisar(erros ? `Reordenei, mas ${erros} não salvaram.` : "Pronto: em cada nicho, os que mais prendem estão na frente do site.", !!erros);
+  };
+}
+
 window.__adminPessoal = true;

@@ -392,7 +392,9 @@ async function iniciar(sessao) {
 const NICHOS = [["tech", "Tech & Apps"], ["cuidado", "Beleza & Cuidados"], ["alimentos", "Gastronomia"], ["casa", "Casa"], ["moda", "Moda"]];
 const nomeNicho = (n) => (NICHOS.find((x) => x[0] === n) || [n, n || "Sem nicho"])[1];
 // Filtro da lista "Meus vídeos": "" mostra todos, ou só um nicho para ordenar dentro dele
-const pf = { nicho: "" };
+const pf = { nicho: "", sub: "videos" };
+try { pf.sub = localStorage.getItem("pf-aba") || "videos"; } catch (_) {}
+const SUBS_PORTFOLIO = [["videos", "Vídeos e curadoria"], ["leads", "Leads"], ["feedbacks", "Feedbacks e site"], ["visitas", "Visitas"]];
 
 function desenharPortfolio(el) {
   const hoje = hojeISO();
@@ -426,7 +428,14 @@ function desenharPortfolio(el) {
     ? `<p class="vazio">Aqui aparece de onde as pessoas chegam ao seu site: Instagram, Google, WhatsApp, link direto.</p>`
     : `<ul class="origens">${listaOrigens.map(([o, n]) => `<li><span>${esc(o)}</span><b>${n}</b><span class="trilho"><i style="width:${(n / total14) * 100}%"></i></span></li>`).join("")}</ul>`;
 
-  el.innerHTML = quadroContatosSite() + `
+  if (!SUBS_PORTFOLIO.some(([k]) => k === pf.sub)) pf.sub = "videos";
+  const novosLeads = (S.contatos_site || []).filter((c) => !c.visto).length;
+  const abas = `<div class="subabas" role="tablist">${SUBS_PORTFOLIO.map(([k, n]) => `<button class="subaba" type="button" role="tab" data-pf-aba="${k}" aria-selected="${pf.sub === k}">${n}${k === "leads" && novosLeads ? ` <span class="pilula p-pendente">${novosLeads}</span>` : ""}</button>`).join("")}</div>`;
+  const ligarAbas = () => $$("[data-pf-aba]", el).forEach((b) => b.onclick = () => { pf.sub = b.dataset.pfAba; try { localStorage.setItem("pf-aba", pf.sub); } catch (_) {} desenharPortfolio(el); });
+  if (pf.sub === "leads") { el.innerHTML = abas + quadroContatosSite(); ligarAbas(); ligarContatosSite(el); return; }
+  if (pf.sub === "feedbacks") { el.innerHTML = abas + `<div id="conteudo-site"></div>`; ligarAbas(); desenharConteudoSite($("#conteudo-site")); return; }
+  if (pf.sub === "visitas") {
+    el.innerHTML = abas + `
     <div class="faixa-kpi">
       <div class="kpi"><span>Visitas em 14 dias</span><strong>${num(total14)}</strong></div>
       <div class="kpi"><span>Visitas hoje</span><strong>${num(porDia[hoje])}</strong></div>
@@ -437,7 +446,12 @@ function desenharPortfolio(el) {
     <div class="grade-2">
       <div class="cartao"><h2>Visitas nos últimos 14 dias</h2>${grafico}</div>
       <div class="cartao"><h2>Por onde chegaram</h2>${listaOrig}</div>
-    </div>
+    </div>`;
+    ligarAbas(); return;
+  }
+  // Vídeos e curadoria: a lista com plays e retenção de cada vídeo (dados do site, tabela video_views)
+  const st = typeof statsVideosPortfolio === "function" ? statsVideosPortfolio(() => { if (abaAtual === "portfolio" && pf.sub === "videos") desenharPortfolio(el); }) : null;
+  el.innerHTML = abas + (typeof cartaoCuradoria === "function" ? cartaoCuradoria(st) : "") + `
     <div class="barra">
       <h2 style="margin:0">Meus vídeos</h2><span class="sub">${pf.nicho ? "arraste pela alça para mudar a ordem dentro deste nicho" : "arraste pela alça para mudar a ordem no site"}</span>
       <span class="espaco"></span>
@@ -449,18 +463,17 @@ function desenharPortfolio(el) {
     </div>
     <div class="tabela-caixa">
       <table>
-        <thead><tr><th style="width:30px"><span class="sr-only">Ordem</span></th><th>Título</th><th>Nicho</th><th>Formato</th><th>Marca</th><th>Destaque</th><th>Link</th><th class="num">Ações</th></tr></thead>
+        <thead><tr><th style="width:30px"><span class="sr-only">Ordem</span></th><th>Título</th><th>Nicho</th><th>Marca</th>${st ? `<th class="num">Plays</th><th>Retenção</th>` : ""}<th>Destaque</th><th>Link</th><th class="num">Ações</th></tr></thead>
         <tbody id="lista-videos">${S.videos.length === 0
-          ? `<tr><td colspan="8"><p class="vazio">Nenhum vídeo cadastrado. Clique em Adicionar vídeo e ele aparece no seu portfólio na hora.</p></td></tr>`
-          : S.videos.filter((v) => !pf.nicho || v.nicho === pf.nicho).map(linhaVideo).join("")}</tbody>
+          ? `<tr><td colspan="9"><p class="vazio">Nenhum vídeo cadastrado. Clique em Adicionar vídeo e ele aparece no seu portfólio na hora.</p></td></tr>`
+          : S.videos.filter((v) => !pf.nicho || v.nicho === pf.nicho).map((v) => linhaVideo(v, st)).join("")}</tbody>
       </table>
-    </div>
-    <div id="conteudo-site"></div>`;
+    </div>`;
 
+  ligarAbas();
+  if (typeof ligarCuradoria === "function") ligarCuradoria(el, () => desenharPortfolio(el));
   $("#add-video").addEventListener("click", () => formVideo(null, pf.nicho));
   $$("[data-pf-nicho]", el).forEach((b) => b.onclick = () => { pf.nicho = b.dataset.pfNicho; desenharPortfolio(el); });
-  ligarContatosSite(el);
-  desenharConteudoSite($("#conteudo-site"));
   const corpo = $("#lista-videos");
   corpo.addEventListener("click", async (e) => {
     const tr = e.target.closest("tr[data-id]");
@@ -478,14 +491,16 @@ function desenharPortfolio(el) {
 
 const linkAbrivel = (l) => (!l ? "" : /^https?:\/\//i.test(l) ? l : "../" + l.replace(/^\.?\//, ""));
 
-function linhaVideo(v) {
+function linhaVideo(v, st) {
   const escondido = v.visivel === false;
+  const e = st ? st.get(String(v.id)) : null;
+  const colStats = st ? `<td class="num">${e ? `<b>${e.plays}</b>` : `<span class="sub">0</span>`}</td><td>${e && e.pct != null ? `<span class="ret-mini ${e.pct >= 60 ? "boa" : e.pct < 25 ? "baixa" : ""}"><i style="width:${e.pct}%"></i></span><small>${e.pct}%</small>` : `<span class="sub">sem dado</span>`}</td>` : "";
   return `<tr data-id="${esc(v.id)}" class="${escondido ? "escondido" : ""}">
     <td><span class="alca" title="Arraste para mudar a ordem" aria-label="Arrastar">${ic("alca")}</span></td>
     <td><b>${esc(v.titulo)}</b>${v.exemplo ? '<span class="pilula p-exemplo">exemplo</span>' : ""}</td>
     <td>${esc(nomeNicho(v.nicho))}</td>
-    <td>${esc(v.formato || "")}</td>
     <td>${esc(v.marca || "")}</td>
+    ${colStats}
     <td>${v.destaque === true || v.destaque === "true" ? "Sim" : v.destaque && v.destaque !== "false" ? esc(v.destaque) : ""}</td>
     <td class="corta">${v.link ? `<a href="${esc(linkAbrivel(v.link))}" target="_blank" rel="noopener">${ehDoStorage(v.link) ? "Vídeo enviado (abrir)" : esc(v.link)}</a>` : ""}</td>
     <td class="acoes">
@@ -3502,7 +3517,11 @@ function pintarLembretes() {
   if (abaAtual === "propostas" && gm.emails && !gm.aberto) marcarVisto("propostas-vistas", ...propostasVisiveis().map((x) => x.id));
   if (abaAtual === "instagram" && ig.dados) { const d = postEmDestaque(); if (d) marcarVisto("ig-vistos", d.post.id); }
   // "Lido": some do sino por 7 dias. Se o lembrete mudar (outro valor, outra data), ele volta na hora
-  const L = calcularLembretes().filter((x) => !adiado(chaveLido(x)));
+  // A chave do "lido" usa o texto com os valores à mostra: no modo privado o texto muda ("R$ ••••") e o lembrete voltaria
+  const priv = privado; privado = false;
+  const chaves = calcularLembretes().map(chaveLido);
+  privado = priv;
+  const L = calcularLembretes().map((x, i) => Object.assign(x, { chaveLido: chaves[i] })).filter((x) => !adiado(x.chaveLido));
   lembretesAtuais = L;
   pintarBolinhasMenu(L);
   // Número no ícone do app no iPhone
@@ -3542,7 +3561,7 @@ function chaveLido(x) {
   return "lido-" + (h >>> 0).toString(36);
 }
 async function marcarLidos(lista) {
-  const linhas = lista.filter(Boolean).map((x) => ({ chave: chaveLido(x), ate: somaDiasISO(7) }));
+  const linhas = lista.filter(Boolean).map((x) => ({ chave: x.chaveLido || chaveLido(x), ate: somaDiasISO(7) }));
   if (!linhas.length) return;
   const { error } = await db.from("lembretes_adiados").upsert(linhas, { onConflict: "chave" });
   if (error) { avisar(traduzErro(error), true); return; }
@@ -3742,9 +3761,9 @@ function desenharInicio(el) {
             : `<p class="vazio">Nenhuma ideia em "Fazer agora" ou "Fazendo".</p>`}
         </div>
         <div class="cartao">
-          <div class="barra" style="margin-bottom:6px"><h2 style="margin:0">Clientes que entraram em contato</h2><span class="espaco"></span><button type="button" class="link-btn" data-ir="portfolio">ver todos</button></div>
+          <div class="barra" style="margin-bottom:6px"><h2 style="margin:0">Clientes que entraram em contato</h2><span class="espaco"></span><button type="button" class="link-btn" data-ir="portfolio" data-pf-sub="leads">ver todos</button></div>
           ${contatosRecentes.length
-            ? `<div class="lista-dia">${contatosRecentes.map((c) => `<button type="button" class="item-dia" data-ir="portfolio">
+            ? `<div class="lista-dia">${contatosRecentes.map((c) => `<button type="button" class="item-dia" data-ir="portfolio" data-pf-sub="leads">
                 <span class="pilula ${c.visto ? "p-conversando" : "p-pendente"}">${c.visto ? (c.tipo === "midia_kit" ? "Mídia kit" : "Formulário") : "Novo"}</span>
                 <span class="item-dia-texto"><b>${esc(c.marca || c.nome)}</b><small>${esc(c.marca ? c.nome : c.email)} · ${dataBR(String(c.criado_em).slice(0, 10)).slice(0, 5)}</small></span>
               </button>`).join("")}</div>`
@@ -3763,7 +3782,7 @@ function desenharInicio(el) {
     const abrirEmail = e.target.closest("[data-inicio-email]");
     if (abrirEmail) { const x = (gm.emails || []).find((m) => m.id === abrirEmail.dataset.inicioEmail); irPara("propostas"); if (x) abrirConversa(x); return; }
     const ir = e.target.closest("[data-ir]");
-    if (ir) { irPara(ir.dataset.ir); return; }
+    if (ir) { if (ir.dataset.pfSub) pf.sub = ir.dataset.pfSub; irPara(ir.dataset.ir); return; }
     const ev = e.target.closest("[data-evento]");
     if (ev) {
       const [origem, id] = ev.dataset.evento.split(":");
