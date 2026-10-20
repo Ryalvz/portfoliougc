@@ -361,7 +361,7 @@ function irParaEndereco() {
   const parte = alvo.match(/^instagram-(metricas|reels|plano|carrossel)$/);
   if (parte) { igx.sub = parte[1]; irPara("instagram"); return; }
   const pp = alvo.match(/^portfolio-(videos|leads|feedbacks|visitas)$/);
-  if (pp) { pf.sub = pp[1]; irPara("portfolio"); return; }
+  if (pp) { pf.sub = pp[1] === "visitas" ? "leads" : pp[1]; irPara("portfolio"); return; }
   const m = alvo.match(/^campanha-(\d+)$/);
   if (!m) { irPara(DESENHOS[alvo] ? alvo : "inicio"); return; }
   irPara("financeiro");
@@ -418,7 +418,7 @@ const nomeNicho = (n) => (NICHOS.find((x) => x[0] === n) || [n, n || "Sem nicho"
 // Filtro da lista "Meus vídeos": "" mostra todos, ou só um nicho para ordenar dentro dele
 const pf = { nicho: "", sub: "videos" };
 try { pf.sub = localStorage.getItem("pf-aba") || "videos"; } catch (_) {}
-const SUBS_PORTFOLIO = [["videos", "Vídeos e curadoria"], ["leads", "Leads"], ["feedbacks", "Feedbacks e site"], ["visitas", "Visitas"]];
+const SUBS_PORTFOLIO = [["videos", "Vídeos e curadoria"], ["leads", "Leads e visitas"], ["feedbacks", "Feedbacks e site"]];
 
 function desenharPortfolio(el) {
   const hoje = hojeISO();
@@ -452,13 +452,13 @@ function desenharPortfolio(el) {
     ? `<p class="vazio">Aqui aparece de onde as pessoas chegam ao seu site: Instagram, Google, WhatsApp, link direto.</p>`
     : `<ul class="origens">${listaOrigens.map(([o, n]) => `<li><span>${esc(o)}</span><b>${n}</b><span class="trilho"><i style="width:${(n / total14) * 100}%"></i></span></li>`).join("")}</ul>`;
 
+  if (pf.sub === "visitas") pf.sub = "leads"; // Visitas agora fica junto com os Leads
   if (!SUBS_PORTFOLIO.some(([k]) => k === pf.sub)) pf.sub = "videos";
   const abas = ""; // as partes do Portfólio ficam no menu lateral
   const ligarAbas = () => $$("[data-pf-aba]", el).forEach((b) => b.onclick = () => { pf.sub = b.dataset.pfAba; try { localStorage.setItem("pf-aba", pf.sub); } catch (_) {} desenharPortfolio(el); });
-  if (pf.sub === "leads") { el.innerHTML = abas + quadroContatosSite(); ligarAbas(); ligarContatosSite(el); return; }
   if (pf.sub === "feedbacks") { el.innerHTML = abas + `<div id="conteudo-site"></div>`; ligarAbas(); desenharConteudoSite($("#conteudo-site")); return; }
-  if (pf.sub === "visitas") {
-    el.innerHTML = abas + `
+  if (pf.sub === "leads") {
+    el.innerHTML = abas + quadroContatosSite() + `
     <div class="faixa-kpi">
       <div class="kpi"><span>Visitas em 14 dias</span><strong>${num(total14)}</strong></div>
       <div class="kpi"><span>Visitas hoje</span><strong>${num(porDia[hoje])}</strong></div>
@@ -470,7 +470,7 @@ function desenharPortfolio(el) {
       <div class="cartao"><h2>Visitas nos últimos 14 dias</h2>${grafico}</div>
       <div class="cartao"><h2>Por onde chegaram</h2>${listaOrig}</div>
     </div>`;
-    ligarAbas(); return;
+    ligarAbas(); ligarContatosSite(el); return;
   }
   // Vídeos e curadoria: a lista com plays e retenção de cada vídeo (dados do site, tabela video_views)
   const st = typeof statsVideosPortfolio === "function" ? statsVideosPortfolio(() => { if (abaAtual === "portfolio" && pf.sub === "videos") desenharPortfolio(el); }) : null;
@@ -3754,7 +3754,7 @@ function desenharInicio(el) {
         <strong>${qtd(emProducao.length, "campanha", "campanhas")}</strong>
         <small>${entregasSemana.length ? `${qtd(entregasSemana.length, "entrega", "entregas")} nos próximos 7 dias` : "nenhuma entrega na semana"}</small>
       </button>
-      <button type="button" class="kpi-inicio" data-ir="portfolio" data-pf-sub="visitas">
+      <button type="button" class="kpi-inicio" data-ir="portfolio" data-pf-sub="leads">
         <span>Visitas no site</span>
         <strong>${plural(visitasHoje, "hoje", "hoje")}</strong>
         <small>${plural(visitas7, "visita", "visitas")} nos últimos 7 dias</small>
