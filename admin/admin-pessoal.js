@@ -272,6 +272,20 @@ function faturaPartes(cartaoId, k) {
   r.eu = r.parc + r.vista; r.total = r.eu + r.outros;
   return r;
 }
+// Sua parte da fatura (todos os cartões): parcelas + à vista. É isso que o teto mede.
+const suaFatura = (k) => P.cartoes.reduce((a, c) => { const f = faturaPartes(c.id, k); return { parc: a.parc + f.parc, vista: a.vista + f.vista, eu: a.eu + f.eu }; }, { parc: 0, vista: 0, eu: 0 });
+// A fatura que está aberta agora (a próxima a fechar)
+const faturaAberta = () => (P.cartoes[0] ? mesFaturaDaCompra(P.cartoes[0], hojeISO()) : somaMes(mesHojePF(), 1));
+function barraTeto(k, teto) {
+  const f = suaFatura(k), p = teto ? Math.min(100, (f.eu / teto) * 100) : 0, pp = teto ? Math.min(100, (f.parc / teto) * 100) : 0;
+  const passou = f.eu > teto;
+  return `<div class="pf-teto-fat ${passou ? "estourou" : f.eu > teto * 0.8 ? "perto" : ""}">
+    <div class="pf-teto-fat-txt"><b>Teto da fatura de ${MESES_LONGOS[Number(k.slice(5)) - 1].toLowerCase()}</b>
+      <span>${real(f.eu)} de ${real(teto)} · ${passou ? `<strong>passou ${real(f.eu - teto)}</strong>` : `<strong>ainda dá ${real(teto - f.eu)}</strong> no cartão`}</span></div>
+    <div class="pf-teto-fat-trilho"><i class="pf-parc" style="width:${pp}%"></i><i class="pf-vista" style="width:${Math.max(0, p - pp)}%"></i></div>
+    <small>${real(f.parc)} já são parcelas (não dá pra mudar)${f.vista ? ` + ${real(f.vista)} de compras à vista` : ""}. O teto é a sua parte, somando os ${P.cartoes.length} cartões.</small>
+  </div>`;
+}
 function cartaoProximasFaturas() {
   if (!P.cartoes.length) return "";
   const hoje = mesHojePF();
@@ -285,7 +299,8 @@ function cartaoProximasFaturas() {
   const maxL = Math.max(1, ...linhas.map((l) => l.total));
   // Escada: suas parcelas mês a mês (de todos os cartões)
   const escada = Array.from({ length: 12 }, (_, i) => { const m = somaMes(hoje, i); return { m, v: P.cartoes.reduce((s, c) => s + faturaPartes(c.id, m).parc, 0) }; });
-  const maxE = Math.max(1, ...escada.map((e) => e.v));
+  const tetoE = n2(cfg("teto_mes"));
+  const maxE = Math.max(1, tetoE, ...escada.map((e) => e.v));
   const seg = (cls, v, max) => (v > 0 ? `<i class="${cls}" style="width:${(v / max) * 100}%"></i>` : "");
   return `<div class="cartao pf-faturas">
     <div class="barra" style="margin-bottom:8px"><h2 style="margin:0">Próximas faturas</h2><span class="espaco"></span>
@@ -296,15 +311,16 @@ function cartaoProximasFaturas() {
       <div><span>De outras pessoas</span><strong>${real(soma.outros)}</strong><small>elas te devolvem</small></div>
       <div class="pf-fat-total"><span>Já está na fatura</span><strong>${real(soma.total)}</strong><small>somando os ${P.cartoes.length} cartões</small></div>
     </div>
+    ${n2(cfg("teto_mes")) ? barraTeto(k, n2(cfg("teto_mes"))) : ""}
     <div class="pf-fat-linhas">${linhas.map((l) => `<div class="pf-fat-linha" data-dica="<b>${esc(l.c.nome)}, ${nomeMes(k)}</b><br>Suas parcelas: ${real(l.parc)}${l.vista ? `<br>Seus gastos à vista: ${real(l.vista)}` : ""}<br>De outras pessoas: ${real(l.outros)}<br><b>Total: ${real(l.total)}</b>">
         <b>${esc(l.c.nome)}</b><small>${l.c.vence_dia ? `vence dia ${l.c.vence_dia}` : ""}</small>
         <div class="pf-fat-trilho">${seg("pf-parc", l.parc, maxL)}${seg("pf-vista", l.vista, maxL)}${seg("pf-outros", l.outros, maxL)}</div>
         <span class="pf-fat-valores"><strong>${real(l.eu)}</strong> seu${l.outros ? ` + ${real(l.outros)} dos outros` : ""}</span>
       </div>`).join("")}</div>
     <div class="legenda"><span><i class="pf-parc"></i>Suas parcelas</span><span><i class="pf-vista"></i>Seus gastos à vista</span><span><i class="pf-outros"></i>De outras pessoas</span></div>
-    <h3 class="pf-escada-tit">Suas parcelas descendo, mês a mês</h3>
-    <div class="pf-escada">${escada.map((e) => `<button type="button" class="pf-degrau ${e.m === k ? "foco" : ""}" data-mes-fat="${e.m}" data-dica="<b>${nomeMes(e.m)}</b><br>Suas parcelas: ${real(e.v)}">
-      <b class="valor-barra">${privado ? "" : Math.round(e.v).toLocaleString("pt-BR")}</b><i style="height:${(e.v / maxE) * 100}%"></i><span>${nomeMes(e.m, true)}</span></button>`).join("")}</div>
+    <h3 class="pf-escada-tit">Suas parcelas descendo, mês a mês${tetoE ? ` <span class="sub">o espaço entre a barra e a linha do teto (${real(tetoE)}) é o que sobra pra gastar no cartão</span>` : ""}</h3>
+    <div class="pf-escada">${escada.map((e) => `<button type="button" class="pf-degrau ${e.m === k ? "foco" : ""}" data-mes-fat="${e.m}" data-dica="<b>${nomeMes(e.m)}</b><br>Suas parcelas: ${real(e.v)}${tetoE ? `<br>Sobra pra gastar no cartão: ${real(Math.max(0, tetoE - e.v))}` : ""}">
+      <b class="valor-barra">${privado ? "" : Math.round(e.v).toLocaleString("pt-BR")}</b><span class="pf-degrau-area"><i style="height:${(e.v / maxE) * 100}%"></i>${tetoE ? `<em style="bottom:${(tetoE / maxE) * 100}%"></em>` : ""}</span><span>${nomeMes(e.m, true)}</span></button>`).join("")}</div>
   </div>`;
 }
 function ligarProximasFaturas(el) {
@@ -482,9 +498,8 @@ function pfGastos(el) {
       <div><span>Seus gastos à vista</span><strong>${real(vista)}</strong><small>comprados em ${MESES_LONGOS[Number(k.slice(5)) - 1].toLowerCase()}</small></div>
       <div><span>Compras parceladas novas</span><strong>${real(novasParc)}</strong><small>valor total, você paga aos poucos</small></div>
       <div><span>De outras pessoas</span><strong>${real(dosOutros)}</strong><small>no seu cartão</small></div>
-      ${teto ? `<div class="pf-fat-total"><span>Teto do mês</span><strong>${real(Math.max(0, teto - vista))}</strong><small>${vista > teto ? `passou ${real(vista - teto)} do teto` : `ainda dá pra gastar, de ${real(teto)}`}</small></div>` : ""}
     </div>
-    ${teto ? `<div class="pf-teto"><i style="width:${Math.min(100, (vista / teto) * 100)}%" class="${vista > teto ? "estourou" : vista > teto * 0.8 ? "perto" : ""}"></i></div>` : ""}
+    ${teto ? barraTeto(faturaAberta(), teto) : ""}
     <div class="grade-fin pf-gastos-grade">
       <div class="cartao">
         <div class="barra" style="margin-bottom:6px"><h2 style="margin:0">Onde foi o seu dinheiro <span class="sub">(à vista)</span></h2><span class="espaco"></span><button class="btn" type="button" id="g-metas">${ic("editar")}Metas</button></div>
@@ -762,7 +777,7 @@ function formAjustesPF() {
       { n: "salario", r: "Salário fixo que você se paga (R$/mês)", t: "number", ajuda: "Vazio = usa a média do que entrou na conta." },
       { n: "reserva", r: "Quanto você tem guardado hoje (R$)", t: "number" },
       { n: "reserva_meses", r: "Meta da reserva (meses de custo)", t: "number", ajuda: "3 é um bom começo; 6 é o ideal pra renda que varia." },
-      { n: "teto_mes", r: "Teto de gastos à vista por mês (R$)", t: "number", ajuda: "Aparece como uma barra em Gastos do mês. Vazio = sem teto." },
+      { n: "teto_mes", r: "Teto da sua parte da fatura por mês (R$)", t: "number", ajuda: "Tudo no cartão: parcelas + compras à vista, somando todos os cartões. Vazio = sem teto." },
       { n: "dia_a_dia", r: "Gasto do dia a dia por mês, para a projeção (R$)", t: "number", ajuda: "Vazio = calcula pela média das faturas importadas." }
     ],
     valores: { salario: cfg("salario", ""), reserva: cfg("reserva", ""), reserva_meses: cfg("reserva_meses", 3), teto_mes: cfg("teto_mes", ""), dia_a_dia: cfg("dia_a_dia", "") },
