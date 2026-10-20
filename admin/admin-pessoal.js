@@ -1280,4 +1280,55 @@ async function abrirTelegram() {
   }
 })();
 
+/* =============================================================
+   RANKING DOS VÍDEOS DO PORTFÓLIO (no Dashboard)
+   Lê a tabela video_views (o site grava cada vez que alguém assiste
+   um vídeo com som) e mostra do mais assistido ao menos assistido.
+   ============================================================= */
+const rankV = { dias: 30, linhas: null, desde: "" };
+try { rankV.dias = Number(localStorage.getItem("rank-dias")) || 30; } catch (_) {}
+const fmtTempo = (s) => (s >= 60 ? `${Math.floor(s / 60)}min${String(Math.round(s % 60)).padStart(2, "0")}` : `${Math.round(s)}s`);
+async function pintarRankingVideos(caixa) {
+  if (!caixa) return;
+  const desde = new Date(Date.now() - rankV.dias * 864e5).toISOString();
+  if (rankV.linhas === null || rankV.desde.slice(0, 13) !== desde.slice(0, 13) || rankV.diasLidos !== rankV.dias) {
+    caixa.innerHTML = `<div class="cartao"><h2>Vídeos mais assistidos no portfólio</h2><p class="vazio">Carregando...</p></div>`;
+    const { data, error } = await db.from("video_views").select("video_id,titulo,secao,segundos,duracao,origem,criado_em").gte("criado_em", desde).limit(10000);
+    if (error) { caixa.innerHTML = `<div class="cartao"><h2>Vídeos mais assistidos no portfólio</h2><p class="aviso-falta">${/does not exist|schema cache/i.test(error.message) ? "Falta criar a tabela video_views no banco (banco.sql, parte 34)." : esc(error.message)}</p></div>`; return; }
+    rankV.linhas = data || []; rankV.desde = desde; rankV.diasLidos = rankV.dias;
+  }
+  if (!caixa.isConnected) return;
+  const grupos = new Map();
+  rankV.linhas.forEach((l) => {
+    const k = l.video_id ? "v" + l.video_id : "t" + (l.titulo || "?");
+    if (!grupos.has(k)) grupos.set(k, { id: l.video_id, titulo: l.titulo, secao: l.secao, plays: 0, seg: 0, dur: 0, completos: 0 });
+    const g = grupos.get(k);
+    g.plays++; g.seg += n2(l.segundos);
+    if (l.duracao) { g.dur = Math.max(g.dur, n2(l.duracao)); if (n2(l.segundos) >= n2(l.duracao) * 0.9) g.completos++; }
+  });
+  const lista = [...grupos.values()].map((g) => {
+    const v = g.id ? S.videos.find((x) => String(x.id) === String(g.id)) : null;
+    return { ...g, v, nome: v ? v.titulo : g.titulo, marca: v ? v.marca : g.secao === "resultados" ? g.titulo : "", media: g.seg / g.plays };
+  }).sort((a, b) => b.plays - a.plays || b.seg - a.seg);
+  const maxP = Math.max(1, ...lista.map((x) => x.plays));
+  const origens = {};
+  rankV.linhas.forEach((l) => { origens[l.origem || "Direto"] = (origens[l.origem || "Direto"] || 0) + 1; });
+  const topOrigens = Object.entries(origens).sort((a, b) => b[1] - a[1]).slice(0, 4);
+  const semPlay = S.videos.filter((v) => v.visivel !== false && !lista.some((x) => String(x.id) === String(v.id)));
+  caixa.innerHTML = `<div class="cartao rank-videos">
+    <div class="barra" style="margin-bottom:6px"><h2 style="margin:0">Vídeos mais assistidos no portfólio</h2><span class="espaco"></span>
+      <div class="chips" role="tablist" aria-label="Período">${[[7, "7 dias"], [30, "30 dias"], [90, "90 dias"]].map(([d, n]) => `<button class="chip" type="button" data-rank-dias="${d}" aria-pressed="${rankV.dias === d}">${n}</button>`).join("")}</div></div>
+    <p class="sub" style="margin:0 0 10px">Conta cada vez que alguém deu play com som. Os vídeos que você assiste neste navegador não entram.${topOrigens.length ? ` Vieram de: ${topOrigens.map(([o, n]) => `${esc(o)} (${n})`).join(", ")}.` : ""}</p>
+    ${lista.length ? `<ol class="rank-lista">${lista.map((x, i) => `<li>
+      <b class="rank-pos">${i + 1}</b>
+      ${x.v && x.v.capa ? `<img src="${esc(x.v.capa)}" alt="" loading="lazy">` : `<span class="rank-sem-capa">${ic("play")}</span>`}
+      <span class="rank-txt"><strong>${esc(x.nome || "Vídeo")}</strong><small>${esc(x.marca || "")}${x.secao === "resultados" ? " · carrossel de resultados" : ""}</small>
+        <i class="rank-trilho"><i style="width:${(x.plays / maxP) * 100}%"></i></i></span>
+      <span class="rank-num"><strong>${x.plays} ${x.plays === 1 ? "play" : "plays"}</strong><small>assistem em média ${fmtTempo(x.media)}${x.dur ? ` de ${fmtTempo(x.dur)} (${Math.min(100, Math.round((x.media / x.dur) * 100))}%)` : ""}${x.completos ? ` · ${x.completos} até o fim` : ""}</small></span>
+    </li>`).join("")}</ol>` : `<p class="vazio">Ninguém assistiu vídeos com som nos últimos ${rankV.dias} dias ainda. O registro começou agora: os números aparecem conforme as marcas visitarem o portfólio.</p>`}
+    ${semPlay.length && lista.length ? `<details class="rank-sem"><summary>${semPlay.length} vídeos sem nenhum play no período</summary><p>${semPlay.map((v) => esc(v.titulo + (v.marca ? ` (${v.marca})` : ""))).join(" · ")}</p></details>` : ""}
+  </div>`;
+  $$("[data-rank-dias]", caixa).forEach((b) => b.onclick = () => { rankV.dias = Number(b.dataset.rankDias); try { localStorage.setItem("rank-dias", String(rankV.dias)); } catch (_) {} pintarRankingVideos(caixa); });
+}
+
 window.__adminPessoal = true;

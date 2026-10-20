@@ -353,6 +353,8 @@ function fecharMenu() {
 
 async function iniciar(sessao) {
   $("#email-logado").textContent = sessao.user.email;
+  // Este navegador é o seu: o site não conta os vídeos que você mesmo assiste no ranking
+  try { localStorage.setItem("painel-ryan", "1"); } catch (_) {}
   $$(".menu-item").forEach((b) => b.addEventListener("click", () => irPara(b.dataset.aba)));
   $("#sair").addEventListener("click", async () => { await db.auth.signOut(); location.replace("../login/"); });
   $("#abrir-menu").addEventListener("click", () => {
@@ -3499,7 +3501,8 @@ function pintarLembretes() {
   // Abrir a aba conta como "vi": as propostas e o destaque do Instagram saem da bolinha
   if (abaAtual === "propostas" && gm.emails && !gm.aberto) marcarVisto("propostas-vistas", ...propostasVisiveis().map((x) => x.id));
   if (abaAtual === "instagram" && ig.dados) { const d = postEmDestaque(); if (d) marcarVisto("ig-vistos", d.post.id); }
-  const L = calcularLembretes();
+  // "Lido": some do sino por 7 dias. Se o lembrete mudar (outro valor, outra data), ele volta na hora
+  const L = calcularLembretes().filter((x) => !adiado(chaveLido(x)));
   lembretesAtuais = L;
   pintarBolinhasMenu(L);
   // Número no ícone do app no iPhone
@@ -3509,16 +3512,19 @@ function pintarLembretes() {
   $("#abrir-lembretes").setAttribute("aria-label", L.length ? plural(L.length, "lembrete", "lembretes") : "Nenhum lembrete");
   const proximos = S.rapidos.filter((r) => !r.feito && Date.parse(r.quando) > Date.now());
   caixa.innerHTML = `<header><div><b>Lembretes</b><span class="sub">${L.length ? plural(L.length, "coisa precisa", "coisas precisam") + " de você" : "tudo em dia"}</span></div>
-      <button type="button" class="btn pequeno primario" data-novo-rapido>${ic("mais")}Lembrete</button></header>
+      <span class="lembretes-topo-acoes">${L.length ? `<button type="button" class="btn pequeno" data-ler-todos>${ic("check")}Marcar tudo como lido</button>` : ""}<button type="button" class="btn pequeno primario" data-novo-rapido>${ic("mais")}Lembrete</button></span></header>
     ${L.length ? `<ul>${L.map((x, i) => `<li class="lembrete ${x.nivel}">
       <span class="insight-ic">${ic(x.ic)}</span>
       <p>${x.texto}</p>
-      <div class="lembrete-acoes">${x.acoes.map(([r, p], j) => `<button type="button" class="btn pequeno ${p ? "primario" : ""}" data-lembrete="${i}" data-acao="${j}">${esc(r)}</button>`).join("")}</div>
+      <div class="lembrete-acoes">${x.acoes.map(([r, p], j) => `<button type="button" class="btn pequeno ${p ? "primario" : ""}" data-lembrete="${i}" data-acao="${j}">${esc(r)}</button>`).join("")}<button type="button" class="btn pequeno lembrete-lido" data-lido="${i}" title="Some do sino por 7 dias">${ic("check")}Lido</button></div>
     </li>`).join("")}</ul>` : `<p class="vazio">Nenhum lembrete agora. Tudo em dia!</p>`}
     ${proximos.length ? `<div class="proximos-rapidos"><span class="sub">Vou te lembrar</span>${proximos.slice(0, 8).map((r) => `<button type="button" class="item-dia" data-rapido-id="${esc(r.id)}">
       <span class="etq">${esc(quandoTexto(r.quando))}</span><span class="item-dia-texto"><b>${esc(r.texto)}</b></span></button>`).join("")}</div>` : ""}`;
   caixa.onclick = (e) => {
     if (e.target.closest("[data-novo-rapido]")) { fecharLembretes(); formLembreteRapido(); return; }
+    if (e.target.closest("[data-ler-todos]")) { marcarLidos(lembretesAtuais); return; }
+    const li = e.target.closest("[data-lido]");
+    if (li) { marcarLidos([lembretesAtuais[Number(li.dataset.lido)]]); return; }
     const ed = e.target.closest("[data-rapido-id]");
     if (ed) { fecharLembretes(); formLembreteRapido(S.rapidos.find((r) => String(r.id) === ed.dataset.rapidoId)); return; }
     const b = e.target.closest("[data-lembrete]");
@@ -3527,6 +3533,22 @@ function pintarLembretes() {
     fecharLembretes();
     if (l) l.acoes[Number(b.dataset.acao)][2]();
   };
+}
+
+// Chave do "lido": o texto do lembrete sem HTML (mudou o texto, é outro lembrete)
+function chaveLido(x) {
+  const t = String(x.texto || "").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+  let h = 0; for (let i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) | 0;
+  return "lido-" + (h >>> 0).toString(36);
+}
+async function marcarLidos(lista) {
+  const linhas = lista.filter(Boolean).map((x) => ({ chave: chaveLido(x), ate: somaDiasISO(7) }));
+  if (!linhas.length) return;
+  const { error } = await db.from("lembretes_adiados").upsert(linhas, { onConflict: "chave" });
+  if (error) { avisar(traduzErro(error), true); return; }
+  S.adiados = S.adiados.filter((a) => !linhas.some((l) => l.chave === a.chave)).concat(linhas);
+  avisar(linhas.length > 1 ? `${linhas.length} lembretes marcados como lidos.` : "Marcado como lido.");
+  pintarLembretes();
 }
 
 /* ---------- Notificações no celular (app na tela de início) ---------- */
@@ -3729,7 +3751,9 @@ function desenharInicio(el) {
             : `<p class="vazio">Ninguém entrou em contato pelo site nos últimos 30 dias.</p>`}
         </div>
       </div>
-    </div>`;
+    </div>
+    <div id="inicio-ranking"></div>`;
+  if (typeof pintarRankingVideos === "function") pintarRankingVideos($("#inicio-ranking", el));
 
   // Busca o Instagram em segundo plano (uma vez) para o quadro do Início
   if (ig.conectado === null && !ig.carregando) carregarInstagram();
