@@ -120,6 +120,17 @@ async function situacaoMes(k: string) {
   lista.forEach((c: any) => { const v = Number(c.valor_parcela) || 0; total += v; const t = categoriaDe(c); porCat[t] = (porCat[t] || 0) + v; });
   return { total, porCat };
 }
+// Sua parte da fatura do mês k, somando todos os cartões (parcelas + à vista). É o que o teto mede.
+async function suaFatura(k: string) {
+  const { data } = await db.from("pf_compras").select("valor_parcela,parcelas,primeiro_mes").is("dono", null).not("cartao_id", "is", null);
+  let parc = 0, vista = 0;
+  (data || []).forEach((x: any) => {
+    const i = (Number(k.slice(0, 4)) - Number(x.primeiro_mes.slice(0, 4))) * 12 + (Number(k.slice(5, 7)) - Number(x.primeiro_mes.slice(5, 7)));
+    if (i < 0 || i >= Number(x.parcelas) || Number(x.parcelas) >= 60) return;
+    if (Number(x.parcelas) > 1) parc += Number(x.valor_parcela); else vista += Number(x.valor_parcela);
+  });
+  return { parc, vista, eu: parc + vista };
+}
 const diasAteFim = (iso: string) => { const [a, m, d] = iso.split("-").map(Number); return new Date(a, m, 0).getDate() - d + 1; };
 // Linhas de aviso depois de um lançamento: teto do mês, faixas de 50/80/100% e metas das categorias mexidas
 async function avisosDoMes(novos: any[]) {
@@ -128,17 +139,20 @@ async function avisosDoMes(novos: any[]) {
   const hoje = hojeBR(), k = hoje.slice(0, 7);
   const { total, porCat } = await situacaoMes(k);
   const L: string[] = [];
-  const vistaNovos = novos.filter((e) => e.n === 1 && !e.dono && mesDe(e.data) === k).reduce((s, e) => s + e.valor, 0);
-  if (teto) {
-    const p = Math.round((total / teto) * 100), antes = total - vistaNovos;
-    const resta = teto - total, dias = diasAteFim(hoje);
-    L.push(`📊 ${capitalizar(nomeMes(k))}: ${real(total)} de ${real(teto)} (${p}%)`);
-    if (resta > 0) L.push(`Ainda dá ${real(resta)}, uns ${real(resta / dias)} por dia até o fim do mês.`);
+  // Teto = sua parte da fatura (todos os cartões). Vale para os gastos no cartão; Pix/débito fica de fora.
+  const noCartao = novos.filter((e) => e.cartao && !e.dono);
+  if (teto && noCartao.length) {
+    const kf = noCartao[0].k;
+    const f = await suaFatura(kf);
+    const novosNaFatura = noCartao.filter((e) => e.k === kf).reduce((s, e) => s + e.valor / e.n, 0);
+    const antes = f.eu - novosNaFatura, p = Math.round((f.eu / teto) * 100), resta = teto - f.eu;
+    L.push(`💳 Fatura de ${nomeMes(kf)} (sua parte, todos os cartões): ${real(f.eu)} de ${real(teto)} (${p}%)`);
+    L.push(resta > 0 ? `Ainda dá ${real(resta)} no cartão até essa fatura fechar.` : `Passou ${real(-resta)} do teto.`);
     const faixa = (x: number) => (x >= teto ? 100 : x >= teto * 0.8 ? 80 : x >= teto * 0.5 ? 50 : 0);
-    if (faixa(total) > faixa(antes)) {
-      if (faixa(total) === 100) L.push(`🚨 Estourou o teto em ${real(total - teto)}. Daqui até o fim do mês, só o essencial: mercado, remédio e transporte.`);
-      else if (faixa(total) === 80) L.push(`⚠️ Passou de 80% do teto. Segura o que dá pra adiar.`);
-      else L.push(`🟡 Metade do teto já foi.`);
+    if (faixa(f.eu) > faixa(antes)) {
+      if (faixa(f.eu) === 100) L.push(`🚨 Estourou o teto da fatura. Daqui até ela fechar, nada no cartão: só o essencial, e se der, no Pix.`);
+      else if (faixa(f.eu) === 80) L.push(`⚠️ Passou de 80% do teto da fatura. Segura o que dá pra adiar.`);
+      else L.push(`🟡 Metade do teto da fatura já foi.`);
     }
   }
   const cats = [...new Set(novos.filter((e) => e.n === 1 && !e.dono).map((e) => categoriaDe({ descricao: e.desc })))];
@@ -398,7 +412,7 @@ async function tratarMensagem(msg: any) {
     }).select("id").single();
     if (error) { await enviar(chat, "Não consegui salvar: " + error.message); return; }
     ids.push(novo.id);
-    novos.push({ ...e, data: dia });
+    novos.push({ ...e, data: dia, k, cartao });
     ultimoCartao = cartao;
     linhas.push(`${e.desc}: ${real(e.valor)}${e.n > 1 ? ` em ${e.n}x de ${real(e.valor / e.n)}` : " à vista"}\n${cartao ? `${cartao.nome}, fatura de ${nomeMes(k)}` : "Pix/débito"}${e.dono ? ` · de ${e.dono}` : ""}`);
   }
@@ -429,7 +443,7 @@ async function avisosDiarios() {
   const ja = (await lerCfg("telegram_avisos")) || {};
   if (ja.dia === hoje) return { pulado: "já avisou hoje" };
   const msgs: string[] = [];
-  const { data: cartoes } = await db.from("pf_cartoes").select("id,nome,vence_dia");
+  const { data: cartoes } = await db.from("pf_cartoes").select("id,nome,vence_dia,fecha_dia").order("ordem").order("id");
   const { data: compras } = await db.from("pf_compras").select("cartao_id,descricao,valor_parcela,parcelas,primeiro_mes,dono,origem,criado_em,data_compra,categoria");
   const parcelaNo = (x: any, k: string) => { const i = (Number(k.slice(0, 4)) - Number(x.primeiro_mes.slice(0, 4))) * 12 + (Number(k.slice(5, 7)) - Number(x.primeiro_mes.slice(5, 7))); return i >= 0 && i < Number(x.parcelas) ? Number(x.valor_parcela) : 0; };
   // 1. Fatura vencendo em 2 dias (com quanto cada pessoa precisa te mandar)
@@ -459,7 +473,9 @@ async function avisosDiarios() {
     const top = Object.entries(porCat).sort((x, y) => y[1] - x[1]).slice(0, 3);
     const prox = somaMes(k, 1);
     const parcProx = (compras || []).filter((x: any) => !x.dono).reduce((s: number, x: any) => s + (Number(x.parcelas) > 1 && Number(x.parcelas) < 60 ? parcelaNo(x, prox) : 0), 0);
-    msgs.push(`🗓️ Resumo da semana\n\nGastos à vista na semana: ${real(daSemana)}\nNo mês: ${real(total)}${teto ? ` de ${real(teto)} (${Math.round((total / teto) * 100)}%)${teto > total ? `, ainda dá ${real(teto - total)}` : `, passou ${real(total - teto)}`}` : ""}\n\nOnde mais foi:\n${top.map(([t, v]) => `${EMOJI[t] || "•"} ${t}: ${real(v)}${metas[t] ? ` (meta ${real(Number(metas[t]))})` : ""}`).join("\n") || "nada lançado ainda"}\n\nSuas parcelas na fatura de ${nomeMes(prox)}: ${real(parcProx)}`);
+    const kf = mesFatura((cartoes || [])[0], hoje);
+    const f = await suaFatura(kf);
+    msgs.push(`🗓️ Resumo da semana\n\nGastos à vista na semana: ${real(daSemana)}\n💳 Fatura de ${nomeMes(kf)} (sua parte): ${real(f.eu)}${teto ? ` de ${real(teto)} (${Math.round((f.eu / teto) * 100)}%)${teto > f.eu ? `, ainda dá ${real(teto - f.eu)}` : `, passou ${real(f.eu - teto)}`}` : ""}\n(${real(f.parc)} são parcelas)\n\nOnde mais foi:\n${top.map(([t, v]) => `${EMOJI[t] || "•"} ${t}: ${real(v)}${metas[t] ? ` (meta ${real(Number(metas[t]))})` : ""}`).join("\n") || "nada lançado ainda"}\n\nSuas parcelas na fatura de ${nomeMes(prox)}: ${real(parcProx)}`);
   }
   ja.dia = hoje;
   await gravarCfg("telegram_avisos", ja);
