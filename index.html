@@ -338,6 +338,11 @@
   .work-play svg { width: 26px; height: 26px; fill: currentColor; margin-left: 3px; }
   .work-v:hover .work-play { background: #fff; }
   .work-v.tocando .work-play { opacity: 0; transform: scale(.8); }
+  /* Carregando: o botão vira um anel girando, para ninguém tocar de novo achando que não foi */
+  .work-v.carregando .work-play { opacity: 1; transform: none; }
+  .work-v.carregando .work-play svg { display: none; }
+  .work-v.carregando .work-play::after { content: ""; width: 28px; height: 28px; border-radius: 50%; border: 3px solid rgba(43, 36, 28, .2); border-top-color: currentColor; animation: girar .8s linear infinite; }
+  @keyframes girar { to { transform: rotate(360deg); } }
   .work-v.tocando .work-pill, .work-v.tocando .work-info, .work-v.tocando::after { opacity: 0; transition: opacity .3s; }
 
   .work-som { position: absolute; top: 12px; right: 12px; z-index: 3; width: 36px; height: 36px; border-radius: 50%; border: 0; background: rgba(24, 19, 14, .55); color: #fff; display: grid; place-items: center; cursor: pointer; }
@@ -1304,7 +1309,7 @@ function desenharTrabalhos(lista) {
       const pilula = w.marca ? `<span class="work-pill">${esc(w.marca)}</span>` : "";
       const info = `<div class="work-info"><h4>${esc(w.titulo)}</h4></div>`;
       // Vídeo do painel: toca no próprio card, sem abrir nada
-      if (video) return `<article class="work work-v" data-titulo="${esc(titulo)}">
+      if (video) return `<article class="work work-v" data-titulo="${esc(titulo)}" data-id="${esc(w.id || "")}">
           <video src="${esc(w.link)}" ${w.capa ? `poster="${esc(w.capa)}"` : ""} playsinline preload="${w.capa ? "none" : "metadata"}" aria-label="Vídeo: ${esc(titulo)}"></video>
           ${pilula}
           <button class="work-play" type="button" aria-label="Assistir: ${esc(titulo)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></button>
@@ -1329,6 +1334,24 @@ function desenharTrabalhos(lista) {
   ligarVideosNoCard();
 }
 
+// Quanto de cada vídeo as pessoas assistem COM SOM (o ranking do painel). Guarda só o vídeo, os segundos
+// e de onde a pessoa veio. Quem abre o painel neste navegador não conta (é você testando).
+function medirVideo(v, info) {
+  let max = 0;
+  v.addEventListener("timeupdate", () => { if (!v.muted && v.currentTime > max) max = v.currentTime; });
+  const enviar = () => {
+    if (max < 1) return;
+    let euMesmo = false;
+    try { euMesmo = localStorage.getItem("painel-ryan") === "1"; } catch (_) {}
+    const seg = Math.round(max); max = 0;
+    if (euMesmo || !window.bancoInserir) return;
+    window.bancoInserir("video_views", { video_id: Number(info.id) || null, titulo: String(info.titulo || "").slice(0, 160), secao: info.secao, segundos: Math.min(3600, seg), duracao: v.duration && isFinite(v.duration) ? Math.min(3600, Math.round(v.duration)) : null, origem: String(window.__origemVisita || "Direto").slice(0, 200) }).catch(() => {});
+  };
+  v.addEventListener("pause", enviar);
+  v.addEventListener("ended", enviar);
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") enviar(); });
+}
+
 // O vídeo só toca quando você clica: toca ali mesmo, com som, e pausa no segundo clique.
 // Só um vídeo toca por vez.
 function ligarVideosNoCard() {
@@ -1337,13 +1360,30 @@ function ligarVideosNoCard() {
     const v = card.querySelector("video");
     if (!v) return;
     v.addEventListener("play", () => card.classList.add("tocando"));
-    v.addEventListener("pause", () => card.classList.remove("tocando"));
-    v.addEventListener("ended", () => { card.classList.remove("tocando"); v.currentTime = 0; });
+    v.addEventListener("pause", () => card.classList.remove("tocando", "carregando"));
+    v.addEventListener("ended", () => { card.classList.remove("tocando", "carregando"); v.currentTime = 0; });
+    v.addEventListener("waiting", () => { if (!v.paused) card.classList.add("carregando"); });
+    v.addEventListener("playing", () => card.classList.remove("carregando"));
+    medirVideo(v, { id: card.dataset.id, titulo: card.dataset.titulo, secao: "trabalhos" });
+    // Começa a baixar quando o dedo (ou o mouse) chega no card, antes do toque terminar
+    const preparar = () => { if (v.preload !== "auto") v.preload = "auto"; };
+    card.addEventListener("pointerenter", preparar, { passive: true });
+    card.addEventListener("touchstart", preparar, { passive: true });
     card.addEventListener("click", () => {
+      // Ainda carregando: o segundo toque não pausa (era isso que parecia "não rodar de primeira")
+      if (card.classList.contains("carregando")) return;
       if (v.paused) {
         todos().forEach((o) => { if (o !== v && !o.paused) o.pause(); });
         v.muted = false;
-        v.play().catch(() => {});
+        preparar();
+        card.classList.add("carregando");
+        setTimeout(() => card.classList.remove("carregando"), 12000);
+        v.play().catch((e) => {
+          // O celular às vezes recusa o primeiro play de um vídeo que não carregou: recarrega e tenta mais uma vez
+          if (e && e.name === "NotAllowedError") { card.classList.remove("carregando"); return; }
+          v.load();
+          v.play().catch(() => card.classList.remove("carregando"));
+        });
       } else v.pause();
     });
   });
@@ -1418,7 +1458,7 @@ async function carregarTrabalhos() {
     if (!window.bancoLer) throw new Error("sem banco");
     const espera = new Promise((_, falha) => setTimeout(() => falha(new Error("demorou")), 6000));
     const lista = await Promise.race([
-      window.bancoLer("videos", "select=titulo,link,capa,nicho,formato,marca,destaque,ordem&visivel=eq.true&order=ordem.asc,id.asc"),
+      window.bancoLer("videos", "select=id,titulo,link,capa,nicho,formato,marca,destaque,ordem&visivel=eq.true&order=ordem.asc,id.asc"),
       espera
     ]);
     desenharTrabalhos(lista);
@@ -1461,6 +1501,7 @@ $("#results").innerHTML = RESULTS.map((r) => `
     c.querySelector("button").tabIndex = d === 0 ? 0 : -1;
   });
   const vids = cards.map((c) => c.querySelector("video"));
+  vids.forEach((v, k) => medirVideo(v, { titulo: RESULTS[k] ? RESULTS[k].marca : "", secao: "resultados" }));
   let naTela = false;
   const tocar = () => vids.forEach((v, k) => { if (naTela && k === atual && !reduceMotion) v.play().catch(() => {}); else v.pause(); });
   if ("IntersectionObserver" in window) new IntersectionObserver((en) => { naTela = en[0].isIntersecting; tocar(); }, { threshold: .35 }).observe(caixa);
@@ -1812,6 +1853,7 @@ carregarTrabalhos();
     }
     if (!origem) origem = nomear(navigator.userAgent); // navegador interno do Instagram, TikTok...
   } catch (_) {}
+  window.__origemVisita = origem || "Direto";
   window.bancoInserir("visitas", { pagina: location.pathname.slice(0, 200), origem: (origem || "Direto").slice(0, 200) }).catch(() => {});
 })();
 

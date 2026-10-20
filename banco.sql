@@ -991,3 +991,32 @@ select cron.schedule('gastos-diario', '0 0 * * *', $$
     headers := '{"Content-Type": "application/json", "apikey": "sb_publishable_oZdhIWRB1gBabQH4xRJ2Xg__F8Lq0V0"}'::jsonb,
     body := '{"tipo": "diario"}'::jsonb)
 $$);
+
+
+-- -------------------------------------------------------------
+-- 34. QUAIS VÍDEOS DO PORTFÓLIO AS MARCAS ASSISTEM
+-- Uma linha cada vez que alguém assiste um vídeo do site com som:
+-- qual vídeo, quantos segundos e de onde a pessoa veio (Instagram,
+-- Google, direto...). Nada que identifique quem assistiu.
+-- O site só consegue CRIAR linhas, com a hora de agora; só o seu
+-- login lê (é o ranking do Dashboard).
+-- -------------------------------------------------------------
+create table if not exists public.video_views (
+  id         bigint generated always as identity primary key,
+  criado_em  timestamptz not null default now(),
+  video_id   bigint,
+  titulo     text check (char_length(titulo) <= 160),
+  secao      text check (char_length(secao) <= 20),
+  segundos   integer not null default 0 check (segundos between 0 and 3600),
+  duracao    integer check (duracao between 0 and 3600),
+  origem     text check (char_length(origem) <= 200)
+);
+create index if not exists video_views_data on public.video_views (criado_em);
+alter table public.video_views enable row level security;
+drop policy if exists "dono faz tudo" on public.video_views;
+create policy "dono faz tudo" on public.video_views
+  for all to authenticated using (public.eh_admin()) with check (public.eh_admin());
+drop policy if exists "site registra video" on public.video_views;
+create policy "site registra video" on public.video_views
+  for insert to anon
+  with check (criado_em between now() - interval '5 minutes' and now() + interval '5 minutes');
