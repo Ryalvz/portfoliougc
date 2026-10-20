@@ -128,18 +128,23 @@ async function conferir(chave: string, cfg: any) {
     }))
     .filter((x) => !vistos.has(x.url) && vistos.add(x.url))
     .filter((x) => ehPortugues(x.legenda));
-  // Primeiro os das últimas 2 semanas (mais views antes); se faltar, completa com os mais antigos
-  const limiteData = Date.now() - 14 * 864e5;
-  const recentes = reels.filter((x) => x.postado_em && Date.parse(x.postado_em) >= limiteData).sort((a, b) => b.views - a.views);
-  const antigos = reels.filter((x) => !(x.postado_em && Date.parse(x.postado_em) >= limiteData)).sort((a, b) => b.views - a.views);
-  const top = [...recentes, ...antigos].slice(0, QUANTOS);
+  // Só o que é novo de verdade: nada que já apareceu nas últimas 4 semanas e nada com mais de 45 dias.
+  // (Antes completava com os "top de sempre" da hashtag, que nunca mudam, e a lista se repetia toda semana.)
   const semana = segundaDaSemana();
+  const desde = new Date(Date.parse(semana) - 28 * 864e5).toISOString().slice(0, 10);
+  const { data: jaVistos } = await db.from("ig_reels").select("url").neq("semana", semana).gte("semana", desde);
+  const repetidos = new Set((jaVistos || []).map((x: any) => x.url));
+  const idade = (x: any) => (x.postado_em ? (Date.now() - Date.parse(x.postado_em)) / 864e5 : 999);
+  const novos = reels.filter((x) => !repetidos.has(x.url));
+  const recentes = novos.filter((x) => idade(x) <= 21).sort((a, b) => b.views - a.views);
+  const doMes = novos.filter((x) => idade(x) > 21 && idade(x) <= 45).sort((a, b) => b.views - a.views);
+  const top = [...recentes, ...doMes].slice(0, QUANTOS);
   if (top.length) {
     await db.from("ig_reels").delete().eq("semana", semana);
     await db.from("ig_reels").insert(top.map((x) => ({ ...x, semana })));
     await guardarCapas(semana);
   }
-  await db.from("ig_pesquisa").update({ run_id: null, coletado_em: new Date().toISOString(), erro: top.length ? null : "O Apify não achou reels nessas hashtags. Troque as hashtags e tente de novo.", avisado: !top.length }).eq("id", 1);
+  await db.from("ig_pesquisa").update({ run_id: null, coletado_em: new Date().toISOString(), erro: top.length ? null : "Não veio nenhum reel novo (dos últimos 45 dias) nessas hashtags. Troque ou acrescente hashtags mais movimentadas e busque de novo.", avisado: !top.length }).eq("id", 1);
   // Avisa no celular (o ajudante de lembretes manda a notificação)
   if (top.length) {
     await fetch(`${URL_BANCO}/functions/v1/lembretes`, {
