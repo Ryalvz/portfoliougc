@@ -24,12 +24,8 @@ function segundaISO(base) {
 
 function desenharInstagram(el) {
   if (!SUBS_IG.some(([k]) => k === igx.sub)) igx.sub = "metricas";
-  el.innerHTML = `<div class="chips ig-subs" role="tablist" aria-label="Partes do Instagram">${SUBS_IG.map(([k, n]) => `<button class="chip" type="button" role="tab" data-ig-sub="${k}" aria-pressed="${igx.sub === k}">${n}</button>`).join("")}</div><div id="ig-corpo"></div>`;
-  $$("[data-ig-sub]", el).forEach((b) => b.onclick = () => {
-    igx.sub = b.dataset.igSub;
-    try { localStorage.setItem("ig-sub", igx.sub); } catch (_) {}
-    desenhar();
-  });
+  // As partes do Instagram ficam no menu lateral (Métricas, Reels da semana, Plano da semana, Carrossel)
+  el.innerHTML = `<div id="ig-corpo"></div>`;
   const corpo = $("#ig-corpo", el);
   if (igx.sub !== "reels" && igx.timer) { clearTimeout(igx.timer); igx.timer = null; }
   if (igx.sub === "reels") return desenharReelsSemana(corpo);

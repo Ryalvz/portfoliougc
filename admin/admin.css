@@ -1327,3 +1327,4 @@ dialog.pf-janela-rapida { width: min(460px, calc(100vw - 20px)); }
 .ret-mini i { display: block; height: 100%; background: #C9A464; }
 .ret-mini.boa i { background: var(--green); }
 .ret-mini.baixa i { background: var(--red); }
+.t-outro { background: #E8EEF6; color: #2D4A6E; }

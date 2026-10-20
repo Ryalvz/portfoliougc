@@ -312,19 +312,41 @@ function irPara(aba) {
   if (!DESENHOS[aba]) aba = "inicio";
   if (aba !== "portfolio" && typeof contatosNovosNaTela !== "undefined") contatosNovosNaTela.clear();
   abaAtual = aba;
-  $$(".menu-item").forEach((b) => { if (b.dataset.aba === aba) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
   $$("main > section").forEach((s) => { s.hidden = s.id !== "aba-" + aba; });
-  const titulo = $("#aba-" + aba).dataset.titulo;
-  $("#titulo").textContent = titulo;
-  $("#titulo-mobile").textContent = titulo;
-  document.title = titulo + " | Admin Ryan Alves";
-  if (location.hash !== "#" + aba) history.replaceState(null, "", "#" + aba);
   fecharMenu();
   desenhar();
 }
 
+// Portfólio e Instagram têm partes, cada uma é um item do menu lateral
+function subDaAba(aba) {
+  if (aba === "instagram" && typeof igx !== "undefined") return igx.sub;
+  if (aba === "portfolio") return pf.sub;
+  return "";
+}
+function irParaSub(aba, sub) {
+  if (aba === "instagram" && typeof igx !== "undefined") { igx.sub = sub; try { localStorage.setItem("ig-sub", sub); } catch (_) {} }
+  if (aba === "portfolio") { pf.sub = sub; try { localStorage.setItem("pf-aba", sub); } catch (_) {} }
+  irPara(aba);
+}
+// Marca o item do menu, o título e o endereço (#instagram-plano, #portfolio-leads...)
+function marcarMenu() {
+  const sub = subDaAba(abaAtual);
+  let ativo = null;
+  $$(".menu-item").forEach((b) => {
+    const eh = b.dataset.aba === abaAtual && (!b.dataset.sub || b.dataset.sub === sub);
+    if (eh) { b.setAttribute("aria-current", "page"); ativo = b; } else b.removeAttribute("aria-current");
+  });
+  const titulo = ativo && ativo.dataset.sub ? ativo.textContent.replace(/\d+$/, "").trim() : $("#aba-" + abaAtual).dataset.titulo;
+  $("#titulo").textContent = titulo;
+  $("#titulo-mobile").textContent = titulo;
+  document.title = titulo + " | Admin Ryan Alves";
+  const hash = "#" + abaAtual + (ativo && ativo.dataset.sub ? "-" + sub : "");
+  if (location.hash !== hash) history.replaceState(null, "", hash);
+}
+
 function desenhar() {
   const el = $("#aba-" + abaAtual);
+  try { marcarMenu(); } catch (e) { console.error(e); }
   try { pintarLembretes(); } catch (e) { console.error(e); }
   try { DESENHOS[abaAtual](el); }
   catch (e) {
@@ -338,6 +360,8 @@ function irParaEndereco() {
   const alvo = (location.hash || "").slice(1) || "inicio";
   const parte = alvo.match(/^instagram-(metricas|reels|plano|carrossel)$/);
   if (parte) { igx.sub = parte[1]; irPara("instagram"); return; }
+  const pp = alvo.match(/^portfolio-(videos|leads|feedbacks|visitas)$/);
+  if (pp) { pf.sub = pp[1]; irPara("portfolio"); return; }
   const m = alvo.match(/^campanha-(\d+)$/);
   if (!m) { irPara(DESENHOS[alvo] ? alvo : "inicio"); return; }
   irPara("financeiro");
@@ -355,7 +379,7 @@ async function iniciar(sessao) {
   $("#email-logado").textContent = sessao.user.email;
   // Este navegador é o seu: o site não conta os vídeos que você mesmo assiste no ranking
   try { localStorage.setItem("painel-ryan", "1"); } catch (_) {}
-  $$(".menu-item").forEach((b) => b.addEventListener("click", () => irPara(b.dataset.aba)));
+  $$(".menu-item").forEach((b) => b.addEventListener("click", () => (b.dataset.sub ? irParaSub(b.dataset.aba, b.dataset.sub) : irPara(b.dataset.aba))));
   $("#sair").addEventListener("click", async () => { await db.auth.signOut(); location.replace("../login/"); });
   $("#abrir-menu").addEventListener("click", () => {
     const aberto = $("#menu").classList.toggle("aberto");
@@ -382,7 +406,7 @@ async function iniciar(sessao) {
     if (S.contatos_site.length !== antes) { if (abaAtual === "portfolio" || abaAtual === "inicio") desenhar(); else pintarLembretes(); }
   }, 120000);
   // Tocar numa notificação com o painel já aberto troca de aba
-  window.addEventListener("hashchange", () => { const aba = (location.hash || "").slice(1); if (aba && aba !== abaAtual) irParaEndereco(); });
+  window.addEventListener("hashchange", () => { const alvo = (location.hash || "").slice(1); if (alvo && alvo !== abaAtual + (subDaAba(abaAtual) ? "-" + subDaAba(abaAtual) : "")) irParaEndereco(); });
   sincronizarGmail();
 }
 
@@ -429,8 +453,7 @@ function desenharPortfolio(el) {
     : `<ul class="origens">${listaOrigens.map(([o, n]) => `<li><span>${esc(o)}</span><b>${n}</b><span class="trilho"><i style="width:${(n / total14) * 100}%"></i></span></li>`).join("")}</ul>`;
 
   if (!SUBS_PORTFOLIO.some(([k]) => k === pf.sub)) pf.sub = "videos";
-  const novosLeads = (S.contatos_site || []).filter((c) => !c.visto).length;
-  const abas = `<div class="subabas" role="tablist">${SUBS_PORTFOLIO.map(([k, n]) => `<button class="subaba" type="button" role="tab" data-pf-aba="${k}" aria-selected="${pf.sub === k}">${n}${k === "leads" && novosLeads ? ` <span class="pilula p-pendente">${novosLeads}</span>` : ""}</button>`).join("")}</div>`;
+  const abas = ""; // as partes do Portfólio ficam no menu lateral
   const ligarAbas = () => $$("[data-pf-aba]", el).forEach((b) => b.onclick = () => { pf.sub = b.dataset.pfAba; try { localStorage.setItem("pf-aba", pf.sub); } catch (_) {} desenharPortfolio(el); });
   if (pf.sub === "leads") { el.innerHTML = abas + quadroContatosSite(); ligarAbas(); ligarContatosSite(el); return; }
   if (pf.sub === "feedbacks") { el.innerHTML = abas + `<div id="conteudo-site"></div>`; ligarAbas(); desenharConteudoSite($("#conteudo-site")); return; }
@@ -1053,7 +1076,7 @@ function formMarca(m, extra = {}) {
 /* =============================================================
    ABA 3: CALENDÁRIO
    ============================================================= */
-const TIPOS_CAL = [["gravar", "Gravar"], ["editar", "Editar"], ["postar", "Postar"], ["reuniao", "Reunião"], ["compromisso", "Compromisso"]];
+const TIPOS_CAL = [["gravar", "Gravar"], ["editar", "Editar"], ["postar", "Postar"], ["reuniao", "Reunião"], ["compromisso", "Compromisso"], ["outro", "Outros"]];
 // "16:00:00" vira "16h", "16:30:00" vira "16h30"
 const horaCurta = (h) => { if (!h) return ""; const [hh, mm] = String(h).split(":"); return `${Number(hh)}h${mm && mm !== "00" ? mm : ""}`; };
 const cal = { mes: new Date(new Date().getFullYear(), new Date().getMonth(), 1), filtro: "todos" };
@@ -3325,9 +3348,9 @@ function calcularLembretes() {
   const L = [];
   // Contato novo pelo site (formulário ou mídia kit) vem primeiro
   const novosSite = S.contatos_site.filter((c) => !c.visto);
-  if (novosSite.length) L.push({ aba: "portfolio", ic: "email", nivel: "alerta",
+  if (novosSite.length) L.push({ aba: "portfolio", sub: "leads", ic: "email", nivel: "alerta",
     texto: `${novosSite.length === 1 ? "<b>1 contato novo</b>" : `<b>${novosSite.length} contatos novos</b>`} pelo seu site: ${novosSite.slice(0, 2).map((c) => esc(c.marca || c.nome)).join(", ")}.`,
-    acoes: [["Ver contatos", true, () => irPara("portfolio")]] });
+    acoes: [["Ver contatos", true, () => irParaSub("portfolio", "leads")]] });
   // Lembretes rápidos que chegaram na hora vêm primeiro
   const agoraMs = Date.now();
   S.rapidos.filter((r) => !r.feito && Date.parse(r.quando) <= agoraMs).forEach((r) => {
@@ -3342,9 +3365,9 @@ function calcularLembretes() {
       acoes: [["Ver propostas", true, () => irPara("propostas")]] });
   }
   const destaque = postEmDestaque();
-  if (destaque) L.push({ aba: "instagram", ic: "insta", nivel: "",
+  if (destaque) L.push({ aba: "instagram", sub: "metricas", ic: "insta", nivel: "",
     texto: `Seu post "<b>${esc((destaque.post.legenda || "sem legenda").slice(0, 50))}</b>" está alcançando <b>${destaque.vezes.toFixed(1).replace(".", ",")}x</b> mais que a sua média. Responda os comentários e repita o formato.`,
-    acoes: [["Ver no painel", true, () => irPara("instagram")], ["Ok, vi", false, () => { marcarVisto("ig-vistos", destaque.post.id); desenhar(); }]] });
+    acoes: [["Ver no painel", true, () => irParaSub("instagram", "metricas")], ["Ok, vi", false, () => { marcarVisto("ig-vistos", destaque.post.id); desenhar(); }]] });
   const quarta = ultimaQuarta();
   if (!S.comissoes.some((x) => String(x.data).slice(0, 10) === quarta) && !adiado("ttk-" + quarta)) {
     L.push({ aba: "financeiro", ic: "financeiro", nivel: quarta === hoje ? "" : "alerta",
@@ -3413,9 +3436,9 @@ function calcularLembretes() {
   // Instagram parado: 7 dias ou mais sem post no feed
   const ultimoPost = typeof ig !== "undefined" && ig.dados && (ig.dados.posts || []).map((x) => isoLocal(new Date(x.data))).sort().pop();
   if (ultimoPost && diasEntre(ultimoPost, hoje) >= 7 && !adiado(`postar-${ultimoPost}`)) {
-    L.push({ aba: "instagram", ic: "insta", nivel: "",
+    L.push({ aba: "instagram", sub: "plano", ic: "insta", nivel: "",
       texto: `Faz <b>${plural(diasEntre(ultimoPost, hoje), "dia", "dias")}</b> que você não posta no Instagram. Constância ajuda o alcance a voltar.`,
-      acoes: [["Ver o que funciona", true, () => irPara("instagram")], ["Lembrar em 3 dias", false, () => adiarLembrete(`postar-${ultimoPost}`, somaDiasISO(2))]] });
+      acoes: [["Ver o plano", true, () => irParaSub("instagram", "plano")], ["Lembrar em 3 dias", false, () => adiarLembrete(`postar-${ultimoPost}`, somaDiasISO(2))]] });
   }
   return L;
 }
@@ -3500,10 +3523,11 @@ function postEmDestaque() {
 // Bolinha com número no menu: fica até você resolver ou abrir a aba
 function pintarBolinhasMenu(L) {
   const conta = {};
-  L.forEach((x) => { if (x.aba) conta[x.aba] = (conta[x.aba] || 0) + 1; });
+  L.forEach((x) => { if (x.aba) { const k = x.sub ? x.aba + ":" + x.sub : x.aba; conta[k] = (conta[k] || 0) + 1; } });
   $$(".menu-item[data-aba]").forEach((b) => {
     let bola = $(".menu-bolinha", b);
-    const n = conta[b.dataset.aba] || 0;
+    // Item de uma parte (ex.: Leads): conta os avisos dela; o item marcado com data-bolinha também leva os avisos gerais da aba
+    const n = b.dataset.sub ? (conta[b.dataset.aba + ":" + b.dataset.sub] || 0) + (b.dataset.bolinha ? conta[b.dataset.aba] || 0 : 0) : conta[b.dataset.aba] || 0;
     if (!n) { if (bola) bola.remove(); return; }
     if (!bola) { bola = document.createElement("i"); bola.className = "menu-bolinha"; b.appendChild(bola); }
     bola.textContent = n > 9 ? "9+" : String(n);
@@ -3730,7 +3754,7 @@ function desenharInicio(el) {
         <strong>${qtd(emProducao.length, "campanha", "campanhas")}</strong>
         <small>${entregasSemana.length ? `${qtd(entregasSemana.length, "entrega", "entregas")} nos próximos 7 dias` : "nenhuma entrega na semana"}</small>
       </button>
-      <button type="button" class="kpi-inicio" data-ir="portfolio">
+      <button type="button" class="kpi-inicio" data-ir="portfolio" data-pf-sub="visitas">
         <span>Visitas no site</span>
         <strong>${plural(visitasHoje, "hoje", "hoje")}</strong>
         <small>${plural(visitas7, "visita", "visitas")} nos últimos 7 dias</small>
