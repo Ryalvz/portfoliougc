@@ -1020,3 +1020,12 @@ drop policy if exists "site registra video" on public.video_views;
 create policy "site registra video" on public.video_views
   for insert to anon
   with check (criado_em between now() - interval '5 minutes' and now() + interval '5 minutes');
+
+
+-- -------------------------------------------------------------
+-- 35. CALENDÁRIO: TIPO "OUTROS"
+-- Para o que não é gravar, editar, postar, reunião nem compromisso.
+-- -------------------------------------------------------------
+alter table public.calendario drop constraint if exists calendario_tipo_check;
+alter table public.calendario add constraint calendario_tipo_check
+  check (tipo in ('gravar', 'editar', 'postar', 'reuniao', 'compromisso', 'outro'));
