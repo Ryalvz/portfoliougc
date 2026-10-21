@@ -5063,7 +5063,7 @@ function desenharProspeccao(el) {
     if (pro.envio === "gmail") {
       const sobra = Math.max(0, LIMITE_GMAIL_DIA - enviadosHojeGmail());
       const vai = Math.min(sobra, r.lista.length);
-      caixa.innerHTML = `<h3 class="pro-titulo">3. Enviar pelo seu Gmail</h3>
+      caixa.innerHTML = `<h3 class="pro-titulo">4. Enviar pelo seu Gmail</h3>
         ${gmailConectado() ? "" : `<div class="pro-alerta">O Gmail ainda está conectando. Espere alguns segundos ou abra a aba Propostas.</div>`}
         <div class="pro-acoes">
           <button class="btn" type="button" id="pro-teste">${ic("email")}Enviar teste pra mim</button>
@@ -5076,7 +5076,7 @@ function desenharProspeccao(el) {
       $("#pro-disparar").onclick = () => dispararGmail(destinatariosDe(pro.publico));
       return;
     }
-    caixa.innerHTML = `<h3 class="pro-titulo">3. Enviar</h3>
+    caixa.innerHTML = `<h3 class="pro-titulo">4. Enviar</h3>
       <div class="pro-acoes">
         <button class="btn" type="button" id="pro-teste">${ic("email")}Enviar teste pra mim</button>
         <button class="btn primario" type="button" id="pro-disparar" ${!testado || !r.lista.length || pro.publico === "teste" ? "disabled" : ""}>${ic("subir")}Disparar para ${plural(r.lista.length, "marca", "marcas")}</button>
@@ -5288,9 +5288,9 @@ async function dispararGmail(r) {
 /* ---------- Modo rascunho (plano B, sem Resend) ---------- */
 function pintarFila(caixa, r) {
   const fila = r.lista.filter((d) => !pro.filaPulados.includes(d.email));
-  if (pro.publico === "teste") { caixa.innerHTML = `<h3 class="pro-titulo">3. Fila de envio</h3><p class="sub">No modo rascunho, escolha uma lista de marcas em "Pra quem vai".</p>`; return; }
+  if (pro.publico === "teste") { caixa.innerHTML = `<h3 class="pro-titulo">4. Fila de envio</h3><p class="sub">No modo rascunho, escolha uma lista de marcas em "Pra quem vai".</p>`; return; }
   if (!fila.length) {
-    caixa.innerHTML = `<h3 class="pro-titulo">3. Fila de envio</h3><p class="vazio">${r.lista.length ? "Você passou por todas da fila." : "Ninguém na fila. Escolha outra lista ou selecione marcas na aba Marcas."}</p>
+    caixa.innerHTML = `<h3 class="pro-titulo">4. Fila de envio</h3><p class="vazio">${r.lista.length ? "Você passou por todas da fila." : "Ninguém na fila. Escolha outra lista ou selecione marcas na aba Marcas."}</p>
       ${pro.filaPulados.length ? `<button class="btn" type="button" id="pro-refila">Voltar as ${num(pro.filaPulados.length)} que pulei</button>` : ""}`;
     if ($("#pro-refila")) $("#pro-refila").onclick = () => { pro.filaPulados = []; desenhar(); };
     return;
@@ -5299,7 +5299,7 @@ function pintarFila(caixa, r) {
   const assunto = assuntoPara(d), texto = textoPuroPara(d);
   const gmail = "https://mail.google.com/mail/?view=cm&fs=1&authuser=" + encodeURIComponent(EMAIL_PROPOSTAS)
     + "&to=" + encodeURIComponent(d.email) + "&su=" + encodeURIComponent(assunto) + "&body=" + encodeURIComponent(texto);
-  caixa.innerHTML = `<div class="barra"><h3 class="pro-titulo" style="margin:0">3. Fila de envio</h3><span class="espaco"></span><span class="etq">1 de ${num(fila.length)}</span></div>
+  caixa.innerHTML = `<div class="barra"><h3 class="pro-titulo" style="margin:0">4. Fila de envio</h3><span class="espaco"></span><span class="etq">1 de ${num(fila.length)}</span></div>
     <div class="pro-fila-item">
       <div class="pro-fila-para"><b>${esc(d.marca)}</b><small>${esc(d.email)}</small></div>
       <p class="pro-fila-assunto">${esc(assunto)}</p>
