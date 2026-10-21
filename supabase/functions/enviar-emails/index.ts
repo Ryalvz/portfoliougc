@@ -9,7 +9,7 @@
 // Sem domínio verificado, o Resend só aceita o remetente de teste
 // onboarding@resend.dev e só entrega para o seu próprio e-mail.
 //
-// Recebe: { destinatarios: [{ email, nome, marca, marca_id }], assunto, html, pularRepetidos, teste }
+// Recebe: { destinatarios: [{ email, nome, marca, marca_id, pessoa, conexao, ideia }], assunto, html, pularRepetidos, teste }
 // teste: true manda só para o seu e-mail, sem entrar no registro
 // Devolve: { enviados, falharam, pulados, cotaAcabou, faltaram }
 // =============================================================
@@ -51,10 +51,24 @@ async function ehOAdmin(req: Request) {
   }
 }
 
-// Troca {{nome}} e {{marca}} (com ou sem espaços dentro das chaves)
+// Troca {nome}, {marca}, {pessoa}, {conexao} e {ideia} (chave simples ou dupla, com ou sem espaços).
+// Parágrafo com {conexao} ou {ideia} vazio some do e-mail, para não sobrar buraco.
 const escapar = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-const preencher = (t: string, nome: string, marca: string) =>
-  t.replace(/\{\{\s*nome\s*\}\}/gi, escapar(nome)).replace(/\{\{\s*marca\s*\}\}/gi, escapar(marca));
+const CHAVE_RE = (k: string) => new RegExp(`\\{\\{?\\s*${k}\\s*\\}?\\}`, "gi");
+const CHAVES = ["nome", "marca", "pessoa", "conexao", "conexão", "ideia"];
+const preencher = (t: string, nome: string, marca: string, x: any = {}) => {
+  const v: Record<string, string> = {
+    nome, marca,
+    pessoa: String(x.pessoa || "").trim() || `time da ${nome}`,
+    conexao: String(x.conexao || "").trim(),
+    ideia: String(x.ideia || "").trim(),
+  };
+  const chave = (k: string) => (k === "conexão" ? "conexao" : k);
+  const vazio = (p: string) => ["conexao", "conexão", "ideia"].some((k) => CHAVE_RE(k).test(p) && !v[chave(k)]);
+  let s = t.replace(/<p\b[^>]*>[\s\S]*?<\/p>/gi, (p) => (vazio(p) ? "" : p));
+  CHAVES.forEach((k) => { s = s.replace(CHAVE_RE(k), escapar(v[chave(k)])); });
+  return s;
+};
 const emailValido = (e: string) => /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/.test(e);
 
 Deno.serve(async (req) => {
@@ -110,8 +124,8 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           from: remetente,
           to: [d.email],
-          subject: preencher(assunto, nome, marca).replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"'),
-          html: preencher(html, nome, marca),
+          subject: preencher(assunto, nome, marca, d).replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"'),
+          html: preencher(html, nome, marca, d),
           reply_to: EMAIL_RESPOSTA,
           headers: { "List-Unsubscribe": `<mailto:${EMAIL_RESPOSTA}?subject=SAIR>` },
         }),
