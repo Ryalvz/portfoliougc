@@ -1029,3 +1029,8 @@ create policy "site registra video" on public.video_views
 alter table public.calendario drop constraint if exists calendario_tipo_check;
 alter table public.calendario add constraint calendario_tipo_check
   check (tipo in ('gravar', 'editar', 'postar', 'reuniao', 'compromisso', 'outro'));
+
+-- Prospecção na voz do Ryan: o que muda em cada marca ({pessoa}, {conexao}, {ideia})
+alter table public.marcas add column if not exists contato_nome text;
+alter table public.marcas add column if not exists conexao text;
+alter table public.marcas add column if not exists ideia text;
