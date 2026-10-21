@@ -1342,3 +1342,4 @@ dialog.pf-janela-rapida { width: min(460px, calc(100vw - 20px)); }
 .pf-juros b { display: block; font-size: 15px; color: var(--text); text-transform: none; letter-spacing: 0; }
 .pf-juros small { display: block; text-transform: none; letter-spacing: 0; color: var(--muted); font-weight: 500; }
 .pf-juros-liga { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); margin: 4px 0 0; cursor: pointer; }
+.perigo-link { color: var(--red) !important; }

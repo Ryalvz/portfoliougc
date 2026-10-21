@@ -928,6 +928,7 @@ function pintarBarraSelecao() {
   caixa.innerHTML = `<span class="barra-selecao-n">${ic("check")}<b>${plural(sel, "marca selecionada", "marcas selecionadas")}</b></span>
     ${doFiltro.length ? `<button type="button" class="link-btn" data-sel-todas>Selecionar as ${num(doFiltro.length)} com e-mail que estão aparecendo</button>` : ""}
     ${sel ? `<button type="button" class="link-btn" data-sel-limpar>Limpar seleção</button>` : ""}
+    ${sel ? `<button type="button" class="link-btn perigo-link" data-sel-sem-email>Apagar o e-mail das selecionadas</button><button type="button" class="link-btn perigo-link" data-sel-apagar>Apagar as marcas selecionadas</button>` : ""}
     <span class="espaco"></span>
     ${sel ? `<button type="button" class="btn pequeno primario" data-ir-prosp>${ic("email")}Ir para Prospecção</button>` : `<small class="sub">Marque as caixinhas para escolher pra quem mandar o e-mail.</small>`}`;
   const todas = $("[data-sel-todas]", caixa);
@@ -941,6 +942,30 @@ function pintarBarraSelecao() {
   };
   const limpar = $("[data-sel-limpar]", caixa);
   if (limpar) limpar.onclick = () => limparSelecao();
+  // Apagar em lote: só o e-mail (a marca fica) ou a marca inteira. O histórico de envios não é apagado.
+  const selecionadas = () => S.marcas.filter((m) => m.selecionada);
+  const semEmail = $("[data-sel-sem-email]", caixa);
+  if (semEmail) semEmail.onclick = async () => {
+    const lista = selecionadas();
+    if (!(await confirmar(`Apagar o e-mail de ${plural(lista.length, "marca selecionada", "marcas selecionadas")}? As marcas continuam na lista, sem e-mail. Não dá para desfazer.`, "Apagar e-mails"))) return;
+    const { error } = await db.from("marcas").update({ email: null, selecionada: false }).in("id", lista.map((m) => m.id));
+    if (error) { avisar(traduzErro(error), true); return; }
+    lista.forEach((m) => { m.email = null; m.selecionada = false; });
+    avisar(`E-mail apagado de ${plural(lista.length, "marca", "marcas")}.`);
+    desenhar();
+  };
+  const apagarSel = $("[data-sel-apagar]", caixa);
+  if (apagarSel) apagarSel.onclick = async () => {
+    const lista = selecionadas();
+    const nomes = lista.slice(0, 5).map((m) => m.nome).join(", ") + (lista.length > 5 ? ` e mais ${lista.length - 5}` : "");
+    if (!(await confirmar(`Apagar de vez ${plural(lista.length, "marca", "marcas")} (${nomes})? Elas saem do painel. Não dá para desfazer.`, "Apagar marcas"))) return;
+    const { error } = await db.from("marcas").delete().in("id", lista.map((m) => m.id));
+    if (error) { avisar(traduzErro(error), true); return; }
+    const ids = new Set(lista.map((m) => m.id));
+    S.marcas = S.marcas.filter((m) => !ids.has(m.id));
+    avisar(`${plural(lista.length, "marca apagada", "marcas apagadas")}.`);
+    desenhar();
+  };
   const ir = $("[data-ir-prosp]", caixa);
   if (ir) ir.onclick = () => { pro.publico = "selecionadas"; irPara("prospeccao"); };
 }
