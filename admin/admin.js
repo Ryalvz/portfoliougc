@@ -78,7 +78,7 @@ function traduzErro(e) {
 // Campos que o painel espera em cada tabela
 const ESQUEMA = {
   videos: ["id", "titulo", "link", "capa", "nicho", "formato", "marca", "destaque", "ordem", "visivel", "exemplo"],
-  marcas: ["id", "nome", "instagram", "email", "telefone", "situacao", "nicho", "favorita", "fixada", "selecionada", "email_enviado_em", "obs", "ultimo_contato", "exemplo", "criado_em"],
+  marcas: ["id", "nome", "instagram", "email", "telefone", "situacao", "nicho", "favorita", "fixada", "selecionada", "email_enviado_em", "obs", "ultimo_contato", "exemplo", "criado_em", "contato_nome", "conexao", "ideia"],
   calendario: ["id", "titulo", "marca", "tipo", "data", "hora", "hora_fim", "local", "status", "serie_id", "repete", "repete_ate", "exemplo"],
   campanhas: ["id", "campanha", "cliente", "tipo", "status", "qtd", "valor", "prazo", "pagamento", "ativa", "favorita", "exemplo"],
   comissoes_ttk: ["id", "data", "valor", "gmv", "itens", "obs"],
@@ -1091,7 +1091,10 @@ function formMarca(m, extra = {}) {
       { n: "telefone", r: "Telefone", t: "tel", ph: "(11) 90000-0000" },
       { n: "situacao", r: "Situação", t: "select", op: SITUACOES },
       { n: "ultimo_contato", r: "Último contato", t: "date" },
-      { n: "obs", r: "Observação", t: "textarea" }
+      { n: "obs", r: "Observação", t: "textarea" },
+      { n: "contato_nome", r: "Com quem falar (vira {pessoa} no e-mail)", ph: "Ex.: Ana" },
+      { n: "conexao", r: "A conexão: por que essa marca, agora (vira {conexao})", t: "textarea", ph: "Ex.: Vi que vocês lançaram a linha X e quase todo vídeo mostra o produto parado na mesa." },
+      { n: "ideia", r: "A ideia de vídeo pronta (vira {ideia})", t: "textarea", ph: "Ex.: eu tirando o fone do case no metrô e mostrando o cancelamento de ruído funcionando." }
     ],
     aoSalvar: async (d) => { if ("nicho" in d) d.nicho = nichoPadrao(d.nicho) || null; const ok = await gravar("marcas", d, m ? m.id : null); if (ok) { recarregar("marcas"); if (extra.depois) extra.depois(); } return ok; },
     aoApagar: m ? async () => { const ok = await apagarLinha("marcas", m.id); if (ok) recarregar("marcas"); return ok; } : null
@@ -4676,6 +4679,51 @@ function quadrosEntrada() {
    envio fica em email_envios e o descadastro em email_optout
    (arquivo disparo.sql).
    ============================================================= */
+// Modelos na voz do Ryan (estrutura: quem eu sou e o diferencial, a conexão, a ideia pronta, portfólio e uma pergunta).
+// Até 150 palavras, sem "espero que esteja bem", sem anexo. {pessoa}, {conexao} e {ideia} vêm de cada marca.
+const MODELOS_VOZ = {
+  prospeccao: {
+    nome: "E-mail de prospecção",
+    assuntos: ["Uma ideia de vídeo pra {marca}", "Roteiro pronto pra {marca}", "Pensei num vídeo pra {marca}"],
+    texto: `Oi, {pessoa}!
+
+Sou o Ryan, criador de UGC de tech e lifestyle. Antes de gravar, passei 12 anos vendendo, então meus roteiros começam pela dúvida que faz o cliente desistir da compra.
+
+{conexao}
+
+A ideia: {ideia} Isso vira vídeo vertical pra vocês usarem no perfil e em anúncio, com roteiro aprovado antes de eu gravar.
+
+Meu portfólio: https://ugc.ryalvz.com.br
+
+Faz sentido eu te mandar o roteiro completo?
+
+Ryan Alves · @ryalvz`
+  },
+  segundo: {
+    nome: "Segundo e-mail (reabre a conversa)",
+    assuntos: ["Sobre o vídeo pra {marca}", "Ainda sobre a ideia pra {marca}", "{marca}: posso te chamar no WhatsApp?"],
+    texto: `Oi, {pessoa}!
+
+Passando rapidinho pra saber se vocês conseguiram ver o meu último e-mail, com a ideia de vídeo pra {marca}.
+
+Se for mais fácil conversar por outro canal, posso te chamar no WhatsApp. Qual número fica melhor pra você?
+
+Ryan Alves · @ryalvz
+https://ugc.ryalvz.com.br`
+  }
+};
+// A DM não vende: só pede o canal certo pra mandar a proposta
+const MODELO_DM = `Oi, time da {marca}! Sou o Ryan, criador de UGC de tech e lifestyle (@ryalvz). Tenho uma ideia de vídeo pra vocês e queria mandar a proposta por e-mail. Qual é o melhor e-mail pra esse tipo de contato?`;
+// Candidatura nas campanhas do Seu Influencer: diferencial, apresentação, conexão e portfólio
+const MODELO_SEUINF = `Mais de 40 marcas atendidas, entre elas Canva, Rexona e Mercado Livre.
+
+Sou o Ryan, criador de UGC de tech e lifestyle. Antes do UGC, passei 12 anos em vendas, então meus roteiros começam pela objeção do cliente e terminam com uma chamada clara.
+
+{conexao}
+
+Meu portfólio: https://ugc.ryalvz.com.br`;
+const usaCamposDaMarca = () => /\{\{?\s*(pessoa|conexao|conexão|ideia)\s*\}?\}/i.test([pro.assunto, pro.escrita === "html" ? pro.html : pro.texto].join(" "));
+
 const MODELO_ASSUNTO = "Conteúdo UGC para a {{marca}}";
 const MODELO_TEXTO = `Oi, time da {{nome}}! Tudo bem?
 
@@ -4689,16 +4737,22 @@ Abraço,
 Ryan Alves`;
 const pro = {
   envio: "gmail", escrita: "texto", publico: "selecionadas", pularRepetidos: true,
-  assunto: MODELO_ASSUNTO, texto: MODELO_TEXTO, html: "", botaoTexto: "Ver meu portfólio", botaoLink: "https://ugc.ryalvz.com.br/",
+  // Padrão: o e-mail na voz do Ryan (só falta preencher o que muda em cada marca)
+  assunto: MODELOS_VOZ.prospeccao.assuntos[0], texto: MODELOS_VOZ.prospeccao.texto, modeloVoz: "prospeccao", html: "", botaoTexto: "", botaoLink: "https://ugc.ryalvz.com.br/",
   envios: null, optout: null, falta: [], carregando: false, carregado: false, buscaHist: "",
   testeFeito: "", filaPulados: [], sairConferido: false
 };
 // O rascunho fica guardado neste aparelho, para você não perder o texto
 (function lerRascunho() {
-  try { const r = JSON.parse(localStorage.getItem("prospeccao-rascunho") || "null"); if (r && r.v !== 2) delete r.envio; if (r) ["envio", "escrita", "assunto", "texto", "html", "botaoTexto", "botaoLink"].forEach((k) => { if (r[k] != null) pro[k] = r[k]; }); } catch (_) {}
+  try {
+    const r = JSON.parse(localStorage.getItem("prospeccao-rascunho") || "null");
+    if (!r) return;
+    if (r.v === 3) ["envio", "escrita", "assunto", "texto", "html", "botaoTexto", "botaoLink", "modeloVoz"].forEach((k) => { if (r[k] != null) pro[k] = r[k]; });
+    else if (r.v === 2 && r.envio) pro.envio = r.envio;
+  } catch (_) {}
 })();
 function guardarRascunho() {
-  try { localStorage.setItem("prospeccao-rascunho", JSON.stringify({ v: 2, envio: pro.envio, escrita: pro.escrita, assunto: pro.assunto, texto: pro.texto, html: pro.html, botaoTexto: pro.botaoTexto, botaoLink: pro.botaoLink })); } catch (_) {}
+  try { localStorage.setItem("prospeccao-rascunho", JSON.stringify({ v: 3, envio: pro.envio, escrita: pro.escrita, assunto: pro.assunto, texto: pro.texto, html: pro.html, botaoTexto: pro.botaoTexto, botaoLink: pro.botaoLink, modeloVoz: pro.modeloVoz })); } catch (_) {}
 }
 
 // O primeiro e-mail válido do campo (tem marca com vários e-mails no mesmo campo)
@@ -4731,17 +4785,34 @@ function montarEmailHTML({ texto, botaoTexto, botaoLink }) {
 }
 // O HTML que vai sair, do jeito que estiver ligado (texto fácil ou HTML colado)
 const htmlAtual = () => pro.escrita === "html" ? pro.html : montarEmailHTML(pro);
-const preencherChaves = (t, nome, marca) => String(t || "").replace(/\{\{\s*nome\s*\}\}/gi, esc(nome)).replace(/\{\{\s*marca\s*\}\}/gi, esc(marca));
-const assuntoPara = (d) => preencherChaves(pro.assunto, d.nome, d.marca).replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+// Chaves do e-mail: {marca}/{{marca}}, {nome}, {pessoa}, {conexao}, {ideia}. O que muda em cada marca vem da aba Marcas.
+// Sem conexão ou sem ideia, o parágrafo inteiro sai (nada inventado). Sem pessoa, vira "time da Marca".
+const CHAVE_RE = (k) => new RegExp(`\\{\\{?\\s*${k}\\s*\\}?\\}`, "gi");
+function valoresDe(nome, marca, x = {}) {
+  return { nome, marca, pessoa: String(x.pessoa || "").trim() || `time da ${nome}`, conexao: String(x.conexao || "").trim(), ideia: String(x.ideia || "").trim() };
+}
+function preencherChaves(t, nome, marca, x) {
+  const v = valoresDe(nome, marca, x);
+  const vazio = (p) => ["conexao", "conexão", "ideia"].some((k) => CHAVE_RE(k).test(p) && !v[k === "conexão" ? "conexao" : k]);
+  let s = String(t || "").replace(/<p\b[^>]*>[\s\S]*?<\/p>/gi, (p) => (vazio(p) ? "" : p));
+  ["nome", "marca", "pessoa", "conexao", "conexão", "ideia"].forEach((k) => { s = s.replace(CHAVE_RE(k), esc(v[k === "conexão" ? "conexao" : k])); });
+  return s;
+}
+// Mesma coisa em texto puro (Gmail e rascunho), parágrafo por parágrafo
+function preencherTexto(t, d) {
+  const v = valoresDe(d.nome, d.marca, d);
+  return String(t || "").split(/\n\s*\n/).filter((p) => !["conexao", "conexão", "ideia"].some((k) => CHAVE_RE(k).test(p) && !v[k === "conexão" ? "conexao" : k]))
+    .map((p) => { ["nome", "marca", "pessoa", "conexao", "conexão", "ideia"].forEach((k) => { p = p.replace(CHAVE_RE(k), v[k === "conexão" ? "conexao" : k]); }); return p; }).join("\n\n");
+}
+const assuntoPara = (d) => preencherChaves(pro.assunto, d.nome, d.marca, d).replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'");
 // Versão em texto puro (para copiar e para o Gmail)
 function textoPuroPara(d) {
   if (pro.escrita === "html") {
     const div = document.createElement("div");
-    div.innerHTML = preencherChaves(pro.html, d.nome, d.marca).replace(/<br\s*\/?>/gi, "\n").replace(/<\/(p|div|h\d|li|tr)>/gi, "\n\n");
+    div.innerHTML = preencherChaves(pro.html, d.nome, d.marca, d).replace(/<br\s*\/?>/gi, "\n").replace(/<\/(p|div|h\d|li|tr)>/gi, "\n\n");
     return (div.textContent || "").replace(/\n{3,}/g, "\n\n").trim();
   }
-  const subs = (t) => String(t).replace(/\{\{\s*nome\s*\}\}/gi, d.nome).replace(/\{\{\s*marca\s*\}\}/gi, d.marca);
-  let t = subs(pro.texto).trim();
+  let t = preencherTexto(pro.texto, d).trim();
   if (pro.botaoTexto && /^https?:\/\//.test(pro.botaoLink || "")) t += `\n\n${pro.botaoTexto}: ${pro.botaoLink}`;
   return t + "\n\nSe não quiser receber mais e-mails meus, é só responder com SAIR.";
 }
@@ -4772,7 +4843,7 @@ function destinatariosDe(publico) {
     vistos.add(email);
     if (fora.has(email)) { descadastrados++; return; }
     if (pro.pularRepetidos && ja.has(email)) { jaReceberam++; return; }
-    lista.push({ email, nome: nomeCurto(m.nome), marca: m.nome, marca_id: m.id });
+    lista.push({ email, nome: nomeCurto(m.nome), marca: m.nome, marca_id: m.id, pessoa: m.contato_nome || "", conexao: m.conexao || "", ideia: m.ideia || "" });
   });
   return { lista, semEmail, repetidos, descadastrados, jaReceberam, total: marcas.length };
 }
@@ -4876,16 +4947,20 @@ function desenharProspeccao(el) {
 
         <div class="cartao">
           <h3 class="pro-titulo">2. O e-mail</h3>
+          <div class="pro-modelos-voz"><span class="pro-rotulo" style="margin:0">Modelos na minha voz</span>
+            ${Object.entries(MODELOS_VOZ).map(([k, m]) => `<button class="btn pequeno" type="button" data-modelo-voz="${k}">${ic("transcricao")}${esc(m.nome)}</button>`).join("")}
+          </div>
           <div class="chips pro-escrita" role="group" aria-label="Jeito de escrever">
             <button class="chip" type="button" data-escrita="texto" aria-pressed="${pro.escrita === "texto"}">Texto fácil</button>
             <button class="chip" type="button" data-escrita="html" aria-pressed="${pro.escrita === "html"}">HTML</button>
           </div>
           <label class="pro-rotulo" for="pro-assunto">Assunto</label>
           <input class="campo" id="pro-assunto" value="${esc(pro.assunto)}" placeholder="Conteúdo UGC para a {{marca}}">
+          ${MODELOS_VOZ[pro.modeloVoz] ? `<div class="pro-assuntos"><small class="sub">Outras opções:</small>${MODELOS_VOZ[pro.modeloVoz].assuntos.map((a) => `<button class="chip" type="button" data-assunto="${esc(a)}" aria-pressed="${pro.assunto === a}">${esc(a)}</button>`).join("")}</div>` : ""}
           ${pro.escrita === "texto" ? `
             <label class="pro-rotulo" for="pro-texto">Texto</label>
             <textarea class="campo pro-texto" id="pro-texto" rows="12">${esc(pro.texto)}</textarea>
-            <p class="ajuda">Use <code>{{nome}}</code> e <code>{{marca}}</code> onde quiser o nome da marca. Linha em branco separa os parágrafos, e os links viram clicáveis sozinhos.</p>
+            <p class="ajuda">Use <code>{marca}</code> pro nome da marca, <code>{pessoa}</code> pra quem vai ler, <code>{conexao}</code> e <code>{ideia}</code> pro que muda em cada marca (preenche no item 3). Linha em branco separa os parágrafos, e os links viram clicáveis sozinhos.</p>
             <div class="pro-botao-campos">
               <div><label class="pro-rotulo" for="pro-btxt">Texto do botão (opcional)</label><input class="campo" id="pro-btxt" value="${esc(pro.botaoTexto)}" placeholder="Ver meu portfólio"></div>
               <div><label class="pro-rotulo" for="pro-blink">Link do botão</label><input class="campo" id="pro-blink" value="${esc(pro.botaoLink)}" placeholder="https://..."></div>
@@ -4896,6 +4971,7 @@ function desenharProspeccao(el) {
             <p class="ajuda">O que estiver aqui é exatamente o que sai. <code>{{nome}}</code> e <code>{{marca}}</code> continuam funcionando. Deixe o rodapé do SAIR no texto.</p>`}
         </div>
 
+        <div class="cartao" id="pro-por-marca" hidden></div>
         <div class="cartao" id="pro-enviar"></div>
       </div>
 
@@ -4925,10 +5001,39 @@ function desenharProspeccao(el) {
   const pintarPrevia = () => {
     const d = exemplo();
     $("#pro-previa-assunto").textContent = assuntoPara(d) || "(sem assunto)";
-    $("#pro-previa").srcdoc = preencherChaves(htmlAtual(), d.nome, d.marca) || `<p style="font-family:Arial;color:#888;padding:20px">Cole o HTML do e-mail para ver a prévia.</p>`;
+    $("#pro-previa").srcdoc = preencherChaves(htmlAtual(), d.nome, d.marca, d) || `<p style="font-family:Arial;color:#888;padding:20px">Cole o HTML do e-mail para ver a prévia.</p>`;
+  };
+  // 3. O que muda em cada marca: pessoa, conexão e ideia, salvos na própria marca
+  const pintarPorMarca = (r = destinatariosDe(pro.publico)) => {
+    const caixa = $("#pro-por-marca");
+    if (!caixa) return;
+    if (!usaCamposDaMarca() || pro.publico === "teste") { caixa.hidden = true; return; }
+    caixa.hidden = false;
+    const lista = r.lista.filter((d) => d.marca_id).slice(0, 60);
+    const comConexao = lista.filter((d) => d.conexao).length, comIdeia = lista.filter((d) => d.ideia).length;
+    caixa.innerHTML = `<h3 class="pro-titulo">3. O que muda em cada marca</h3>
+      <p class="sub" style="margin:0 0 8px">${comConexao} de ${lista.length} com conexão e ${comIdeia} com ideia. Quem estiver sem, recebe o e-mail sem esse parágrafo: nada é inventado. Fica salvo na marca, pra próxima vez.</p>
+      ${lista.length ? `<div class="pro-marcas-campos">${lista.map((d) => `<div class="pro-marca-linha" data-mid="${d.marca_id}">
+        <div class="pro-marca-nome"><b>${esc(d.marca)}</b><small>${esc(d.email)}</small><button class="link-btn" type="button" data-dm="${d.marca_id}">${ic("insta")}Copiar DM</button><button class="link-btn" type="button" data-dm="${d.marca_id}" data-tipo="seuinf">${ic("transcricao")}Copiar Seu Influencer</button></div>
+        <input class="campo" data-campo="contato_nome" placeholder="Com quem falar (opcional)" value="${esc(d.pessoa)}">
+        <textarea class="campo" data-campo="conexao" rows="2" placeholder="A conexão: por que essa marca, agora">${esc(d.conexao)}</textarea>
+        <textarea class="campo" data-campo="ideia" rows="2" placeholder="A ideia de vídeo pronta">${esc(d.ideia)}</textarea>
+      </div>`).join("")}</div>${r.lista.length > lista.length ? `<p class="sub">Mostrando as primeiras ${lista.length}.</p>` : ""}` : `<p class="vazio">Escolha pra quem vai no item 1.</p>`}`;
+    $$("[data-campo]", caixa).forEach((inp) => inp.onchange = async () => {
+      const id = inp.closest("[data-mid]").dataset.mid, campo = inp.dataset.campo, valor = inp.value.trim() || null;
+      if (!(await gravar("marcas", { [campo]: valor }, id))) return;
+      const m = S.marcas.find((x) => String(x.id) === String(id)); if (m) m[campo] = valor;
+      pintarPrevia();
+    });
+    $$("[data-dm]", caixa).forEach((b) => b.onclick = async () => {
+      const d = destinatariosDe(pro.publico).lista.find((x) => String(x.marca_id) === b.dataset.dm);
+      const texto = preencherTexto(b.dataset.tipo === "seuinf" ? MODELO_SEUINF : MODELO_DM, d).trim();
+      try { await navigator.clipboard.writeText(texto); avisar(b.dataset.tipo === "seuinf" ? "Texto do Seu Influencer copiado." : "DM copiada. Cola no direct da marca."); } catch (_) { abrirJanelaSimples("Copie a DM", `<textarea class="campo" rows="5" style="width:100%">${esc(texto)}</textarea>`); }
+    });
   };
   const pintarContagem = () => {
     const r = destinatariosDe(pro.publico);
+    pintarPorMarca(r);
     const fora = [];
     if (r.semEmail) fora.push(`${plural(r.semEmail, "ficou", "ficaram")} de fora por não ter e-mail`);
     if (r.repetidos) fora.push(`${plural(r.repetidos, "e-mail repetido", "e-mails repetidos")} (vai uma vez só)`);
@@ -4940,6 +5045,16 @@ function desenharProspeccao(el) {
     $$("[data-ir-aba]", $("#pro-contagem")).forEach((b) => b.onclick = () => irPara(b.dataset.irAba));
     pintarEnviar(r);
   };
+  // Modelos na voz do Ryan e as sugestões de assunto
+  $$("[data-modelo-voz]", el).forEach((b) => b.onclick = async () => {
+    const m = MODELOS_VOZ[b.dataset.modeloVoz];
+    if ((pro.texto || "").trim() && pro.texto !== m.texto && !(await confirmar(`Trocar o texto atual pelo modelo "${m.nome}"?`, "Usar o modelo"))) return;
+    Object.assign(pro, { escrita: "texto", texto: m.texto, assunto: m.assuntos[0], botaoTexto: "", modeloVoz: b.dataset.modeloVoz });
+    guardarRascunho();
+    desenhar();
+  });
+  $$("[data-assunto]", el).forEach((b) => b.onclick = () => { pro.assunto = b.dataset.assunto; guardarRascunho(); desenhar(); });
+  ["#pro-texto", "#pro-html", "#pro-assunto"].forEach((q) => { const x = $(q, el); if (x) x.addEventListener("change", () => pintarPorMarca()); });
   const pintarEnviar = (r = destinatariosDe(pro.publico)) => {
     const caixa = $("#pro-enviar");
     if (pro.envio === "rascunho") { pintarFila(caixa, r); return; }
@@ -5004,7 +5119,7 @@ function desenharProspeccao(el) {
     const c = document.createElement("dialog"); c.className = "pro-cheia";
     c.innerHTML = `<div class="janela-topo"><h3>${esc(assuntoPara(d))}</h3><button type="button" class="icone-btn" data-fechar aria-label="Fechar">${ic("fechar")}</button></div><iframe title="E-mail em tela cheia" sandbox="allow-popups"></iframe>`;
     document.body.appendChild(c);
-    $("iframe", c).srcdoc = preencherChaves(htmlAtual(), d.nome, d.marca);
+    $("iframe", c).srcdoc = preencherChaves(htmlAtual(), d.nome, d.marca, d);
     const fim = () => { c.close(); c.remove(); };
     $("[data-fechar]", c).onclick = fim;
     c.addEventListener("click", (e) => { if (e.target === c) fim(); });
@@ -5046,7 +5161,7 @@ async function enviarTeste() {
   const b = $("#pro-teste"); b.disabled = true; b.textContent = "Enviando teste...";
   const d = destinatariosDe(pro.publico === "teste" ? "todas" : pro.publico).lista[0] || { nome: "Natura", marca: "Natura" };
   try {
-    const r = await chamarCarteiro({ teste: true, assunto: pro.assunto, html: htmlAtual(), destinatarios: [{ email: EMAIL_PROPOSTAS, nome: d.nome, marca: d.marca }] });
+    const r = await chamarCarteiro({ teste: true, assunto: pro.assunto, html: htmlAtual(), destinatarios: [{ email: EMAIL_PROPOSTAS, nome: d.nome, marca: d.marca, pessoa: d.pessoa, conexao: d.conexao, ideia: d.ideia }] });
     if (r.enviados) { pro.testeFeito = "resend|" + pro.assunto + "|" + htmlAtual(); avisar(`Teste enviado para ${EMAIL_PROPOSTAS}, com o nome "${d.nome}". Abra no celular para conferir.`); }
     else avisar("O teste não saiu: " + explicarErroResend((r.erros || [])[0] || "erro desconhecido"), true);
   } catch (e) { avisar(explicarErroResend(e.message), true); }
@@ -5124,7 +5239,7 @@ function mensagemGmail(d) {
     `List-Unsubscribe: <mailto:${EMAIL_PROPOSTAS}?subject=SAIR>`, "MIME-Version: 1.0",
     `Content-Type: multipart/alternative; boundary="${fronteira}"`, "",
     `--${fronteira}`, "Content-Type: text/plain; charset=UTF-8", "Content-Transfer-Encoding: base64", "", b64(textoPuroPara(d)),
-    `--${fronteira}`, "Content-Type: text/html; charset=UTF-8", "Content-Transfer-Encoding: base64", "", b64(preencherChaves(htmlAtual(), d.nome, d.marca)),
+    `--${fronteira}`, "Content-Type: text/html; charset=UTF-8", "Content-Transfer-Encoding: base64", "", b64(preencherChaves(htmlAtual(), d.nome, d.marca, d)),
     `--${fronteira}--`, ""].join("\r\n");
 }
 const mandarPeloGmail = async (d) => (await gmailApi("messages/send", { metodo: "POST", corpo: { raw: base64Url(mensagemGmail(d)) } })).id;

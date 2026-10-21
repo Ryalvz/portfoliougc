@@ -1343,3 +1343,12 @@ dialog.pf-janela-rapida { width: min(460px, calc(100vw - 20px)); }
 .pf-juros small { display: block; text-transform: none; letter-spacing: 0; color: var(--muted); font-weight: 500; }
 .pf-juros-liga { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); margin: 4px 0 0; cursor: pointer; }
 .perigo-link { color: var(--red) !important; }
+/* Prospecção: modelos na voz e campos por marca */
+.pro-modelos-voz { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0 0 10px; padding: 8px 10px; border-radius: var(--radius); background: var(--olive-tint); }
+.pro-assuntos { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin: 6px 0 2px; }
+.pro-marcas-campos { display: grid; gap: 10px; max-height: 520px; overflow: auto; }
+.pro-marca-linha { display: grid; grid-template-columns: 160px 1fr; gap: 6px 10px; padding: 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--parchment); }
+.pro-marca-nome { grid-row: span 3; display: grid; align-content: start; gap: 2px; min-width: 0; }
+.pro-marca-nome small { color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; }
+.pro-marca-linha .campo { font-size: 12.5px; }
+@media (max-width: 620px) { .pro-marca-linha { grid-template-columns: 1fr; } .pro-marca-nome { grid-row: auto; } }
