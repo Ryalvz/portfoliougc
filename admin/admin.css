@@ -1328,3 +1328,17 @@ dialog.pf-janela-rapida { width: min(460px, calc(100vw - 20px)); }
 .ret-mini.boa i { background: var(--green); }
 .ret-mini.baixa i { background: var(--red); }
 .t-outro { background: #E8EEF6; color: #2D4A6E; }
+/* Quem me deve: pagamentos em partes */
+.pf-pago-trilho { height: 8px; border-radius: 4px; background: var(--tint); overflow: hidden; margin: 8px 0 2px; }
+.pf-pago-trilho i { display: block; height: 100%; background: var(--green); }
+.pf-pagamentos { margin-top: 10px; border-top: 1px dashed var(--line); padding-top: 8px; font-size: 12.5px; }
+.pf-pagamentos > b { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); }
+.pf-pagamentos ul { list-style: none; margin: 4px 0 6px; padding: 0; display: grid; gap: 2px; }
+.pf-pagamentos li { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; }
+.pf-pagamentos li strong { color: var(--green); font-variant-numeric: tabular-nums; }
+.pf-pagamentos p { margin: 0; }
+.pf-juros { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 2px 0 6px; padding: 8px 10px; border-radius: var(--radius); background: var(--amber-bg); }
+.pf-juros span { font-size: 11px; color: var(--amber); text-transform: uppercase; letter-spacing: .5px; font-weight: 600; }
+.pf-juros b { display: block; font-size: 15px; color: var(--text); text-transform: none; letter-spacing: 0; }
+.pf-juros small { display: block; text-transform: none; letter-spacing: 0; color: var(--muted); font-weight: 500; }
+.pf-juros-liga { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); margin: 4px 0 0; cursor: pointer; }

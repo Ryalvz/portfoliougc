@@ -153,6 +153,63 @@ function devedores() {
   P.receb.forEach((r) => { const p = pega(r.pessoa); p.pago += n2(r.valor); p.receb.push(r); });
   return [...mapa.values()].map((p) => ({ ...p, falta: r2(p.devido - p.pago) })).sort((a, b) => b.falta - a.falta || b.futuro - a.futuro);
 }
+/* ---------- Juros por atraso de quem te deve ----------
+   Cada parcela da pessoa vence no dia do vencimento da fatura do cartão
+   em que ela caiu. Se o pagamento chega depois, corre juros simples por dia
+   sobre o que está vencido e em aberto, na taxa do cartão (ao mês / 30).
+   Os pagamentos abatem primeiro o valor das compras; os juros ficam para
+   o fim, pagos com o que sobrar (como você combina com a pessoa). */
+const TAXAS_CARTAO_PADRAO = { nubank: 10.99, bradesco: 14.99, inter: 10.99 };
+const taxaDoCartao = (c) => {
+  if (!c) return 0;
+  const salvo = (P.config.juros_cartoes || {})[String(c.id)];
+  if (salvo != null && salvo !== "") return n2(salvo);
+  return TAXAS_CARTAO_PADRAO[semAcento(c.nome)] ?? 10.99;
+};
+const cobraJuros = (nome) => !!(P.config.juros_pessoas || {})[chavePessoa(nome)];
+function vencimentoNoMes(cartao, k) {
+  const [a, m] = k.split("-").map(Number);
+  const ultimo = new Date(a, m, 0).getDate();
+  const dia = Math.min(ultimo, Number((cartao && cartao.vence_dia) || 10));
+  return `${k}-${pad(dia)}`;
+}
+function jurosDe(p) {
+  const hoje = hojeISO(), inicio = inicioCobranca();
+  // Parcelas vencidas: { data, valor, taxa ao dia }
+  const devidas = [];
+  p.compras.forEach((c) => {
+    const cartao = P.cartoes.find((x) => String(x.id) === String(c.cartao_id));
+    for (let i = 0; i < Number(c.parcelas || 1); i++) {
+      const k = somaMes(mesDe(c.primeiro_mes), i);
+      if (k < inicio) continue;
+      const venc = vencimentoNoMes(cartao, k);
+      if (venc > hoje) continue;
+      devidas.push({ data: venc, valor: n2(c.valor_parcela), dia: taxaDoCartao(cartao) / 100 / 30 });
+    }
+  });
+  devidas.sort((a, b) => a.data.localeCompare(b.data));
+  const pags = [...p.receb].map((r) => ({ data: String(r.data).slice(0, 10), valor: n2(r.valor) })).sort((a, b) => a.data.localeCompare(b.data));
+  // Anda dia a dia: abate os pagamentos nas parcelas mais antigas e soma os juros do que ficou vencido
+  let juros = 0, sobra = 0, jurosPagos = 0, desde = null;
+  const abertas = [];
+  let iD = 0, iP = 0;
+  const primeiro = devidas[0] ? devidas[0].data : null;
+  if (!primeiro) return { juros: 0, jurosPagos: 0, pendente: 0, desde: null };
+  for (let d = deISO(primeiro); isoLocal(d) <= hoje; d.setDate(d.getDate() + 1)) {
+    const dia = isoLocal(d);
+    while (iD < devidas.length && devidas[iD].data <= dia) abertas.push({ ...devidas[iD++] });
+    while (iP < pags.length && pags[iP].data <= dia) {
+      let v = pags[iP++].valor + sobra; sobra = 0;
+      for (const a of abertas) { if (v <= 0) break; const x = Math.min(a.valor, v); a.valor -= x; v -= x; }
+      if (v > 0) { const x = Math.min(juros - jurosPagos, v); jurosPagos += x; v -= x; sobra = v; }
+    }
+    // Juros do dia sobre o que venceu e não foi pago (a partir do dia seguinte ao vencimento)
+    abertas.forEach((a) => { if (a.valor > 0.005 && a.data < dia) { juros += a.valor * a.dia; if (!desde) desde = a.data; } });
+  }
+  juros = r2(juros); jurosPagos = r2(jurosPagos);
+  return { juros, jurosPagos, pendente: r2(Math.max(0, juros - jurosPagos)), desde };
+}
+
 const pessoasConhecidas = () => [...new Set([...P.compras.filter((c) => !ehMinha(c)).map((c) => nomePessoa(c.dono)), ...P.receb.map((r) => nomePessoa(r.pessoa))])].sort(ordenaTexto);
 
 /* ---------- Tela ---------- */
@@ -644,41 +701,54 @@ function pfDevem(el) {
       <button class="btn primario" type="button" id="pf-novo-receb">${ic("mais")}Registrar pagamento</button></div>
     ${dev.length ? `<div class="pf-pessoas">${dev.map((p) => {
       const abertas = p.compras.filter((c) => ultimoMes(c) >= hoje);
-      const msg = `Oi, ${p.nome.split(" ")[0]}! Passando o resumo do cartão: ${abertas.map((c) => { const i = idxParcela(c, hoje); return `${c.descricao}${Number(c.parcelas) > 1 && Number(c.parcelas) < RECORRENTE && i >= 0 ? ` (${i + 1}/${c.parcelas})` : ""} ${real(c.valor_parcela)}`; }).join("; ")}. Em aberto até agora: ${real(Math.max(0, p.falta))}. Consegue me mandar até o vencimento?`;
+      const msg = `Oi, ${p.nome.split(" ")[0]}! Passando o resumo do cartão: ${abertas.map((c) => { const i = idxParcela(c, hoje); return `${c.descricao}${Number(c.parcelas) > 1 && Number(c.parcelas) < RECORRENTE && i >= 0 ? ` (${i + 1}/${c.parcelas})` : ""} ${real(c.valor_parcela)}`; }).join("; ")}. Em aberto até agora: ${real(Math.max(0, p.falta))}.${cobraJuros(p.nome) && jurosDe(p).pendente > 0 ? ` Juros por atraso: ${real(jurosDe(p).pendente)}. Total pra quitar hoje: ${real(Math.max(0, p.falta) + jurosDe(p).pendente)}.` : ""} Consegue me mandar até o vencimento?`;
       return `<div class="cartao pf-pessoa ${p.falta > 0 ? "atrasado" : ""}">
         <div class="barra" style="margin:0 0 6px"><h2 style="margin:0">${esc(p.nome)}</h2><span class="espaco"></span>
           ${p.falta > 0 ? `<span class="pilula p-vencido">deve ${real(p.falta)}</span>` : p.falta < 0 ? `<span class="pilula p-pago">pagou ${real(-p.falta)} adiantado</span>` : `<span class="pilula p-pago">em dia</span>`}</div>
         <div class="pf-nums"><span>Já venceu<b>${real(p.devido)}</b></span><span>Já pagou<b>${real(p.pago)}</b></span><span>Próximos 12 meses<b>${real(p.futuro)}</b></span></div>
+        ${cobraJuros(p.nome) ? (() => { const j = jurosDe(p); return `<div class="pf-juros"><span>Juros por atraso${j.desde ? ` (desde ${dataBR(j.desde).slice(0, 5)})` : ""}<b>${real(j.pendente)}</b>${j.jurosPagos ? `<small>já pagou ${real(j.jurosPagos)} de juros</small>` : ""}</span><span>Pra quitar hoje<b>${real(Math.max(0, p.falta) + j.pendente)}</b><small>o que falta + juros</small></span></div>`; })() : ""}
+        <label class="pf-juros-liga"><input type="checkbox" data-juros-pessoa="${esc(p.nome)}" ${cobraJuros(p.nome) ? "checked" : ""}> Cobrar juros por atraso (taxa do cartão, por dia)</label>
         <ul class="pf-mini">${abertas.slice(0, 8).map((c) => { const i = idxParcela(c, hoje); return `<li><span>${esc(c.descricao)}</span><small>${Number(c.parcelas) >= RECORRENTE ? "todo mês" : Number(c.parcelas) > 1 ? (i >= 0 ? `${i + 1}/${c.parcelas}` : `até ${nomeMes(ultimoMes(c), true)}`) : "à vista"}</small><b>${real(c.valor_parcela)}</b></li>`; }).join("")}</ul>
-        ${p.receb.length ? `<p class="sub" style="margin:6px 0 0">Último pagamento: ${real(p.receb[0].valor)} em ${dataBR(p.receb[0].data)}</p>` : ""}
+        ${p.devido > 0 ? `<div class="pf-pago-trilho" title="Pagou ${real(p.pago)} de ${real(p.devido)}"><i style="width:${Math.min(100, (p.pago / p.devido) * 100)}%"></i></div>` : ""}
+        ${p.receb.length ? `<div class="pf-pagamentos"><b>Pagamentos</b>
+          <ul>${[...p.receb].sort((a, b) => String(b.data).localeCompare(String(a.data))).map((r) => `<li><span>${dataBR(r.data)}${r.obs ? ` · ${esc(r.obs)}` : ""}</span><strong>${real(r.valor)}</strong><button class="icone-btn" type="button" data-edita-receb="${r.id}" aria-label="Editar pagamento">${ic("editar")}</button></li>`).join("")}</ul>
+          <p>${p.falta > 0 ? `Falta agora: <strong>${real(p.falta)}</strong>` : p.falta < 0 ? `Pagou <strong>${real(-p.falta)}</strong> a mais (conta para as próximas parcelas)` : "Tudo pago até agora ✅"}</p></div>` : ""}
         <div class="barra" style="margin:10px 0 0">
-          <button class="btn" type="button" data-receb="${esc(p.nome)}">${ic("check")}Recebi</button>
+          <button class="btn primario" type="button" data-receb="${esc(p.nome)}">${ic("mais")}Pagamento</button>
           <a class="btn" href="https://wa.me/?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">${ic("whats")}Cobrar no WhatsApp</a>
-          <button class="btn" type="button" data-hist="${esc(p.nome)}">Ver pagamentos</button>
         </div></div>`; }).join("")}</div>`
       : `<p class="vazio">Ninguém te deve nada por aqui. Quando importar a fatura, escreva o nome da pessoa nas compras que não são suas.</p>`}`;
   $("#pf-novo-receb", el).onclick = () => formRecebPF();
-  $$("[data-receb]", el).forEach((b) => b.onclick = () => formRecebPF(null, b.dataset.receb, Math.max(0, (dev.find((p) => p.nome === b.dataset.receb) || {}).falta || 0)));
-  $$("[data-hist]", el).forEach((b) => b.onclick = () => {
-    const p = dev.find((x) => x.nome === b.dataset.hist);
-    const d = abrirJanelaSimples(`Pagamentos de ${esc(p.nome)}`, p.receb.length ? `<ul class="pf-mini">${p.receb.map((r) => `<li><span>${dataBR(r.data)}${r.obs ? ` · ${esc(r.obs)}` : ""}</span><b>${real(r.valor)}</b><button class="icone-btn" type="button" data-edita-receb="${r.id}" aria-label="Editar">${ic("editar")}</button></li>`).join("")}</ul>` : `<p class="vazio">Nenhum pagamento registrado.</p>`);
-    $$("[data-edita-receb]", d).forEach((x) => x.onclick = () => formRecebPF(P.receb.find((r) => String(r.id) === x.dataset.editaReceb)));
+  $$("[data-receb]", el).forEach((b) => b.onclick = () => formRecebPF(null, b.dataset.receb, (dev.find((p) => p.nome === b.dataset.receb) || {}).falta || 0));
+  $$("[data-edita-receb]", el).forEach((x) => x.onclick = () => formRecebPF(P.receb.find((r) => String(r.id) === x.dataset.editaReceb)));
+  $$("[data-juros-pessoa]", el).forEach((cx) => cx.onchange = async () => {
+    const mapa = { ...(P.config.juros_pessoas || {}) };
+    mapa[chavePessoa(cx.dataset.jurosPessoa)] = cx.checked;
+    const { error } = await db.from("pf_config").upsert({ chave: "juros_pessoas", valor: mapa }, { onConflict: "chave" });
+    if (error) { avisar(traduzErro(error), true); cx.checked = !cx.checked; return; }
+    P.config.juros_pessoas = mapa;
+    desenhar();
   });
 }
-function formRecebPF(r, pessoa, valor) {
+// Pagamento pode ser em partes: cada valor que a pessoa manda vira uma linha, e o "falta" vai diminuindo
+function formRecebPF(r, pessoa, falta) {
   abrirForm({
-    titulo: r ? "Editar pagamento" : "Registrar pagamento recebido",
+    titulo: r ? "Editar pagamento" : pessoa ? `Pagamento de ${pessoa}` : "Registrar pagamento recebido",
     tabela: "pf_recebimentos",
     campos: [
       { n: "pessoa", r: "Quem pagou", req: true, lista: pessoasConhecidas() },
-      { n: "valor", r: "Valor (R$)", t: "number", req: true },
+      { n: "valor", r: "Quanto a pessoa te mandou (R$)", t: "number", req: true, ajuda: !r && falta > 0 ? `Falta ${real(falta)}. Pode ser só uma parte: cada pagamento fica guardado com a data.` : "" },
       { n: "data", r: "Data", t: "date", req: true },
       { n: "obs", r: "Observação", inteiro: true }
     ],
-    valores: r || { pessoa: pessoa || "", valor: valor ? r2(valor) : "", data: hojeISO() },
+    valores: r || { pessoa: pessoa || "", valor: "", data: hojeISO() },
     aoSalvar: async (d) => {
       const ok = await gravar("pf_recebimentos", { ...d, pessoa: nomePessoa(d.pessoa) }, r ? r.id : null);
-      if (ok) await recarregarPF();
+      if (ok) {
+        await recarregarPF();
+        const p = devedores().find((x) => chavePessoa(x.nome) === chavePessoa(d.pessoa));
+        if (p && !r) setTimeout(() => avisar(p.falta > 0 ? `Anotado. Falta ${real(p.falta)} de ${p.nome}.` : `Anotado. ${p.nome} está em dia.`), 50);
+      }
       return ok;
     },
     aoApagar: r ? async () => { const ok = await apagarLinha("pf_recebimentos", r.id); if (ok) await recarregarPF(); return ok; } : null
@@ -778,11 +848,15 @@ function formAjustesPF() {
       { n: "reserva", r: "Quanto você tem guardado hoje (R$)", t: "number" },
       { n: "reserva_meses", r: "Meta da reserva (meses de custo)", t: "number", ajuda: "3 é um bom começo; 6 é o ideal pra renda que varia." },
       { n: "teto_mes", r: "Teto da sua parte da fatura por mês (R$)", t: "number", ajuda: "Tudo no cartão: parcelas + compras à vista, somando todos os cartões. Vazio = sem teto." },
-      { n: "dia_a_dia", r: "Gasto do dia a dia por mês, para a projeção (R$)", t: "number", ajuda: "Vazio = calcula pela média das faturas importadas." }
+      { n: "dia_a_dia", r: "Gasto do dia a dia por mês, para a projeção (R$)", t: "number", ajuda: "Vazio = calcula pela média das faturas importadas." },
+      ...P.cartoes.map((c) => ({ n: "juros_" + c.id, r: `Juros por atraso no ${c.nome} (% ao mês)`, t: "number", livre: true, ajuda: "Usado para cobrar de quem te paga depois do vencimento. Veja na sua fatura: juros do rotativo." }))
     ],
-    valores: { salario: cfg("salario", ""), reserva: cfg("reserva", ""), reserva_meses: cfg("reserva_meses", 3), teto_mes: cfg("teto_mes", ""), dia_a_dia: cfg("dia_a_dia", "") },
+    valores: { salario: cfg("salario", ""), reserva: cfg("reserva", ""), reserva_meses: cfg("reserva_meses", 3), teto_mes: cfg("teto_mes", ""), dia_a_dia: cfg("dia_a_dia", ""), ...Object.fromEntries(P.cartoes.map((c) => ["juros_" + c.id, taxaDoCartao(c)])) },
     aoSalvar: async (d) => {
+      const juros = {};
+      Object.keys(d).filter((k) => k.startsWith("juros_")).forEach((k) => { juros[k.slice(6)] = d[k]; delete d[k]; });
       const linhas = Object.entries(d).map(([chave, v]) => ({ chave, valor: v || 0 }));
+      if (Object.keys(juros).length) linhas.push({ chave: "juros_cartoes", valor: juros });
       const { error } = await db.from("pf_config").upsert(linhas, { onConflict: "chave" });
       if (error) { avisar(traduzErro(error), true); return false; }
       await recarregarPF();
