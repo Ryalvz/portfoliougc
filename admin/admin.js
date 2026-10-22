@@ -4697,7 +4697,9 @@ Meu portfólio: https://ugc.ryalvz.com.br
 
 Faz sentido eu te mandar o roteiro completo?
 
-Ryan Alves · @ryalvz`
+Ryan Alves · @ryalvz
+
+P.S.: independente dessa collab, me conta como funciona o processo de vocês com criativos hoje? Se tiverem lista de creators, quero entrar nela.`
   },
   segundo: {
     nome: "Segundo e-mail (reabre a conversa)",
@@ -4722,6 +4724,64 @@ Sou o Ryan, criador de UGC de tech e lifestyle. Antes do UGC, passei 12 anos em 
 {conexao}
 
 Meu portfólio: https://ugc.ryalvz.com.br`;
+// Textos pra colar no Claude: o que é fixo já vem preenchido, o que muda fica entre colchetes
+const SOBRE_RYAN = "gravo UGC de tech e lifestyle, vídeo vertical pra perfil e anúncio. Antes do UGC passei 12 anos em vendas, então meus roteiros começam pela dúvida que faz o cliente desistir da compra. Mais de 40 marcas atendidas, entre elas Canva, Rexona e Mercado Livre.";
+const TOM_RYAN = "conversa de café, primeira pessoa, direto, frases curtas, de igual pra igual. Nunca usar travessão. Nada de \"não é X, é Y\", \"isso muda tudo\" ou número e resultado inventado.";
+const PS_RYAN = "P.S.: independente dessa collab, me conta como funciona o processo de vocês com criativos hoje? Se tiverem lista de creators, quero entrar nela.";
+const PROMPTS_CLAUDE = {
+  email: { nome: "E-mail", texto: `Escreve o meu e-mail de prospecção pra marca, seguindo esta estrutura:
+1 quem eu sou e o meu diferencial · 2 por que estou falando com essa marca · 3 a ideia de conteúdo pronta · 4 link do portfólio e uma pergunta no fim.
+
+Sobre mim: ${SOBRE_RYAN}
+Meu portfólio: https://ugc.ryalvz.com.br
+Meu tom: ${TOM_RYAN}
+
+Regras: no máximo 150 palavras, sem enrolação, sem "espero que esteja bem", nada de anexo.
+Deixa marcado com chave o que muda em cada marca: {marca}, {pessoa} e {conexao}.
+Termina com este P.S., do jeito que está:
+${PS_RYAN}
+
+Me entrega três opções de assunto também.
+
+Marca desta vez (opcional): [cole o site, o Instagram ou o que você sabe da marca. Se colar, ele já preenche as chaves]` },
+  dm: { nome: "Versão de DM", texto: `Escreve a versão de DM do meu e-mail de prospecção, pro direct do Instagram da marca, seguindo esta estrutura:
+1 quem eu sou em uma frase · 2 a ideia de vídeo pra marca em uma frase · 3 uma pergunta pedindo o melhor e-mail pra mandar a proposta.
+
+Sobre mim: ${SOBRE_RYAN}
+Meu Instagram: @ryalvz
+Meu tom: ${TOM_RYAN}
+
+Regras: no máximo 60 palavras, sem link, sem "espero que esteja bem", uma pergunta só.
+Deixa marcado com chave o que muda em cada marca: {marca} e {conexao}.
+
+Me entrega duas versões: uma mais curta e uma com a ideia mais detalhada.
+
+Marca desta vez (opcional): [cole o Instagram ou o que você sabe da marca]` },
+  segundo: { nome: "Segundo e-mail", texto: `Escreve o segundo e-mail de prospecção, pra marca que não respondeu o primeiro, seguindo esta estrutura:
+1 retoma em uma frase a ideia que mandei · 2 traz um ângulo novo (outra ideia curta de vídeo) · 3 pede o WhatsApp de quem cuida das parcerias.
+
+Sobre mim: ${SOBRE_RYAN}
+Meu portfólio: https://ugc.ryalvz.com.br
+Meu tom: ${TOM_RYAN}
+
+Regras: no máximo 80 palavras, sem cobrar resposta, sem "só passando pra lembrar", sem "espero que esteja bem", nada de anexo.
+Deixa marcado com chave o que muda em cada marca: {marca}, {pessoa} e {ideia}.
+
+Me entrega três opções de assunto também, que funcionem como resposta do primeiro e-mail.
+
+Ideia do primeiro e-mail (opcional): [cole aqui a ideia que você mandou]` },
+  seuinf: { nome: "Seu Influencer", texto: `Escreve a minha candidatura pra uma campanha no Seu Influencer, seguindo esta estrutura:
+1 prova logo na primeira linha (marcas que já atendi) · 2 quem eu sou e o meu diferencial · 3 por que essa campanha combina comigo · 4 link do portfólio.
+
+Sobre mim: ${SOBRE_RYAN}
+Meu portfólio: https://ugc.ryalvz.com.br
+Meu tom: ${TOM_RYAN}
+
+Regras: no máximo 100 palavras, sem enrolação, sem pedir oportunidade, sem "espero que esteja bem".
+Deixa marcado com chave o que muda em cada campanha: {marca} e {conexao}.
+
+Campanha desta vez: [cole o briefing da campanha]` }
+};
 const usaCamposDaMarca = () => /\{\{?\s*(pessoa|conexao|conexão|ideia)\s*\}?\}/i.test([pro.assunto, pro.escrita === "html" ? pro.html : pro.texto].join(" "));
 
 const MODELO_ASSUNTO = "Conteúdo UGC para a {{marca}}";
@@ -4740,19 +4800,19 @@ const pro = {
   // Padrão: o e-mail na voz do Ryan (só falta preencher o que muda em cada marca)
   assunto: MODELOS_VOZ.prospeccao.assuntos[0], texto: MODELOS_VOZ.prospeccao.texto, modeloVoz: "prospeccao", html: "", botaoTexto: "", botaoLink: "https://ugc.ryalvz.com.br/",
   envios: null, optout: null, falta: [], carregando: false, carregado: false, buscaHist: "",
-  testeFeito: "", filaPulados: [], sairConferido: false
+  testeFeito: "", filaPulados: [], sairConferido: false, abaPrompt: "email"
 };
 // O rascunho fica guardado neste aparelho, para você não perder o texto
 (function lerRascunho() {
   try {
     const r = JSON.parse(localStorage.getItem("prospeccao-rascunho") || "null");
     if (!r) return;
-    if (r.v === 3) ["envio", "escrita", "assunto", "texto", "html", "botaoTexto", "botaoLink", "modeloVoz"].forEach((k) => { if (r[k] != null) pro[k] = r[k]; });
-    else if (r.v === 2 && r.envio) pro.envio = r.envio;
+    if (r.v === 4) ["envio", "escrita", "assunto", "texto", "html", "botaoTexto", "botaoLink", "modeloVoz"].forEach((k) => { if (r[k] != null) pro[k] = r[k]; });
+    else if (r.envio) pro.envio = r.envio;
   } catch (_) {}
 })();
 function guardarRascunho() {
-  try { localStorage.setItem("prospeccao-rascunho", JSON.stringify({ v: 3, envio: pro.envio, escrita: pro.escrita, assunto: pro.assunto, texto: pro.texto, html: pro.html, botaoTexto: pro.botaoTexto, botaoLink: pro.botaoLink, modeloVoz: pro.modeloVoz })); } catch (_) {}
+  try { localStorage.setItem("prospeccao-rascunho", JSON.stringify({ v: 4, envio: pro.envio, escrita: pro.escrita, assunto: pro.assunto, texto: pro.texto, html: pro.html, botaoTexto: pro.botaoTexto, botaoLink: pro.botaoLink, modeloVoz: pro.modeloVoz })); } catch (_) {}
 }
 
 // O primeiro e-mail válido do campo (tem marca com vários e-mails no mesmo campo)
@@ -4930,6 +4990,18 @@ function desenharProspeccao(el) {
 
   if (!opcoesPublico().some((x) => x[0] === pro.publico)) pro.publico = "selecionadas";
   el.innerHTML = capa + cartoes + aviso + `
+    <div class="cartao pro-prompts">
+      <div class="barra"><h2 style="margin:0">${ic("transcricao")} Pedir pro Claude</h2></div>
+      <p class="sub" style="margin:2px 0 12px">Escolha o texto, copie e cole no Claude. Só troque o que estiver entre colchetes.</p>
+      <div class="pro-abas" role="tablist" aria-label="Qual texto">
+        ${Object.entries(PROMPTS_CLAUDE).map(([k, p]) => `<button type="button" role="tab" data-aba-prompt="${k}" aria-selected="${pro.abaPrompt === k}">${esc(p.nome)}</button>`).join("")}
+      </div>
+      <pre class="pro-prompt" id="pro-prompt" role="tabpanel">${esc(PROMPTS_CLAUDE[pro.abaPrompt].texto)}</pre>
+      <div class="pro-prompt-acoes">
+        <button class="btn primario" type="button" id="pro-prompt-copiar">${ic("transcricao")}Copiar</button>
+        <a class="btn" href="https://claude.ai/new" target="_blank" rel="noopener">Abrir o Claude</a>
+      </div>
+    </div>
     <div class="pro-grade">
       <div class="pro-form">
         <div class="cartao">
@@ -4996,6 +5068,18 @@ function desenharProspeccao(el) {
         <button class="btn" type="button" id="pro-optout">${ic("fechar")}Descadastrar um e-mail</button></div>
       <div class="tabela-caixa"><table><thead><tr><th>Para</th><th>Assunto</th><th>Quando</th><th>Situação</th></tr></thead><tbody id="pro-hist"></tbody></table></div>
     </div>`;
+
+  // Pedir pro Claude: troca de aba sem redesenhar a página
+  $$("[data-aba-prompt]", el).forEach((b) => b.onclick = () => {
+    pro.abaPrompt = b.dataset.abaPrompt;
+    $$("[data-aba-prompt]", el).forEach((x) => x.setAttribute("aria-selected", String(x === b)));
+    $("#pro-prompt").textContent = PROMPTS_CLAUDE[pro.abaPrompt].texto;
+  });
+  $("#pro-prompt-copiar").onclick = async () => {
+    const texto = PROMPTS_CLAUDE[pro.abaPrompt].texto;
+    try { await navigator.clipboard.writeText(texto); avisar(`${PROMPTS_CLAUDE[pro.abaPrompt].nome}: copiado. Cola no Claude.`); }
+    catch (_) { abrirJanelaSimples("Copie o texto", `<textarea class="campo" rows="14" style="width:100%">${esc(texto)}</textarea>`); }
+  };
 
   const exemplo = () => (destinatariosDe(pro.publico === "teste" ? "todas" : pro.publico).lista[0]) || { nome: "Natura", marca: "Natura" };
   const pintarPrevia = () => {

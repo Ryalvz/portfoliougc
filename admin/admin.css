@@ -1346,9 +1346,19 @@ dialog.pf-janela-rapida { width: min(460px, calc(100vw - 20px)); }
 /* Prospecção: modelos na voz e campos por marca */
 .pro-modelos-voz { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0 0 10px; padding: 8px 10px; border-radius: var(--radius); background: var(--olive-tint); }
 .pro-assuntos { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin: 6px 0 2px; }
-.pro-marcas-campos { display: grid; gap: 10px; max-height: 520px; overflow: auto; }
-.pro-marca-linha { display: grid; grid-template-columns: 160px 1fr; gap: 6px 10px; padding: 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--parchment); }
-.pro-marca-nome { grid-row: span 3; display: grid; align-content: start; gap: 2px; min-width: 0; }
+.pro-marcas-campos { display: grid; gap: 14px; max-height: 520px; overflow: auto; }
+.pro-marca-linha { display: grid; grid-template-columns: 170px 1fr; gap: 8px 14px; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--parchment); }
+.pro-marca-nome { grid-row: span 3; display: grid; align-content: start; justify-items: start; gap: 6px; min-width: 0; }
 .pro-marca-nome small { color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; }
 .pro-marca-linha .campo { font-size: 12.5px; }
 @media (max-width: 620px) { .pro-marca-linha { grid-template-columns: 1fr; } .pro-marca-nome { grid-row: auto; } }
+
+/* Pedir pro Claude: abas separadas, uma de cada vez */
+.pro-prompts { margin-bottom: 16px; }
+.pro-abas { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 14px; }
+.pro-abas button { border: 1px solid var(--line); background: var(--card); color: var(--text); border-radius: 12px; padding: 10px 18px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.pro-abas button:hover { border-color: var(--muted); }
+.pro-abas button[aria-selected="true"] { background: var(--text); border-color: var(--text); color: var(--parchment); }
+.pro-abas button:focus-visible { outline: 2px solid var(--cobalt); outline-offset: 2px; }
+.pro-prompt { margin: 0; padding: 18px 20px; max-height: 420px; overflow: auto; white-space: pre-wrap; word-break: break-word; font: inherit; font-size: 13.5px; line-height: 1.65; color: var(--text); background: var(--parchment); border: 1px solid var(--line); border-radius: var(--radius); }
+.pro-prompt-acoes { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
