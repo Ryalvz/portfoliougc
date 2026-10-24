@@ -63,17 +63,49 @@ const RECORRENTE = 60; // compra "parcelada" em 60x ou mais = valor mensal sem f
 // Índice da parcela (0 = primeira) que cai no mês k, ou -1
 const idxParcela = (c, k) => { const i = difMes(mesDe(c.primeiro_mes), k); return i >= 0 && i < Number(c.parcelas || 1) ? i : -1; };
 const ultimoMes = (c) => somaMes(mesDe(c.primeiro_mes), Number(c.parcelas || 1) - 1);
-const ehMinha = (c) => !String(c.dono || "").trim();
 const parcelado = (c) => Number(c.parcelas) > 1;
 const nomePessoa = (s) => String(s || "").trim().replace(/\s+/g, " ");
 const chavePessoa = (s) => semAcento(nomePessoa(s));
+/* Compra dividida: em "De quem é" vale "Eu, Diego" ou "Diego e Emillie".
+   Cada nome paga uma parte igual. Vazio = a compra é toda sua. */
+const EU_NOMES = new Set(["eu", "meu", "minha", "ryan"]);
+function partesDe(c) {
+  const t = nomePessoa(c.dono);
+  if (!t) return [{ nome: "", eu: true, frac: 1 }];
+  const vistos = new Map();
+  t.split(/\s*(?:,|;|\+|\/|\s+e\s+)\s*/i).map(nomePessoa).filter(Boolean).forEach((n) => {
+    const eu = EU_NOMES.has(semAcento(n)), k = eu ? "eu" : chavePessoa(n);
+    if (!vistos.has(k)) vistos.set(k, { nome: eu ? "" : n, eu });
+  });
+  const l = [...vistos.values()];
+  return l.length ? l.map((x) => ({ ...x, frac: 1 / l.length })) : [{ nome: "", eu: true, frac: 1 }];
+}
+const fracMinha = (c) => partesDe(c).reduce((s, x) => s + (x.eu ? x.frac : 0), 0);
+const ehMinha = (c) => fracMinha(c) === 1;   // toda sua
+const temMinha = (c) => fracMinha(c) > 0;    // toda ou uma parte
+const outrosDe = (c) => partesDe(c).filter((x) => !x.eu);
+const dividida = (c) => partesDe(c).length > 1;
+const rotuloDono = (c) => { const l = partesDe(c); return l.length === 1 ? (l[0].eu ? "Eu" : l[0].nome) : "Dividida: " + l.map((x) => (x.eu ? "eu" : x.nome)).join(" + "); };
+// Monta o "De quem é" a partir do tipo escolhido no formulário
+const donoDoTipo = (tipo, nomes) => {
+  const n = nomePessoa(nomes);
+  if (tipo === "minha" || !n) return null;
+  return tipo === "dividida" ? `Eu, ${n}` : n;
+};
+// E o contrário: tipo e nomes de uma compra já salva
+const tipoDaCompra = (c) => {
+  if (ehMinha(c)) return { tipo: "minha", nomes: "" };
+  const outros = outrosDe(c).map((x) => x.nome).join(", ");
+  return { tipo: temMinha(c) ? "dividida" : "outra", nomes: outros };
+};
 
 function cartaoNo(k, filtro = () => true) {
   const r = { parcEu: 0, avEu: 0, outros: 0 };
   P.compras.forEach((c) => {
     if (!filtro(c) || idxParcela(c, k) < 0) return;
-    const v = n2(c.valor_parcela);
-    if (!ehMinha(c)) r.outros += v; else if (parcelado(c)) r.parcEu += v; else r.avEu += v;
+    const v = n2(c.valor_parcela), f = fracMinha(c);
+    r.outros += v * (1 - f);
+    if (parcelado(c)) r.parcEu += v * f; else r.avEu += v * f;
   });
   return r;
 }
@@ -141,15 +173,17 @@ function devedores() {
     if (!mapa.has(k)) mapa.set(k, { nome: nomePessoa(nome), devido: 0, futuro: 0, pago: 0, compras: [], receb: [] });
     return mapa.get(k);
   };
-  P.compras.filter((c) => !ehMinha(c)).forEach((c) => {
-    const p = pega(c.dono);
-    p.compras.push(c);
+  // Na compra dividida, cada pessoa entra só com a parte dela
+  P.compras.forEach((c) => outrosDe(c).forEach((pt) => {
+    const p = pega(pt.nome);
+    const parte = pt.frac < 1 ? { ...c, valor_parcela: r2(n2(c.valor_parcela) * pt.frac), parteDe: n2(c.valor_parcela) } : c;
+    p.compras.push(parte);
     for (let i = 0; i < Number(c.parcelas || 1); i++) {
       const k = somaMes(mesDe(c.primeiro_mes), i);
       if (k < inicio) continue;
-      if (k <= hoje) p.devido += n2(c.valor_parcela); else if (k <= ate) p.futuro += n2(c.valor_parcela);
+      if (k <= hoje) p.devido += n2(parte.valor_parcela); else if (k <= ate) p.futuro += n2(parte.valor_parcela);
     }
-  });
+  }));
   P.receb.forEach((r) => { const p = pega(r.pessoa); p.pago += n2(r.valor); p.receb.push(r); });
   return [...mapa.values()].map((p) => ({ ...p, falta: r2(p.devido - p.pago) })).sort((a, b) => b.falta - a.falta || b.futuro - a.futuro);
 }
@@ -210,7 +244,7 @@ function jurosDe(p) {
   return { juros, jurosPagos, pendente: r2(Math.max(0, juros - jurosPagos)), desde };
 }
 
-const pessoasConhecidas = () => [...new Set([...P.compras.filter((c) => !ehMinha(c)).map((c) => nomePessoa(c.dono)), ...P.receb.map((r) => nomePessoa(r.pessoa))])].sort(ordenaTexto);
+const pessoasConhecidas = () => [...new Set([...P.compras.flatMap((c) => outrosDe(c).map((x) => x.nome)), ...P.receb.map((r) => nomePessoa(r.pessoa))])].sort(ordenaTexto);
 
 /* ---------- Tela ---------- */
 function chipsVisaoFin() {
@@ -268,8 +302,8 @@ function pfVisao(el) {
   const renda = rendaPrevista(), dia = diaADiaEstimado();
   const dev = devedores();
   const aReceber = dev.reduce((s, p) => s + Math.max(0, p.falta), 0);
-  const restante = P.compras.filter(ehMinha).filter(parcelado).reduce((s, c) => {
-    let t = 0; for (let i = 0; i < Number(c.parcelas); i++) { if (somaMes(mesDe(c.primeiro_mes), i) >= hoje) t += n2(c.valor_parcela); } return s + t;
+  const restante = P.compras.filter(temMinha).filter(parcelado).reduce((s, c) => {
+    let t = 0; for (let i = 0; i < Number(c.parcelas); i++) { if (somaMes(mesDe(c.primeiro_mes), i) >= hoje) t += n2(c.valor_parcela) * fracMinha(c); } return s + t;
   }, 0);
   const fimParcelas = P.compras.filter((c) => parcelado(c) && Number(c.parcelas) < RECORRENTE).map(ultimoMes).filter((k) => k >= hoje).sort().pop();
   const reserva = n2(cfg("reserva")), metaMeses = Number(cfg("reserva_meses", 3)) || 3;
@@ -323,8 +357,9 @@ function faturaPartes(cartaoId, k) {
   const r = { parc: 0, vista: 0, outros: 0 };
   P.compras.forEach((c) => {
     if (String(c.cartao_id) !== String(cartaoId) || idxParcela(c, k) < 0) return;
-    const v = n2(c.valor_parcela);
-    if (!ehMinha(c)) r.outros += v; else if (parcelado(c)) r.parc += v; else r.vista += v;
+    const v = n2(c.valor_parcela), f = fracMinha(c);
+    r.outros += v * (1 - f);
+    if (parcelado(c)) r.parc += v * f; else r.vista += v * f;
   });
   r.eu = r.parc + r.vista; r.total = r.eu + r.outros;
   return r;
@@ -396,7 +431,7 @@ function cartaoLiberacao() {
     const fim = ultimoMes(c);
     if (fim < hoje) return;
     if (!porMes.has(fim)) porMes.set(fim, { v: 0, eu: 0, itens: [] });
-    const g = porMes.get(fim); g.v += n2(c.valor_parcela); if (ehMinha(c)) g.eu += n2(c.valor_parcela); g.itens.push(c);
+    const g = porMes.get(fim); g.v += n2(c.valor_parcela); g.eu += n2(c.valor_parcela) * fracMinha(c); g.itens.push(c);
   });
   const lista = [...porMes].sort((a, b) => (a[0] < b[0] ? -1 : 1)).slice(0, 10);
   let acumulado = 0;
@@ -404,7 +439,7 @@ function cartaoLiberacao() {
     <p class="sub" style="margin:-6px 0 8px">a última parcela cai no mês indicado. No mês seguinte esse valor sai da fatura.</p>
     ${lista.length ? `<ul class="pf-libera">${lista.map(([k, g]) => { acumulado += g.v; return `<li>
       <b>${nomeMes(k, true)}</b>
-      <span>${g.itens.map((c) => esc(c.descricao) + (ehMinha(c) ? "" : ` <em>(${esc(nomePessoa(c.dono))})</em>`)).join(", ")}</span>
+      <span>${g.itens.map((c) => esc(c.descricao) + (ehMinha(c) ? "" : ` <em>(${esc(rotuloDono(c))})</em>`)).join(", ")}</span>
       <strong>−${real(g.v)}</strong><small>a partir de ${nomeMes(somaMes(k, 1), true)}, ${real(acumulado)}/mês a menos</small></li>`; }).join("")}</ul>`
       : `<p class="vazio">Nenhuma compra parcelada cadastrada. Importe a fatura ou lance uma compra em Parcelas.</p>`}
   </div>`;
@@ -529,15 +564,17 @@ function pfGastos(el) {
   let lista = P.compras.filter((c) => mesDaCompra(c) === k && Number(c.parcelas) < RECORRENTE);
   const doMes = lista.slice();
   if (pfx.gCartao) lista = lista.filter((c) => (pfx.gCartao === "pix" ? !c.cartao_id : String(c.cartao_id) === pfx.gCartao));
-  if (pfx.gDono === "eu") lista = lista.filter(ehMinha); else if (pfx.gDono === "outros") lista = lista.filter((c) => !ehMinha(c));
+  if (pfx.gDono === "eu") lista = lista.filter(temMinha); else if (pfx.gDono === "outros") lista = lista.filter((c) => !ehMinha(c));
   const total = (l) => l.reduce((s, c) => s + n2(c.valor_parcela) * Number(c.parcelas || 1), 0);
-  const meus = doMes.filter(ehMinha);
-  const vista = total(meus.filter((c) => !parcelado(c))), novasParc = total(meus.filter(parcelado)), dosOutros = total(doMes.filter((c) => !ehMinha(c)));
+  // Só a sua parte (na dividida, a sua fração)
+  const totalEu = (l) => l.reduce((s, c) => s + n2(c.valor_parcela) * Number(c.parcelas || 1) * fracMinha(c), 0);
+  const meus = doMes.filter(temMinha);
+  const vista = totalEu(meus.filter((c) => !parcelado(c))), novasParc = totalEu(meus.filter(parcelado)), dosOutros = total(doMes) - totalEu(doMes);
   const teto = n2(cfg("teto_mes"));
   // Por categoria (só o que é seu)
   const cats = {};
   // Só o à vista: é o que o teto e as metas medem (as parceladas já estão em Parcelas)
-  meus.filter((c) => !parcelado(c)).forEach((c) => { const t = categoriaDe(c); cats[t] = (cats[t] || 0) + n2(c.valor_parcela); });
+  meus.filter((c) => !parcelado(c)).forEach((c) => { const t = categoriaDe(c); cats[t] = (cats[t] || 0) + n2(c.valor_parcela) * fracMinha(c); });
   const listaCats = Object.entries(cats).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
   const maxCat = Math.max(1, ...listaCats.map(([, v]) => v));
   // Agrupado por dia, mais recente primeiro
@@ -567,10 +604,10 @@ function pfGastos(el) {
       <div class="cartao">
         <div class="barra" style="margin-bottom:6px"><h2 style="margin:0">Dia a dia</h2><span class="espaco"></span><button class="btn" type="button" id="g-novo">${ic("mais")}Gasto</button></div>
         ${Object.keys(dias).length ? Object.keys(dias).sort().reverse().map((d) => { const dt = deISO(d); const l = dias[d]; return `<div class="pf-dia">
-          <div class="pf-dia-topo"><b>${DIAS_SEMANA_PF[dt.getDay()]}, ${dt.getDate()} de ${MESES_LONGOS[dt.getMonth()].toLowerCase()}</b><span>${real(total(l.filter(ehMinha)))}</span></div>
+          <div class="pf-dia-topo"><b>${DIAS_SEMANA_PF[dt.getDay()]}, ${dt.getDate()} de ${MESES_LONGOS[dt.getMonth()].toLowerCase()}</b><span>${real(totalEu(l))}</span></div>
           ${l.map((c) => `<button type="button" class="pf-gasto" data-g-id="${c.id}">
             <span class="pf-gasto-nome">${esc(c.descricao)}${c.origem === "rapido" ? ` <i class="pf-tag">lançado por você</i>` : ""}</span>
-            <span class="pf-gasto-info">${esc(nomeCartao(c.cartao_id))}${parcelado(c) ? ` · ${c.parcelas}x de ${real(c.valor_parcela)}${dataAproximada(c) ? ", dia aproximado" : ""}` : ""}${ehMinha(c) ? "" : ` · <b>${esc(nomePessoa(c.dono))}</b>`} · ${esc(categoriaDe(c))}</span>
+            <span class="pf-gasto-info">${esc(nomeCartao(c.cartao_id))}${parcelado(c) ? ` · ${c.parcelas}x de ${real(c.valor_parcela)}${dataAproximada(c) ? ", dia aproximado" : ""}` : ""}${ehMinha(c) ? "" : ` · <b>${esc(rotuloDono(c))}</b>`}${dividida(c) && temMinha(c) ? ` · sua parte ${real(n2(c.valor_parcela) * Number(c.parcelas || 1) * fracMinha(c))}` : ""} · ${esc(categoriaDe(c))}</span>
             <strong class="${n2(c.valor_parcela) < 0 ? "pf-credito-v" : ""}">${real(n2(c.valor_parcela) * Number(c.parcelas || 1))}</strong>
           </button>`).join("")}</div>`; }).join("") : `<p class="vazio">Nenhum gasto em ${MESES_LONGOS[Number(k.slice(5)) - 1].toLowerCase()}${pfx.gCartao || pfx.gDono ? " com esse filtro" : ""}. Lance pelo botão + Gasto ou pelo Telegram.</p>`}
       </div>
@@ -599,9 +636,10 @@ function pfCompras(el) {
   const pessoas = pessoasConhecidas();
   let lista = P.compras.slice();
   if (pfx.cartao) lista = lista.filter((c) => String(c.cartao_id) === pfx.cartao);
-  if (pfx.dono === "eu") lista = lista.filter(ehMinha);
+  if (pfx.dono === "eu") lista = lista.filter(temMinha);
   else if (pfx.dono === "outros") lista = lista.filter((c) => !ehMinha(c));
-  else if (pfx.dono) lista = lista.filter((c) => chavePessoa(c.dono) === pfx.dono);
+  else if (pfx.dono === "dividida") lista = lista.filter(dividida);
+  else if (pfx.dono) lista = lista.filter((c) => outrosDe(c).some((x) => chavePessoa(x.nome) === pfx.dono));
   // Parceladas ainda rodando (padrão), parceladas que já acabaram, ou tudo (inclui à vista)
   if (pfx.tipo === "parceladas") lista = lista.filter((c) => parcelado(c) && ultimoMes(c) >= hoje);
   else if (pfx.tipo === "acabaram") lista = lista.filter((c) => parcelado(c) && ultimoMes(c) < hoje);
@@ -611,7 +649,7 @@ function pfCompras(el) {
   el.innerHTML = `
     <div class="barra">
       <select class="campo" id="pf-f-cartao" aria-label="Cartão"><option value="">Todos os cartões</option>${P.cartoes.map((c) => `<option value="${c.id}" ${pfx.cartao === String(c.id) ? "selected" : ""}>${esc(c.nome)}</option>`).join("")}</select>
-      <select class="campo" id="pf-f-dono" aria-label="De quem"><option value="">Todas as compras</option><option value="eu" ${pfx.dono === "eu" ? "selected" : ""}>Só as minhas</option><option value="outros" ${pfx.dono === "outros" ? "selected" : ""}>Só de outras pessoas</option>${pessoas.map((p) => `<option value="${esc(chavePessoa(p))}" ${pfx.dono === chavePessoa(p) ? "selected" : ""}>${esc(p)}</option>`).join("")}</select>
+      <select class="campo" id="pf-f-dono" aria-label="De quem"><option value="">Todas as compras</option><option value="eu" ${pfx.dono === "eu" ? "selected" : ""}>Só as minhas</option><option value="outros" ${pfx.dono === "outros" ? "selected" : ""}>Só de outras pessoas</option><option value="dividida" ${pfx.dono === "dividida" ? "selected" : ""}>Só as divididas</option>${pessoas.map((p) => `<option value="${esc(chavePessoa(p))}" ${pfx.dono === chavePessoa(p) ? "selected" : ""}>${esc(p)}</option>`).join("")}</select>
       <div class="chips" role="tablist" aria-label="Quais compras">${[["parceladas", "Parcelas rodando"], ["acabaram", "Já acabaram"], ["todas", "Tudo, com à vista"]].map(([k, n]) => `<button class="chip" type="button" data-pf-tipo="${k}" aria-pressed="${pfx.tipo === k}">${n}</button>`).join("")}</div>
       <span class="espaco"></span>
       <button class="btn" type="button" data-novo-cartao>${ic("mais")}Cartão</button>
@@ -623,9 +661,9 @@ function pfCompras(el) {
       let falta = 0; for (let j = 0; j < n; j++) if (somaMes(mesDe(c.primeiro_mes), j) >= hoje) falta += n2(c.valor_parcela);
       return `<tr class="clicavel" data-id="${c.id}"><td><b>${esc(c.descricao)}</b>${c.data_compra ? `<br><small class="sub">${dataBR(c.data_compra)}</small>` : ""}</td>
         <td>${esc(nomeCartao(c.cartao_id))}</td>
-        <td>${ehMinha(c) ? "Eu" : `<span class="pilula p-pendente">${esc(nomePessoa(c.dono))}</span>`}</td>
+        <td>${ehMinha(c) ? "Eu" : `<span class="pilula p-pendente">${esc(rotuloDono(c))}</span>`}</td>
         <td>${n === 1 ? "à vista" : n >= RECORRENTE ? "todo mês" : i >= 0 ? `${i + 1}/${n}` : mesDe(c.primeiro_mes) > hoje ? `começa ${nomeMes(mesDe(c.primeiro_mes), true)}` : `acabou (${n}x)`}</td>
-        <td>${real(c.valor_parcela)}</td><td>${real(falta)}</td><td>${nomeMes(ultimoMes(c), true)}</td></tr>`; }).join("") || `<tr><td colspan="7" class="vazio">Nada por aqui. Importe a fatura ou lance uma compra parcelada.</td></tr>`}</tbody></table></div>
+        <td>${real(c.valor_parcela)}${dividida(c) ? `<br><small class="sub">${partesDe(c).length} partes de ${real(n2(c.valor_parcela) / partesDe(c).length)}</small>` : ""}</td><td>${real(falta)}</td><td>${nomeMes(ultimoMes(c), true)}</td></tr>`; }).join("") || `<tr><td colspan="7" class="vazio">Nada por aqui. Importe a fatura ou lance uma compra parcelada.</td></tr>`}</tbody></table></div>
     <p class="contagem">${qtd(lista.length, "compra", "compras")} · ${real(porMes)} neste mês${pfx.tipo === "parceladas" ? ". As compras à vista ficam em <b>Gastos do mês</b>." : ""}</p>`;
   $("#pf-f-cartao", el).onchange = (e) => { pfx.cartao = e.target.value; desenhar(); };
   $("#pf-f-dono", el).onchange = (e) => { pfx.dono = e.target.value; desenhar(); };
@@ -647,7 +685,8 @@ function formCompraPF(c) {
     campos: [
       { n: "descricao", r: "O que foi", req: true, inteiro: true },
       { n: "cartao_id", r: "Cartão", t: "select", op: [["", "Sem cartão"], ...P.cartoes.map((x) => [String(x.id), x.nome])] },
-      { n: "dono", r: "De quem é", lista: pessoasConhecidas(), ph: "vazio = sua", ajuda: "Deixe vazio se a compra é sua." },
+      { n: "tipo", r: "Tipo", t: "select", livre: true, op: [["minha", "Minha"], ["outra", "De outra pessoa"], ["dividida", "Dividida (eu + outras pessoas)"]] },
+      { n: "nomes", r: "Com quem / de quem", livre: true, lista: pessoasConhecidas(), ph: "ex.: Diego", ajuda: "Dividida: escreva só os outros nomes (ex.: Diego, ou Diego e Emillie). Cada um paga uma parte igual, você incluso. Minha: deixe vazio." },
       { n: "valor_parcela", r: "Valor de cada parcela (R$)", t: "number", req: true },
       { n: "parcelas", r: "Quantas parcelas no total", t: "number", req: true },
       ...(novo ? [{ n: "agora", r: "Qual parcela vem na fatura deste mês", t: "number", livre: true, ajuda: "Ex.: se este mês vem a 3/10, digite 3. Se ainda não começou, digite 0." }]
@@ -655,13 +694,13 @@ function formCompraPF(c) {
       { n: "data_compra", r: "Data da compra", t: "date" },
       { n: "categoria", r: "Categoria", lista: ["Casa", "Mercado", "Saúde", "Transporte", "Roupas", "Eletrônicos", "Lazer", "Trabalho", "Outros"] }
     ],
-    valores: c ? { ...c, cartao_id: c.cartao_id == null ? "" : String(c.cartao_id), primeiro_mes: mesDe(c.primeiro_mes) } : { parcelas: "", agora: 1, cartao_id: P.cartoes[0] ? String(P.cartoes[0].id) : "" },
+    valores: c ? { ...c, ...tipoDaCompra(c), cartao_id: c.cartao_id == null ? "" : String(c.cartao_id), primeiro_mes: mesDe(c.primeiro_mes) } : { tipo: "minha", nomes: "", parcelas: "", agora: 1, cartao_id: P.cartoes[0] ? String(P.cartoes[0].id) : "" },
     aoSalvar: async (d) => {
       const n = Math.max(1, Math.round(d.parcelas || 1));
       let primeiro;
       if (novo) { const agora = Math.max(0, Math.round(d.agora || 0)); primeiro = somaMes(hoje, agora ? -(agora - 1) : 1); }
       else primeiro = d.primeiro_mes || mesDe(c.primeiro_mes);
-      const dados = { descricao: d.descricao, cartao_id: d.cartao_id ? Number(d.cartao_id) : null, dono: d.dono ? nomePessoa(d.dono) : null, valor_parcela: d.valor_parcela, parcelas: n, primeiro_mes: primeiro + "-01", data_compra: d.data_compra, categoria: d.categoria };
+      const dados = { descricao: d.descricao, cartao_id: d.cartao_id ? Number(d.cartao_id) : null, dono: donoDoTipo(d.tipo, d.nomes), valor_parcela: d.valor_parcela, parcelas: n, primeiro_mes: primeiro + "-01", data_compra: d.data_compra, categoria: d.categoria };
       if (novo) dados.origem = "manual";
       const ok = await gravar("pf_compras", dados, c ? c.id : null);
       if (ok) await recarregarPF();
@@ -701,14 +740,14 @@ function pfDevem(el) {
       <button class="btn primario" type="button" id="pf-novo-receb">${ic("mais")}Registrar pagamento</button></div>
     ${dev.length ? `<div class="pf-pessoas">${dev.map((p) => {
       const abertas = p.compras.filter((c) => ultimoMes(c) >= hoje);
-      const msg = `Oi, ${p.nome.split(" ")[0]}! Passando o resumo do cartão: ${abertas.map((c) => { const i = idxParcela(c, hoje); return `${c.descricao}${Number(c.parcelas) > 1 && Number(c.parcelas) < RECORRENTE && i >= 0 ? ` (${i + 1}/${c.parcelas})` : ""} ${real(c.valor_parcela)}`; }).join("; ")}. Em aberto até agora: ${real(Math.max(0, p.falta))}.${cobraJuros(p.nome) && jurosDe(p).pendente > 0 ? ` Juros por atraso: ${real(jurosDe(p).pendente)}. Total pra quitar hoje: ${real(Math.max(0, p.falta) + jurosDe(p).pendente)}.` : ""} Consegue me mandar até o vencimento?`;
+      const msg = `Oi, ${p.nome.split(" ")[0]}! Passando o resumo do cartão: ${abertas.map((c) => { const i = idxParcela(c, hoje); return `${c.descricao}${Number(c.parcelas) > 1 && Number(c.parcelas) < RECORRENTE && i >= 0 ? ` (${i + 1}/${c.parcelas})` : ""} ${real(c.valor_parcela)}${c.parteDe ? ` (sua parte de ${real(c.parteDe)})` : ""}`; }).join("; ")}. Em aberto até agora: ${real(Math.max(0, p.falta))}.${cobraJuros(p.nome) && jurosDe(p).pendente > 0 ? ` Juros por atraso: ${real(jurosDe(p).pendente)}. Total pra quitar hoje: ${real(Math.max(0, p.falta) + jurosDe(p).pendente)}.` : ""} Consegue me mandar até o vencimento?`;
       return `<div class="cartao pf-pessoa ${p.falta > 0 ? "atrasado" : ""}">
         <div class="barra" style="margin:0 0 6px"><h2 style="margin:0">${esc(p.nome)}</h2><span class="espaco"></span>
           ${p.falta > 0 ? `<span class="pilula p-vencido">deve ${real(p.falta)}</span>` : p.falta < 0 ? `<span class="pilula p-pago">pagou ${real(-p.falta)} adiantado</span>` : `<span class="pilula p-pago">em dia</span>`}</div>
         <div class="pf-nums"><span>Já venceu<b>${real(p.devido)}</b></span><span>Já pagou<b>${real(p.pago)}</b></span><span>Próximos 12 meses<b>${real(p.futuro)}</b></span></div>
         ${cobraJuros(p.nome) ? (() => { const j = jurosDe(p); return `<div class="pf-juros"><span>Juros por atraso${j.desde ? ` (desde ${dataBR(j.desde).slice(0, 5)})` : ""}<b>${real(j.pendente)}</b>${j.jurosPagos ? `<small>já pagou ${real(j.jurosPagos)} de juros</small>` : ""}</span><span>Pra quitar hoje<b>${real(Math.max(0, p.falta) + j.pendente)}</b><small>o que falta + juros</small></span></div>`; })() : ""}
         <label class="pf-juros-liga"><input type="checkbox" data-juros-pessoa="${esc(p.nome)}" ${cobraJuros(p.nome) ? "checked" : ""}> Cobrar juros por atraso (taxa do cartão, por dia)</label>
-        <ul class="pf-mini">${abertas.slice(0, 8).map((c) => { const i = idxParcela(c, hoje); return `<li><span>${esc(c.descricao)}</span><small>${Number(c.parcelas) >= RECORRENTE ? "todo mês" : Number(c.parcelas) > 1 ? (i >= 0 ? `${i + 1}/${c.parcelas}` : `até ${nomeMes(ultimoMes(c), true)}`) : "à vista"}</small><b>${real(c.valor_parcela)}</b></li>`; }).join("")}</ul>
+        <ul class="pf-mini">${abertas.slice(0, 8).map((c) => { const i = idxParcela(c, hoje); return `<li><span>${esc(c.descricao)}${c.parteDe ? ` <em>(parte de ${real(c.parteDe)})</em>` : ""}</span><small>${Number(c.parcelas) >= RECORRENTE ? "todo mês" : Number(c.parcelas) > 1 ? (i >= 0 ? `${i + 1}/${c.parcelas}` : `até ${nomeMes(ultimoMes(c), true)}`) : "à vista"}</small><b>${real(c.valor_parcela)}</b></li>`; }).join("")}</ul>
         ${p.devido > 0 ? `<div class="pf-pago-trilho" title="Pagou ${real(p.pago)} de ${real(p.devido)}"><i style="width:${Math.min(100, (p.pago / p.devido) * 100)}%"></i></div>` : ""}
         ${p.receb.length ? `<div class="pf-pagamentos"><b>Pagamentos</b>
           <ul>${[...p.receb].sort((a, b) => String(b.data).localeCompare(String(a.data))).map((r) => `<li><span>${dataBR(r.data)}${r.obs ? ` · ${esc(r.obs)}` : ""}</span><strong>${real(r.valor)}</strong><button class="icone-btn" type="button" data-edita-receb="${r.id}" aria-label="Editar pagamento">${ic("editar")}</button></li>`).join("")}</ul>
@@ -1275,10 +1314,12 @@ async function abrirGastoRapido() {
       <datalist id="gr-lista">${recentes.map((r) => `<option value="${esc(r)}">`).join("")}</datalist>
       <div class="pf-rapido-rot">Cartão</div>
       <div class="pf-rapido-chips" id="gr-cartoes">${P.cartoes.map((c) => `<button type="button" class="chip-grande" data-gr-cartao="${c.id}" aria-pressed="${String(c.id) === st.cartao}">${esc(c.nome)}</button>`).join("")}<button type="button" class="chip-grande" data-gr-cartao="" aria-pressed="${!st.cartao}">Pix/débito</button></div>
+      <div class="pf-rapido-rot">Tipo</div>
+      <div class="pf-rapido-chips" id="gr-tipo">${[["minha", "Minha"], ["outra", "De outra pessoa"], ["dividida", "Dividida"]].map(([k, t]) => `<button type="button" class="chip-grande" data-gr-tipo="${k}" aria-pressed="${k === "minha"}">${t}</button>`).join("")}</div>
       <div class="pf-rapido-rot">Parcelas</div>
       <div class="pf-rapido-chips" id="gr-parc">${[1, 2, 3, 4, 5, 6, 10, 12].map((n) => `<button type="button" class="chip-grande" data-gr-n="${n}" aria-pressed="${n === 1}">${n === 1 ? "À vista" : n + "x"}</button>`).join("")}</div>
       <div class="form-grade" style="margin-top:10px">
-        <div><label for="gr-dono">De quem</label><input class="campo" id="gr-dono" list="gr-pessoas" placeholder="Meu" autocomplete="off"><datalist id="gr-pessoas">${pessoasConhecidas().map((p) => `<option value="${esc(p)}">`).join("")}</datalist></div>
+        <div><label for="gr-dono">Com quem / de quem</label><input class="campo" id="gr-dono" list="gr-pessoas" placeholder="ex.: Diego" autocomplete="off" disabled><datalist id="gr-pessoas">${pessoasConhecidas().map((p) => `<option value="${esc(p)}">`).join("")}</datalist></div>
         <div><label for="gr-data">Dia</label><input class="campo" id="gr-data" type="date" value="${hojeISO()}"></div>
       </div>
       <p class="sub" id="gr-info" style="margin:10px 0 0"></p>
@@ -1289,21 +1330,31 @@ async function abrirGastoRapido() {
   const cartao = () => P.cartoes.find((c) => String(c.id) === st.cartao) || null;
   const info = () => {
     const v = valor(), c = cartao(), k = mesFaturaDaCompra(c, $("#gr-data", d).value);
-    $("#gr-info", d).innerHTML = c ? `Cai na fatura de <b>${nomeMes(k)}</b> do ${esc(c.nome)}${st.n > 1 && v ? `: ${st.n}x de ${real(v / st.n)}, até ${nomeMes(somaMes(k, st.n - 1), true)}` : ""}.` : "Pago na hora (Pix ou débito): entra no dia a dia deste mês.";
+    const dono = donoDoTipo(st.tipo, $("#gr-dono", d).value), partes = partesDe({ dono });
+    const div = partes.length > 1 && v ? ` Dividida em ${partes.length}: ${real(v / partes.length)} pra cada.` : "";
+    $("#gr-info", d).innerHTML = (c ? `Cai na fatura de <b>${nomeMes(k)}</b> do ${esc(c.nome)}${st.n > 1 && v ? `: ${st.n}x de ${real(v / st.n)}, até ${nomeMes(somaMes(k, st.n - 1), true)}` : ""}.` : "Pago na hora (Pix ou débito): entra no dia a dia deste mês.") + div;
   };
   $$("[data-gr-cartao]", d).forEach((b) => b.onclick = () => { st.cartao = b.dataset.grCartao; $$("[data-gr-cartao]", d).forEach((x) => x.setAttribute("aria-pressed", String(x === b))); info(); });
   $$("[data-gr-n]", d).forEach((b) => b.onclick = () => { st.n = Number(b.dataset.grN); $$("[data-gr-n]", d).forEach((x) => x.setAttribute("aria-pressed", String(x === b))); info(); });
-  ["#gr-valor", "#gr-data"].forEach((q) => $(q, d).addEventListener("input", info));
+  st.tipo = "minha";
+  $$("[data-gr-tipo]", d).forEach((b) => b.onclick = () => {
+    st.tipo = b.dataset.grTipo;
+    $$("[data-gr-tipo]", d).forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    const nome = $("#gr-dono", d); nome.disabled = st.tipo === "minha"; if (!nome.disabled) nome.focus();
+    info();
+  });
+  ["#gr-valor", "#gr-data", "#gr-dono"].forEach((q) => $(q, d).addEventListener("input", info));
   info();
   $("#gr-valor", d).focus();
   $("#gr-salvar", d).onclick = async () => {
     const v = valor(), onde = $("#gr-onde", d).value.trim();
     if (!v) { avisar("Digite o valor.", true); $("#gr-valor", d).focus(); return; }
     if (!onde) { avisar("Diga onde foi.", true); $("#gr-onde", d).focus(); return; }
+    if (st.tipo !== "minha" && !nomePessoa($("#gr-dono", d).value)) { avisar(st.tipo === "dividida" ? "Diga com quem você dividiu." : "Diga de quem é.", true); $("#gr-dono", d).focus(); return; }
     const c = cartao(), data = $("#gr-data", d).value || hojeISO();
     const btn = $("#gr-salvar", d); btn.disabled = true; btn.textContent = "Lançando...";
     const k = mesFaturaDaCompra(c, data);
-    const { error } = await db.from("pf_compras").insert({ cartao_id: c ? c.id : null, descricao: onde, valor_parcela: r2(v / st.n), parcelas: st.n, primeiro_mes: k + "-01", data_compra: data, dono: nomePessoa($("#gr-dono", d).value) || null, origem: "rapido" });
+    const { error } = await db.from("pf_compras").insert({ cartao_id: c ? c.id : null, descricao: onde, valor_parcela: r2(v / st.n), parcelas: st.n, primeiro_mes: k + "-01", data_compra: data, dono: donoDoTipo(st.tipo, $("#gr-dono", d).value), origem: "rapido" });
     btn.disabled = false; btn.textContent = "Lançar";
     if (error) { avisar(traduzErro(error), true); return; }
     try { localStorage.setItem("pf-ultimo-cartao", st.cartao); } catch (_) {}
