@@ -245,7 +245,7 @@ function lerPlano(texto) {
   return { itens, carrosseis: carrosseis.filter((c) => c.slides.length) };
 }
 
-function pedidoPlano(nicho) {
+function pedidoPlano(nicho, seg = segundaISO()) {
   const d = ig.dados;
   let meus = "";
   if (d && (d.posts || []).length) {
@@ -271,7 +271,6 @@ ${semana.map((r, i) => `${i + 1}. ${r.perfil || ""} · ${num(r.views)} views${n2
   const minhasIdeias = ideias.length ? `MINHAS IDEIAS DE ROTEIRO PARA O INSTAGRAM JÁ ANOTADAS (#número para você citar)
 ${ideias.map((t) => `#${t.id} [${(CATEGORIAS.find((c) => c[0] === t.categoria) || [0, t.categoria || ""])[1]}${t.status === "agora" ? ", fazer agora" : ""}] ${t.titulo || "sem título"}${(t.minha_versao || t.transcricao) ? `: ${String(t.minha_versao || t.transcricao).replace(/\s+/g, " ").slice(0, 160)}` : ""}`).join("\n")}
 ` : "";
-  const seg = segundaISO();
   const contexto = String((igx.contextos || {})[seg] || "").trim();
   return `Você é o meu estrategista de conteúdo para Instagram. O seu trabalho é montar uma semana que siga a MINHA ESTRATÉGIA abaixo, com ideias específicas e coerentes, nada vago.
 
@@ -338,6 +337,31 @@ O QUE EU PRECISO (pesquise na internet o que está em alta no Brasil nesta seman
 
 Fale como gente de verdade, em português do Brasil, tom de conversa de café, sem cara de anúncio. Não use travessão em nenhum texto. Proibido: "não é X, é Y" e variações, "aí eu descobri", "foi aí que", "foi quando", "até que", "você sabia que" como gancho, "isso muda tudo", "isso muda o jogo". Não invente número ou resultado meu: o que você não sabe vira campo entre parênteses.`;
 }
+
+// Plano automático: a tarefa do Claude de todo sábado usa isso pelo navegador, com o painel aberto.
+// planoAuto.pedido(): o pedido da PRÓXIMA semana (no sábado e no domingo; de segunda a sexta, a semana atual).
+// planoAuto.salvar(resposta): grava o plano dessa semana. Não troca um plano que você já salvou.
+window.planoAuto = {
+  semana() { const dia = new Date().getDay(); return dia === 6 || dia === 0 ? somaDiasISO(7, segundaISO()) : segundaISO(); },
+  async pedido() {
+    await carregarPlanos();
+    if (!ig.dados && ig.conectado !== false) await chamarInstagram({ acao: "dados", dias: 30 }).then((r) => { if (r.perfil) { ig.dados = r; ig.conectado = true; } }).catch(() => {});
+    const semana = this.semana();
+    let nicho = NICHO_PADRAO; try { nicho = localStorage.getItem("ig-nicho") || NICHO_PADRAO; } catch (_) {}
+    return { semana, jaTemPlano: (igx.planos || []).some((p) => p.semana === semana), pedido: pedidoPlano(nicho, semana) };
+  },
+  async salvar(resposta, trocar = false) {
+    const semana = this.semana();
+    await carregarPlanos();
+    if (!trocar && (igx.planos || []).some((p) => p.semana === semana)) return { erro: "Já tem plano salvo para essa semana." };
+    const lido = lerPlano(resposta);
+    if (!lido.itens.length) return { erro: "Não achei as linhas do plano (SEG | Reels | ...)." };
+    const { error } = await db.from("ig_planos").upsert({ semana, resposta, itens: lido }, { onConflict: "semana" });
+    if (error) return { erro: traduzErro(error) };
+    await carregarPlanos();
+    return { semana, posts: lido.itens.length, carrosseis: lido.carrosseis.length };
+  }
+};
 
 // Adiar: tira o post da semana (e da agenda) e a ideia volta para o banco de ideias.
 // Se o post não veio de uma ideia anotada, ele vira uma ideia nova no banco, com o gancho guardado.
