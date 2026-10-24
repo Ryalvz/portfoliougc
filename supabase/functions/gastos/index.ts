@@ -113,8 +113,9 @@ function mesDaCompra(c: any) {
 }
 // Quanto do à vista seu já foi no mês, no total e por categoria
 async function situacaoMes(k: string) {
-  const { data } = await db.from("pf_compras").select("descricao,valor_parcela,parcelas,primeiro_mes,data_compra,dono,categoria").is("dono", null).eq("parcelas", 1);
-  const lista = (data || []).filter((c: any) => mesDaCompra(c) === k);
+  const { data } = await db.from("pf_compras").select("descricao,valor_parcela,parcelas,primeiro_mes,data_compra,dono,categoria").eq("parcelas", 1);
+  // Só a sua parte (na compra dividida, a sua fração)
+  const lista = (data || []).filter((c: any) => mesDaCompra(c) === k && fracEu(c.dono) > 0).map((c: any) => ({ ...c, valor_parcela: Number(c.valor_parcela) * fracEu(c.dono) }));
   const porCat: Record<string, number> = {};
   let total = 0;
   lista.forEach((c: any) => { const v = Number(c.valor_parcela) || 0; total += v; const t = categoriaDe(c); porCat[t] = (porCat[t] || 0) + v; });
@@ -122,12 +123,13 @@ async function situacaoMes(k: string) {
 }
 // Sua parte da fatura do mês k, somando todos os cartões (parcelas + à vista). É o que o teto mede.
 async function suaFatura(k: string) {
-  const { data } = await db.from("pf_compras").select("valor_parcela,parcelas,primeiro_mes").is("dono", null).not("cartao_id", "is", null);
+  const { data } = await db.from("pf_compras").select("valor_parcela,parcelas,primeiro_mes,dono").not("cartao_id", "is", null);
   let parc = 0, vista = 0;
   (data || []).forEach((x: any) => {
     const i = (Number(k.slice(0, 4)) - Number(x.primeiro_mes.slice(0, 4))) * 12 + (Number(k.slice(5, 7)) - Number(x.primeiro_mes.slice(5, 7)));
     if (i < 0 || i >= Number(x.parcelas) || Number(x.parcelas) >= 60) return;
-    if (Number(x.parcelas) > 1) parc += Number(x.valor_parcela); else vista += Number(x.valor_parcela);
+    const v = Number(x.valor_parcela) * fracEu(x.dono);
+    if (Number(x.parcelas) > 1) parc += v; else vista += v;
   });
   return { parc, vista, eu: parc + vista };
 }
@@ -140,11 +142,11 @@ async function avisosDoMes(novos: any[]) {
   const { total, porCat } = await situacaoMes(k);
   const L: string[] = [];
   // Teto = sua parte da fatura (todos os cartões). Vale para os gastos no cartão; Pix/débito fica de fora.
-  const noCartao = novos.filter((e) => e.cartao && !e.dono);
+  const noCartao = novos.filter((e) => e.cartao && fracEu(e.dono) > 0);
   if (teto && noCartao.length) {
     const kf = noCartao[0].k;
     const f = await suaFatura(kf);
-    const novosNaFatura = noCartao.filter((e) => e.k === kf).reduce((s, e) => s + e.valor / e.n, 0);
+    const novosNaFatura = noCartao.filter((e) => e.k === kf).reduce((s, e) => s + (e.valor / e.n) * fracEu(e.dono), 0);
     const antes = f.eu - novosNaFatura, p = Math.round((f.eu / teto) * 100), resta = teto - f.eu;
     L.push(`💳 Fatura de ${nomeMes(kf)} (sua parte, todos os cartões): ${real(f.eu)} de ${real(teto)} (${p}%)`);
     L.push(resta > 0 ? `Ainda dá ${real(resta)} no cartão até essa fatura fechar.` : `Passou ${real(-resta)} do teto.`);
@@ -155,13 +157,13 @@ async function avisosDoMes(novos: any[]) {
       else L.push(`🟡 Metade do teto da fatura já foi.`);
     }
   }
-  const cats = [...new Set(novos.filter((e) => e.n === 1 && !e.dono).map((e) => categoriaDe({ descricao: e.desc })))];
+  const cats = [...new Set(novos.filter((e) => e.n === 1 && fracEu(e.dono) > 0).map((e) => categoriaDe({ descricao: e.desc })))];
   cats.forEach((t) => {
     const meta = Number(metas[t]) || 0, v = porCat[t] || 0;
     if (meta && v >= meta * 0.8) L.push(`${EMOJI[t] || "•"} ${t}: ${real(v)} de ${real(meta)} no mês${v > meta ? `, passou ${real(v - meta)}` : ", quase no limite"}.`);
   });
-  const parc = novos.filter((e) => e.n > 1 && !e.dono);
-  if (parc.length) L.push(`⚠️ Compra parcelada nova: o plano é não parcelar nada até as parcelas caírem. Isso soma ${real(parc.reduce((s, e) => s + e.valor / e.n, 0))} por mês nas próximas faturas.`);
+  const parc = novos.filter((e) => e.n > 1 && fracEu(e.dono) > 0);
+  if (parc.length) L.push(`⚠️ Compra parcelada nova: o plano é não parcelar nada até as parcelas caírem. Isso soma ${real(parc.reduce((s, e) => s + (e.valor / e.n) * fracEu(e.dono), 0))} por mês nas próximas faturas.`);
   return L;
 }
 
@@ -170,6 +172,20 @@ const semAcento = (t: string) => String(t || "").normalize("NFD").replace(/[̀-�
 const capitalizar = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 const PALAVRAS_VAZIAS = new Set(["do", "da", "de", "dos", "das", "no", "na", "em", "pra", "pro", "para", "com", "reais", "real", "r$", "r", "rs", "o", "a", "um", "uma", "gastei", "paguei", "comprei", "e"]);
 const EU = new Set(["eu", "mim", "meu", "minha", "meus", "minhas"]);
+// Compra dividida: o "dono" fica "Eu, Diego" (ou "Diego e Emillie"). Cada nome paga uma parte igual. Vazio = toda sua.
+function partesDe(dono: any) {
+  const t = String(dono || "").trim().replace(/\s+/g, " ");
+  if (!t) return [{ nome: "", eu: true, frac: 1 }];
+  const vistos = new Map<string, { nome: string; eu: boolean }>();
+  t.split(/\s*(?:,|;|\+|\/|\s+e\s+)\s*/i).map((n) => n.trim()).filter(Boolean).forEach((n) => {
+    const eu = EU.has(semAcento(n)) || semAcento(n) === "ryan", k = eu ? "eu" : semAcento(n);
+    if (!vistos.has(k)) vistos.set(k, { nome: eu ? "" : n, eu });
+  });
+  const l = [...vistos.values()];
+  return l.length ? l.map((x) => ({ ...x, frac: 1 / l.length })) : [{ nome: "", eu: true, frac: 1 }];
+}
+const fracEu = (dono: any) => partesDe(dono).reduce((s, x) => s + (x.eu ? x.frac : 0), 0);
+const rotuloDono = (dono: any) => { const l = partesDe(dono); return l.length === 1 ? (l[0].eu ? "" : l[0].nome) : "dividida: " + l.map((x) => (x.eu ? "eu" : x.nome)).join(" + "); };
 function valorDe(t: string) {
   const m = t.match(/^r?\$?(\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?|\d+(?:[.,]\d{1,2})?)$/i);
   if (!m) return 0;
@@ -180,6 +196,8 @@ function valorDe(t: string) {
 }
 function entender(texto: string, cartoes: any[], pessoas: string[]) {
   const r: any = { valor: 0, cartao: undefined, n: 1, dono: undefined, desc: "" };
+  const nomes: string[] = [];
+  let comigo = false, divide = false;
   const sobra: string[] = [];
   let t = String(texto || "").replace(/\n/g, " ");
   // Aviso de compra do banco ("COMPRA APROVADA NO CARTAO FINAL 0240 EM 19/10/2026 12:28 NO VALOR DE R$ 252,50 EM 3 X LOJA"):
@@ -210,17 +228,21 @@ function entender(texto: string, cartoes: any[], pessoas: string[]) {
     const c = cartoes.find((c) => semAcento(c.nome) === s);
     if (c) { r.cartao = c; continue; }
     if (["pix", "debito", "dinheiro", "especie"].includes(s)) { r.cartao = null; continue; }
-    if (EU.has(s)) { r.dono = null; continue; }
+    if (EU.has(s)) { comigo = true; continue; }
+    if (/^(dividid[oa]s?|dividi|divide|dividir|rachad[oa]|rachei|metade|meio\s*a\s*meio)$/.test(s)) { divide = true; continue; }
     const pessoa = pessoas.find((n) => semAcento(n) === s);
-    if (pessoa) { r.dono = pessoa; continue; }
+    if (pessoa) { nomes.push(pessoa); continue; }
     // "do fulano" / "da fulana" com nome novo
     if (["do", "da", "pro", "pra"].includes(s) && palavras[i + 1] && !cartoes.some((c) => semAcento(c.nome) === semAcento(palavras[i + 1]))) {
       const nome = semAcento(palavras[i + 1]).replace(/[^a-z]/g, "");
-      if (nome && !EU.has(nome) && nome.length > 2 && /^[A-ZÀ-Ú]/.test(palavras[i + 1])) { r.dono = capitalizar(nome); i++; continue; }
+      if (nome && !EU.has(nome) && nome.length > 2 && /^[A-ZÀ-Ú]/.test(palavras[i + 1])) { nomes.push(capitalizar(nome)); i++; continue; }
     }
     const limpa = p.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "");
     if (limpa && !PALAVRAS_VAZIAS.has(semAcento(limpa))) sobra.push(limpa);
   }
+  // "30 uber diego" = do Diego; "60 pizza dividido diego" ou "60 pizza eu e diego" = metade de cada
+  if (nomes.length) r.dono = (comigo || divide ? "Eu, " : "") + [...new Set(nomes)].join(", ");
+  else if (comigo) r.dono = null;
   r.desc = sobra.join(" ").trim();
   if (r.desc) r.desc = capitalizar(r.desc);
   return r;
@@ -307,6 +329,7 @@ const AJUDA = `Como lançar um gasto:
 • Texto: 45,90 ifood nubank
 • Parcelado: 300 tênis bradesco 3x (ou "em 3 vezes")
 • De outra pessoa: 30 uber nubank diego
+• Dividido: 60 pizza nubank dividido diego (metade de cada)
 • Pix ou débito: 12 padaria pix
 • Foto da nota, com legenda opcional (ex.: "diego", "inter 2x")
 
@@ -337,7 +360,7 @@ async function tratarMensagem(msg: any) {
 
   const { data: cartoes } = await db.from("pf_cartoes").select("id,nome,vence_dia,fecha_dia").order("ordem").order("id");
   const { data: donos } = await db.from("pf_compras").select("dono").not("dono", "is", null).limit(2000);
-  const pessoas = [...new Set((donos || []).map((d: any) => String(d.dono).trim()))];
+  const pessoas = [...new Set((donos || []).flatMap((d: any) => partesDe(d.dono).filter((x) => !x.eu).map((x) => x.nome)))];
 
   if (/^\/(ajuda|help)/i.test(texto)) { await enviar(chat, AJUDA); return; }
 
@@ -360,7 +383,8 @@ async function tratarMensagem(msg: any) {
         if (String(x.cartao_id) !== String(c.id)) return;
         const i = (Number(k.slice(0, 4)) - Number(x.primeiro_mes.slice(0, 4))) * 12 + (Number(k.slice(5, 7)) - Number(x.primeiro_mes.slice(5, 7)));
         if (i < 0 || i >= Number(x.parcelas)) return;
-        if (x.dono) outros += Number(x.valor_parcela); else eu += Number(x.valor_parcela);
+        const f = fracEu(x.dono);
+        eu += Number(x.valor_parcela) * f; outros += Number(x.valor_parcela) * (1 - f);
       });
       return { nome: c.nome, eu, outros };
     });
@@ -414,7 +438,7 @@ async function tratarMensagem(msg: any) {
     ids.push(novo.id);
     novos.push({ ...e, data: dia, k, cartao });
     ultimoCartao = cartao;
-    linhas.push(`${e.desc}: ${real(e.valor)}${e.n > 1 ? ` em ${e.n}x de ${real(e.valor / e.n)}` : " à vista"}\n${cartao ? `${cartao.nome}, fatura de ${nomeMes(k)}` : "Pix/débito"}${e.dono ? ` · de ${e.dono}` : ""}`);
+    linhas.push(`${e.desc}: ${real(e.valor)}${e.n > 1 ? ` em ${e.n}x de ${real(e.valor / e.n)}` : " à vista"}\n${cartao ? `${cartao.nome}, fatura de ${nomeMes(k)}` : "Pix/débito"}${e.dono ? ` · ${rotuloDono(e.dono).startsWith("dividida") ? rotuloDono(e.dono) : `de ${rotuloDono(e.dono)}`}` : ""}`);
   }
   await gravarCfg("telegram_ultimo_id", ids);
   await gravarCfg("telegram_ultimo_cartao", ultimoCartao ? ultimoCartao.id : "pix");
@@ -453,7 +477,7 @@ async function avisosDiarios() {
   (cartoes || []).forEach((c: any) => {
     if (Number(c.vence_dia) !== em2.getDate()) return;
     let eu = 0; const outros: Record<string, number> = {};
-    (compras || []).forEach((x: any) => { if (String(x.cartao_id) !== String(c.id)) return; const v = parcelaNo(x, k2); if (!v) return; if (x.dono) outros[x.dono] = (outros[x.dono] || 0) + v; else eu += v; });
+    (compras || []).forEach((x: any) => { if (String(x.cartao_id) !== String(c.id)) return; const v = parcelaNo(x, k2); if (!v) return; partesDe(x.dono).forEach((pt) => { if (pt.eu) eu += v * pt.frac; else outros[pt.nome] = (outros[pt.nome] || 0) + v * pt.frac; }); });
     const tot = eu + Object.values(outros).reduce((s, v) => s + v, 0);
     if (tot <= 0) return;
     msgs.push(`💳 A fatura do ${c.nome} vence em 2 dias (dia ${c.vence_dia}): ${real(tot)} até agora.${Object.keys(outros).length ? `\nCobre antes: ${Object.entries(outros).map(([n, v]) => `${n} ${real(v)}`).join(", ")}.` : ""}\nPague o valor inteiro, nunca o mínimo.`);
@@ -469,10 +493,10 @@ async function avisosDiarios() {
     const metas = (await lerCfg("metas_categoria")) || {};
     const { total, porCat } = await situacaoMes(k);
     const semana = new Date(a, m - 1, d - 6).toLocaleDateString("sv-SE");
-    const daSemana = (compras || []).filter((x: any) => !x.dono && Number(x.parcelas) === 1 && String(x.data_compra || "") >= semana && String(x.data_compra || "") <= hoje).reduce((s: number, x: any) => s + Number(x.valor_parcela), 0);
+    const daSemana = (compras || []).filter((x: any) => fracEu(x.dono) > 0 && Number(x.parcelas) === 1 && String(x.data_compra || "") >= semana && String(x.data_compra || "") <= hoje).reduce((s: number, x: any) => s + Number(x.valor_parcela) * fracEu(x.dono), 0);
     const top = Object.entries(porCat).sort((x, y) => y[1] - x[1]).slice(0, 3);
     const prox = somaMes(k, 1);
-    const parcProx = (compras || []).filter((x: any) => !x.dono).reduce((s: number, x: any) => s + (Number(x.parcelas) > 1 && Number(x.parcelas) < 60 ? parcelaNo(x, prox) : 0), 0);
+    const parcProx = (compras || []).filter((x: any) => fracEu(x.dono) > 0).reduce((s: number, x: any) => s + (Number(x.parcelas) > 1 && Number(x.parcelas) < 60 ? parcelaNo(x, prox) * fracEu(x.dono) : 0), 0);
     const kf = mesFatura((cartoes || [])[0], hoje);
     const f = await suaFatura(kf);
     msgs.push(`🗓️ Resumo da semana\n\nGastos à vista na semana: ${real(daSemana)}\n💳 Fatura de ${nomeMes(kf)} (sua parte): ${real(f.eu)}${teto ? ` de ${real(teto)} (${Math.round((f.eu / teto) * 100)}%)${teto > f.eu ? `, ainda dá ${real(teto - f.eu)}` : `, passou ${real(f.eu - teto)}`}` : ""}\n(${real(f.parc)} são parcelas)\n\nOnde mais foi:\n${top.map(([t, v]) => `${EMOJI[t] || "•"} ${t}: ${real(v)}${metas[t] ? ` (meta ${real(Number(metas[t]))})` : ""}`).join("\n") || "nada lançado ainda"}\n\nSuas parcelas na fatura de ${nomeMes(prox)}: ${real(parcProx)}`);
