@@ -1106,16 +1106,17 @@ TOM
 Conversa de café. Íntimo, sem pressa, honesto. Autoridade sem pose, sem amadorismo engraçadinho.
 Português falado, primeira pessoa, frases curtas, ritmo ágil. Se travar na boca, reescreva.
 
-A EXPERIÊNCIA EM VENDAS VIRA TÉCNICA
+A EXPERIÊNCIA EM VENDAS VIRA TÉCNICA (só em TikTok Shop e publi)
 Antecipe a objeção principal antes que ela vire motivo para rolar a tela: vale o que custa? funciona pra mim? vou usar mesmo? posso confiar na loja?
 Responda com prova: mostrar, usar, comparar com a rotina.
 Um benefício principal por vídeo, dito do jeito que o cliente falaria.
 Fechamento que conduz: uma ação clara e o motivo para fazer agora, sem urgência inventada.
 Os 12 anos em vendas só viram gancho em conteúdo sobre venda, negócio, carreira de creator ou para lojista.
 
-ESTRUTURA
-Para marca: GANCHO, IDENTIFICAÇÃO, SOLUÇÃO, PROVA, FECHAMENTO.
-Conteúdo de valor no meu perfil: GANCHO, CONTEXTO, CONTEÚDO, FECHAMENTO.
+ESTRUTURA (cada tipo tem a sua)
+TikTok Shop: PROBLEMA, PRODUTO EM USO, POR QUE VALE A PENA, COMPRA.
+Publi para marca: GANCHO, IDENTIFICAÇÃO, SOLUÇÃO, PROVA, FECHAMENTO.
+Orgânico no meu perfil: GANCHO, CONTEXTO, CONTEÚDO, FECHAMENTO. Sem cara de venda.
 Se o briefing da marca trouxer estrutura própria, ela vence.
 Gancho para o dedo nos 3 primeiros segundos, com dor grande e comum. Sempre mais de uma opção (em anúncio, 2 ou 3 para gravar todas).
 Mudança perceptível do começo ao fim. O produto entra como consequência da história. Toda afirmação tem prova na tela.
@@ -1141,27 +1142,73 @@ async function carregarVoz() {
   return vozGuia;
 }
 
+// Cada tipo de roteiro tem objetivo e estrutura próprios. O guia de voz entra só com o TOM, a DURAÇÃO e os PROIBIDOS.
 const FORMATO_ROTEIRO = {
-  organico: `FORMATO: Reels de conteúdo de valor para o MEU Instagram (Tech & Lifestyle e bastidores de UGC).
-Estrutura: GANCHO, CONTEXTO, CONTEÚDO, FECHAMENTO. De 30 a 60 segundos (uns 100 a 195 palavras no meu ritmo).
-O objetivo é alcance, salvamento e seguidores novos. Sem produto de marca, a não ser que a ideia peça.`,
-  tiktok_shop: `FORMATO: vídeo de venda para o TikTok Shop (afiliado), falando com consumidor final.
-Estrutura: GANCHO, IDENTIFICAÇÃO, SOLUÇÃO, PROVA, FECHAMENTO. De 15 a 40 segundos.
-Produto em uso na mão, um benefício principal com prova na tela, a objeção principal respondida, chamada para o carrinho laranja. Preço ou oferta só se eu informar.`,
-  publi: `FORMATO: vídeo UGC para uma marca (publi).
-Estrutura: GANCHO, IDENTIFICAÇÃO, SOLUÇÃO, PROVA, FECHAMENTO, a não ser que o briefing traga a estrutura dele. Briefing é lei: antes de escrever, liste obrigatórios e proibidos e aponte o que estiver faltando ou contraditório.
-Falas obrigatórias literais. Ofereça 2 ou 3 ganchos para gravar todos.`
+  tiktok_shop: {
+    nome: "TikTok Shop",
+    texto: `TIPO: vídeo de VENDA para o TikTok Shop (afiliado), falando com consumidor final.
+OBJETIVO: a pessoa entender o produto e comprar no carrinho. Direto ao ponto: quem assiste quer saber o que o produto é, os benefícios e como ele ajuda. Nada de história longa, bastidor de creator ou conteúdo educativo.
+O vídeo precisa de três elementos:
+1. Um bom gancho, que chama a atenção logo no começo.
+2. Um desenvolvimento que mostra como o produto resolve uma dor ou necessidade do cliente.
+3. Uma CTA clara, conduzindo para a compra.
+ESTRUTURA (use estes blocos, nesta ordem):
+PROBLEMA: o gancho chama a atenção para um problema que o cliente reconhece na hora.
+PRODUTO EM USO: o produto na mão, sendo usado, com os benefícios e os diferenciais. Transformação visual (antes e depois) quando fizer sentido.
+POR QUE VALE A PENA: o motivo para comprar esse e não outro, respondendo a dúvida principal (vale o preço? funciona? é fácil?).
+COMPRA: indica a compra no carrinho laranja, uma ação só.
+DURAÇÃO: de 15 a 40 segundos. Preço, frete ou oferta só se eu informar.`,
+    entrega: `GANCHOS: 3 opções de tipos diferentes, para eu testar qual funciona melhor.
+ROTEIRO: nos 4 blocos (PROBLEMA, PRODUTO EM USO, POR QUE VALE A PENA, COMPRA). Em cada bloco, a fala corrida entre aspas e embaixo a cena em [CENA: ...] em primeira pessoa, mostrando o produto.
+CTAS: 2 opções de chamada para a compra, para eu testar.
+LEGENDA: texto do post para o TikTok, curto, com 3 a 5 hashtags.`
+  },
+  organico: {
+    nome: "Ideia orgânica",
+    texto: `TIPO: conteúdo ORGÂNICO para o MEU perfil (Instagram), para o MEU público. NÃO é publicidade e NÃO é venda.
+OBJETIVO: alcance, salvamento, comentário e seguidores novos. Eu falo como pessoa e creator, não como anunciante: sem produto de marca (a não ser que a ideia peça), sem objeção de compra, sem "prova" de produto, sem carrinho, sem "link do produto".
+Cada post tem um papel nos três Cs: CONHECER (quem eu sou, meu estilo de vida; CTA seguir ou compartilhar), CONECTAR (ensina com a minha experiência real, rotina e bastidores; CTA salvar ou comentar) ou CONVERTER (mostra o meu trabalho para as marcas; CTA portfólio na bio ou direct).
+ESTRUTURA (use estes blocos, nesta ordem):
+GANCHO: abre uma pergunta nos 3 primeiros segundos, sem apresentação.
+CONTEXTO: uma ou duas frases da minha história real que explicam por que isso importa.
+CONTEÚDO: entrega de verdade: passo a passo, número, antes e depois ou exemplo concreto. A resposta do gancho fica para o fim.
+FECHAMENTO: a conclusão e um CTA só, coerente com o C.
+O post nasce de uma história, experiência ou prova REAL minha. Dica que qualquer creator daria não serve: se faltar a minha história, me pergunte.
+DURAÇÃO: de 30 a 60 segundos (uns 100 a 195 palavras no meu ritmo).`,
+    entrega: `C: qual dos três Cs esse post cumpre e por quê, em uma linha.
+GANCHOS: 3 opções de tipos diferentes.
+ROTEIRO: nos 4 blocos (GANCHO, CONTEXTO, CONTEÚDO, FECHAMENTO). Em cada bloco, a fala corrida entre aspas, do jeito que eu falaria, e embaixo a cena em [CENA: ...] em primeira pessoa.
+LEGENDA: para o Instagram, gancho na primeira linha, o mesmo CTA do vídeo, 1 a 3 emojis e 3 a 5 hashtags.`
+  },
+  publi: {
+    nome: "Publi / UGC",
+    texto: `TIPO: vídeo UGC para uma MARCA (publi), pago pela marca, para ela usar no perfil e em anúncio.
+OBJETIVO: o que o briefing pedir (geralmente conversão). Briefing é lei: antes de escrever, liste os obrigatórios e os proibidos e aponte o que estiver faltando ou contraditório. Falas obrigatórias entram literais.
+ESTRUTURA (a não ser que o briefing traga a dele):
+GANCHO: dor grande e comum nos 3 primeiros segundos.
+IDENTIFICAÇÃO: a situação em que o cliente se reconhece.
+SOLUÇÃO: o produto entra como consequência da história, com um benefício principal.
+PROVA: mostrar, usar, comparar com a rotina. Toda afirmação tem prova na tela.
+FECHAMENTO: uma ação clara e o motivo para fazer agora, sem urgência inventada.
+DURAÇÃO: a do briefing; se não tiver, de 30 a 45 segundos.`,
+    entrega: `OBRIGATÓRIOS E PROIBIDOS: a lista do briefing, e o que estiver faltando.
+GANCHOS: 3 opções, para gravar todas.
+ROTEIRO: nos 5 blocos (GANCHO, IDENTIFICAÇÃO, SOLUÇÃO, PROVA, FECHAMENTO). Em cada bloco, a fala corrida entre aspas e embaixo a cena em [CENA: ...] em primeira pessoa.
+LEGENDA: sugestão para a marca, respeitando o briefing.`
+  }
 };
 
 function roteiroNaMinhaVoz(t) {
   Promise.all([carregarVoz(), carregarDna()]).then(([voz, dna]) => {
-    const cat = FORMATO_ROTEIRO[t.categoria] ? t.categoria : "organico";
-    const montar = () => `Você vai escrever um roteiro pronto para eu gravar, do MEU jeito de falar.
+    let cat = FORMATO_ROTEIRO[t.categoria] ? t.categoria : "organico";
+    const montar = () => { const f = FORMATO_ROTEIRO[cat]; return `Você vai escrever um roteiro pronto para eu gravar, do MEU jeito de falar.
 
-MEU GUIA DE VOZ (siga à risca)
+${f.texto}
+
+IMPORTANTE: o TIPO acima manda no objetivo e na estrutura. Do meu guia de voz abaixo, use só o TOM, o jeito de falar, a DURAÇÃO no meu ritmo e a lista de PROIBIDOS.${cat === "organico" ? " As partes do guia sobre vender, objeção, prova de produto e estrutura para marca NÃO valem aqui." : ""}
+
+MEU GUIA DE VOZ
 ${voz}
-
-${FORMATO_ROTEIRO[cat]}
 ${cat === "organico" ? `
 O QUE JÁ FUNCIONOU NO MEU PERFIL (encaixe a ideia na fórmula que mais combina e diga qual no ÂNGULO)
 ${dna}
@@ -1169,24 +1216,29 @@ ${dna}
 A IDEIA
 Título: ${t.titulo || "sem título"}
 ${t.minha_versao ? `O que eu já anotei:\n${t.minha_versao}\n` : ""}${t.observacoes ? `Observações:\n${t.observacoes}\n` : ""}${t.transcricao ? `Referência (vídeo de ${t.perfil || "outra pessoa"}): use só a ESTRUTURA, nunca copie as frases.\n${String(t.transcricao).slice(0, 2500)}\n` : ""}
-Se você tiver a skill "roteiro-ugc", siga ela. Se não, siga o meu guia acima.
+Se você tiver a skill "roteiro-ugc", use as regras de voz dela, mas a estrutura é a do TIPO acima (${f.nome}).
 
 ME ENTREGUE ASSIM (use exatamente estes títulos em maiúsculas)
-GANCHOS: 3 opções de tipos diferentes, com dor grande e comum.
-ROTEIRO: dividido nos blocos da estrutura. Em cada bloco, a fala corrida entre aspas, do jeito que eu falaria, e embaixo a cena em [CENA: ...] escrita em primeira pessoa ("gravo a tela", "aponto pro produto"). Nada de picotar a fala linha por linha.
-CHAMADA FINAL: uma ação só.
-${cat === "tiktok_shop" ? "LEGENDA: texto do post para o TikTok, curto, com 3 a 5 hashtags." : cat === "publi" ? "LEGENDA: sugestão para a marca, respeitando o briefing." : "LEGENDA: para o Instagram, gancho na primeira linha, o mesmo CTA do vídeo, 1 a 3 emojis e 3 a 5 hashtags."}
+${f.entrega}
 DURAÇÃO: quantas palavras faladas, dividido por 3,25, mais o respiro de tela. Se passar do formato, diga qual frase cortar.
-DICAS DE GRAVAÇÃO: enquadramento, cenas de apoio e qual cena é a prova do vídeo.
+DICAS DE GRAVAÇÃO: enquadramento e cenas de apoio${cat === "organico" ? "" : ", e qual cena é a prova do vídeo"}.
 ÂNGULO: em uma linha, por que escolheu esse ângulo.
 
-Antes de entregar, confira contra a lista de proibidos do guia. Nada de número ou resultado inventado: o que eu precisar preencher vai entre parênteses.`;
+Nada de picotar a fala linha por linha. Antes de entregar, confira contra a lista de proibidos do guia. Nada de número ou resultado inventado: o que eu precisar preencher vai entre parênteses.`; };
     const d = abrirJanelaSimples("✍️ Roteiro na minha voz", `
-      <p class="sub" style="margin-top:0">O pedido já leva o seu guia de voz, a ideia${t.transcricao ? ", a referência" : ""} e o formato de <b>${esc((CATEGORIAS.find((c) => c[0] === cat) || [0, ""])[1])}</b>.</p>
+      <p class="sub" style="margin-top:0">Cada tipo tem objetivo e estrutura próprios. Confira o tipo antes de copiar:</p>
+      <div class="pro-abas" role="tablist" aria-label="Tipo de roteiro">${Object.entries(FORMATO_ROTEIRO).map(([k, f]) => `<button type="button" role="tab" data-rv-tipo="${k}" aria-selected="${k === cat}">${esc(f.nome)}</button>`).join("")}</div>
+      ${t.categoria && FORMATO_ROTEIRO[t.categoria] ? "" : `<p class="sub">Essa ideia está sem divisão, então comecei como ideia orgânica. Troque acima se for TikTok Shop ou publi.</p>`}
       <ol class="passos"><li>Toque em <b>Copiar o pedido</b> e cole no Claude.</li><li>Ajuste o que quiser conversando com ele.</li><li>Cole o roteiro final em <b>Minha versão</b> e salve. Pronto pra gravar.</li></ol>
       ${vozGuia === VOZ_PADRAO ? `<p class="sub">Dica: em <b>🗣️ Minha voz</b> (embaixo da lista de roteiros) dá para deixar o guia ainda mais com a sua cara.</p>` : ""}
       <textarea class="campo" id="rv-prompt" rows="10" style="width:100%;font-size:12px" readonly>${esc(montar())}</textarea>`,
       `<a class="btn" href="https://claude.ai/new" target="_blank" rel="noopener">Abrir o Claude ↗</a><button type="button" class="btn primario" id="rv-copiar">📋 Copiar o pedido</button>`);
+    $$("[data-rv-tipo]", d).forEach((b) => b.onclick = () => {
+      cat = b.dataset.rvTipo;
+      $$("[data-rv-tipo]", d).forEach((x) => x.setAttribute("aria-selected", String(x === b)));
+      $("#rv-prompt", d).value = montar();
+      $("#rv-copiar", d).textContent = "📋 Copiar o pedido";
+    });
     $("#rv-copiar", d).onclick = async () => {
       try { await navigator.clipboard.writeText($("#rv-prompt", d).value); $("#rv-copiar", d).textContent = "copiado ✓"; avisar("Pedido copiado. Cole no Claude."); }
       catch (_) { $("#rv-prompt", d).select(); avisar("Selecionei o texto: aperte Cmd + C para copiar.", true); }
