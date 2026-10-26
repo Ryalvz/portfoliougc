@@ -1625,7 +1625,8 @@ function subRevisar(corpo, B) {
     <div class="grade-2">
       <div class="cartao"><h2>Cole o seu roteiro aqui</h2>
         <textarea class="roteiro" id="roteiro" placeholder="Cole o roteiro e confira item por item ao lado.">${esc(rascunho)}</textarea>
-        <p class="sub" id="roteiro-conta"></p>
+        <div id="roteiro-revisor" hidden></div>
+        <p class="sub" style="margin-top:8px">A conferência automática pega as regras da sua voz. O checklist ao lado é pro que só você consegue julgar.</p>
       </div>
       <div>
         <div class="cartao"><div class="barra" style="margin-bottom:6px"><b>Revisão</b><span class="espaco"></span><span class="sub">${feitos} de ${chaves.length}</span></div>${barra(feitos, chaves.length)}
@@ -1636,12 +1637,8 @@ function subRevisar(corpo, B) {
       </div>
     </div>`;
   const ta = $("#roteiro");
-  const contar = () => {
-    const palavras = ta.value.trim() ? ta.value.trim().split(/\s+/).length : 0;
-    $("#roteiro-conta").textContent = palavras ? `${plural(palavras, "palavra", "palavras")}, mais ou menos ${Math.round(palavras / 2.5)} segundos falando` : "";
-  };
-  contar();
-  ta.addEventListener("input", () => { contar(); try { localStorage.setItem("roteiro-rascunho", ta.value); } catch (_) {} });
+  ligarRevisor(ta, $("#roteiro-revisor"), "roteiro");
+  ta.addEventListener("input", () => { try { localStorage.setItem("roteiro-rascunho", ta.value); } catch (_) {} });
   lembrarAbertas(corpo);
   ligarChecks(corpo, () => desenhar());
   $("#limpar-rev").onclick = async () => {
@@ -1652,6 +1649,73 @@ function subRevisar(corpo, B) {
     }
     desenhar();
   };
+}
+
+/* ---------- Revisor automático ----------
+   Confere o texto com as regras da sua voz enquanto você digita (sem IA, na hora).
+   tipo "roteiro": duração no seu ritmo, fala picotada e mais de um CTA.
+   tipo "email": até 150 palavras, sem "espero que esteja bem" e sem anexo. */
+const RITMO_FALA = 3.25; // palavras por segundo, medido em out/2026
+const REGRAS_REVISOR = [
+  { re: /[—–]/gu, t: "Travessão", d: "Troque por ponto, vírgula ou dois-pontos." },
+  { re: /\S\s-\s\S/gu, t: "Hífen solto, parece travessão", d: "Troque por vírgula ou ponto." },
+  { re: /(?:(?<![\p{L}\p{N}])(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])(?![\p{L}\p{N}]))n[ãa]o\s+(?:[ée]|era|foi|s[ãa]o|eram|t[áa]|est[áa])\s+(?:s[óo]\s+)?[^.!?\n]{1,60}?[,;:]\s*(?:mas\s+)?(?:[ée]|era|foi|s[ãa]o|e\s+sim)(?:(?<![\p{L}\p{N}])(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])(?![\p{L}\p{N}]))/giu, t: "\"Não é X, é Y\"", d: "Negação seguida de correção. Diga direto o que é." },
+  { re: /(?:(?<![\p{L}\p{N}])(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])(?![\p{L}\p{N}]))o problema n[ãa]o [ée](?:(?<![\p{L}\p{N}])(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])(?![\p{L}\p{N}]))|(?:(?<![\p{L}\p{N}])(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])(?![\p{L}\p{N}]))n[ãa]o se trata de(?:(?<![\p{L}\p{N}])(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])(?![\p{L}\p{N}]))/giu, t: "\"Não é X, é Y\"", d: "Negação seguida de correção. Diga direto o que é." },
+  { re: /(?:(?<![\p{L}\p{N}])(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])(?![\p{L}\p{N}]))(?:a[íi] eu descobri|foi a[íi] que|foi quando|at[ée] que|a[íi] eu conheci|hoje eu descobri)(?:(?<![\p{L}\p{N}])(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])(?![\p{L}\p{N}]))/giu, t: "Falsa revelação", d: "Conte o que aconteceu, sem suspense forçado." },
+  { re: /(?:(?<![\p{L}\p{N}])(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])(?![\p{L}\p{N}]))(?:voc[êe] sabia que|isso muda tudo|muda o jogo|e sinceramente\?|[ée] o tipo de|voc[êe] j[áa] reparou que|se voc[êe] ainda t[áa] no ciclo|ol[áa],? pessoal|hoje vou falar sobre|queria compartilhar com voc[êe]s|hoje vim indicar)/giu, t: "Frase da lista proibida", d: "Está entre as frases que você não usa." },
+  { re: /\[[^\]\n]{2,80}\]/gu, t: "Campo pra preencher", d: "Ainda tem texto entre colchetes." }
+];
+const REGRAS_EMAIL = [
+  { re: /(?:(?<![\p{L}\p{N}])(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])(?![\p{L}\p{N}]))espero que (?:voc[êe] )?(?:esteja|estejam) bem(?:(?<![\p{L}\p{N}])(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])(?![\p{L}\p{N}]))/giu, t: "\"Espero que esteja bem\"", d: "Abertura proibida. Comece por quem você é." },
+  { re: /(?:(?<![\p{L}\p{N}])(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])(?![\p{L}\p{N}]))(?:segue em anexo|em anexo|anexad[oa]s?|anexo)(?:(?<![\p{L}\p{N}])(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])(?![\p{L}\p{N}]))/giu, t: "Anexo", d: "No primeiro contato, nada de anexo: mande o link do portfólio." }
+];
+const CTAS_REVISOR = [/(?:(?<![\p{L}\p{N}])(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])(?![\p{L}\p{N}]))(?:me )?segu[ei](?:(?<![\p{L}\p{N}])(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])(?![\p{L}\p{N}]))|(?:(?<![\p{L}\p{N}])(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])(?![\p{L}\p{N}]))siga(?:(?<![\p{L}\p{N}])(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])(?![\p{L}\p{N}]))/iu, /(?:(?<![\p{L}\p{N}])(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])(?![\p{L}\p{N}]))coment[ae](?:(?<![\p{L}\p{N}])(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])(?![\p{L}\p{N}]))/iu, /(?:(?<![\p{L}\p{N}])(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])(?![\p{L}\p{N}]))salv[ae] (?:esse|este|o) (?:post|v[íi]deo)(?:(?<![\p{L}\p{N}])(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])(?![\p{L}\p{N}]))|(?:(?<![\p{L}\p{N}])(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])(?![\p{L}\p{N}]))salv[ae](?:(?<![\p{L}\p{N}])(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])(?![\p{L}\p{N}]))/iu, /(?:(?<![\p{L}\p{N}])(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])(?![\p{L}\p{N}]))compartilh[ae](?:(?<![\p{L}\p{N}])(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])(?![\p{L}\p{N}]))|(?:(?<![\p{L}\p{N}])(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])(?![\p{L}\p{N}]))manda (?:pra|para) (?:algu[ée]m|um amigo)/iu, /(?:(?<![\p{L}\p{N}])(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])(?![\p{L}\p{N}]))link na bio(?:(?<![\p{L}\p{N}])(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])(?![\p{L}\p{N}]))|(?:(?<![\p{L}\p{N}])(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])(?![\p{L}\p{N}]))clic[ae](?:(?<![\p{L}\p{N}])(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])(?![\p{L}\p{N}]))|(?:(?<![\p{L}\p{N}])(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])(?![\p{L}\p{N}]))clique(?:(?<![\p{L}\p{N}])(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])(?![\p{L}\p{N}]))/iu, /(?:(?<![\p{L}\p{N}])(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])(?![\p{L}\p{N}]))direct(?:(?<![\p{L}\p{N}])(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])(?![\p{L}\p{N}]))|(?:(?<![\p{L}\p{N}])(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])(?![\p{L}\p{N}]))me chama(?:(?<![\p{L}\p{N}])(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])(?![\p{L}\p{N}]))|(?:(?<![\p{L}\p{N}])(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])(?![\p{L}\p{N}]))dm(?:(?<![\p{L}\p{N}])(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])(?![\p{L}\p{N}]))/iu];
+function revisarTexto(texto, tipo = "roteiro") {
+  const t = String(texto || "");
+  const problemas = [];
+  [...REGRAS_REVISOR, ...(tipo === "email" ? REGRAS_EMAIL : [])].forEach((r) => {
+    for (const m of t.matchAll(r.re)) problemas.push({ t: r.t, d: r.d, pos: m.index, len: m[0].length, trecho: m[0].trim() });
+  });
+  // Só o que vai ser falado: sem rótulos (GANCHO:) nem marcações entre parênteses
+  const falado = t.split("\n").map((l) => l.replace(/^\s*[A-ZÁÉÍÓÚÂÊÔÃÕÇ ]{3,}\s*(?:\d\s*)?:/, "").replace(/\([^)]*\)/g, "")).join("\n");
+  const palavras = (falado.match(/[\p{L}\p{N}]+/gu) || []).length;
+  let info = "";
+  if (tipo === "email") {
+    const total = (t.match(/[\p{L}\p{N}]+/gu) || []).length;
+    info = `${total} palavras`;
+    if (total > 150) problemas.push({ t: "Passou de 150 palavras", d: `Está com ${total}. Corte o que não ajuda a marca a responder.`, pos: 0, len: 0, trecho: "" });
+  } else {
+    info = palavras ? `${palavras} palavras faladas, uns ${Math.round(palavras / RITMO_FALA)} segundos no seu ritmo` : "";
+    const linhas = falado.split("\n").map((l) => l.trim()).filter(Boolean);
+    const curtas = linhas.filter((l) => (l.match(/[\p{L}\p{N}]+/gu) || []).length <= 4).length;
+    if (linhas.length >= 6 && curtas / linhas.length >= 0.6) problemas.push({ t: "Fala picotada", d: "Muitas linhas curtinhas uma embaixo da outra. Junte em frases que você falaria de verdade.", pos: 0, len: 0, trecho: "" });
+    const ctas = CTAS_REVISOR.filter((re) => re.test(falado)).length;
+    if (ctas > 1) problemas.push({ t: "Mais de um CTA", d: "Parece ter mais de uma chamada (seguir, salvar, comentar, link...). Deixe uma ação só.", pos: 0, len: 0, trecho: "" });
+  }
+  // O mesmo tipo de problema no mesmo trecho aparece uma vez só
+  const unicos = problemas.sort((a, b) => a.pos - b.pos).filter((p, i, l) => !l.slice(0, i).some((q) => q.t === p.t && p.len && q.pos + q.len > p.pos));
+  return { problemas: unicos, info };
+}
+// Liga o revisor numa caixa de texto: atualiza enquanto digita e, ao clicar num ponto, seleciona o trecho
+function ligarRevisor(ta, caixa, tipo = "roteiro") {
+  if (!ta || !caixa) return;
+  let timer = null, res = { problemas: [] };
+  const pintar = () => {
+    res = revisarTexto(ta.value, tipo);
+    if (!ta.value.trim()) { caixa.innerHTML = ""; caixa.hidden = true; return; }
+    caixa.hidden = false;
+    const n = res.problemas.length;
+    caixa.className = `revisor ${n ? "tem" : "ok"}`;
+    caixa.innerHTML = `<div class="revisor-topo"><b>${n ? `${n} ${n === 1 ? "ponto" : "pontos"} pra ajustar` : "✓ Dentro das suas regras"}</b>${res.info ? `<span>${esc(res.info)}</span>` : ""}</div>
+      ${n ? `<ul>${res.problemas.map((p, i) => `<li><button type="button" data-rev="${i}"><b>${esc(p.t)}</b>${p.trecho ? ` <q>${esc(p.trecho.slice(0, 60))}</q>` : ""}<small>${esc(p.d)}</small></button></li>`).join("")}</ul>` : ""}`;
+  };
+  caixa.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-rev]"); if (!b) return;
+    const p = res.problemas[Number(b.dataset.rev)]; if (!p || !p.len) { ta.focus(); return; }
+    ta.focus(); ta.setSelectionRange(p.pos, p.pos + p.len);
+  });
+  ta.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(pintar, 250); });
+  pintar();
 }
 
 /* =============================================================
@@ -2355,6 +2419,7 @@ function pintarDetalheTrans() {
         <div class="cartao destaque-versao">
           <div class="barra" style="margin-bottom:6px"><h2 style="margin:0">Minha versão (meu roteiro)</h2><span class="espaco"></span><button class="btn pequeno primario" type="button" id="t-roteiro-voz">✍️ Roteiro na minha voz</button></div>
           <textarea class="campo" id="t-versao" rows="9" placeholder="${t.link ? "Escreva aqui a sua versão: o seu gancho, a sua fala, como você vai adaptar essa referência." : "Escreva aqui a sua ideia e o roteiro: gancho, desenvolvimento e chamada final."}">${esc(t.minha_versao || "")}</textarea>
+          <div id="t-revisor" hidden></div>
         </div>
         <div class="cartao">
           <h2>📝 Legenda do post</h2>
@@ -2372,6 +2437,7 @@ function pintarDetalheTrans() {
       </div>
     </div>`;
 
+  ligarRevisor($("#t-versao"), $("#t-revisor"), "roteiro");
   $("#t-roteiro-voz").onclick = () => roteiroNaMinhaVoz({ ...t, titulo: $("#t-titulo").value.trim(), categoria: $("#t-cat").value, minha_versao: $("#t-versao").value.trim(), observacoes: $("#t-obs").value.trim(), transcricao: $("#t-transcricao") ? $("#t-transcricao").value.trim() : t.transcricao });
   const ta = $("#t-transcricao");
   const status = (txt) => { const s = $("#t-status"); if (s) s.textContent = txt; };
@@ -3168,8 +3234,75 @@ function desenharProducao(el) {
     if (!cartao) return;
     const c = S.contratos.find((x) => String(x.id) === cartao.dataset.id);
     if (estrela) { if (await gravar("contratos", { favorita: !c.favorita }, c.id)) { c.favorita = !c.favorita; pintar(); } return; }
+    if (e.target.closest("[data-depoimento]")) { pedirDepoimento(c); return; }
     formContrato(c);
   });
+}
+
+/* ---------- Pedir depoimento ----------
+   Depois da entrega, mensagens prontas que conduzem a marca a falar de algo
+   específico (processo, roteiro, resultado). A resposta vai pra Feedbacks e site. */
+function mensagensDepoimento(c) {
+  const marca = String(c.cliente || "a marca").trim();
+  const trab = String(c.descricao || "").trim() ? `os vídeos de ${String(c.descricao).trim()}` : "os vídeos que fizemos";
+  return {
+    whats: { nome: "WhatsApp", texto: `Oi! Aqui é o Ryan. Fiquei muito feliz com ${trab} pra ${marca}. Posso te pedir um favor rápido?
+
+Me conta em 2 ou 3 frases como foi trabalhar comigo. Se ajudar, responde uma destas:
+1. Como foi o processo, do briefing à entrega?
+2. O que você mais gostou no roteiro ou no vídeo?
+3. Teve algum resultado que vale contar (views, vendas, aprovação de primeira)?
+
+Com a sua autorização, coloco no meu portfólio com o nome da ${marca}. Pode ser?` },
+    email: { nome: "E-mail", assunto: `Um favor rápido sobre ${trab}`, texto: `Oi, tudo certo?
+
+Queria agradecer pela parceria em ${trab} pra ${marca}. Foi muito bom construir isso com vocês.
+
+Posso te pedir um favor? Me responde com 2 ou 3 frases sobre como foi trabalhar comigo. Pra facilitar, pode ser sobre uma destas:
+1. Como foi o processo, do briefing à entrega?
+2. O que mais funcionou no roteiro ou no vídeo?
+3. Teve algum resultado que vale contar?
+
+Com a sua autorização, uso no meu portfólio (ugc.ryalvz.com.br) com o nome da ${marca}.
+
+Obrigado!
+Ryan Alves · @ryalvz` },
+    numeros: { nome: "Pedir resultado", texto: `Oi! Passando pra saber como ${trab} performaram. Se tiver algum número (alcance, cliques, vendas ou custo por resultado), me conta?
+
+Isso me ajuda a deixar os próximos roteiros ainda melhores pra vocês. E, com a sua autorização, coloco no meu portfólio como case da ${marca}.` },
+    lembrete: { nome: "Lembrete", texto: `Oi! Sei que a rotina é corrida, então deixo fácil: se puder, me responde só com uma frase sobre como foi trabalhar comigo em ${trab}. Já me ajuda muito. Obrigado!` }
+  };
+}
+function pedirDepoimento(c) {
+  const msgs = mensagensDepoimento(c);
+  let aba = "whats";
+  const d = abrirJanelaSimples(`Pedir depoimento: ${esc(c.cliente || "campanha")}`, `
+    <p class="sub" style="margin:0 0 12px">As perguntas fazem a marca falar de algo específico (processo, roteiro, resultado). Isso vende mais no portfólio do que um "amei o trabalho".</p>
+    <div class="pro-abas" role="tablist" aria-label="Qual mensagem">${Object.entries(msgs).map(([k, m]) => `<button type="button" role="tab" data-dep="${k}" aria-selected="${k === aba}">${esc(m.nome)}</button>`).join("")}</div>
+    <p class="sub" id="dep-assunto" style="margin:0 0 6px" hidden></p>
+    <pre class="pro-prompt" id="dep-texto" role="tabpanel"></pre>
+    <div class="pro-prompt-acoes">
+      <button class="btn primario" type="button" id="dep-copiar">${ic("transcricao")}Copiar</button>
+      <a class="btn" id="dep-abrir" target="_blank" rel="noopener"></a>
+    </div>
+    <p class="sub" style="margin:14px 0 0">Quando responderem, coloque o depoimento em <button type="button" class="link-btn" id="dep-site">Feedbacks e site</button> pra aparecer no portfólio.</p>`,
+    `<button type="button" class="btn" data-fechar>Fechar</button>`);
+  const pintar = () => {
+    const m = msgs[aba];
+    $("#dep-texto", d).textContent = m.texto;
+    const as = $("#dep-assunto", d); as.hidden = !m.assunto; as.innerHTML = m.assunto ? `<b>Assunto:</b> ${esc(m.assunto)}` : "";
+    const abrir = $("#dep-abrir", d);
+    if (aba === "email") { abrir.href = `mailto:?subject=${encodeURIComponent(m.assunto)}&body=${encodeURIComponent(m.texto)}`; abrir.textContent = "Abrir no e-mail"; }
+    else { abrir.href = `https://wa.me/?text=${encodeURIComponent(m.texto)}`; abrir.textContent = "Abrir no WhatsApp"; }
+    $$("[data-dep]", d).forEach((b) => b.setAttribute("aria-selected", String(b.dataset.dep === aba)));
+  };
+  $$("[data-dep]", d).forEach((b) => b.onclick = () => { aba = b.dataset.dep; pintar(); });
+  $("#dep-copiar", d).onclick = async () => {
+    const m = msgs[aba];
+    try { await navigator.clipboard.writeText(m.assunto ? `${m.assunto}\n\n${m.texto}` : m.texto); avisar("Mensagem copiada."); } catch (_) { avisar("Não consegui copiar. Selecione o texto e copie.", true); }
+  };
+  $("#dep-site", d).onclick = () => { d.close(); pf.sub = "feedbacks"; irPara("portfolio"); };
+  pintar();
 }
 
 function cartaoCampanha(c) {
@@ -3185,6 +3318,7 @@ function cartaoCampanha(c) {
     ${fechado(c) && !entregue(c) ? `<small>${c.prazo_entrega ? `Entrega ${dataBR(c.prazo_entrega)}` : "Sem prazo de entrega"}${avisoEntrega(c)}</small>` : ""}
     <small><b>${real(c.valor)}</b>${saldoDe(c) > 0 && entregue(c) ? ` · falta receber ${real(saldoDe(c))}` : ""}</small>
     ${c.status !== "Pago" ? `<span class="pilula ${classeStatus(s)}" style="align-self:flex-start">${esc(s)}</span>` : ""}
+    ${entregue(c) ? `<button class="link-btn" type="button" data-depoimento style="align-self:flex-start">💬 Pedir depoimento</button>` : ""}
     <select class="campo etapa-cartao" data-etapa-prod="${esc(c.id)}" aria-label="Mudar a etapa de ${esc(c.cliente)}">
       ${STATUS_CONTRATO.map((v) => `<option value="${esc(v)}" ${v === c.status ? "selected" : ""}>${esc(v)}</option>`).join("")}
     </select>
@@ -5032,6 +5166,7 @@ function desenharProspeccao(el) {
           ${pro.escrita === "texto" ? `
             <label class="pro-rotulo" for="pro-texto">Texto</label>
             <textarea class="campo pro-texto" id="pro-texto" rows="12">${esc(pro.texto)}</textarea>
+            <div id="pro-revisor" hidden></div>
             <p class="ajuda">Use <code>{marca}</code> pro nome da marca, <code>{pessoa}</code> pra quem vai ler, <code>{conexao}</code> e <code>{ideia}</code> pro que muda em cada marca (preenche no item 3). Linha em branco separa os parágrafos, e os links viram clicáveis sozinhos.</p>
             <div class="pro-botao-campos">
               <div><label class="pro-rotulo" for="pro-btxt">Texto do botão (opcional)</label><input class="campo" id="pro-btxt" value="${esc(pro.botaoTexto)}" placeholder="Ver meu portfólio"></div>
@@ -5139,6 +5274,7 @@ function desenharProspeccao(el) {
   });
   $$("[data-assunto]", el).forEach((b) => b.onclick = () => { pro.assunto = b.dataset.assunto; guardarRascunho(); desenhar(); });
   ["#pro-texto", "#pro-html", "#pro-assunto"].forEach((q) => { const x = $(q, el); if (x) x.addEventListener("change", () => pintarPorMarca()); });
+  ligarRevisor($("#pro-texto", el), $("#pro-revisor", el), "email");
   const pintarEnviar = (r = destinatariosDe(pro.publico)) => {
     const caixa = $("#pro-enviar");
     if (pro.envio === "rascunho") { pintarFila(caixa, r); return; }

@@ -1362,3 +1362,17 @@ dialog.pf-janela-rapida { width: min(460px, calc(100vw - 20px)); }
 .pro-abas button:focus-visible { outline: 2px solid var(--cobalt); outline-offset: 2px; }
 .pro-prompt { margin: 0; padding: 18px 20px; max-height: 420px; overflow: auto; white-space: pre-wrap; word-break: break-word; font: inherit; font-size: 13.5px; line-height: 1.65; color: var(--text); background: var(--parchment); border: 1px solid var(--line); border-radius: var(--radius); }
 .pro-prompt-acoes { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+
+/* Revisor automático (regras da sua voz) */
+.revisor { margin-top: 8px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); font-size: 13px; }
+.revisor-topo { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 8px 12px; }
+.revisor-topo span { color: var(--muted); font-size: 12px; }
+.revisor.ok .revisor-topo b { color: var(--green); }
+.revisor.tem { border-color: rgba(138, 90, 0, .35); }
+.revisor.tem .revisor-topo { background: var(--amber-bg); border-radius: var(--radius) var(--radius) 0 0; }
+.revisor.tem .revisor-topo b { color: var(--amber); }
+.revisor ul { list-style: none; margin: 0; padding: 4px; max-height: 220px; overflow: auto; }
+.revisor li button { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 7px 8px; border-radius: 6px; font: inherit; color: var(--text); cursor: pointer; }
+.revisor li button:hover { background: var(--tint); }
+.revisor li q { color: var(--red); font-style: italic; }
+.revisor li small { display: block; color: var(--muted); font-size: 12px; margin-top: 1px; }
