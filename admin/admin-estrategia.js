@@ -245,6 +245,18 @@ function lerPlano(texto) {
   return { itens, carrosseis: carrosseis.filter((c) => c.slides.length) };
 }
 
+// Episódios da série "Manual do Creator" (ideias em Roteiros com esse título), em ordem de número
+const EH_MANUAL = (t) => /manual do creator/i.test(t.titulo || "");
+const numEp = (t) => Number((String(t.titulo || "").match(/ep\.?\s*(\d+)/i) || [])[1] || 999);
+function manualDoCreator(seg) {
+  const eps = (S.transcricoes || []).filter(EH_MANUAL).sort((a, b) => numEp(a) - numEp(b));
+  // Já usado: entrou num plano de outra semana ou já foi postado
+  const outrosPlanos = (igx.planos || []).filter((p) => p.semana !== seg).map((p) => String(p.resposta || "")).join("\n");
+  const usado = (t) => t.status === "feito" || new RegExp(`#${t.id}\\b`).test(outrosPlanos);
+  const usados = eps.filter(usado), proximo = eps.find((t) => !usado(t)) || null;
+  return { proximo, usados, numero: proximo ? numEp(proximo) : 0 };
+}
+
 function pedidoPlano(nicho, seg = segundaISO()) {
   const d = ig.dados;
   let meus = "";
@@ -266,7 +278,14 @@ ${semana.map((r, i) => `${i + 1}. ${r.perfil || ""} · ${num(r.views)} views${n2
 ` : "";
   // Suas ideias de roteiro que ainda não foram pro ar (as "Fazer agora" primeiro)
   const ordemEtapa = { agora: 0, fazendo: 1, ideia: 2 };
-  const ideias = (S.transcricoes || []).filter((t) => t.status !== "feito" && t.categoria === "organico" && (t.titulo || t.minha_versao || t.transcricao))
+  // Série fixa "Manual do Creator": 1 episódio por semana, sempre o próximo que ainda não entrou em plano nenhum
+  const ep = manualDoCreator(seg);
+  const serie = ep.proximo ? `SÉRIE FIXA DA SEMANA: MANUAL DO CREATOR (1 episódio por semana, obrigatório)
+Episódio desta semana: #${ep.proximo.id} ${ep.proximo.titulo}${ep.proximo.minha_versao ? `: ${String(ep.proximo.minha_versao).replace(/\s+/g, " ").slice(0, 220)}` : ""}
+${ep.usados.length ? `Já saíram: ${ep.usados.map((t) => t.titulo).join("; ")}.` : "É o primeiro episódio da série."}
+Regras da série: é sempre um Conectar, em Reels. O título do post começa com "Manual do Creator · Ep. ${ep.numero}". O vídeo abre nos 2 primeiros segundos com "Manual do Creator, episódio ${ep.numero}" para a série ser reconhecida, e depois vem o gancho. Uma dica prática por episódio, mostrada no celular, que a pessoa consegue aplicar no mesmo dia. CTA: salvar para montar o manual inteiro.
+` : "";
+  const ideias = (S.transcricoes || []).filter((t) => t.status !== "feito" && t.categoria === "organico" && !EH_MANUAL(t) && (t.titulo || t.minha_versao || t.transcricao))
     .sort((a, b) => (ordemEtapa[a.status] ?? 3) - (ordemEtapa[b.status] ?? 3)).slice(0, 30);
   const minhasIdeias = ideias.length ? `MINHAS IDEIAS DE ROTEIRO PARA O INSTAGRAM JÁ ANOTADAS (#número para você citar)
 ${ideias.map((t) => `#${t.id} [${(CATEGORIAS.find((c) => c[0] === t.categoria) || [0, t.categoria || ""])[1]}${t.status === "agora" ? ", fazer agora" : ""}] ${t.titulo || "sem título"}${(t.minha_versao || t.transcricao) ? `: ${String(t.minha_versao || t.transcricao).replace(/\s+/g, " ").slice(0, 160)}` : ""}`).join("\n")}
@@ -283,7 +302,7 @@ ${contexto || "(nada de especial informado)"}
 ${meus}
 ${refs}
 ${minhasIdeias}
-MINHA ESTRATÉGIA (siga à risca)
+${serie}MINHA ESTRATÉGIA (siga à risca)
 O meu perfil existe para três coisas: atrair as pessoas e as marcas certas, gerar confiança e converter isso em trabalho. Cada post tem UM papel, um dos três Cs:
 - CONHECER (1 a 2 por semana): mostra quem eu sou, meu estilo de vida e minha área (tech, lifestyle, moda, grooming, UGC). Formatos: vídeo curto, opinião, situação do cotidiano. CTA: seguir ou compartilhar. Métrica: alcance e seguidores novos.
 - CONECTAR (2 a 3 por semana): educa e ensina com a minha experiência real, rotina e bastidores. Formatos: carrossel educativo, tutorial, bastidor, vlog. CTA: salvar ou comentar. Métrica: salvamentos, comentários e tempo assistido.
@@ -313,6 +332,7 @@ O QUE EU PRECISO (pesquise na internet de verdade, nada de tendência inventada)
 3. PADRÕES DOS REELS QUE BOMBARAM: o que os reels da lista têm em comum (gancho, duração, estilo, tema).
 4. O QUE FUNCIONA PARA MIM: o que os meus números mostram (o que repetir e o que parar).
 5. PLANO DA SEMANA: de 4 a 6 posts, com 1 a 2 Conhecer, 2 a 3 Conectar e 1 Converter, pelo menos 1 carrossel e 2 reels. Cada post entra pelo GAP de um assunto em alta ou por uma ideia minha anotada.
+   Se tiver SÉRIE FIXA DA SEMANA acima, um dos posts é obrigatoriamente esse episódio (com o #número no tema).
    PRIORIZE as minhas ideias anotadas (com o #número no tema). Só invente tema novo se faltar, e aí ele precisa sair de uma história minha.
    Escreva CADA post numa linha, EXATAMENTE neste formato, separado por | :
    SEG | Reels | Conectar | tema | gancho (a primeira frase do vídeo ou a capa) | o que a pessoa aprende ou sente + CTA
