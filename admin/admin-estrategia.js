@@ -323,7 +323,7 @@ O QUE EU PRECISO (pesquise na internet de verdade, nada de tendência inventada)
    PRIMEIROS 30 SEGUNDOS (tema): escritos com carinho, frase a frase, em linguagem de fala: 0 a 3 s o gancho, 3 a 10 s por que a pessoa tem que ficar, 10 a 30 s a primeira entrega de valor. É aqui que se ganha ou se perde a pessoa.
    ROTEIRO (tema): o resto em tópicos, em linguagem de fala (do jeito que eu falaria, não texto de blog), seguindo GANCHO, CONTEXTO, CONTEÚDO, FECHAMENTO.
    FECHAMENTO: o CTA, uma ação só.
-7. CARROSSÉIS PRONTOS: para cada carrossel do plano, escreva os slides neste formato (de 5 a 8 slides, no máximo 30 palavras por slide). Num título, *palavra* fica em itálico colorido e **palavra** em negrito (1 destaque por título, no máximo).
+7. CARROSSÉIS PRONTOS: para cada carrossel do plano, escreva os slides neste formato. Carrossel CURTO, que faz a pessoa arrastar até o fim: de 5 a 7 slides, título de até 8 palavras e texto de até 15 palavras por slide. Linguagem de conversa, nada formal nem de apostila. A capa promete algo que só se resolve no fim, cada slide termina abrindo a curiosidade pro próximo e a resposta mais forte fica no penúltimo slide. Num título, *palavra* fica em itálico colorido e **palavra** em negrito (1 destaque por título, no máximo).
    CARROSSEL: título do carrossel
    1 capa | título forte (até 10 palavras) | linha pequena em cima (opcional) | etiqueta curta (opcional) | foto: que foto minha usar
    2 texto | título com *uma palavra* destacada | texto do slide
@@ -691,10 +691,21 @@ function linhasRicas(ctx, texto, fontes, largura, maiusc) {
   });
   return linhas;
 }
+// Diminui a letra até caber na altura E na largura (uma palavra longa, tipo "PALAVRAS", não pode vazar do slide)
+function larguraDaLinha(ctx, l, f) {
+  ctx.font = f.n; const esp = ctx.measureText(" ").width;
+  return l.itens.reduce((s, p, k) => s + p.w + (k > 0 && !p.cola ? esp : 0), 0);
+}
 function caberRico(ctx, texto, { fontes, max, min, largura, altura, entre = 1.15, maiusc = false, passo = 2 }) {
+  const cabeLargura = (linhas, f) => linhas.every((l) => larguraDaLinha(ctx, l, f) <= largura + 1);
   for (let tam = max; tam >= min; tam -= passo) {
     const f = fontes(tam), linhas = linhasRicas(ctx, texto, f, largura, maiusc);
-    if (linhas.length * tam * entre <= altura) return { tam, linhas, entre, f };
+    if (linhas.length * tam * entre <= altura && cabeLargura(linhas, f)) return { tam, linhas, entre, f };
+  }
+  // Ainda vazando no tamanho mínimo: diminui mais só o necessário para não sair do slide
+  for (let tam = min - passo; tam >= 16; tam -= passo) {
+    const f = fontes(tam), linhas = linhasRicas(ctx, texto, f, largura, maiusc);
+    if (cabeLargura(linhas, f)) return { tam, linhas, entre, f };
   }
   const f = fontes(min);
   return { tam: min, linhas: linhasRicas(ctx, texto, f, largura, maiusc), entre, f };
@@ -1032,7 +1043,7 @@ function desenharCarrossel(el) {
             <button class="btn pequeno" type="button" data-copiar-slide aria-label="Duplicar slide">⧉</button>
             <button class="btn pequeno" type="button" data-tirar aria-label="Tirar slide">✕</button></div>
           ${mod[3].map((c) => campoHtml(s, i, c)).join("")}
-          <p class="sub car-dica">${esc(mod[2])} ${palavrasDe(s) > 30 ? `<b class="car-muito">${palavrasDe(s)} palavras: tente deixar em 30.</b>` : ""}</p>
+          <p class="sub car-dica">${esc(mod[2])} ${palavrasDe(s) > 15 ? `<b class="car-muito">${palavrasDe(s)} palavras: carrossel bom é curto, tente deixar em 15.</b>` : ""}</p>
         </div>`; }).join("")}
         <div class="car-mais">
           <select class="campo" id="car-modelo-novo" aria-label="Modelo do slide novo">${MODELOS_SLIDE.map(([v, n]) => `<option value="${v}">${n}</option>`).join("")}</select>
