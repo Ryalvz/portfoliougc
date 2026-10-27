@@ -545,14 +545,15 @@ function pintarSlide(cv, s, i, total, temaChave, aoCarregar) {
 }
 
 </script><script>/* Estilo "Caderno do Ryan": grade de caderno + granulado, claro e escuro alternando,
-   Anton em etiqueta cobalto, Playfair itálica no destaque, Montserrat no texto,
+   Montserrat grossa em etiqueta dourada, Playfair itálica no destaque, Montserrat no texto,
    seta e anotação dourada à mão. */
+// Paleta Ryan: creme, café e dourado. Faixa dourada escura no claro, dourado claro no escuro.
 const R = {
-  claro: { fundo: "#F1ECE3", grade: "rgba(43,36,28,.07)", tinta: "#1C1814", cinza: "#9A9187", texto: "#2E2822" },
-  escuro: { fundo: "#15120F", grade: "rgba(255,255,255,.05)", tinta: "#F3EEE6", cinza: "#8E867B", texto: "#DDD5C8" },
-  cobalto: "#1F3FC3", ouro: "#D6A43A"
+  claro: { fundo: "#F5F1EA", tinta: "#2B241C", cinza: "#A39A8C", texto: "#3A3128", faixa: "#7A6322", naFaixa: "#FFF8EA", ouro: "#7A6322" },
+  escuro: { fundo: "#2B241C", tinta: "#F5F1EA", cinza: "#A89E8E", texto: "#E9E1D3", faixa: "#D9C48A", naFaixa: "#2B241C", ouro: "#D9C48A" }
 };
-const ANTON = "Anton";
+R.foto = R.escuro;
+const ETQ = (t) => `800 ${t}px Montserrat`;
 const mont = (p, t) => `${p} ${t}px Montserrat`;
 const play = (t) => `italic 700 ${t}px 'Playfair Display'`;
 
@@ -577,7 +578,7 @@ function moldura(ctx, tom, i, total, serie = "DE CREATOR PRA CREATOR") {
   if (i < total - 1) { ctx.textAlign = "right"; ctx.fillText("arrasta pro lado  →", W_CAR - 80, H_CAR - 60); }
   ctx.restore();
 }
-// Texto rico: *palavra* = Playfair itálica numa etiqueta cobalto; **palavra** = cinza
+// Texto rico: *palavra* = Playfair itálica numa faixa dourada; **palavra** = cinza
 function rico(ctx, texto, x, y, { tam, largura, tom, alinhar = "left", peso = 800, entre = 1.12, fonte }) {
   const c = R[tom === "foto" ? "escuro" : tom];
   const f = (t) => ({ n: fonte ? fonte(t) : mont(peso, t), b: fonte ? fonte(t) : mont(peso, t), a: play(t * 1.04) });
@@ -589,19 +590,19 @@ function rico(ctx, texto, x, y, { tam, largura, tom, alinhar = "left", peso = 80
     let cx = alinhar === "center" ? x - total / 2 : alinhar === "right" ? x - total : x;
     l.itens.forEach((p, k) => {
       if (k > 0 && !p.cola) {
-        if (p.e === "a" && l.itens[k - 1].e === "a") { ctx.fillStyle = R.cobalto; ctx.fillRect(cx - 2, base - tam * 0.8, esp + 4, tam * 1.0); }
+        if (p.e === "a" && l.itens[k - 1].e === "a") { ctx.fillStyle = c.faixa; ctx.fillRect(cx - 2, base - tam * 0.8, esp + 4, tam * 1.0); }
         cx += esp;
       }
-      if (p.e === "a") { ctx.fillStyle = R.cobalto; ctx.fillRect(cx - 12, base - tam * 0.8, p.w + 24, tam * 1.0); }
-      ctx.font = f(tam)[p.e]; ctx.fillStyle = p.e === "a" ? "#FFFFFF" : p.e === "b" ? c.cinza : (tom === "foto" ? "#fff" : c.tinta);
+      if (p.e === "a") { ctx.fillStyle = c.faixa; ctx.fillRect(cx - 12, base - tam * 0.8, p.w + 24, tam * 1.0); }
+      ctx.font = f(tam)[p.e]; ctx.fillStyle = p.e === "a" ? c.naFaixa : p.e === "b" ? c.cinza : (tom === "foto" ? "#fff" : c.tinta);
       ctx.textAlign = "left"; ctx.textBaseline = "alphabetic"; ctx.fillText(p.t, cx, base); cx += p.w;
     });
   });
   return y + linhas.length * tam * entre;
 }
-function etiquetaAnton(ctx, texto, cx, y, tam, fundo = R.cobalto, cor = "#fff", graus = 0, maxW = 900) {
-  ctx.save(); ctx.font = `400 ${tam}px ${ANTON}`;
-  while (ctx.measureText(texto).width + tam * 0.6 > maxW && tam > 40) { tam -= 4; ctx.font = `400 ${tam}px ${ANTON}`; } const w = ctx.measureText(texto).width + tam * 0.6, h = tam * 1.25;
+function etiquetaAnton(ctx, texto, cx, y, tam, fundo = R.claro.faixa, cor = R.claro.naFaixa, graus = 0, maxW = 900) {
+  ctx.save(); ctx.font = ETQ(tam);
+  while (ctx.measureText(texto).width + tam * 0.6 > maxW && tam > 30) { tam -= 4; ctx.font = ETQ(tam); } const w = ctx.measureText(texto).width + tam * 0.6, h = tam * 1.25;
   girar(ctx, cx, y + h / 2, graus, () => { ctx.fillStyle = fundo; ctx.fillRect(-w / 2, -h / 2, w, h); ctx.fillStyle = cor; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(texto, 0, tam * 0.04); });
   ctx.restore(); return y + h;
 }
@@ -611,11 +612,11 @@ function paragrafo(ctx, texto, x, y, { tam = 36, largura = 820, tom, alinhar = "
   escreverRico(ctx, b, x, y, { n: cor || c.texto, a: c.tinta, b: c.tinta }, alinhar);
   return y + b.linhas.length * b.tam * b.entre;
 }
-function anotacao(ctx, texto, x, y, graus = -6, tam = 84) {
-  girar(ctx, x, y, graus, () => { ctx.font = `400 ${tam}px Allura`; ctx.fillStyle = R.ouro; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic"; ctx.fillText(texto, 0, 0); });
+function anotacao(ctx, texto, x, y, graus = -6, tam = 84, tom = "escuro") {
+  girar(ctx, x, y, graus, () => { ctx.font = `400 ${tam}px Allura`; ctx.fillStyle = R[tom].ouro; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic"; ctx.fillText(texto, 0, 0); });
 }
 // Seta de caneta: curva com ponta
-function setaMao(ctx, pts, cor = R.ouro, lw = 5) {
+function setaMao(ctx, pts, cor = R.escuro.ouro, lw = 5) {
   ctx.save(); ctx.strokeStyle = cor; ctx.lineWidth = lw; ctx.lineCap = "round"; ctx.lineJoin = "round";
   ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]);
   ctx.bezierCurveTo(pts[1][0], pts[1][1], pts[2][0], pts[2][1], pts[3][0], pts[3][1]); ctx.stroke();
@@ -632,8 +633,8 @@ function palavraFantasma(ctx, texto, tom) {
   ctx.strokeText(texto, W_CAR / 2, H_CAR / 2 - 40); ctx.restore();
 }
 function pilula(ctx, texto, cx, y, w, tom) {
-  ctx.save(); ctx.font = mont(700, 36); retanguloRedondo(ctx, cx - w / 2, y, w, 76, 38, R.cobalto);
-  ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(texto, cx, y + 40); ctx.restore(); return y + 76;
+  ctx.save(); ctx.font = mont(700, 36); retanguloRedondo(ctx, cx - w / 2, y, w, 76, 38, R[tom].faixa);
+  ctx.fillStyle = R[tom].naFaixa; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(texto, cx, y + 40); ctx.restore(); return y + 76;
 }
 
 /* ---------- Os 7 tipos de página (a estrutura: gancho, contexto, construção x2, tensão, recompensa, CTA) ---------- */
@@ -647,12 +648,12 @@ function pintarRyan(cv, s, i, total) {
       ctx.fillStyle = g; ctx.fillRect(0, 0, W_CAR, H_CAR); texturaPapel(ctx, 0.08);
       moldura(ctx, "foto", i, total);
       let y = H_CAR - 640;
-      ctx.font = `400 150px ${ANTON}`; ctx.fillStyle = "#fff"; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
-      const linhas = linhasRicas(ctx, s.titulo.toUpperCase(), { n: `400 150px ${ANTON}`, a: `400 150px ${ANTON}`, b: `400 150px ${ANTON}` }, W_CAR - 160, false);
-      let tam = 150; while (linhas.length * tam > 330 && tam > 90) tam -= 6;
-      const l2 = linhasRicas(ctx, s.titulo.toUpperCase(), { n: `400 ${tam}px ${ANTON}`, a: `400 ${tam}px ${ANTON}`, b: `400 ${tam}px ${ANTON}` }, W_CAR - 160, false);
-      l2.forEach((l, k) => { ctx.font = `400 ${tam}px ${ANTON}`; ctx.fillText(l.itens.map((p) => p.t).join(" "), 80, y + tam * (k + 1) * 0.98); });
-      y += l2.length * tam * 0.98 + 30;
+      const pf = (t) => `700 ${t}px 'Playfair Display'`;
+      let tam = 124, l2;
+      do { l2 = linhasRicas(ctx, s.titulo, { n: pf(tam), a: pf(tam), b: pf(tam) }, W_CAR - 160, false); if (l2.length * tam * 1.02 <= 340) break; tam -= 6; } while (tam > 70);
+      ctx.fillStyle = "#FFF8EA"; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+      l2.forEach((l, k) => { ctx.font = pf(tam); ctx.fillText(l.itens.map((p) => p.t).join(" "), 80, y + tam * (k + 1) * 1.02); });
+      y += l2.length * tam * 1.02 + 34;
       y = rico(ctx, s.texto, 92, y, { tam: 76, largura: W_CAR - 180, tom: "foto" });
       anotacao(ctx, s.nota || "", 96, H_CAR - 680, -5, 76);
       return;
@@ -669,7 +670,7 @@ function pintarRyan(cv, s, i, total) {
       let y = rico(ctx, s.titulo, 100, 300, { tam: 84, largura: 880, tom: "claro" }) + 70;
       s.itens.forEach(([a, b], k) => {
         ctx.save(); ctx.strokeStyle = R.claro.tinta; ctx.lineWidth = 5; ctx.beginPath(); ctx.roundRect(100, y, 120, 120, 26); ctx.stroke();
-        ctx.font = `400 70px ${ANTON}`; ctx.fillStyle = R.cobalto; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(String(k + 1), 160, y + 64); ctx.restore();
+        ctx.font = play(70); ctx.fillStyle = R.claro.faixa; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(String(k + 1), 160, y + 64); ctx.restore();
         ctx.font = mont(800, 50); ctx.fillStyle = R.claro.tinta; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic"; ctx.fillText(a, 262, y + 52);
         ctx.font = mont(500, 34); ctx.fillStyle = R.claro.cinza; ctx.fillText(b, 262, y + 104);
         y += 190;
@@ -678,12 +679,12 @@ function pintarRyan(cv, s, i, total) {
     }
     case "print": {
       fundoCaderno(ctx, "claro"); moldura(ctx, "claro", i, total);
-      let y = etiquetaAnton(ctx, s.titulo, W_CAR / 2, 230, 96);
+      let y = etiquetaAnton(ctx, s.titulo, W_CAR / 2, 230, 64);
       y = paragrafo(ctx, s.texto, W_CAR / 2, y + 50, { tam: 40, largura: 820, tom: "claro", alinhar: "center" }) + 50;
       const w = 560, h = H_CAR - y - 170, x = (W_CAR - w) / 2;
       girar(ctx, W_CAR / 2, y + h / 2, -2, () => { caixaPapel(ctx, -w / 2 - 14, -h / 2 - 14, w + 28, h + 28, 30, "#fff", true); fotoRedonda(ctx, img, -w / 2, -h / 2, w, h, 22, 0.3); });
-      anotacao(ctx, s.nota || "", x + w - 30, y + h - 40, -8, 76);
-      setaMao(ctx, [[x + w + 40, y + h - 120], [x + w + 110, y + h - 220], [x + w + 70, y + 160], [x + w + 10, y + 120]]);
+      anotacao(ctx, s.nota || "", x + w - 30, y + h - 40, -8, 76, "claro");
+      setaMao(ctx, [[x + w + 40, y + h - 120], [x + w + 110, y + h - 220], [x + w + 70, y + 160], [x + w + 10, y + 120]], R.claro.ouro);
       return;
     }
     case "tensao": {
@@ -691,7 +692,7 @@ function pintarRyan(cv, s, i, total) {
       let y = rico(ctx, s.titulo, W_CAR / 2, 340, { tam: 104, largura: 900, tom: "escuro", alinhar: "center" });
       ctx.font = mont(600, 42); ctx.fillStyle = R.escuro.cinza; ctx.textAlign = "center"; ctx.fillText(s.lead, W_CAR / 2, y + 60);
       y += 130;
-      s.itens.forEach((t) => { y = pilula(ctx, t, W_CAR / 2, y, 700) + 34; });
+      s.itens.forEach((t) => { y = pilula(ctx, t, W_CAR / 2, y, 700, "escuro") + 34; });
       return;
     }
     case "recompensa": {
@@ -708,11 +709,11 @@ function pintarRyan(cv, s, i, total) {
       ctx.save(); ctx.beginPath(); ctx.rect(fx, 0, fw, H_CAR); ctx.clip(); fotoPB(ctx, img, fx, 0, fw, H_CAR, 0.3); ctx.restore();
       const g = ctx.createLinearGradient(fx, 0, fx + 200, 0); g.addColorStop(0, R.claro.fundo); g.addColorStop(1, "rgba(241,236,227,0)"); ctx.fillStyle = g; ctx.fillRect(fx, 0, 200, H_CAR);
       moldura(ctx, "claro", i, total);
-      ctx.font = `400 150px ${ANTON}`; ctx.fillStyle = R.claro.tinta; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic"; ctx.fillText("COMENTA", 80, 520);
-      etiquetaAnton(ctx, s.palavra, 80 + ctx.measureText(s.palavra).width / 2 + 40, 560, 150, R.cobalto, "#fff", -3);
-      ctx.font = `400 150px ${ANTON}`;
+      ctx.font = play(130); ctx.fillStyle = R.claro.tinta; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic"; ctx.fillText("Comenta", 80, 520);
+      ctx.font = ETQ(96); const wp = Math.min(560, ctx.measureText(s.palavra).width + 58);
+      etiquetaAnton(ctx, s.palavra, 80 + wp / 2, 570, 96, R.claro.faixa, R.claro.naFaixa, -3, 560);
       paragrafo(ctx, s.texto, 86, 800, { tam: 46, largura: 560, tom: "claro" });
-      setaMao(ctx, [[120, 1120], [160, 1210], [380, 1200], [470, 1120]]);
+      setaMao(ctx, [[120, 1120], [160, 1210], [380, 1200], [470, 1120]], R.claro.ouro);
       return;
     }
   }
