@@ -4058,9 +4058,13 @@ const EMAIL_PROPOSTAS = "heyryan.ugc@gmail.com";
 // Gmail (ler e responder) + Google Agenda (só os calendários criados pelo painel, como o "Trabalhos")
 const ESCOPOS_GMAIL = "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/calendar.app.created";
 const temAgendaGoogle = () => gm.escopo.includes("calendar");
-const PALAVRAS_PROPOSTA = ["ugc", "\"user generated\"", "proposta", "parceria", "publi", "publicidade", "publipost", "campanha", "collab", "collaboration", "briefing", "orçamento", "orcamento", "\"mídia kit\"", "\"media kit\"", "midiakit", "influenciador", "influencer", "creator", "\"criador de conteúdo\"", "permuta", "cachê", "cache", "job", "contratar", "freela"];
+const PALAVRAS_PROPOSTA = ["oportunidade", "candidatura", "convite", "selecionado", "selecionada", "vaga", "invited", "picked", "task", "recompensa", "ugc", "\"user generated\"", "proposta", "parceria", "publi", "publicidade", "publipost", "campanha", "collab", "collaboration", "briefing", "orçamento", "orcamento", "\"mídia kit\"", "\"media kit\"", "midiakit", "influenciador", "influencer", "creator", "\"criador de conteúdo\"", "permuta", "cachê", "cache", "job", "contratar", "freela"];
 // Lê a caixa de entrada E a de spam (às vezes o e-mail da marca cai lá)
-const BUSCA_PROPOSTAS = `{in:inbox in:spam} newer_than:90d -category:promotions -category:social -category:forums -category:updates (${PALAVRAS_PROPOSTA.join(" OR ")})`;
+// Promoções e Atualizações entram também: é lá que caem as campanhas das plataformas de UGC
+const BUSCA_PROPOSTAS = `{in:inbox in:spam} newer_than:90d -category:social -category:forums (${PALAVRAS_PROPOSTA.join(" OR ")})`;
+// E-mail automático de plataforma que é oportunidade de trabalho (campanha, convite, candidatura), e não login, código ou pedido
+const OPORTUNIDADE_RE = /campanha|proposta|publi|candidatura|candidate|oportunidade|vaga|convite|convid|invited|selecionad|picked|task|tarefa|recompensa|reward|brief|job|collab|parceria/i;
+const NAO_OPORTUNIDADE_RE = /senha|password|login|entrou|signed in|device|dispositivo|c[óo]digo|code|verifica|confirma[çc][ãa]o|pedido|entrega|order|pagamento|payment|fatura|documento|identidade|welcome|bem-vind/i;
 const DOMINIOS_PESSOAIS = ["gmail", "hotmail", "outlook", "yahoo", "icloud", "live", "bol", "uol", "terra", "me"];
 // Remetentes que são robôs ou envio em massa (o começo do e-mail, antes do @)
 const REMETENTE_ROBO = /^(no-?reply|nao-?responda|naoresponda|donotreply|do-?not-?reply|notifica|notification|news|newsletter|marketing|mkt|comunicad|todomundo|support|suporte|faleconosco|fale-conosco|atendimento|info|noticias|alert|update|mailer|bounce|hello|team|time|equipe|contato-?noreply|campanhas|digest|community|comunidade|creators?|parcerias-?noreply|plataforma)/i;
@@ -4184,6 +4188,8 @@ const cabecalho = (m, n) => (((m.payload && m.payload.headers) || []).find((x) =
 const ASSUNTO_ROBO = /\[#?\d{3,}\]|novo dispositivo|fez login|c[oó]digo de (verifica|acesso|seguran)|verify|verifica[cç][aã]o|redefinir senha|password|fatura|boleto|pix|pagamento (recebido|aprovado|confirmado)|recibo|seu pedido|pedido #|inscri[cç][oõ]es abertas|newsletter|webinar|edi[cç][aã]o #?\d|#\d{2,}\b|grupo do whatsapp/i;
 
 function motivoAutomatico(m, de) {
+  // Resposta de uma pessoa a uma conversa (Re:) aparece sempre, mesmo que ela use ferramenta de e-mail
+  if (/^\s*(re|res|resp|enc|fw|fwd)\s*:/i.test(cabecalho(m, "Subject")) && !/resposta autom|automatic reply|out of office|aus[êe]ncia/i.test(cabecalho(m, "Subject")) && !REMETENTE_ROBO.test(de.email.split("@")[0])) return "";
   if (cabecalho(m, "List-Unsubscribe") || cabecalho(m, "List-Id")) return "envio em massa";
   if (cabecalho(m, "Feedback-ID") || cabecalho(m, "X-Feedback-Id") || cabecalho(m, "X-SES-Outgoing") || cabecalho(m, "X-Mailer")) return "ferramenta de envio em massa";
   if (/^yes/i.test(cabecalho(m, "X-Spam-Flag")) || /^yes/i.test(cabecalho(m, "X-Spam-Status"))) return "marcado como spam";
@@ -4206,7 +4212,7 @@ async function lerPropostas() {
   if (abaAtual === "propostas") desenhar();
   try {
     const q = BUSCA_PROPOSTAS + (gm.busca ? " " + gm.busca : "");
-    const lista = await gmailApi("messages?maxResults=60&includeSpamTrash=true&q=" + encodeURIComponent(q));
+    const lista = await gmailApi("messages?maxResults=100&includeSpamTrash=true&q=" + encodeURIComponent(q));
     const ids = (lista.messages || []).map((x) => x.id);
     const campos = ["From", "To", "Cc", "Subject", "Date", "List-Unsubscribe", "List-Id", "Precedence", "Auto-Submitted", "Feedback-ID", "X-Feedback-Id", "X-SES-Outgoing", "X-Mailer", "X-Spam-Flag", "X-Spam-Status"].map((h) => "&metadataHeaders=" + h).join("");
     const msgs = await Promise.all(ids.map((id) => gmailApi(`messages/${id}?format=metadata${campos}`).catch(() => null)));
@@ -4216,6 +4222,7 @@ async function lerPropostas() {
         data: new Date(Number(m.internalDate) || Date.parse(cabecalho(m, "Date")) || Date.now()),
         spam: (m.labelIds || []).includes("SPAM"),
         novo: (m.labelIds || []).includes("UNREAD") && !adiado("lido-" + m.id), automatico: motivoAutomatico(m, de),
+        oportunidade: OPORTUNIDADE_RE.test(cabecalho(m, "Subject") + " " + (m.snippet || "")) && !NAO_OPORTUNIDADE_RE.test(cabecalho(m, "Subject")),
         importante: /proposta|or[cç]amento|briefing|contrato|campanha|parceria|pagamento|valor|cach[eê]|budget|rate|paid|collab/i.test(cabecalho(m, "Subject") + " " + (m.snippet || "")) };
     }).filter((x) => x.de.email !== EMAIL_PROPOSTAS)
       // Uma conversa vira um cartão só (o e-mail mais recente dela)
@@ -4224,11 +4231,12 @@ async function lerPropostas() {
     gm.erro = e.message || String(e);
   }
   gm.carregando = false;
-  propostasNovas = propostasVisiveis().filter((x) => x.novo).length;
+  propostasNovas = [...propostasVisiveis(), ...oportunidadesVisiveis()].filter((x) => x.novo).length;
   desenhar();
 }
 
 const propostasVisiveis = () => (gm.emails || []).filter((x) => !x.automatico && !adiado("email-" + x.id));
+const oportunidadesVisiveis = () => (gm.emails || []).filter((x) => x.automatico && x.oportunidade && !adiado("email-" + x.id));
 const marcarEmailTratado = (id, aviso) => adiarLembrete("email-" + id, "2999-12-31", aviso);
 
 /* ---------- Conversa aberta e resposta ---------- */
@@ -4264,7 +4272,7 @@ function marcarLidoNoPainel(email) {
   email.novo = false;
   const chave = "lido-" + email.id, ate = "2999-12-31";
   S.adiados = S.adiados.filter((a) => a.chave !== chave).concat({ chave, ate });
-  propostasNovas = propostasVisiveis().filter((x) => x.novo).length;
+  propostasNovas = [...propostasVisiveis(), ...oportunidadesVisiveis()].filter((x) => x.novo).length;
   db.from("lembretes_adiados").upsert({ chave, ate }, { onConflict: "chave" }).then(({ error }) => { if (error) console.warn("lido", error); });
 }
 
@@ -4463,7 +4471,9 @@ function desenharPropostas(el) {
   if (!gm.emails && !gm.carregando && !gm.erro) lerPropostas();
 
   const visiveis = propostasVisiveis();
-  const automaticos = (gm.emails || []).filter((x) => x.automatico && !adiado("email-" + x.id));
+  const automaticos = (gm.emails || []).filter((x) => x.automatico && !x.oportunidade && !adiado("email-" + x.id));
+  // Campanhas e convites das plataformas de UGC (Air, Creatify, Vyre, TikTok Shop...): não são de pessoa, mas são trabalho
+  const oportunidades = oportunidadesVisiveis();
   const minutos = Math.max(1, Math.round((gm.expira - Date.now()) / 60000));
   el.innerHTML = `
     <div class="barra">
@@ -4478,7 +4488,10 @@ function desenharPropostas(el) {
       : `${visiveis.length
           ? `<p class="sub" style="margin:0 0 8px">${plural(visiveis.length, "proposta escrita por uma pessoa", "propostas escritas por pessoas")} nos últimos 90 dias${propostasNovas ? ` · <b>${plural(propostasNovas, "não lida", "não lidas")}</b>` : ""}</p>
             <div class="lista-emails">${visiveis.map(cartaoEmail).join("")}</div>`
-          : `<p class="vazio">Nenhuma proposta de pessoa nos últimos 90 dias. Os e-mails automáticos e de plataformas ficam escondidos.</p>`}
+          : `<p class="vazio">Nenhuma proposta de pessoa nos últimos 90 dias.</p>`}
+        ${oportunidades.length ? `<h3 class="pro-titulo" style="margin:22px 0 4px">📣 Oportunidades em plataformas</h3>
+          <p class="sub" style="margin:0 0 8px">Campanhas, convites e candidaturas que chegaram pelas plataformas de UGC${oportunidades.filter((x) => x.novo).length ? ` · <b>${plural(oportunidades.filter((x) => x.novo).length, "não lida", "não lidas")}</b>` : ""}</p>
+          <div class="lista-emails">${oportunidades.map(cartaoEmail).join("")}</div>` : ""}
         ${automaticos.length ? `<button type="button" class="link-btn ver-automaticos" id="ver-automaticos">${gm.verAutomaticos ? "esconder" : "ver"} ${plural(automaticos.length, "e-mail automático escondido", "e-mails automáticos escondidos")}</button>
           ${gm.verAutomaticos ? `<div class="lista-emails">${automaticos.map(cartaoEmail).join("")}</div>` : ""}` : ""}`}`;
 
