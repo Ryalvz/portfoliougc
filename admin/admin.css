@@ -1376,3 +1376,7 @@ dialog.pf-janela-rapida { width: min(460px, calc(100vw - 20px)); }
 .revisor li button:hover { background: var(--tint); }
 .revisor li q { color: var(--red); font-style: italic; }
 .revisor li small { display: block; color: var(--muted); font-size: 12px; margin-top: 1px; }
+
+/* Plano da semana: agenda e motivo de cada gancho */
+.pl-agenda-toda { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 12px; }
+.pp-motivo { display: block; margin-top: 3px; color: var(--muted); font-size: 12px; font-style: normal; }

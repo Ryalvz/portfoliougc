@@ -189,7 +189,7 @@ function formHashtags(cfg) {
 
 /* ---------- 🧭 Plano da semana ---------- */
 const DIAS_PLANO = [["SEG", 0, "Segunda"], ["TER", 1, "Terça"], ["QUA", 2, "Quarta"], ["QUI", 3, "Quinta"], ["SEX", 4, "Sexta"], ["SAB", 5, "Sábado"], ["DOM", 6, "Domingo"]];
-const NICHO_PADRAO = "Sou o Ryan (@ryalvz), creator UGC no Brasil. Meu Instagram mistura duas coisas: bastidores de UGC (como fechar com marcas, quanto cobrar, rotina, gravação, edição) e conteúdo de produtos na vida real (tech e apps, beleza, moda e fitness). Quero crescer, atrair marcas e ter constância.";
+const NICHO_PADRAO = "Sou o Ryan (@ryalvz), creator UGC no Brasil. Meu Instagram mistura: bastidores de UGC (como fechar com marcas, quanto cobrar, rotina, gravação, edição), TikTok Shop do ponto de vista de quem faz (como funciona, como escolho produto, o que dá resultado, erros) e conteúdo de produtos na vida real (tech e apps, lifestyle, moda e grooming). Quero crescer, atrair marcas, me posicionar como quem entende de UGC e TikTok Shop e ter constância.";
 
 async function carregarPlanos() {
   const [a, b] = await Promise.all([
@@ -295,31 +295,34 @@ REGRAS PARA AS IDEIAS NÃO FICAREM GENÉRICAS
 2. Ensinar de verdade: o post entrega um passo a passo, um número, um antes e depois ou um exemplo concreto. "Dicas para melhorar a edição" sem dizer QUAIS dicas não serve.
 3. Retenção: o gancho abre uma pergunta nos 3 primeiros segundos e o post só responde no fim. Nada de apresentação. Tem uma mudança perceptível do começo ao fim.
 4. Estrutura do perfil: GANCHO, CONTEXTO, CONTEÚDO, FECHAMENTO. Um CTA só, coerente com o C.
-5. Respeite O QUE ACONTECE NESTA SEMANA: use como matéria-prima (ex.: aniversário vira um Conhecer ou Conectar pessoal) e NÃO coloque nesses dias tema que fica sem sentido.
+5. Respeite O QUE ACONTECE NESTA SEMANA: use como matéria-prima (ex.: aniversário vira um Conhecer ou Conectar pessoal) e NÃO coloque nesses dias tema que fica sem sentido. Um acontecimento curto rende no MÁXIMO 1 post: nada de série, episódios ou "diário" (uma viagem de fim de semana não vira diário de viagem). Não infle a semana com coisa que eu não vou viver.
 6. Os 12 anos que eu passei em vendas B2B rendem gancho em Converter e em conteúdo sobre carreira de creator e negócio.
 7. O post mais importante vai nos meus melhores dias (sábado, quarta, segunda). Evite domingo e sexta para ele.
-8. Este plano é SÓ para o Instagram. Nada de TikTok Shop (vídeo de venda de produto com carrinho).
+8. Este plano é SÓ para o Instagram orgânico. TikTok Shop entra como ASSUNTO para me posicionar (bastidores, como funciona, como escolho produto, o que deu resultado, erros, quanto rende de verdade sem inventar número). O que NÃO entra é vídeo de venda com carrinho.
+9. Seja o meu estrategista de rotina: aproveite o que eu já faço na semana (gravação de marca, edição, rotina de creator, TikTok Shop) para eu gravar mais com menos esforço. Diga o que dá para gravar no mesmo dia, em lote.
 
 ${dnaPerfil || DNA_PADRAO}
 (As fórmulas acima são formatos que já funcionaram no meu perfil. Use como formato, mas o PAPEL de cada post vem dos três Cs.)
 
-O QUE EU PRECISO (pesquise na internet o que está em alta no Brasil nesta semana):
+O QUE EU PRECISO (pesquise na internet de verdade, nada de tendência inventada):
 
-1. TENDÊNCIAS DA SEMANA: 5 temas, formatos ou áudios em alta no meu nicho e por que estão funcionando.
-2. O QUE O MEU PÚBLICO QUER SABER: 8 perguntas reais que as pessoas estão fazendo sobre esses assuntos.
+1. ASSUNTOS EM ALTA: os 3 a 5 assuntos que mais estão bombando no meu nicho nesta semana (UGC e carreira de creator, TikTok Shop, tech e lifestyle, moda e grooming), cada um com a fonte e por que está em alta.
+2. PESQUISA DE CADA ASSUNTO: para cada um, separe
+   O QUE JÁ DEU RESULTADO: posts, formatos e ângulos que já performaram (com perfil e números quando tiver).
+   O GAP: a parte daquele assunto que ninguém do meu mercado falou ainda. É nesse buraco que eu vou entrar.
 3. PADRÕES DOS REELS QUE BOMBARAM: o que os reels da lista têm em comum (gancho, duração, estilo, tema).
 4. O QUE FUNCIONA PARA MIM: o que os meus números mostram (o que repetir e o que parar).
-5. PLANO DA SEMANA: de 4 a 6 posts, com 1 a 2 Conhecer, 2 a 3 Conectar e 1 Converter, pelo menos 1 carrossel e 2 reels.
+5. PLANO DA SEMANA: de 4 a 6 posts, com 1 a 2 Conhecer, 2 a 3 Conectar e 1 Converter, pelo menos 1 carrossel e 2 reels. Cada post entra pelo GAP de um assunto em alta ou por uma ideia minha anotada.
    PRIORIZE as minhas ideias anotadas (com o #número no tema). Só invente tema novo se faltar, e aí ele precisa sair de uma história minha.
    Escreva CADA post numa linha, EXATAMENTE neste formato, separado por | :
    SEG | Reels | Conectar | tema | gancho (a primeira frase do vídeo ou a capa) | o que a pessoa aprende ou sente + CTA
    Use só SEG, TER, QUA, QUI, SEX, SAB, DOM no começo. Formatos: Reels, Carrossel, Stories ou Foto. O terceiro campo é sempre Conhecer, Conectar ou Converter.
-6. ROTEIRO DE CADA POST: depois do plano, para cada post escreva:
-   ROTEIRO (tema)
-   GANCHO: duas opções
-   CONTEXTO: uma frase
-   CONTEÚDO: os passos ou pontos concretos, um por linha
-   FECHAMENTO: o CTA, uma ação só
+   Depois do plano, diga em 2 ou 3 linhas o que dá para gravar junto, no mesmo dia.
+6. PARA CADA POST DO PLANO:
+   GANCHOS (tema): 10 ganchos de 10 ângulos DIFERENTES (ex.: curiosidade, contra o senso comum, número, erro que eu cometi, bastidor, antes e depois, pergunta direta, mini história, comparação, prova). Nada de 10 versões da mesma frase. Cada um numa linha: 1. "frase" | ângulo | por que vai prender.
+   PRIMEIROS 30 SEGUNDOS (tema): escritos com carinho, frase a frase, em linguagem de fala: 0 a 3 s o gancho, 3 a 10 s por que a pessoa tem que ficar, 10 a 30 s a primeira entrega de valor. É aqui que se ganha ou se perde a pessoa.
+   ROTEIRO (tema): o resto em tópicos, em linguagem de fala (do jeito que eu falaria, não texto de blog), seguindo GANCHO, CONTEXTO, CONTEÚDO, FECHAMENTO.
+   FECHAMENTO: o CTA, uma ação só.
 7. CARROSSÉIS PRONTOS: para cada carrossel do plano, escreva os slides neste formato (de 5 a 8 slides, no máximo 30 palavras por slide). Num título, *palavra* fica em itálico colorido e **palavra** em negrito (1 destaque por título, no máximo).
    CARROSSEL: título do carrossel
    1 capa | título forte (até 10 palavras) | linha pequena em cima (opcional) | etiqueta curta (opcional) | foto: que foto minha usar
@@ -336,6 +339,17 @@ O QUE EU PRECISO (pesquise na internet o que está em alta no Brasil nesta seman
    Modelos possíveis: capa, texto, lista, numero, moldura, notas, polaroid, colagem, cartao, frase, final. Comece sempre com capa e termine com final.
 
 Fale como gente de verdade, em português do Brasil, tom de conversa de café, sem cara de anúncio. Não use travessão em nenhum texto. Proibido: "não é X, é Y" e variações, "aí eu descobri", "foi aí que", "foi quando", "até que", "você sabia que" como gancho, "isso muda tudo", "isso muda o jogo". Não invente número ou resultado meu: o que você não sabe vira campo entre parênteses.`;
+}
+
+// Põe os posts do plano no Calendário (tipo "postar"), sem duplicar o que já está lá
+async function planoParaAgenda(semana, itens) {
+  const novos = (itens || []).map((it) => ({ titulo: `${it.formato}: ${it.tema}`.slice(0, 200), tipo: "postar", data: somaDiasISO((DIAS_PLANO.find((x) => x[0] === it.dia) || [0, 0])[1], semana), status: "a fazer" }))
+    .filter((n) => !S.calendario.some((a) => a.titulo === n.titulo));
+  if (!novos.length) return 0;
+  const { error } = await db.from("calendario").insert(novos);
+  if (error) { avisar(traduzErro(error), true); return 0; }
+  await recarregar("calendario");
+  return novos.length;
 }
 
 // Plano automático: a tarefa do Claude de todo sábado usa isso pelo navegador, com o painel aberto.
@@ -359,7 +373,24 @@ window.planoAuto = {
     const { error } = await db.from("ig_planos").upsert({ semana, resposta, itens: lido }, { onConflict: "semana" });
     if (error) return { erro: traduzErro(error) };
     await carregarPlanos();
-    return { semana, posts: lido.itens.length, carrosseis: lido.carrosseis.length };
+    const naAgenda = await planoParaAgenda(semana, lido.itens);
+    return { semana, posts: lido.itens.length, carrosseis: lido.carrosseis.length, naAgenda };
+  },
+  // Cria uma ideia em Roteiros com a pesquisa, os 10 ganchos e o roteiro. Devolve o #número para usar no plano.
+  async criarIdeia({ titulo, categoria = "organico", texto = "", observacoes = "" }) {
+    const dados = { titulo: String(titulo || "").slice(0, 200), categoria, status: "agora", de_quem: "minha", minha_versao: texto || null, observacoes: observacoes || null };
+    const limpo = {}; Object.keys(dados).forEach((k) => { if (temCampo("transcricoes", k)) limpo[k] = dados[k]; });
+    const { data, error } = await db.from("transcricoes").insert(limpo).select("id").single();
+    if (error) return { erro: traduzErro(error) };
+    await recarregar("transcricoes");
+    return { id: data.id };
+  },
+  // Manda os posts de um plano já salvo para o Calendário
+  async agenda(semana = this.semana()) {
+    await carregarPlanos();
+    const p = (igx.planos || []).find((x) => x.semana === semana);
+    if (!p) return { erro: "Não achei plano dessa semana." };
+    return { semana, naAgenda: await planoParaAgenda(semana, (p.itens || {}).itens || []) };
   }
 };
 
@@ -428,6 +459,7 @@ function desenharPlanoSemana(el) {
     ${itens.length ? (() => { const cont = { conhecer: 0, conectar: 0, converter: 0 }; itens.forEach((it) => { const c = cDoItem(it); if (c) cont[c]++; }); const semC = itens.filter((it) => !cDoItem(it)).length; return `<div class="pl-cs">${["conhecer", "conectar", "converter"].map((c) => `<span class="pilula ${C_INFO[c].cls}">${C_INFO[c].nome}: ${cont[c]}</span>`).join("")}<span class="sub">ideal: 1 a 2 Conhecer, 2 a 3 Conectar, 1 Converter${!cont.converter && !semC ? ". <b>Falta um Converter</b>: sem ele as marcas não entendem como te contratar." : ""}${semC ? `. ${semC === itens.length ? "Este plano foi feito antes dos três Cs: refaça com o pedido novo." : `${semC} sem C definido.`}` : ""}</span></div>`; })() : ""}
 
     ${itens.length ? `
+      <div class="pl-agenda-toda"><button class="btn" type="button" id="pl-agenda-toda">📅 Mandar a semana toda pra agenda</button><span class="sub">${itens.filter((it) => S.calendario.some((a) => a.titulo === `${it.formato}: ${it.tema}`.slice(0, 200))).length} de ${itens.length} já estão no Calendário</span></div>
       <div class="pl-dias">${itens.map((it, i) => { const ci = carDoItem(it); const data = dataDoDia(it.dia); return `
         <article class="pl-dia ${data === hojeISO() ? "hoje" : ""}" data-pl-abrir="${i}" tabindex="0" role="button" aria-label="Ver tudo de ${esc(it.tema)}">
           <header><b>${esc((DIAS_PLANO.find((x) => x[0] === it.dia) || [0, 0, it.dia])[2])}</b><span class="sub">${dataBR(data).slice(0, 5)}</span><span class="pilula ${/reel/i.test(it.formato) ? "p-azul" : /carross/i.test(it.formato) ? "p-oliva" : ""}">${esc(it.formato)}</span>${cDoItem(it) ? `<span class="pilula ${C_INFO[cDoItem(it)].cls}">${C_INFO[cDoItem(it)].nome}</span>` : ""}</header>
@@ -481,7 +513,8 @@ function desenharPlanoSemana(el) {
     const { error } = await db.from("ig_planos").upsert({ semana, resposta, itens: lido }, { onConflict: "semana" });
     if (error) { avisar(traduzErro(error), true); return; }
     await carregarPlanos(); igx.semanaPlano = semana;
-    avisar(lido.itens.length ? `Plano salvo: ${plural(lido.itens.length, "post", "posts")}${lido.carrosseis.length ? ` e ${plural(lido.carrosseis.length, "carrossel pronto", "carrosséis prontos")}` : ""}.` : "Salvei, mas não achei as linhas do plano. Veja o aviso.", !lido.itens.length);
+    const naAgenda = await planoParaAgenda(semana, lido.itens);
+    avisar(lido.itens.length ? `Plano salvo${naAgenda ? ` e ${plural(naAgenda, "post foi", "posts foram")} pra agenda` : ""}: ${plural(lido.itens.length, "post", "posts")}${lido.carrosseis.length ? ` e ${plural(lido.carrosseis.length, "carrossel pronto", "carrosséis prontos")}` : ""}.` : "Salvei, mas não achei as linhas do plano. Veja o aviso.", !lido.itens.length);
     desenhar();
   };
   $$("[data-pl-car]", el).forEach((b) => b.onclick = () => {
@@ -510,6 +543,8 @@ function desenharPlanoSemana(el) {
   $$("[data-pl-copiar]", el).forEach((b) => b.onclick = async () => {
     try { await navigator.clipboard.writeText(itens[Number(b.dataset.plCopiar)].gancho); avisar("Gancho copiado."); } catch (_) { avisar("Não deu para copiar.", true); }
   });
+  const agToda = $("#pl-agenda-toda");
+  if (agToda) agToda.onclick = async () => { const n = await planoParaAgenda(plano.semana, itens); avisar(n ? `${plural(n, "post foi", "posts foram")} pro Calendário.` : "A semana toda já está no Calendário."); desenhar(); };
   $$("[data-pl-agenda]", el).forEach((b) => b.onclick = async () => {
     const it = itens[Number(b.dataset.plAgenda)];
     const titulo = `${it.formato}: ${it.tema}`.slice(0, 200);
@@ -1287,7 +1322,7 @@ ${legendas.map((x) => `- (${num(x.reach)} de alcance) ${String(x.legenda).replac
    citadas (#34 etc.: ganchos, roteiro, chamada, legenda, hashtags,
    dicas) e o trecho da pesquisa que fala do post. Cada parte tem
    o seu botão de copiar. */
-const SECOES_ROTEIRO = [["ganchos", /^(GANCHOS|OP[ÇC][ÕO]ES DE GANCHO)\b/i], ["duracao", /^DURA[ÇC][ÃA]O\b/i], ["angulo", /^(ÂNGULO|ANGULO)\b/i], ["filmar", /^O QUE FILMAR\b/i], ["roteiro", /^ROTEIRO\b/i], ["chamada", /^CHAMADA( FINAL)?\b/i], ["legenda", /^(LEGENDA|TEXTO DO POST)\b/i], ["dicas", /^DICAS( DE GRAVA[ÇC][ÃA]O)?\b/i], ["anotacao", /^ANOTA[ÇC][ÃA]O ORIGINAL\b/i]];
+const SECOES_ROTEIRO = [["pesquisa", /^(O QUE J[ÁA] DEU RESULTADO|PESQUISA)\b/i], ["gap", /^(O )?GAP\b/i], ["primeiros", /^(OS )?PRIMEIROS 30\b/i], ["ganchos", /^(GANCHOS|OP[ÇC][ÕO]ES DE GANCHO)\b/i], ["duracao", /^DURA[ÇC][ÃA]O\b/i], ["angulo", /^(ÂNGULO|ANGULO)\b/i], ["filmar", /^O QUE FILMAR\b/i], ["roteiro", /^ROTEIRO\b/i], ["chamada", /^CHAMADA( FINAL)?\b/i], ["legenda", /^(LEGENDA|TEXTO DO POST)\b/i], ["dicas", /^DICAS( DE GRAVA[ÇC][ÃA]O)?\b/i], ["anotacao", /^ANOTA[ÇC][ÃA]O ORIGINAL\b/i]];
 function partesDoRoteiro(texto) {
   const partes = {}; let atual = "inicio";
   String(texto || "").split("\n").forEach((bruta) => {
@@ -1325,6 +1360,9 @@ function abrirPostDoPlano(plano, it, evento) {
 
   // Ganchos: o do plano + os do roteiro
   const ganchos = [...new Set([it.gancho, ...ideias.flatMap((t) => ganchosDe(partesDoRoteiro(t.minha_versao).ganchos))].map((g) => String(g || "").replace(/^["“]|["”]$/g, "").trim()).filter(Boolean))];
+  // O motivo de cada gancho (o que vem depois da frase: "| ângulo | por que vai prender")
+  const motivos = {};
+  ideias.forEach((t) => String(partesDoRoteiro(t.minha_versao).ganchos || "").split("\n").forEach((l) => { const m = l.match(/["“]([^"”]{4,})["”]\s*[|:–-]?\s*(.+)$/); if (m) motivos[m[1].trim()] = m[2].replace(/^\|\s*/, "").replace(/\s*\|\s*/g, " · ").trim(); }));
 
   const htmlIdeias = ideias.map((t) => {
     const p = partesDoRoteiro(t.minha_versao);
@@ -1333,7 +1371,10 @@ function abrirPostDoPlano(plano, it, evento) {
     return `<div class="pp-ideia">
       <div class="pp-ideia-topo"><b>#${t.id} ${esc(t.titulo || "")}</b><span class="espaco"></span>
         <button type="button" class="btn pequeno" data-ir-ideia="${t.id}">Abrir nos Roteiros</button></div>
+      ${bloco("🔎 O que já deu resultado", p.pesquisa)}
+      ${bloco("🕳️ O gap (onde você entra)", p.gap)}
       ${pronto ? `
+        ${bloco("⏱️ Primeiros 30 segundos", p.primeiros)}
         ${bloco("🎬 Roteiro", p.roteiro)}
         ${bloco("📣 Chamada final", p.chamada)}
         ${bloco("📝 Legenda", p.legenda, tags.length ? `<div class="pp-tags">${tags.map((h) => `<span class="pilula">${esc(h)}</span>`).join(" ")} ${btnCopiar(tags.join(" "), "📋 Hashtags")}</div>` : "")}
@@ -1351,7 +1392,7 @@ function abrirPostDoPlano(plano, it, evento) {
     <h3 class="pp-tema">${esc(it.tema)}</h3>
     ${it.porque ? `<p class="pp-porque">💡 ${esc(it.porque)}</p>` : ""}
     ${ganchos.length ? `<section class="pp-bloco"><div class="pp-bloco-topo"><h4>🪝 Ganchos</h4></div>
-      <ul class="pp-ganchos">${ganchos.map((g) => `<li><span>“${esc(g)}”</span>${btnCopiar(g)}</li>`).join("")}</ul></section>` : ""}
+      <ul class="pp-ganchos">${ganchos.map((g) => `<li><span>“${esc(g)}”${motivos[g] ? `<small class="pp-motivo">${esc(motivos[g])}</small>` : ""}</span>${btnCopiar(g)}</li>`).join("")}</ul></section>` : ""}
     ${htmlIdeias || `<section class="pp-bloco"><p class="sub" style="margin:0 0 8px">Esse post não está ligado a uma ideia dos Roteiros, então ainda não tem roteiro, legenda nem hashtags.</p>
       <button type="button" class="btn primario" data-voz-novo>✍️ Fazer o roteiro na minha voz</button></section>`}
     ${car ? `<section class="pp-bloco"><div class="pp-bloco-topo"><h4>🎨 Slides do carrossel</h4><button type="button" class="btn pequeno primario" data-abrir-car>Abrir no gerador</button></div>
