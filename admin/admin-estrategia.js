@@ -1353,7 +1353,7 @@ ${legendas.map((x) => `- (${num(x.reach)} de alcance) ${String(x.legenda).replac
    citadas (#34 etc.: ganchos, roteiro, chamada, legenda, hashtags,
    dicas) e o trecho da pesquisa que fala do post. Cada parte tem
    o seu botão de copiar. */
-const SECOES_ROTEIRO = [["pesquisa", /^(O QUE J[ÁA] DEU RESULTADO|PESQUISA)\b/i], ["gap", /^(O )?GAP\b/i], ["primeiros", /^(OS )?PRIMEIROS 30\b/i], ["ganchos", /^(GANCHOS|OP[ÇC][ÕO]ES DE GANCHO)\b/i], ["duracao", /^DURA[ÇC][ÃA]O\b/i], ["angulo", /^(ÂNGULO|ANGULO)\b/i], ["filmar", /^O QUE FILMAR\b/i], ["roteiro", /^ROTEIRO\b/i], ["chamada", /^CHAMADA( FINAL)?\b/i], ["legenda", /^(LEGENDA|TEXTO DO POST)\b/i], ["dicas", /^DICAS( DE GRAVA[ÇC][ÃA]O)?\b/i], ["anotacao", /^ANOTA[ÇC][ÃA]O ORIGINAL\b/i]];
+const SECOES_ROTEIRO = [["pesquisa", /^(O QUE J[ÁA] DEU RESULTADO|PESQUISA)\b/i], ["gap", /^(O )?GAP\b/i], ["primeiros", /^(OS )?PRIMEIROS 30\b/i], ["ganchos", /^(GANCHOS|OP[ÇC][ÕO]ES DE GANCHO)\b/i], ["duracao", /^DURA[ÇC][ÃA]O\b/i], ["angulo", /^(ÂNGULO|ANGULO)\b/i], ["filmar", /^O QUE FILMAR\b/i], ["roteiro", /^ROTEIRO\b/i], ["chamada", /^CHAMADA( FINAL)?\b/i], ["legenda", /^(LEGENDA|TEXTO DO POST)\b/i], ["dicas", /^DICAS( DE GRAVA[ÇC][ÃA]O)?\b/i], ["anotacao", /^ANOTA[ÇC][ÃA]O ORIGINAL\b/i], ["slides", /^SLIDES\b/i]];
 function partesDoRoteiro(texto) {
   const partes = {}; let atual = "inicio";
   String(texto || "").split("\n").forEach((bruta) => {
@@ -1397,7 +1397,8 @@ function abrirPostDoPlano(plano, it, evento) {
 
   const htmlIdeias = ideias.map((t) => {
     const p = partesDoRoteiro(t.minha_versao);
-    const pronto = !!(p.roteiro || p.legenda);
+    // Carrossel também conta como pronto: os slides aparecem lá embaixo, no bloco do carrossel
+    const pronto = !!(p.roteiro || p.legenda || p.slides);
     const tags = hashtagsDe(p.legenda);
     return `<div class="pp-ideia">
       <div class="pp-ideia-topo"><b>#${t.id} ${esc(t.titulo || "")}</b><span class="espaco"></span>
@@ -1412,7 +1413,8 @@ function abrirPostDoPlano(plano, it, evento) {
         ${bloco("⏱️ Duração", p.duracao)}
         ${bloco("🎞️ O que filmar", p.filmar)}
         ${bloco("🎥 Dicas de gravação", p.dicas)}
-        ${bloco("🧭 Por que esse ângulo", p.angulo)}`
+        ${bloco("🧭 Por que esse ângulo", p.angulo)}
+        ${!car && p.slides ? `<section class="pp-bloco"><div class="pp-bloco-topo"><h4>🎨 Slides</h4>${btnCopiar(p.slides, "📋 Copiar")}</div><ol class="pp-slides">${p.slides.split("\n").map((l) => l.trim()).filter(Boolean).map((l) => { const c = l.replace(/^\d+[.)]?\s*/, "").split("|").map((x) => x.trim().replace(/\*/g, "")); return `<li><span class="pilula">${esc(c[0] || "")}</span> ${esc(c.slice(1).filter((x) => !/^foto\s*:/i.test(x)).join(" · "))}</li>`; }).join("")}</ol></section>` : ""}`
       : `<p class="sub">${t.minha_versao ? "Essa ideia tem anotações, mas ainda não tem roteiro pronto." : "Essa ideia ainda não tem roteiro."}</p>
         ${t.minha_versao ? bloco("Suas anotações", t.minha_versao) : ""}
         <button type="button" class="btn primario" data-voz="${t.id}">✍️ Fazer o roteiro na minha voz</button>`}
