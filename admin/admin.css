@@ -1380,3 +1380,4 @@ dialog.pf-janela-rapida { width: min(460px, calc(100vw - 20px)); }
 /* Plano da semana: agenda e motivo de cada gancho */
 .pl-agenda-toda { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 12px; }
 .pp-motivo { display: block; margin-top: 3px; color: var(--muted); font-size: 12px; font-style: normal; }
+.car-f-pincel { font-family: Yellowtail, cursive; font-size: 1.25em; color: #B8862A; }

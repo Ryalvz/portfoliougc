@@ -210,7 +210,7 @@ const C_INFO = {
 };
 const cDoItem = (it) => { const m = semAcento(it.c || it.porque || "").match(/conhecer|conectar|converter/); return m ? m[0] : ""; };
 
-const ORDEM_CAMPOS_PLANO = { capa: ["titulo", "texto", "destaque"], texto: ["titulo", "texto"], lista: ["titulo", "texto"], numero: ["texto2", "titulo", "texto"], moldura: ["texto2", "titulo"], notas: ["titulo", "texto2"], polaroid: ["titulo"], colagem: ["titulo", "texto"], cartao: ["titulo", "texto", "texto2"], frase: ["titulo"], final: ["titulo", "texto", "destaque", "texto2"] };
+const ORDEM_CAMPOS_PLANO = { capamao: ["titulo", "destaque"], objeto: ["titulo", "texto2", "destaque", "texto"], capa: ["titulo", "texto", "destaque"], texto: ["titulo", "texto"], lista: ["titulo", "texto"], numero: ["texto2", "titulo", "texto"], moldura: ["texto2", "titulo"], notas: ["titulo", "texto2"], polaroid: ["titulo"], colagem: ["titulo", "texto"], cartao: ["titulo", "texto", "texto2"], frase: ["titulo"], final: ["titulo", "texto", "destaque", "texto2"] };
 // Lê a resposta do Claude: linhas "SEG | Reels | tema | gancho | por quê" e blocos "CARROSSEL: título"
 function lerPlano(texto) {
   const itens = [], carrosseis = [];
@@ -228,7 +228,7 @@ function lerPlano(texto) {
       else itens.push({ dia: sigla, formato: p[0] || "", tema: p[1] || "", gancho: p[2] || "", porque: p[3] || "" });
       car = null; return;
     }
-    const ms = l.match(/^(\d{1,2})[.)]?\s*(capa|texto|lista|numero|número|moldura|notas|polaroid|colagem|cartao|cartão|frase|final|comparacao|comparação)\s*\|\s*(.*)$/i);
+    const ms = l.match(/^(\d{1,2})[.)]?\s*(capamao|objeto|capa|texto|lista|numero|número|moldura|notas|polaroid|colagem|cartao|cartão|frase|final|comparacao|comparação)\s*\|\s*(.*)$/i);
     if (ms && car) {
       const modelo = ms[2].toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace("comparacao", "cartao");
       const partes = ms[3].split("|").map((x) => x.trim());
@@ -357,6 +357,10 @@ O QUE EU PRECISO (pesquise na internet de verdade, nada de tendência inventada)
    10 frase | frase de impacto | foto: fundo
    11 final | frase de cima | frase de baixo | caixa de destaque (ex.: Salva esse post) | letra de mão (ex.: Link na bio)
    Modelos possíveis: capa, texto, lista, numero, moldura, notas, polaroid, colagem, cartao, frase, final. Comece sempre com capa e termine com final.
+   ESTILO COM FOTOS (dinâmico e direto): quando o carrossel é uma lista de coisas reais que eu uso (equipamentos, apps, setup, o que tem na minha bolsa), use este estilo no lugar do editorial. Cada slide é a foto do objeto na minha mão, o nome em letra de mão, o modelo, o preço e um comentário sincero de até 10 palavras. Preço e modelo que você não souber ficam entre parênteses para eu preencher.
+   1 capamao | título com 2 *palavras* em letra de mão (ex.: Quais *equipamentos* eu uso pra *gravar* conteúdo?) | selo circulado (ex.: com valores) | foto: que foto minha usar
+   2 objeto | nome em letra de mão (ex.: microfone) | modelo (ex.: Hollyland Lark M2) | preço (ex.: R$700) | comentário curto e sincero | foto: o objeto na minha mão
+   Termine com final.
 
 Fale como gente de verdade, em português do Brasil, tom de conversa de café, sem cara de anúncio. Não use travessão em nenhum texto. Proibido: "não é X, é Y" e variações, "aí eu descobri", "foi aí que", "foi quando", "até que", "você sabia que" como gancho, "isso muda tudo", "isso muda o jogo". Não invente número ou resultado meu: o que você não sabe vira campo entre parênteses.`;
 }
@@ -579,21 +583,21 @@ function desenharPlanoSemana(el) {
    papel (etiqueta, Notas, polaroid, clipe, fita, estrela).
    No texto: *palavra* = itálico colorido, **palavra** = negrito.
    ----------------------------------------------------------------- */
-const FONTE_SERIFA = "'Playfair Display'", FONTE_BASTAO = "Montserrat", FONTE_MAO = "Allura";
+const FONTE_SERIFA = "'Playfair Display'", FONTE_BASTAO = "Montserrat", FONTE_MAO = "Allura", FONTE_PINCEL = "Yellowtail";
 const TEMAS_CARROSSEL = {
-  ryan: { nome: "Ryan (creme e dourado)", acento: "#1F3FC3",
+  ryan: { nome: "Ryan (creme e dourado)", acento: "#1F3FC3", mao: "#E8B33C",
     claro: { fundo: "#F5F1EA", titulo: "#2B241C", texto: "#3A3128", destaque: "#7A6322" },
     escuro: { fundo: "#2B241C", titulo: "#F5F1EA", texto: "#E9E1D3", destaque: "#D9C48A" },
     forte: { fundo: "#7A6322", titulo: "#FFF8EA", texto: "#F5ECD9", destaque: "#F3E2A6" } },
-  roxo: { nome: "Roxo e lima", acento: "#7B3FB0",
+  roxo: { nome: "Roxo e lima", acento: "#7B3FB0", mao: "#E4F04B",
     claro: { fundo: "#F3EEE3", titulo: "#3A0E46", texto: "#3A0E46", destaque: "#7B2C8F" },
     escuro: { fundo: "#3A0E46", titulo: "#FBF6E8", texto: "#EDE3F0", destaque: "#E4F04B" },
     forte: { fundo: "#D8F04A", titulo: "#3A0E46", texto: "#2B2B2B", destaque: "#3A0E46" } },
-  cafe: { nome: "Café e verde", acento: "#1F4D3A",
+  cafe: { nome: "Café e verde", acento: "#1F4D3A", mao: "#E3C987",
     claro: { fundo: "#ECE7E0", titulo: "#4A3428", texto: "#4A3428", destaque: "#1F4D3A" },
     escuro: { fundo: "#1F3A2E", titulo: "#F3EEE6", texto: "#E8E2D6", destaque: "#E3C987" },
     forte: { fundo: "#4A3428", titulo: "#F3EEE6", texto: "#EDE5DA", destaque: "#E3C987" } },
-  cobalto: { nome: "Cobalto (cores do site)", acento: "#1F3FC3",
+  cobalto: { nome: "Cobalto (cores do site)", acento: "#1F3FC3", mao: "#F2E66B",
     claro: { fundo: "#F0EEEA", titulo: "#1F3FC3", texto: "#14182B", destaque: "#8A855E" },
     escuro: { fundo: "#1F3FC3", titulo: "#F0EEEA", texto: "#E8EAF6", destaque: "#F2E66B" },
     forte: { fundo: "#14182B", titulo: "#F0EEEA", texto: "#D9DCE8", destaque: "#F2E66B" } }
@@ -613,8 +617,12 @@ const MODELOS_SLIDE = [
   ["colagem", "Colagem (2 fotos)", "Título, duas fotos tortas com clipe e um texto.", ["tom", "titulo", "foto", "foto2", "texto"]],
   ["cartao", "Card sobre a foto", "Card de papel e um bilhete por cima da sua foto.", ["foto", "titulo", "texto", "texto2"]],
   ["frase", "Frase sobre a foto", "Uma frase centralizada em cima da sua foto.", ["foto", "titulo"]],
-  ["final", "Final com chamada", "Chamada para seguir, salvar ou ir no link.", ["tom", "titulo", "foto", "texto", "destaque", "texto2"]]
+  ["final", "Final com chamada", "Chamada para seguir, salvar ou ir no link.", ["tom", "titulo", "foto", "texto", "destaque", "texto2"]],
+  // Estilo foto: dinâmico, direto, foto em tela cheia e letra de mão grossa
+  ["capamao", "Capa foto + letra de mão", "Estilo foto: sua foto em tela cheia, *palavras* grandes em letra de mão.", ["foto", "titulo", "destaque"]],
+  ["objeto", "Foto + objeto com preço", "Estilo foto: o objeto na sua mão, nome em letra de mão, modelo, preço circulado e um comentário.", ["foto", "posicao", "titulo", "texto2", "destaque", "texto"]]
 ];
+const ESTILO_FOTO = ["capamao", "objeto"];
 const ROTULOS_CAMPO = {
   capa: { texto: "Linha pequena em cima (opcional)", titulo: "Título (*itálico* **negrito**)", destaque: "Etiqueta torta (opcional)" },
   texto: { titulo: "Título (*palavra* fica colorida)", texto: "Texto do slide" },
@@ -626,7 +634,20 @@ const ROTULOS_CAMPO = {
   colagem: { titulo: "Título", texto: "Texto embaixo (**negrito** no final)" },
   cartao: { titulo: "Título do card (itálico)", texto: "Texto do card", texto2: "Bilhete por cima (opcional)" },
   frase: { titulo: "A frase" },
-  final: { titulo: "Frase de cima", texto: "Frase de baixo", destaque: "Caixa de destaque (ex.: Salva esse post)", texto2: "Letra de mão (ex.: Link na bio)" }
+  final: { titulo: "Frase de cima", texto: "Frase de baixo", destaque: "Caixa de destaque (ex.: Salva esse post)", texto2: "Letra de mão (ex.: Link na bio)" },
+  capamao: { titulo: "Título (*palavra* vira letra de mão grande)", destaque: "Selo circulado (ex.: com valores)" },
+  objeto: { titulo: "Palavra em letra de mão (ex.: microfone)", texto2: "Modelo (ex.: Hollyland Lark M2)", destaque: "Preço circulado (ex.: R$700)", texto: "Comentário curto e sincero" }
+};
+const CARROSSEL_FOTO_EXEMPLO = {
+  titulo: "Equipamentos que eu uso pra gravar", tema: "ryan",
+  slides: [
+    { modelo: "capamao", titulo: "Quais *equipamentos* eu uso pra *gravar* conteúdo?", destaque: "com valores" },
+    { modelo: "objeto", posicao: "cima", titulo: "câmera", texto2: "(o seu celular)", destaque: "R$0", texto: "Na real, qualquer celular bom já atende." },
+    { modelo: "objeto", posicao: "baixo", titulo: "microfone", texto2: "(modelo)", destaque: "R$0", texto: "O que mais muda o vídeo, acredite." },
+    { modelo: "objeto", posicao: "diagonal", titulo: "iluminação", texto2: "(modelo)", destaque: "R$0", texto: "Luz boa vale mais que câmera cara." },
+    { modelo: "objeto", posicao: "cima", titulo: "tripé", texto2: "(modelo)", destaque: "R$0", texto: "O importante é ser firme." },
+    { modelo: "final", tom: "escuro", titulo: "Faço vídeos pra marcas com esse setup.", texto: "Quer ver o resultado?", destaque: "Portfólio no link da bio", texto2: "@ryalvz" }
+  ]
 };
 const CARROSSEL_EXEMPLO = {
   titulo: "Há 1 ano eu não tinha nenhuma marca", tema: "ryan",
@@ -645,7 +666,7 @@ let fontesCarrossel = null;
 function carregarFontesCarrossel() {
   if (!fontesCarrossel) fontesCarrossel = Promise.all([
     `400 60px ${FONTE_SERIFA}`, `700 60px ${FONTE_SERIFA}`, `italic 400 60px ${FONTE_SERIFA}`, `italic 700 60px ${FONTE_SERIFA}`,
-    `500 40px ${FONTE_BASTAO}`, `600 40px ${FONTE_BASTAO}`, `700 40px ${FONTE_BASTAO}`, `800 40px ${FONTE_BASTAO}`, `400 60px ${FONTE_MAO}`
+    `500 40px ${FONTE_BASTAO}`, `600 40px ${FONTE_BASTAO}`, `700 40px ${FONTE_BASTAO}`, `800 40px ${FONTE_BASTAO}`, `400 60px ${FONTE_MAO}`, `400 60px ${FONTE_PINCEL}`
   ].map((f) => document.fonts.load(f).catch(() => null))).then(() => document.fonts.ready);
   return fontesCarrossel;
 }
@@ -831,6 +852,32 @@ function etiqueta(ctx, texto, cx, cy, graus, fundo, cor, tam = 40) {
   });
 }
 
+/* ---------- Estilo foto: letra de mão grossa, círculo feito à mão, arroba no canto ---------- */
+function comSombra(ctx, forca, desenho) { ctx.save(); ctx.shadowColor = `rgba(0,0,0,${forca})`; ctx.shadowBlur = 22; ctx.shadowOffsetY = 3; desenho(); ctx.restore(); }
+// Mede a palavra em letra de mão e devolve o tamanho que cabe na largura
+function tamPincel(ctx, texto, largura, max) { ctx.font = `400 100px ${FONTE_PINCEL}`; const w = ctx.measureText(texto).width || 1; return Math.min(max, Math.floor((largura / w) * 100)); }
+function pincel(ctx, texto, x, y, tam, cor, alinhar = "center", graus = 0) {
+  girar(ctx, x, y, graus, () => comSombra(ctx, 0.28, () => { ctx.font = `400 ${tam}px ${FONTE_PINCEL}`; ctx.fillStyle = cor; ctx.textAlign = alinhar; ctx.textBaseline = "alphabetic"; ctx.fillText(texto, 0, 0); }));
+}
+// Contorno torto, de caneta, em volta do preço ou do selo
+function circuloMao(ctx, texto, cx, cy, cor, fonte, tam) {
+  ctx.save(); ctx.font = `400 ${tam}px ${fonte}`;
+  const w = ctx.measureText(texto).width + tam * 1.3, h = tam * 1.55;
+  comSombra(ctx, 0.25, () => { ctx.fillStyle = "#FFFFFF"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(texto, cx, cy + tam * 0.06); });
+  ctx.strokeStyle = cor; ctx.lineCap = "round";
+  [[0, 3.2, -4, 0.02], [5, 2.2, -1, 1.9]].forEach(([dx, lw, graus, ini]) => {
+    ctx.lineWidth = lw; ctx.beginPath();
+    ctx.ellipse(cx + dx, cy + dx * 0.3, w / 2, h / 2, (graus * Math.PI) / 180, ini, ini + Math.PI * 2.1); ctx.stroke();
+  });
+  ctx.restore();
+}
+function arrobaCanto(ctx) { comSombra(ctx, 0.35, () => { ctx.fillStyle = "#FFFFFF"; ctx.font = `500 36px ${FONTE_BASTAO}`; ctx.textAlign = "right"; ctx.textBaseline = "alphabetic"; ctx.fillText(ASSINATURA.arroba, W_CAR - 48, H_CAR - 50); }); }
+function escreverBranco(ctx, texto, x, y, { tam = 38, peso = 500, largura = 440, altura = 220, alinhar = "left" } = {}) {
+  const b = caberRico(ctx, texto, { fontes: bastao(peso), max: tam, min: 26, largura, altura, entre: 1.22 });
+  comSombra(ctx, 0.35, () => escreverRico(ctx, b, x, y, { n: "#fff", a: "#fff", b: "#fff" }, alinhar));
+  return y + b.linhas.length * b.tam * b.entre;
+}
+
 /* ---------- Desenha um slide ---------- */
 function pintarSlide(cv, s, i, total, temaChave, aoCarregar) {
   const T = TEMAS_CARROSSEL[temaChave] || TEMAS_CARROSSEL.ryan;
@@ -843,6 +890,59 @@ function pintarSlide(cv, s, i, total, temaChave, aoCarregar) {
   const cores = (c) => ({ n: c.titulo, a: c.destaque, b: c.titulo });
 
   switch (s.modelo) {
+    case "capamao": {
+      fotoCobre(ctx, f1, 0, 0, W, H, foco);
+      const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "rgba(0,0,0,.25)"); g.addColorStop(0.45, "rgba(0,0,0,.05)"); g.addColorStop(1, "rgba(0,0,0,.4)");
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+      // Cada *palavra* vira uma linha grande em letra de mão; o resto fica em bastão grossa, branca
+      const pedacos = pedacosRicos(s.titulo).map((p) => ({ ...p, t: p.t.trim() })).filter((p) => p.t);
+      const montar = (tn) => pedacos.map((p) => {
+        if (p.e === "a") { const tam = tamPincel(ctx, p.t, W - 150, tn * 2.5); return { mao: true, t: p.t, tam, alt: tam * 0.95 }; }
+        const b = caberRico(ctx, p.t, { fontes: (n) => ({ n: `800 ${n}px ${FONTE_BASTAO}`, a: `800 ${n}px ${FONTE_BASTAO}`, b: `800 ${n}px ${FONTE_BASTAO}` }), max: tn, min: tn, largura: 520, altura: 9999, entre: 0.98 });
+        return { mao: false, b, alt: b.linhas.length * b.tam * b.entre };
+      });
+      let tn = 104, blocos = montar(tn);
+      while (tn > 50 && blocos.reduce((a, x) => a + x.alt, 0) > H - 420) { tn -= 6; blocos = montar(tn); }
+      let y = Math.max(140, (H - 120 - blocos.reduce((a, x) => a + x.alt, 0)) / 2);
+      // Bastão alterna: o primeiro trecho à esquerda, o seguinte à direita, como num cartaz
+      let nb = 0;
+      blocos.forEach((x) => {
+        if (x.mao) pincel(ctx, x.t, W / 2, y + x.tam * 0.72, x.tam, T.mao, "center", -4);
+        else { const dir = nb++ % 2 === 1; comSombra(ctx, 0.3, () => escreverRico(ctx, x.b, dir ? W - M - 40 : M + 90, y, { n: "#fff", a: "#fff", b: "#fff" }, dir ? "right" : "left")); }
+        y += x.alt;
+      });
+      if (s.destaque) circuloMao(ctx, s.destaque, W - 290, H - 200, T.mao, FONTE_PINCEL, 56);
+      arrobaCanto(ctx);
+      return;
+    }
+    case "objeto": {
+      fotoCobre(ctx, f1, 0, 0, W, H, foco);
+      const pos = s.posicao || "cima", X = M + 70;
+      if (pos === "baixo") {
+        const tam = tamPincel(ctx, s.titulo || "", 760, 230);
+        pincel(ctx, s.titulo || "", W - M - 20, H - 420, tam, T.mao, "right", -5);
+        let y = H - 390;
+        if (s.texto2) y = escreverBranco(ctx, s.texto2, W - M - 30, y, { tam: 46, peso: 800, largura: 600, altura: 70, alinhar: "right" }) + 18;
+        if (s.texto) escreverBranco(ctx, s.texto, W - M - 30, y, { largura: 460, altura: H - 110 - y, alinhar: "right" });
+        if (s.destaque) circuloMao(ctx, s.destaque, M + 230, H - 560, T.mao, FONTE_MAO, 64);
+      } else if (pos === "diagonal") {
+        const tam = tamPincel(ctx, s.titulo || "", 1050, 230);
+        pincel(ctx, s.titulo || "", W * 0.66, H * 0.4, tam, T.mao, "center", 58);
+        let y = H * 0.56;
+        if (s.texto2) y = escreverBranco(ctx, s.texto2, X, y, { tam: 46, peso: 800, largura: 420, altura: 130 }) + 22;
+        if (s.texto) escreverBranco(ctx, s.texto, X, y, { largura: 420, altura: 220 });
+        if (s.destaque) circuloMao(ctx, s.destaque, W * 0.62, H * 0.8, T.mao, FONTE_MAO, 64);
+      } else {
+        const tam = tamPincel(ctx, s.titulo || "", W - 180, 240);
+        pincel(ctx, s.titulo || "", W / 2, 120 + tam * 0.72, tam, T.mao, "center", -3);
+        if (s.texto2) escreverBranco(ctx, s.texto2, X + 30, 150 + tam * 0.72, { tam: 46, peso: 800, largura: 640, altura: 70 });
+        let y = H - 400;
+        if (s.destaque) { circuloMao(ctx, s.destaque, X + 120, y - 70, T.mao, FONTE_MAO, 64); }
+        if (s.texto) escreverBranco(ctx, s.texto, X, y, { largura: 440, altura: 250 });
+      }
+      arrobaCanto(ctx);
+      return;
+    }
     case "capa": {
       fotoCobre(ctx, f1, 0, 0, W, H, foco);
       const g = ctx.createLinearGradient(0, H * 0.35, 0, H); g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(1, "rgba(0,0,0,.72)");
@@ -1010,6 +1110,7 @@ function desenharCarrossel(el) {
   const campoHtml = (s, i, c) => {
     const rot = (ROTULOS_CAMPO[s.modelo] || {})[c] || c;
     if (c === "tom") return `<label class="car-campo-curto">Fundo <select class="campo" data-k="tom">${[["claro", "Claro"], ["escuro", "Escuro"], ["forte", "Cor forte"]].map(([v, n]) => `<option value="${v}" ${(s.tom || "") === v ? "selected" : ""}>${n}</option>`).join("")}<option value="" ${!s.tom ? "selected" : ""}>Padrão</option></select></label>`;
+    if (c === "posicao") return `<label class="car-campo-curto">Letra de mão <select class="campo" data-k="posicao">${[["cima", "Em cima"], ["baixo", "Embaixo"], ["diagonal", "Na diagonal"]].map(([v, n]) => `<option value="${v}" ${(s.posicao || "cima") === v ? "selected" : ""}>${n}</option>`).join("")}</select></label>`;
     if (c === "foto" || c === "foto2") return `<div class="car-foto">
         ${s[c] ? `<img src="${esc(s[c])}" alt="" crossorigin="anonymous">` : `<span class="car-foto-vazia">📷</span>`}
         <label class="btn pequeno">${s[c] ? "Trocar foto" : c === "foto2" ? "Segunda foto" : "Subir foto"}<input type="file" accept="image/*" data-foto="${c}" hidden></label>
@@ -1035,6 +1136,8 @@ function desenharCarrossel(el) {
           <p class="car-f-mao">Allura, a letra de mão</p></div>
         <div><h3 class="pro-titulo">Sua assinatura</h3>
           <ul class="passos"><li>Foto sua na capa, sempre. Rosto aparece, carrossel rende.</li><li>"Arraste a tela →" e a marca d'água UGC Creator na capa.</li><li>RYAN ALVES | UGC CREATOR no topo dos slides de texto.</li><li>Só uma palavra destacada por título.</li></ul></div>
+        <div><h3 class="pro-titulo">Dois estilos</h3>
+          <ul class="passos"><li><b>Editorial</b>: ideia, opinião, bastidor, história. Fundo de cor e serifada.</li><li><b>Com fotos</b>: lista de coisas reais (equipamentos, apps, setup). Foto em tela cheia, nome em <span class="car-f-pincel">letra de mão</span>, preço circulado e um comentário sincero.</li></ul></div>
         <div><h3 class="pro-titulo">Regras de ouro</h3>
           <ul class="passos"><li>1 ideia por slide, no máximo 30 palavras.</li><li>Capa: promessa clara em até 10 palavras.</li><li>De 5 a 8 slides. Alterne foto e texto.</li><li>Último slide: chamada (salvar, seguir ou link na bio).</li><li>Legenda: repita o gancho na primeira linha.</li></ul></div>
       </div>
@@ -1045,7 +1148,8 @@ function desenharCarrossel(el) {
       <select class="campo" id="car-tema" aria-label="Paleta">${Object.entries(TEMAS_CARROSSEL).map(([k, t]) => `<option value="${k}" ${car.tema === k ? "selected" : ""}>🎨 ${esc(t.nome)}</option>`).join("")}</select>
       <span class="espaco"></span>
       <select class="campo" id="car-abrir" aria-label="Abrir carrossel salvo"><option value="">📂 Abrir salvo (${igx.carrosseis.length})</option>${igx.carrosseis.map((c) => `<option value="${esc(c.id)}">${esc(c.titulo)} · ${dataBR(String(c.atualizado_em).slice(0, 10)).slice(0, 5)}</option>`).join("")}</select>
-      <button class="btn" type="button" id="car-novo">Novo</button>
+      <button class="btn" type="button" id="car-novo" title="Estilo editorial: ideias, opinião, bastidor">Novo editorial</button>
+      <button class="btn" type="button" id="car-novo-foto" title="Estilo foto: lista de coisas reais, com preço">Novo com fotos</button>
       <button class="btn" type="button" id="car-salvar">💾 Salvar</button>
       <button class="btn primario" type="button" id="car-baixar">⬇️ Baixar imagens</button>
     </section>
@@ -1116,6 +1220,7 @@ function desenharCarrossel(el) {
   });
   $("#car-mais").onclick = () => { const novo = novoSlide($("#car-modelo-novo").value); const fim = car.slides[car.slides.length - 1]; if (fim && fim.modelo === "final") car.slides.splice(car.slides.length - 1, 0, novo); else car.slides.push(novo); desenhar(); };
   $("#car-novo").onclick = () => { igx.car = { titulo: "Novo carrossel", tema: car.tema, slides: [novoSlide("capa"), { ...novoSlide("texto"), tom: "escuro" }, { ...novoSlide("final"), tom: "escuro", destaque: "Salva esse post", texto2: "Link na bio" }] }; desenhar(); };
+  $("#car-novo-foto").onclick = () => { igx.car = JSON.parse(JSON.stringify({ ...CARROSSEL_FOTO_EXEMPLO, tema: car.tema })); desenhar(); avisar("Estilo foto: troque as fotos e escreva o modelo e o preço de cada coisa."); };
   $("#car-abrir").onchange = (e) => {
     const c = igx.carrosseis.find((x) => String(x.id) === e.target.value); if (!c) return;
     const dados = Array.isArray(c.slides) ? { slides: c.slides } : c.slides || {};
