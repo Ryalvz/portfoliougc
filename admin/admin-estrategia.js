@@ -189,7 +189,7 @@ function formHashtags(cfg) {
 
 /* ---------- 🧭 Plano da semana ---------- */
 const DIAS_PLANO = [["SEG", 0, "Segunda"], ["TER", 1, "Terça"], ["QUA", 2, "Quarta"], ["QUI", 3, "Quinta"], ["SEX", 4, "Sexta"], ["SAB", 5, "Sábado"], ["DOM", 6, "Domingo"]];
-const NICHO_PADRAO = "Sou o Ryan (@ryalvz), creator UGC no Brasil. Meu Instagram mistura: bastidores de UGC (como fechar com marcas, quanto cobrar, rotina, gravação, edição), TikTok Shop do ponto de vista de quem faz (como funciona, como escolho produto, o que dá resultado, erros) e conteúdo de produtos na vida real (tech e apps, lifestyle, moda e grooming). Quero crescer, atrair marcas, me posicionar como quem entende de UGC e TikTok Shop e ter constância.";
+const NICHO_PADRAO = "Sou o Ryan (@ryalvz), creator UGC no Brasil, focado em UGC de tech. Meu Instagram é para passar AUTORIDADE em UGC: bastidores de UGC (como fecho com marcas, briefing, roteiro, gravação, edição, quanto cobrar), UGC de tech (apps, gadgets, como mostrar produto de tecnologia) e tecnologia e IA na rotina de creator (como eu otimizei a minha rotina com o Claude). Lifestyle e grooming entram só como Conhecer. Quero atrair marcas, ser visto como referência em UGC de tech e ter constância.";
 
 async function carregarPlanos() {
   const [a, b] = await Promise.all([
@@ -298,7 +298,7 @@ REGRAS PARA AS IDEIAS NÃO FICAREM GENÉRICAS
 5. Respeite O QUE ACONTECE NESTA SEMANA: use como matéria-prima (ex.: aniversário vira um Conhecer ou Conectar pessoal) e NÃO coloque nesses dias tema que fica sem sentido. Um acontecimento curto rende no MÁXIMO 1 post: nada de série, episódios ou "diário" (uma viagem de fim de semana não vira diário de viagem). Não infle a semana com coisa que eu não vou viver.
 6. Os 12 anos que eu passei em vendas B2B rendem gancho em Converter e em conteúdo sobre carreira de creator e negócio.
 7. O post mais importante vai nos meus melhores dias (sábado, quarta, segunda). Evite domingo e sexta para ele.
-8. Este plano é SÓ para o Instagram orgânico. TikTok Shop entra como ASSUNTO para me posicionar (bastidores, como funciona, como escolho produto, o que deu resultado, erros, quanto rende de verdade sem inventar número). O que NÃO entra é vídeo de venda com carrinho.
+8. Este plano é SÓ para o Instagram orgânico, e o foco é AUTORIDADE EM UGC E UGC DE TECH. Conectar e Converter falam de UGC (bastidor, processo, como trabalho com marca, UGC de tech) e de tecnologia e IA na minha rotina de creator. TikTok Shop quase nunca: no máximo 1 post a cada 3 ou 4 semanas, e só como bastidor, nunca vídeo de venda com carrinho. O perfil não pode virar uma mistura de assuntos.
 9. Seja o meu estrategista de rotina: aproveite o que eu já faço na semana (gravação de marca, edição, rotina de creator, TikTok Shop) para eu gravar mais com menos esforço. Diga o que dá para gravar no mesmo dia, em lote.
 
 ${dnaPerfil || DNA_PADRAO}
@@ -306,7 +306,7 @@ ${dnaPerfil || DNA_PADRAO}
 
 O QUE EU PRECISO (pesquise na internet de verdade, nada de tendência inventada):
 
-1. ASSUNTOS EM ALTA: os 3 a 5 assuntos que mais estão bombando no meu nicho nesta semana (UGC e carreira de creator, TikTok Shop, tech e lifestyle, moda e grooming), cada um com a fonte e por que está em alta.
+1. ASSUNTOS EM ALTA: os 3 a 5 assuntos que mais estão bombando no meu nicho nesta semana (UGC e carreira de creator, UGC de tech, apps e gadgets, IA e ferramentas na rotina de creator), cada um com a fonte e por que está em alta.
 2. PESQUISA DE CADA ASSUNTO: para cada um, separe
    O QUE JÁ DEU RESULTADO: posts, formatos e ângulos que já performaram (com perfil e números quando tiver).
    O GAP: a parte daquele assunto que ninguém do meu mercado falou ainda. É nesse buraco que eu vou entrar.
