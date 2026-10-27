@@ -1658,12 +1658,12 @@ function subRevisar(corpo, B) {
 const RITMO_FALA = 3.25; // palavras por segundo, medido em out/2026
 const REGRAS_REVISOR = [
   { re: /[—–]/gu, t: "Travessão", d: "Troque por ponto, vírgula ou dois-pontos." },
-  { re: /\S\s-\s\S/gu, t: "Hífen solto, parece travessão", d: "Troque por vírgula ou ponto." },
+  { re: /\S[ \t]-[ \t]\S/gu, t: "Hífen solto, parece travessão", d: "Troque por vírgula ou ponto." },
   { re: /(?:(?<![\p{L}\p{N}])(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])(?![\p{L}\p{N}]))n[ãa]o\s+(?:[ée]|era|foi|s[ãa]o|eram|t[áa]|est[áa])\s+(?:s[óo]\s+)?[^.!?\n]{1,60}?[,;:]\s*(?:mas\s+)?(?:[ée]|era|foi|s[ãa]o|e\s+sim)(?:(?<![\p{L}\p{N}])(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])(?![\p{L}\p{N}]))/giu, t: "\"Não é X, é Y\"", d: "Negação seguida de correção. Diga direto o que é." },
   { re: /(?:(?<![\p{L}\p{N}])(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])(?![\p{L}\p{N}]))o problema n[ãa]o [ée](?:(?<![\p{L}\p{N}])(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])(?![\p{L}\p{N}]))|(?:(?<![\p{L}\p{N}])(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])(?![\p{L}\p{N}]))n[ãa]o se trata de(?:(?<![\p{L}\p{N}])(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])(?![\p{L}\p{N}]))/giu, t: "\"Não é X, é Y\"", d: "Negação seguida de correção. Diga direto o que é." },
   { re: /(?:(?<![\p{L}\p{N}])(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])(?![\p{L}\p{N}]))(?:a[íi] eu descobri|foi a[íi] que|foi quando|at[ée] que|a[íi] eu conheci|hoje eu descobri)(?:(?<![\p{L}\p{N}])(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])(?![\p{L}\p{N}]))/giu, t: "Falsa revelação", d: "Conte o que aconteceu, sem suspense forçado." },
   { re: /(?:(?<![\p{L}\p{N}])(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])(?![\p{L}\p{N}]))(?:voc[êe] sabia que|isso muda tudo|muda o jogo|e sinceramente\?|[ée] o tipo de|voc[êe] j[áa] reparou que|se voc[êe] ainda t[áa] no ciclo|ol[áa],? pessoal|hoje vou falar sobre|queria compartilhar com voc[êe]s|hoje vim indicar)/giu, t: "Frase da lista proibida", d: "Está entre as frases que você não usa." },
-  { re: /\[[^\]\n]{2,80}\]/gu, t: "Campo pra preencher", d: "Ainda tem texto entre colchetes." }
+  { re: /\[(?!\s*(?:CENA|TELA|B-?ROLL|CORTE|TEXTO NA TELA)\b)[^\]\n]{2,80}\]/giu, t: "Campo pra preencher", d: "Ainda tem texto entre colchetes." }
 ];
 const REGRAS_EMAIL = [
   { re: /(?:(?<![\p{L}\p{N}])(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])(?![\p{L}\p{N}]))espero que (?:voc[êe] )?(?:esteja|estejam) bem(?:(?<![\p{L}\p{N}])(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])(?![\p{L}\p{N}]))/giu, t: "\"Espero que esteja bem\"", d: "Abertura proibida. Comece por quem você é." },
@@ -4064,7 +4064,7 @@ const PALAVRAS_PROPOSTA = ["oportunidade", "candidatura", "convite", "selecionad
 const BUSCA_PROPOSTAS = `{in:inbox in:spam} newer_than:90d -category:social -category:forums (${PALAVRAS_PROPOSTA.join(" OR ")})`;
 // E-mail automático de plataforma que é oportunidade de trabalho (campanha, convite, candidatura), e não login, código ou pedido
 const OPORTUNIDADE_RE = /campanha|proposta|publi|candidatura|candidate|oportunidade|vaga|convite|convid|invited|selecionad|picked|task|tarefa|recompensa|reward|brief|job|collab|parceria/i;
-const NAO_OPORTUNIDADE_RE = /senha|password|login|entrou|signed in|device|dispositivo|c[óo]digo|code|verifica|confirma[çc][ãa]o|pedido|entrega|order|pagamento|payment|fatura|documento|identidade|welcome|bem-vind/i;
+const NAO_OPORTUNIDADE_RE = /senha|password|login|entrou|signed in|device|dispositivo|c[óo]digo|code|verifica|confirma[çc][ãa]o|pedido|entrega|order|pagamento|payment|fatura|documento|identidade|welcome|bem-vind|cadastro|recebemos/i;
 const DOMINIOS_PESSOAIS = ["gmail", "hotmail", "outlook", "yahoo", "icloud", "live", "bol", "uol", "terra", "me"];
 // Remetentes que são robôs ou envio em massa (o começo do e-mail, antes do @)
 const REMETENTE_ROBO = /^(no-?reply|nao-?responda|naoresponda|donotreply|do-?not-?reply|notifica|notification|news|newsletter|marketing|mkt|comunicad|todomundo|support|suporte|faleconosco|fale-conosco|atendimento|info|noticias|alert|update|mailer|bounce|hello|team|time|equipe|contato-?noreply|campanhas|digest|community|comunidade|creators?|parcerias-?noreply|plataforma)/i;
@@ -4196,7 +4196,9 @@ function motivoAutomatico(m, de) {
   if (/bulk|list|junk/i.test(cabecalho(m, "Precedence"))) return "envio em massa";
   const auto = cabecalho(m, "Auto-Submitted");
   if (auto && !/^no$/i.test(auto)) return "automático";
-  if (REMETENTE_ROBO.test(de.email.split("@")[0])) return "remetente automático";
+  if (REMETENTE_ROBO.test(de.email.split("@")[0]) || /no-?reply|nao-?responda|hostmaster|postmaster/i.test(de.email.split("@")[0])) return "remetente automático";
+  // O que o Gmail separou em Promoções ou Atualizações é aviso de plataforma (se for campanha, vai pras oportunidades)
+  if ((m.labelIds || []).some((l) => l === "CATEGORY_PROMOTIONS" || l === "CATEGORY_UPDATES")) return "promoção ou aviso";
   if (/^(updates?|mail|email|news|mkt|marketing|send|info|noreply|notify|notifica[cç]oes?)\./i.test(de.email.split("@")[1] || "")) return "remetente automático";
   // Mandado em cópia oculta para muita gente: o seu e-mail não aparece no "Para" nem no "Cc"
   const destino = (cabecalho(m, "To") + " " + cabecalho(m, "Cc")).toLowerCase();
