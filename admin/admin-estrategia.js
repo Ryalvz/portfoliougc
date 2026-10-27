@@ -245,8 +245,8 @@ function lerPlano(texto) {
   return { itens, carrosseis: carrosseis.filter((c) => c.slides.length) };
 }
 
-// Episódios da série "Manual do Creator" (ideias em Roteiros com esse título), em ordem de número
-const EH_MANUAL = (t) => /manual do creator/i.test(t.titulo || "");
+// Episódios da série "De Creator pra Creator" (ideias em Roteiros com esse título), em ordem de número
+const EH_MANUAL = (t) => /de creator pra creator/i.test(t.titulo || "");
 const numEp = (t) => Number((String(t.titulo || "").match(/ep\.?\s*(\d+)/i) || [])[1] || 999);
 function manualDoCreator(seg) {
   const eps = (S.transcricoes || []).filter(EH_MANUAL).sort((a, b) => numEp(a) - numEp(b));
@@ -278,12 +278,12 @@ ${semana.map((r, i) => `${i + 1}. ${r.perfil || ""} · ${num(r.views)} views${n2
 ` : "";
   // Suas ideias de roteiro que ainda não foram pro ar (as "Fazer agora" primeiro)
   const ordemEtapa = { agora: 0, fazendo: 1, ideia: 2 };
-  // Série fixa "Manual do Creator": 1 episódio por semana, sempre o próximo que ainda não entrou em plano nenhum
+  // Série fixa "De Creator pra Creator": 1 episódio por semana, sempre o próximo que ainda não entrou em plano nenhum
   const ep = manualDoCreator(seg);
-  const serie = ep.proximo ? `SÉRIE FIXA DA SEMANA: MANUAL DO CREATOR (1 episódio por semana, obrigatório)
+  const serie = ep.proximo ? `SÉRIE FIXA DA SEMANA: DE CREATOR PRA CREATOR (1 episódio por semana, obrigatório)
 Episódio desta semana: #${ep.proximo.id} ${ep.proximo.titulo}${ep.proximo.minha_versao ? `: ${String(ep.proximo.minha_versao).replace(/\s+/g, " ").slice(0, 220)}` : ""}
 ${ep.usados.length ? `Já saíram: ${ep.usados.map((t) => t.titulo).join("; ")}.` : "É o primeiro episódio da série."}
-Regras da série: é sempre um Conectar, em Reels. O título do post começa com "Manual do Creator · Ep. ${ep.numero}". O vídeo abre nos 2 primeiros segundos com "Manual do Creator, episódio ${ep.numero}" para a série ser reconhecida, e depois vem o gancho. Uma dica prática por episódio, mostrada no celular, que a pessoa consegue aplicar no mesmo dia. CTA: salvar para montar o manual inteiro.
+Regras da série: é sempre um Conectar, em Reels. O título do post começa com "De Creator pra Creator · Ep. ${ep.numero}". O gancho vem primeiro (0 a 2 s) e logo depois aparece, na tela e falado rápido, "De creator pra creator, episódio ${ep.numero}", para a série ser reconhecida. Cada episódio tem 3 DICAS concretas num vídeo só (nunca uma dica solta), mostradas na tela do celular ou do app, que a pessoa aplica no mesmo dia. Use o que está anotado na ideia e o que eu uso de verdade; o que você não souber vira campo entre parênteses. CTA: salvar para usar no próximo vídeo.
 ` : "";
   const ideias = (S.transcricoes || []).filter((t) => t.status !== "feito" && t.categoria === "organico" && !EH_MANUAL(t) && (t.titulo || t.minha_versao || t.transcricao))
     .sort((a, b) => (ordemEtapa[a.status] ?? 3) - (ordemEtapa[b.status] ?? 3)).slice(0, 30);
