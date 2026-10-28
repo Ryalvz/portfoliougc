@@ -41,7 +41,7 @@ const hojeISO = () => isoLocal(new Date());
 const deISO = (s) => { const [y, m, d] = String(s).slice(0, 10).split("-").map(Number); return new Date(y, m - 1, d); };
 const diasEntre = (a, b) => Math.round((deISO(b) - deISO(a)) / 86400000);
 const dataBR = (s) => (s ? String(s).slice(0, 10).split("-").reverse().join("/") : "");
-// Modo privado: esconde todos os valores em R$ (para mostrar o painel para alguém)
+// Modo privado: esconde os valores em R$ e borra e-mails, temas e dados pessoais (para gravar ou mostrar o painel)
 let privado = false;
 try { privado = localStorage.getItem("modo-privado") === "1"; } catch (_) {}
 const OCULTO = "R$ ••••";
@@ -1029,7 +1029,7 @@ function desenharMarcas(el) {
             <td>${m.nicho ? `<span class="etq">${esc(nichoPadrao(m.nicho))}</span>` : ""}</td>
             ${temInstaMarcas() ? `<td>${ig ? `<a href="${ig}" target="_blank" rel="noopener">${esc(m.instagram)}</a>` : esc(m.instagram || "")}</td>` : ""}
             <td class="col-email">${emailsDaMarca(m)}</td>
-            <td style="white-space:nowrap">${esc(m.telefone || "")} ${wa ? `<a class="icone-btn" href="${wa}" target="_blank" rel="noopener" title="Abrir no WhatsApp" aria-label="Abrir ${esc(m.nome)} no WhatsApp">${ic("whats")}</a>` : ""}</td>
+            <td class="sigilo" style="white-space:nowrap">${esc(m.telefone || "")} ${wa ? `<a class="icone-btn" href="${wa}" target="_blank" rel="noopener" title="Abrir no WhatsApp" aria-label="Abrir ${esc(m.nome)} no WhatsApp">${ic("whats")}</a>` : ""}</td>
             <td><span class="pilula p-${esc(m.situacao)}">${esc(nomeSituacao(m.situacao))}</span></td>
             <td class="corta" title="${esc(m.obs || "")}">${esc(m.obs || "")}</td>
             <td>${dataBR(m.ultimo_contato)}</td></tr>`;
@@ -3724,7 +3724,7 @@ function pintarLembretes() {
       <div class="lembrete-acoes">${x.acoes.map(([r, p], j) => `<button type="button" class="btn pequeno ${p ? "primario" : ""}" data-lembrete="${i}" data-acao="${j}">${esc(r)}</button>`).join("")}<button type="button" class="btn pequeno lembrete-lido" data-lido="${i}" title="Some do sino por 7 dias">${ic("check")}Lido</button></div>
     </li>`).join("")}</ul>` : `<p class="vazio">Nenhum lembrete agora. Tudo em dia!</p>`}
     ${proximos.length ? `<div class="proximos-rapidos"><span class="sub">Vou te lembrar</span>${proximos.slice(0, 8).map((r) => `<button type="button" class="item-dia" data-rapido-id="${esc(r.id)}">
-      <span class="etq">${esc(quandoTexto(r.quando))}</span><span class="item-dia-texto"><b>${esc(r.texto)}</b></span></button>`).join("")}</div>` : ""}`;
+      <span class="etq">${esc(quandoTexto(r.quando))}</span><span class="item-dia-texto sigilo"><b>${esc(r.texto)}</b></span></button>`).join("")}</div>` : ""}`;
   caixa.onclick = (e) => {
     if (e.target.closest("[data-novo-rapido]")) { fecharLembretes(); formLembreteRapido(); return; }
     if (e.target.closest("[data-ler-todos]")) { marcarLidos(lembretesAtuais); return; }
@@ -3879,7 +3879,7 @@ function desenharInicio(el) {
   const proximos = eventos.filter((e) => e.data > hoje && e.data <= somaDiasISO(7)).sort((a, b) => a.data.localeCompare(b.data));
   const linhaEvento = (e, extra = "") => `<button type="button" class="item-dia" data-evento="${esc(e.origem)}:${esc(e.ref.id)}">
       <span class="pilula item-cal t-${esc(e.tipo)}" style="width:auto;margin:0">${e.hora ? horaCurta(e.hora) + " · " : ""}${esc(nomeTipo(e.tipo))}</span>
-      <span class="item-dia-texto"><b>${esc(e.titulo || "")}</b>${e.marca || e.local ? `<small>${esc([e.marca, e.local].filter(Boolean).join(" · "))}</small>` : ""}</span>
+      <span class="item-dia-texto sigilo"><b>${esc(e.titulo || "")}</b>${e.marca || e.local ? `<small>${esc([e.marca, e.local].filter(Boolean).join(" · "))}</small>` : ""}</span>
       ${extra}
     </button>`;
 
@@ -3942,7 +3942,7 @@ function desenharInicio(el) {
           ${ideias.length
             ? `<div class="lista-dia">${ideias.map((t) => `<button type="button" class="item-dia" data-ideia="${esc(t.id)}">
                 <span class="pilula ${etapaDe(t) === "fazendo" ? "p-conversando" : "p-pendente"}">${etapaDe(t) === "fazendo" ? "Fazendo" : "Fazer agora"}</span>
-                <span class="item-dia-texto"><b>${esc(t.titulo || "Ideia sem título")}</b><small>${esc(nomeCategoria(t.categoria))}</small></span>
+                <span class="item-dia-texto sigilo"><b>${esc(t.titulo || "Ideia sem título")}</b><small>${esc(nomeCategoria(t.categoria))}</small></span>
               </button>`).join("")}</div>`
             : `<p class="vazio">Nenhuma ideia em "Fazer agora" ou "Fazendo".</p>`}
         </div>
@@ -3951,7 +3951,7 @@ function desenharInicio(el) {
           ${contatosRecentes.length
             ? `<div class="lista-dia">${contatosRecentes.map((c) => `<button type="button" class="item-dia" data-ir="portfolio" data-pf-sub="leads">
                 <span class="pilula ${c.visto ? "p-conversando" : "p-pendente"}">${c.visto ? (c.tipo === "midia_kit" ? "Mídia kit" : "Formulário") : "Novo"}</span>
-                <span class="item-dia-texto"><b>${esc(c.marca || c.nome)}</b><small>${esc(c.marca ? c.nome : c.email)} · ${dataBR(String(c.criado_em).slice(0, 10)).slice(0, 5)}</small></span>
+                <span class="item-dia-texto sigilo"><b>${esc(c.marca || c.nome)}</b><small>${esc(c.marca ? c.nome : c.email)} · ${dataBR(String(c.criado_em).slice(0, 10)).slice(0, 5)}</small></span>
               </button>`).join("")}</div>`
             : `<p class="vazio">Ninguém entrou em contato pelo site nos últimos 30 dias.</p>`}
         </div>
@@ -4029,8 +4029,8 @@ function ligarCabecalho() {
   const pintarOlho = () => {
     document.documentElement.classList.toggle("privado", privado);
     olho.setAttribute("aria-pressed", String(privado));
-    olho.setAttribute("aria-label", privado ? "Mostrar valores" : "Esconder valores");
-    olho.title = privado ? "Mostrar valores" : "Esconder valores";
+    olho.setAttribute("aria-label", privado ? "Mostrar dados" : "Esconder valores e dados pessoais");
+    olho.title = privado ? "Mostrar dados" : "Esconder valores e dados pessoais";
     $("use", olho).setAttribute("href", privado ? "#i-olho-fechado" : "#i-olho");
   };
   pintarOlho();
@@ -4039,7 +4039,7 @@ function ligarCabecalho() {
     try { localStorage.setItem("modo-privado", privado ? "1" : "0"); } catch (_) {}
     pintarOlho();
     desenhar();
-    avisar(privado ? "Valores escondidos. Pode mostrar o painel tranquilo." : "Valores visíveis de novo.");
+    avisar(privado ? "Valores, e-mails e temas escondidos. Pode gravar o painel tranquilo." : "Tudo visível de novo.");
   });
 }
 
@@ -4357,7 +4357,7 @@ function desenharConversa(el) {
         <span class="sub" id="status-traducao">${gm.idioma && gm.idioma !== "pt" ? `a marca escreve em ${esc(NOME_IDIOMA[gm.idioma] || gm.idioma)}` : ""}</span>
       </div>
       <div class="barra" style="margin:8px 0 0">
-        <span class="sub">vai de ${esc(EMAIL_PROPOSTAS)}, dentro da mesma conversa no Gmail</span>
+        <span class="sub">vai de <span class="sigilo">${esc(EMAIL_PROPOSTAS)}</span>, dentro da mesma conversa no Gmail</span>
         <span class="espaco"></span>
         ${podeResponder() ? `<button class="btn primario" type="button" id="enviar-resposta">${ic("email")}Enviar resposta</button>` : `<button class="btn primario" type="button" id="liberar-respostas">Liberar respostas</button>`}
       </div>
@@ -4457,7 +4457,7 @@ function desenharPropostas(el) {
     el.innerHTML = `<div class="cartao gmail-conectar">
       <span class="gmail-icone">${ic("email")}</span>
       <h2>Conecte o Gmail de propostas</h2>
-      <p>O painel lê a caixa de entrada do <b>${esc(EMAIL_PROPOSTAS)}</b>, separa os e-mails de proposta escritos por pessoas e esconde os automáticos. Você responde daqui mesmo, sem abrir o Gmail.</p>
+      <p>O painel lê a caixa de entrada do <b class="sigilo">${esc(EMAIL_PROPOSTAS)}</b>, separa os e-mails de proposta escritos por pessoas e esconde os automáticos. Você responde daqui mesmo, sem abrir o Gmail.</p>
       <p class="sub">Você só faz isso <b>uma vez</b>: depois o painel fica sincronizado sozinho, em qualquer aba e no celular. O Google mostra um aviso de "app não verificado"; é normal, o app é só seu: clique em <b>Continuar</b> e aceite ver e enviar e-mails.</p>
       ${gm.erro ? `<div class="aviso-falta">${esc(gm.erro)}</div>` : ""}
       <button class="btn primario" type="button" id="conectar-gmail">${ic("email")}Conectar o Gmail</button>
@@ -4481,7 +4481,7 @@ function desenharPropostas(el) {
     <div class="barra">
       <div class="busca">${ic("busca")}<input type="search" id="busca-gmail" placeholder="Filtrar mais (ex: nome da marca)" value="${esc(gm.busca)}" aria-label="Filtrar propostas"></div>
       <span class="espaco"></span>
-      <span class="sub">${esc(EMAIL_PROPOSTAS)} · ${gm.permanente ? "sincronizado sozinho" : `conectado por mais ${minutos} min`}</span>
+      <span class="sub"><span class="sigilo">${esc(EMAIL_PROPOSTAS)}</span> · ${gm.permanente ? "sincronizado sozinho" : `conectado por mais ${minutos} min`}</span>
       <button class="btn" type="button" id="atualizar-gmail" ${gm.carregando ? "disabled" : ""}>${gm.carregando ? "Lendo..." : "Atualizar"}</button>
       <button class="btn" type="button" id="sair-gmail">Desconectar</button>
     </div>
@@ -4782,7 +4782,7 @@ function quadrosEntrada() {
       ? `<p class="sub" style="margin:0 0 6px">${naoLidas ? `<b>${plural(naoLidas, "proposta não lida", "propostas não lidas")}</b> de pessoas` : "nenhuma proposta não lida"}</p>
         <div class="lista-dia">${lista.map((x) => `<button type="button" class="item-dia" data-inicio-email="${esc(x.id)}">
           <span class="pilula ${x.spam ? "p-parada" : x.importante ? "p-pendente" : "p-conversando"}">${x.spam ? "Estava no spam" : x.importante ? "Importante" : x.novo ? "Nova" : "Proposta"}</span>
-          <span class="item-dia-texto"><b>${x.novo ? "● " : ""}${esc(x.assunto)}</b><small>${esc(x.de.nome)} · ${x.data.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}</small></span>
+          <span class="item-dia-texto sigilo"><b>${x.novo ? "● " : ""}${esc(x.assunto)}</b><small>${esc(x.de.nome)} · ${x.data.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}</small></span>
         </button>`).join("")}</div>`
       : `<p class="vazio">Nenhum e-mail novo de proposta. Os antigos estão na aba Propostas.</p>`;
   }
@@ -5155,7 +5155,7 @@ function desenharProspeccao(el) {
       <div class="pro-form">
         <div class="cartao">
           <div class="pro-modos" role="radiogroup" aria-label="Como enviar">
-            <button type="button" role="radio" data-envio="gmail" aria-checked="${pro.envio === "gmail"}"><b>Pelo meu Gmail</b><small>sai do ${esc(EMAIL_PROPOSTAS)}</small></button>
+            <button type="button" role="radio" data-envio="gmail" aria-checked="${pro.envio === "gmail"}"><b>Pelo meu Gmail</b><small>sai do <span class="sigilo">${esc(EMAIL_PROPOSTAS)}</span></small></button>
             <button type="button" role="radio" data-envio="resend" aria-checked="${pro.envio === "resend"}"><b>Resend</b><small>precisa de domínio próprio</small></button>
             <button type="button" role="radio" data-envio="rascunho" aria-checked="${pro.envio === "rascunho"}"><b>Rascunho</b><small>uma por vez, você confere</small></button>
           </div>
@@ -5203,7 +5203,7 @@ function desenharProspeccao(el) {
           <div class="pro-janela-email">
             <div class="pro-email-cabeca">
               <span class="pro-avatar">R</span>
-              <div><strong id="pro-previa-assunto"></strong><small>Ryan Alves &lt;${esc(EMAIL_PROPOSTAS)}&gt; para você</small></div>
+              <div><strong id="pro-previa-assunto"></strong><small><span class="sigilo">Ryan Alves &lt;${esc(EMAIL_PROPOSTAS)}&gt;</span> para você</small></div>
             </div>
             <iframe id="pro-previa" title="Prévia do e-mail" sandbox="allow-popups"></iframe>
           </div>
@@ -5326,7 +5326,7 @@ function desenharProspeccao(el) {
     if (!pro.envios) { $("#pro-hist").innerHTML = `<tr><td colspan="4"><p class="vazio">O histórico aparece depois de rodar o disparo.sql.</p></td></tr>`; return; }
     const l = pro.envios.filter((x) => !q || x.email.toLowerCase().includes(q));
     $("#pro-hist").innerHTML = l.length ? l.slice(0, 300).map((x) => `<tr>
-        <td>${esc(x.email)}</td><td class="corta" title="${esc(x.assunto)}">${esc(x.assunto)}</td>
+        <td class="sigilo">${esc(x.email)}</td><td class="corta" title="${esc(x.assunto)}">${esc(x.assunto)}</td>
         <td style="white-space:nowrap">${new Date(x.criado_em).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</td>
         <td>${x.status === "ok" ? `<span class="pilula p-cliente">${x.via === "gmail" ? "Enviado pelo Gmail" : "Enviado"}</span>` : `<span class="pilula p-parada" title="${esc(x.erro || "")}">Erro</span> <small class="sub">${esc((x.erro || "").slice(0, 80))}</small>`}</td></tr>`).join("")
       : `<tr><td colspan="4"><p class="vazio">${pro.envios.length ? "Nenhum envio com esse e-mail." : "Nenhum e-mail enviado ainda."}</p></td></tr>`;
@@ -5409,7 +5409,7 @@ function confirmarDisparo(r, nota = "") {
     c.innerHTML = `<div class="janela-topo"><h3>Confirmar o disparo</h3></div>
       <div class="janela-corpo"><p class="pro-confirma">Vai para <b>${plural(r.lista.length, "marca", "marcas")}</b>, da lista <b>${esc(nomePublico(pro.publico))}</b>, e não dá pra desfazer.</p>
         <p class="sub">Assunto: ${esc(pro.assunto)}</p>
-        ${pro.envio === "gmail" ? `<p class="sub">Sai do seu e-mail ${esc(EMAIL_PROPOSTAS)}, um por um.</p>` : ""}
+        ${pro.envio === "gmail" ? `<p class="sub">Sai do seu e-mail <span class="sigilo">${esc(EMAIL_PROPOSTAS)}</span>, um por um.</p>` : ""}
         ${nota ? `<p class="sub">${esc(nota)}</p>` : ""}
         ${semSair ? `<div class="pro-alerta">O seu HTML está sem o rodapé do SAIR. Sem ele a marca não tem como pedir para sair da lista. Use "Começar do modelo pronto" para ter o rodapé.</div>` : ""}</div>
       <div class="janela-pe"><button type="button" class="btn" data-n>Cancelar</button><button type="button" class="btn primario" data-s>${semSair ? "Disparar mesmo assim" : "Sim, disparar"}</button></div>`;
@@ -5674,7 +5674,7 @@ async function abrirAgendaIphone() {
           <p><b>No iPhone, uma vez só:</b></p>
           <ol class="passos">
             <li>Abra <b>Ajustes &gt; Apps &gt; Calendário &gt; Contas &gt; Adicionar Conta &gt; Google</b>.</li>
-            <li>Entre com <b>${esc(EMAIL_PROPOSTAS)}</b> e deixe <b>Calendários</b> ligado.</li>
+            <li>Entre com <b class="sigilo">${esc(EMAIL_PROPOSTAS)}</b> e deixe <b>Calendários</b> ligado.</li>
             <li>No app Calendário, toque em <b>Calendários</b> e confira que <b>Trabalhos</b> está marcado.</li>
             <li>Para criar pelo iPhone: novo evento &gt; <b>Calendário: Trabalhos</b>. Em até 5 minutos ele aparece aqui.</li>
           </ol>

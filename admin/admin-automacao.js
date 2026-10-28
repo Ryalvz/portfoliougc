@@ -77,7 +77,7 @@ function desenharAutomacoes(el) {
       <h3 class="pro-titulo">📬 Quem recebeu</h3>
       ${au.envios.length ? `<div class="tabela-caixa"><table class="au-tabela"><thead><tr><th>Quando</th><th>Quem</th><th>Comentou</th><th>Automação</th><th>Situação</th></tr></thead><tbody>
         ${au.envios.slice(0, 50).map((x) => `<tr><td>${new Date(x.criado_em).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</td>
-          <td>${x.nome ? `${esc(x.nome)} · ` : ""}${x.usuario ? `<a href="https://instagram.com/${esc(x.usuario)}" target="_blank" rel="noopener">@${esc(x.usuario)}</a>` : "?"}</td>
+          <td class="sigilo">${x.nome ? `${esc(x.nome)} · ` : ""}${x.usuario ? `<a href="https://instagram.com/${esc(x.usuario)}" target="_blank" rel="noopener">@${esc(x.usuario)}</a>` : "?"}</td>
           <td>${esc(String(x.texto || "").slice(0, 60))}</td>
           <td>${esc((au.lista.find((a) => a.id === x.automacao_id) || {}).nome || "")}</td>
           <td>${x.status === "enviado" ? `<span class="pilula au-ok">Enviado</span>` : x.status === "erro" ? `<span class="pilula au-falhou" title="${esc(x.erro || "")}">Erro</span>` : x.status === "aguardando" ? `<span class="pilula p-oliva">${x.erro === "esperando seguir" ? "Esperando seguir" : "Esperando o toque"}</span>` : `<span class="pilula">Enviando</span>`}${x.erro && x.status !== "erro" && x.erro !== "esperando seguir" ? `<br><small class="sub">${esc(x.erro)}</small>` : x.status === "erro" ? `<br><small class="sub">${esc(x.erro || "")}</small>` : ""}</td></tr>`).join("")}
