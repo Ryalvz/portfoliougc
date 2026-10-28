@@ -1454,3 +1454,4 @@ dialog.pf-janela-rapida { width: min(460px, calc(100vw - 20px)); }
 .au-posts button:hover { border-color: var(--olive); }
 .au-posts img { width: 100%; aspect-ratio: 4 / 5; object-fit: cover; display: block; border-radius: 4px; }
 @media (max-width: 700px) { .au-item { grid-template-columns: 56px minmax(0, 1fr); } .au-acoes { grid-column: 1 / -1; justify-content: flex-start; } }
+.au-rot[hidden] { display: none; }
