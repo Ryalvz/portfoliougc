@@ -90,9 +90,16 @@ function bate(texto: string, palavras: string) {
 const preencher = (t: string, nome: string, usuario: string) => String(t || "")
   .replace(/\s*\{nome\}/g, nome ? ` ${nome}` : "").replace(/\s*\{usuario\}/g, usuario ? ` @${usuario}` : "").trim();
 // O Instagram só entrega o nome de quem já conversou com a conta; para os outros, fica sem nome
+let motivoSemNome = "";
 async function primeiroNome(id: string, token: string) {
+  motivoSemNome = "";
   if (!id) return "";
-  try { const p = await graph(`${id}?fields=name`, token); return String(p.name || "").trim().split(/\s+/)[0] || ""; } catch (_) { return ""; }
+  try {
+    const p = await graph(`${id}?fields=name,username`, token);
+    const n = String(p.name || "").trim().split(/\s+/)[0] || "";
+    if (!n) motivoSemNome = "o perfil não tem nome preenchido";
+    return n;
+  } catch (e) { motivoSemNome = (e as Error).message; return ""; }
 }
 const sortear = (linhas: string) => { const l = String(linhas || "").split("\n").map((x) => x.trim()).filter(Boolean); return l.length ? l[Math.floor(Math.random() * l.length)] : ""; };
 
@@ -115,7 +122,8 @@ async function tratarComentario(v: any, dono: string, token: string) {
     let erroPublico = "";
     const publica = sortear(a.respostas);
     if (publica) { try { await graph(`${comentario}/replies`, token, { message: preencher(publica, nome, autor.username || "") }); } catch (e) { erroPublico = `direct ok, resposta no comentário falhou: ${(e as Error).message}`; } }
-    await db.from("automacao_envios").update({ status: "enviado", erro: erroPublico || null }).eq("id", reg.id);
+    const avisos = [erroPublico, motivoSemNome && /\{nome\}/.test(a.mensagem) ? `sem nome: ${motivoSemNome}` : ""].filter(Boolean).join(" · ");
+    await db.from("automacao_envios").update({ status: "enviado", erro: avisos || null }).eq("id", reg.id);
   } catch (e) {
     await db.from("automacao_envios").update({ status: "erro", erro: String((e as Error).message).slice(0, 300) }).eq("id", reg.id);
   }
@@ -167,6 +175,10 @@ Deno.serve(async (req) => {
       const r = await graph("me/subscribed_apps?subscribed_fields=comments", cfg.ig_token, {});
       return resposta({ ok: !!r.success });
     } catch (e) { return resposta({ erro: (e as Error).message }, 400); }
+  }
+  if (corpo.acao === "perfil") {
+    try { return resposta({ perfil: await graph(`${String(corpo.id || "")}?fields=name,username,is_user_follow_business`, cfg.ig_token) }); }
+    catch (e) { return resposta({ erro: (e as Error).message }); }
   }
   if (corpo.acao === "posts") {
     try {
