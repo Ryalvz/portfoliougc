@@ -34,7 +34,8 @@ function desenharAutomacoes(el) {
   const st = au.status || {};
   const enviosDe = (id) => au.envios.filter((x) => x.automacao_id === id);
   const passos = [
-    [!!st.endereco, "Instagram conectado", st.endereco ? "A chave do Instagram está no painel." : esc(st.erro || "Conecte em Métricas do Instagram.")],
+    [!!st.endereco, "Instagram conectado", `${st.endereco ? "A chave do Instagram está no painel." : esc(st.erro || "Conecte em Métricas do Instagram.")}
+      <span class="au-linha"><input class="campo" id="au-token" type="password" autocomplete="off" placeholder="Gerou uma chave nova na Meta? Cole aqui"><button class="btn" type="button" id="au-token-ok">Trocar chave</button></span>`],
     [!!st.temSegredo, "Chave secreta do app", st.temSegredo ? "Guardada. Serve pra conferir que o aviso veio mesmo da Meta." : `Cole a <b>Chave secreta do app do Instagram</b> (na Meta: Casos de uso → Personalizar → Configuração da API com login do Instagram).
       <span class="au-linha"><input class="campo" id="au-segredo" type="password" autocomplete="off" placeholder="Chave secreta do app do Instagram"><button class="btn" type="button" id="au-segredo-ok">Guardar</button></span>`],
     [!!st.ultimoAviso, "Webhook na Meta", `Na Meta, em Webhooks do Instagram, use:
@@ -84,6 +85,11 @@ function desenharAutomacoes(el) {
     </section>`;
 
   $("#au-recarregar").onclick = () => { au.lista = null; desenhar(); };
+  $("#au-token-ok").onclick = async () => {
+    const token = $("#au-token").value.trim(); if (!token) { avisar("Cole a chave nova primeiro.", true); return; }
+    try { const r = await chamarInstagram({ acao: "conectar", token }); if (r.erro) throw new Error(r.erro); avisar(`Chave nova guardada${r.usuario ? ` (@${r.usuario})` : ""}.`); au.lista = null; ig.conectado = null; ig.dados = null; desenhar(); }
+    catch (e) { avisar(e.message, true); }
+  };
   const seg = $("#au-segredo-ok");
   if (seg) seg.onclick = async () => {
     try { await chamarAutomacao({ acao: "segredo", valor: $("#au-segredo").value }); avisar("Chave secreta guardada."); au.lista = null; desenhar(); }
