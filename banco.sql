@@ -1034,3 +1034,46 @@ alter table public.calendario add constraint calendario_tipo_check
 alter table public.marcas add column if not exists contato_nome text;
 alter table public.marcas add column if not exists conexao text;
 alter table public.marcas add column if not exists ideia text;
+
+
+-- -------------------------------------------------------------
+-- 36. AUTOMAÇÕES DO INSTAGRAM: comentou a palavra, recebe no direct
+-- automacoes: cada regra (palavras, em qual post, a mensagem).
+-- automacao_envios: um registro por comentário atendido (o mesmo
+-- comentário nunca recebe dois directs). O ajudante "automacao"
+-- grava aqui com a chave interna; o painel só lê e apaga.
+-- -------------------------------------------------------------
+create table if not exists public.automacoes (
+  id            bigint generated always as identity primary key,
+  nome          text not null default 'Automação' check (char_length(nome) <= 120),
+  palavras      text not null check (char_length(palavras) between 1 and 300),
+  midia_id      text check (char_length(midia_id) <= 60),
+  midia_legenda text check (char_length(midia_legenda) <= 300),
+  midia_capa    text check (char_length(midia_capa) <= 2000),
+  mensagem      text not null check (char_length(mensagem) between 1 and 1000),
+  respostas     text check (char_length(respostas) <= 1000),
+  ativa         boolean not null default true,
+  criado_em     timestamptz not null default now()
+);
+alter table public.automacoes enable row level security;
+drop policy if exists "dono faz tudo" on public.automacoes;
+create policy "dono faz tudo" on public.automacoes
+  for all to authenticated using (public.eh_admin()) with check (public.eh_admin());
+
+create table if not exists public.automacao_envios (
+  id            bigint generated always as identity primary key,
+  automacao_id  bigint references public.automacoes (id) on delete set null,
+  comentario_id text not null unique,
+  usuario       text,
+  usuario_id    text,
+  midia_id      text,
+  texto         text,
+  status        text not null default 'recebido' check (status in ('recebido', 'enviado', 'erro')),
+  erro          text,
+  criado_em     timestamptz not null default now()
+);
+create index if not exists automacao_envios_data on public.automacao_envios (criado_em desc);
+alter table public.automacao_envios enable row level security;
+drop policy if exists "dono faz tudo" on public.automacao_envios;
+create policy "dono faz tudo" on public.automacao_envios
+  for all to authenticated using (public.eh_admin()) with check (public.eh_admin());
