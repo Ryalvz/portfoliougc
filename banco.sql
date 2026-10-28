@@ -1077,3 +1077,19 @@ alter table public.automacao_envios enable row level security;
 drop policy if exists "dono faz tudo" on public.automacao_envios;
 create policy "dono faz tudo" on public.automacao_envios
   for all to authenticated using (public.eh_admin()) with check (public.eh_admin());
+
+-- -------------------------------------------------------------
+-- 37. AUTOMAÇÕES COM BOTÃO E SÓ PARA SEGUIDORES
+-- com_botao: o primeiro direct pede um toque no botão; só no toque
+-- o Instagram libera o nome da pessoa, e aí vai o link.
+-- exige_seguir: no toque, confere se a pessoa segue o @ryalvz;
+-- se não segue, pede pra seguir e tocar de novo.
+-- -------------------------------------------------------------
+alter table public.automacoes add column if not exists com_botao boolean not null default false;
+alter table public.automacoes add column if not exists exige_seguir boolean not null default false;
+alter table public.automacoes add column if not exists texto_botao text check (char_length(texto_botao) <= 640);
+alter table public.automacoes add column if not exists texto_seguir text check (char_length(texto_seguir) <= 640);
+alter table public.automacao_envios add column if not exists nome text;
+alter table public.automacao_envios drop constraint if exists automacao_envios_status_check;
+alter table public.automacao_envios add constraint automacao_envios_status_check
+  check (status in ('recebido', 'aguardando', 'enviado', 'erro'));
