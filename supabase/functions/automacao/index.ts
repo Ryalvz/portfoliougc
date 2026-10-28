@@ -162,7 +162,11 @@ Deno.serve(async (req) => {
   if (corpo.acao === "posts") {
     try {
       const r = await graph("me/media?fields=id,caption,media_type,thumbnail_url,media_url,permalink,timestamp&limit=24", cfg.ig_token);
-      return resposta({ posts: r.data || [] });
+      const posts = r.data || [];
+      // Os últimos comentários do post mais recente (também confirma que a permissão de comentários funciona)
+      let comentarios: unknown[] = [], erroComentarios = "";
+      if (posts[0]) { try { comentarios = (await graph(`${posts[0].id}/comments?fields=id,text,username,timestamp&limit=5`, cfg.ig_token)).data || []; } catch (e) { erroComentarios = (e as Error).message; } }
+      return resposta({ posts, comentarios, erroComentarios });
     } catch (e) { return resposta({ erro: (e as Error).message }, 400); }
   }
 
