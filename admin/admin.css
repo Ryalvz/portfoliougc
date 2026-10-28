@@ -1381,3 +1381,41 @@ dialog.pf-janela-rapida { width: min(460px, calc(100vw - 20px)); }
 .pl-agenda-toda { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 12px; }
 .pp-motivo { display: block; margin-top: 3px; color: var(--muted); font-size: 12px; font-style: normal; }
 .car-f-pincel { font-family: Yellowtail, cursive; font-size: 1.25em; color: #B8862A; }
+
+/* ---------- Carrossel: os 4 estilos, celular e perfil ---------- */
+.car-estilos { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0 4px; }
+.car-estilos button, .car-vistas button { font: inherit; font-weight: 600; font-size: 13px; border: 1.5px solid var(--cobalt); background: transparent; color: var(--cobalt); border-radius: 30px; padding: 7px 16px; cursor: pointer; }
+.car-estilos button.on, .car-vistas button.on { background: var(--cobalt); color: var(--parchment); }
+.car-estilos .sub { margin-left: 6px; }
+.car-ideia summary { cursor: pointer; }
+.car-ideia textarea { width: 100%; margin-top: 10px; }
+.car-ideia-acoes { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.car-rot { display: grid; gap: 4px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.car-rot .campo { font-weight: 400; color: var(--text); }
+.car-lado { position: sticky; top: 16px; display: grid; gap: 10px; }
+.car-lado .car-previa { position: static; }
+.car-previa[hidden], .car-tel[hidden] { display: none; }
+.car-vistas { display: flex; flex-wrap: wrap; gap: 6px; }
+.car-tel { display: grid; justify-items: center; gap: 8px; padding: 16px; border-radius: 16px; background: #e4e1da; }
+.car-tel .tel { width: min(340px, 100%); background: #000; border-radius: 46px; padding: 12px; box-shadow: 0 24px 50px rgba(0, 0, 0, .25); }
+.car-tel .tela { background: #000; border-radius: 36px; overflow: hidden; color: #fff; font: 13px/1.4 -apple-system, system-ui, sans-serif; padding-top: 18px; }
+.tel-topo, .tel-perfil-topo { display: flex; align-items: center; gap: 10px; padding: 8px 12px; }
+.tel-topo b, .tel-perfil-topo b { display: block; font-size: 13px; }
+.tel-topo small, .tel-perfil-topo small { color: #aaa; font-size: 11px; }
+.tel-av { width: 30px; height: 30px; border-radius: 50%; flex: none; background: url(../bio/foto.jpg) center 25% / cover; border: 2px solid #333; }
+.tel-av.grande { width: 64px; height: 64px; }
+.tel-car { position: relative; }
+.tel-trilho { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; }
+.tel-trilho::-webkit-scrollbar { display: none; }
+.tel-trilho img { width: 100%; flex: none; scroll-snap-align: start; display: block; aspect-ratio: 4 / 5; }
+.tel-cont { position: absolute; top: 10px; right: 10px; background: rgba(30, 30, 30, .7); border-radius: 12px; padding: 3px 9px; font-size: 12px; }
+.tel-acoes { display: flex; align-items: center; gap: 14px; padding: 10px 12px 2px; font-size: 20px; }
+.tel-pontos { display: flex; gap: 4px; justify-content: center; flex: 1; }
+.tel-pontos i { width: 6px; height: 6px; border-radius: 50%; background: #555; }
+.tel-pontos i.on { background: #3897f0; }
+.tel-leg { margin: 0; padding: 6px 12px 18px; }
+.tela-perfil { padding-bottom: 10px; }
+.tel-grade { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; margin-top: 8px; }
+.tel-grade span { aspect-ratio: 3 / 4; background: #1c1c1c center / cover; }
+.tel-grade span.novo { outline: 2px solid #D9C48A; outline-offset: -2px; }
+@media (max-width: 900px) { .car-lado { position: static; } }

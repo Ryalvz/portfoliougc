@@ -218,7 +218,7 @@ function lerPlano(texto) {
   String(texto || "").split("\n").forEach((bruta) => {
     const l = bruta.replace(/^[\s>*•-]+/, "").replace(/\*\*/g, "").replace(/^\|/, "").replace(/\|\s*$/, "").trim();
     const mc = l.match(/^CARROSSEL\s*:\s*(.+)$/i);
-    if (mc) { car = { titulo: mc[1].trim(), slides: [] }; carrosseis.push(car); return; }
+    if (mc) { const [tit, ...resto] = mc[1].split("|").map((x) => x.trim()); const me = resto.join(" ").match(/estilo\s*:?\s*(bastidor|revista|conversa|fotos)/i); car = { titulo: tit, estilo: me ? me[1].toLowerCase() : "", slides: [] }; carrosseis.push(car); return; }
     const md = l.match(/^(SEG|TER|QUA|QUI|SEX|S[AÁ]B|DOM)[A-Za-zçÇáÁ-]*\s*\|\s*(.+)$/i);
     if (md) {
       const p = md[2].split("|").map((x) => x.trim());
@@ -228,6 +228,8 @@ function lerPlano(texto) {
       else itens.push({ dia: sigla, formato: p[0] || "", tema: p[1] || "", gancho: p[2] || "", porque: p[3] || "" });
       car = null; return;
     }
+    const nova = car && CAR_ESTILOS.lerSlide(bruta.replace(/^[\s>•-]+/, "").replace(/^\|/, "").replace(/\|\s*$/, "").trim());
+    if (nova) { if (!car.estilo) car.estilo = "bastidor"; car.slides.push(nova); return; }
     const ms = l.match(/^(\d{1,2})[.)]?\s*(capamao|objeto|capa|texto|lista|numero|número|moldura|notas|polaroid|colagem|cartao|cartão|frase|final|comparacao|comparação)\s*\|\s*(.*)$/i);
     if (ms && car) {
       const modelo = ms[2].toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace("comparacao", "cartao");
@@ -291,6 +293,7 @@ Regras da série: é sempre um Conectar, em Reels. O título do post começa com
 ${ideias.map((t) => `#${t.id} [${(CATEGORIAS.find((c) => c[0] === t.categoria) || [0, t.categoria || ""])[1]}${t.status === "agora" ? ", fazer agora" : ""}] ${t.titulo || "sem título"}${(t.minha_versao || t.transcricao) ? `: ${String(t.minha_versao || t.transcricao).replace(/\s+/g, " ").slice(0, 160)}` : ""}`).join("\n")}
 ` : "";
   const contexto = String((igx.contextos || {})[seg] || "").trim();
+  const ultimoEstilo = ((CAR_ESTILOS.ESTILOS[((igx.carrosseis || []).map((c) => (c.slides || {}).estilo).find(Boolean))] || {}).nome) || "";
   return `Você é o meu estrategista de conteúdo para Instagram. O seu trabalho é montar uma semana que siga a MINHA ESTRATÉGIA abaixo, com ideias específicas e coerentes, nada vago.
 
 QUEM SOU EU
@@ -343,24 +346,8 @@ O QUE EU PRECISO (pesquise na internet de verdade, nada de tendência inventada)
    PRIMEIROS 30 SEGUNDOS (tema): escritos com carinho, frase a frase, em linguagem de fala: 0 a 3 s o gancho, 3 a 10 s por que a pessoa tem que ficar, 10 a 30 s a primeira entrega de valor. É aqui que se ganha ou se perde a pessoa.
    ROTEIRO (tema): o resto em tópicos, em linguagem de fala (do jeito que eu falaria, não texto de blog), seguindo GANCHO, CONTEXTO, CONTEÚDO, FECHAMENTO.
    FECHAMENTO: o CTA, uma ação só.
-7. CARROSSÉIS PRONTOS: para cada carrossel do plano, escreva os slides neste formato. Carrossel CURTO, que faz a pessoa arrastar até o fim: de 5 a 7 slides, título de até 8 palavras e texto de até 15 palavras por slide. Linguagem de conversa, nada formal nem de apostila. A capa promete algo que só se resolve no fim, cada slide termina abrindo a curiosidade pro próximo e a resposta mais forte fica no penúltimo slide. Num título, *palavra* fica em itálico colorido e **palavra** em negrito (1 destaque por título, no máximo).
-   CARROSSEL: título do carrossel
-   1 capa | título forte (até 10 palavras) | linha pequena em cima (opcional) | etiqueta curta (opcional) | foto: que foto minha usar
-   2 texto | título com *uma palavra* destacada | texto do slide
-   3 lista | título | item um; item dois; item três
-   4 numero | linha pequena (ex.: HOJE) | o número (ex.: +40 MARCAS.) | linha de baixo
-   5 moldura | nota pequena | frase (ex.: sem experiência. **sem marca.** sem cliente.) | foto: que foto ou print usar
-   6 notas | frase forte do card | balão curtinho (ex.: *panic*) | foto: fundo
-   7 polaroid | legenda curta | foto: que foto usar
-   8 colagem | título | texto com **final em negrito** | foto: quais 2 fotos
-   9 cartao | título do card | texto do card | bilhete curto | foto: fundo
-   10 frase | frase de impacto | foto: fundo
-   11 final | frase de cima | frase de baixo | caixa de destaque (ex.: Salva esse post) | letra de mão (ex.: Link na bio)
-   Modelos possíveis: capa, texto, lista, numero, moldura, notas, polaroid, colagem, cartao, frase, final. Comece sempre com capa e termine com final.
-   ESTILO COM FOTOS (dinâmico e direto): quando o carrossel é uma lista de coisas reais que eu uso (equipamentos, apps, setup, o que tem na minha bolsa), use este estilo no lugar do editorial. Cada slide é a foto do objeto na minha mão, o nome em letra de mão, o modelo, o preço e um comentário sincero de até 10 palavras. Preço e modelo que você não souber ficam entre parênteses para eu preencher.
-   1 capamao | título com 2 *palavras* em letra de mão (ex.: Quais *equipamentos* eu uso pra *gravar* conteúdo?) | selo circulado (ex.: com valores) | foto: que foto minha usar
-   2 objeto | nome em letra de mão (ex.: microfone) | modelo (ex.: Hollyland Lark M2) | preço (ex.: R$700) | comentário curto e sincero | foto: o objeto na minha mão
-   Termine com final.
+7. CARROSSÉIS PRONTOS: para cada carrossel do plano, escreva os slides num dos meus 4 estilos (Bastidor, Revista, Conversa ou Fotos), escolhendo o que combina com o assunto${ultimoEstilo ? `. O último carrossel foi ${ultimoEstilo}: use outro estilo, e nunca dois carrosséis do mesmo estilo na mesma semana` : ", e nunca dois carrosséis do mesmo estilo na mesma semana"}.
+   ${CAR_ESTILOS.formato("").split("\n").join("\n   ")}
 
 Fale como gente de verdade, em português do Brasil, tom de conversa de café, sem cara de anúncio. Não use travessão em nenhum texto. Proibido: "não é X, é Y" e variações, "aí eu descobri", "foi aí que", "foi quando", "até que", "você sabia que" como gancho, "isso muda tudo", "isso muda o jogo". Não invente número ou resultado meu: o que você não sabe vira campo entre parênteses.`;
 }
@@ -544,7 +531,7 @@ function desenharPlanoSemana(el) {
   $$("[data-pl-car]", el).forEach((b) => b.onclick = () => {
     const c = carrosseisPlano[Number(b.dataset.plCar)];
     if (!c) return;
-    igx.car = { titulo: c.titulo, slides: c.slides.map((s) => ({ ...s })) };
+    igx.car = { titulo: c.titulo, estilo: c.estilo || undefined, slides: c.slides.map((s) => ({ ...s })) };
     igx.sub = "carrossel"; try { localStorage.setItem("ig-sub", "carrossel"); } catch (_) {}
     desenhar(); window.scrollTo({ top: 0 });
   });
@@ -1099,7 +1086,8 @@ const novoSlide = (modelo) => ({ modelo, titulo: "", texto: "" });
 function desenharCarrossel(el) {
   if (igx.carrosseis === null) { el.innerHTML = `<p class="vazio">Abrindo o gerador...</p>`; Promise.all([carregarCarrosseis(), carregarFontesCarrossel()]).then(desenhar); return; }
   if (igx.faltaCarrosseis) { el.innerHTML = `<div class="aviso-falta">Falta rodar a parte 27 do banco.sql no Supabase.</div>`; return; }
-  if (!igx.car) igx.car = JSON.parse(JSON.stringify(CARROSSEL_EXEMPLO));
+  if (!igx.car) igx.car = CAR_ESTILOS.exemplo("bastidor");
+  if (igx.car.estilo && CAR_ESTILOS.ESTILOS[igx.car.estilo]) return desenharEstilos(el);
   const car = igx.car;
   car.slides.forEach((s) => { if (!MODELOS_SLIDE.some((m) => m[0] === s.modelo)) s.modelo = s.modelo === "comparacao" ? "cartao" : "texto"; });
   if (!TEMAS_CARROSSEL[car.tema]) car.tema = "ryan";
@@ -1148,11 +1136,11 @@ function desenharCarrossel(el) {
       <select class="campo" id="car-tema" aria-label="Paleta">${Object.entries(TEMAS_CARROSSEL).map(([k, t]) => `<option value="${k}" ${car.tema === k ? "selected" : ""}>🎨 ${esc(t.nome)}</option>`).join("")}</select>
       <span class="espaco"></span>
       <select class="campo" id="car-abrir" aria-label="Abrir carrossel salvo"><option value="">📂 Abrir salvo (${igx.carrosseis.length})</option>${igx.carrosseis.map((c) => `<option value="${esc(c.id)}">${esc(c.titulo)} · ${dataBR(String(c.atualizado_em).slice(0, 10)).slice(0, 5)}</option>`).join("")}</select>
-      <button class="btn" type="button" id="car-novo" title="Estilo editorial: ideias, opinião, bastidor">Novo editorial</button>
-      <button class="btn" type="button" id="car-novo-foto" title="Estilo foto: lista de coisas reais, com preço">Novo com fotos</button>
+      <button class="btn" type="button" id="car-novo">Novo</button>
       <button class="btn" type="button" id="car-salvar">💾 Salvar</button>
       <button class="btn primario" type="button" id="car-baixar">⬇️ Baixar imagens</button>
     </section>
+    <div class="car-estilos" role="tablist">${ESTILOS_CHIPS().map(([k, n]) => `<button type="button" class="${k === "classico" ? "on" : ""}" data-estilo="${k}">${n}</button>`).join("")}<span class="sub">O Clássico é o gerador antigo, com os modelos soltos.</span></div>
     <p class="sub car-ajuda">Dica: escreva <b>*palavra*</b> para itálico colorido e <b>**palavra**</b> para negrito.</p>
 
     <div class="car-grade">
@@ -1220,12 +1208,8 @@ function desenharCarrossel(el) {
   });
   $("#car-mais").onclick = () => { const novo = novoSlide($("#car-modelo-novo").value); const fim = car.slides[car.slides.length - 1]; if (fim && fim.modelo === "final") car.slides.splice(car.slides.length - 1, 0, novo); else car.slides.push(novo); desenhar(); };
   $("#car-novo").onclick = () => { igx.car = { titulo: "Novo carrossel", tema: car.tema, slides: [novoSlide("capa"), { ...novoSlide("texto"), tom: "escuro" }, { ...novoSlide("final"), tom: "escuro", destaque: "Salva esse post", texto2: "Link na bio" }] }; desenhar(); };
-  $("#car-novo-foto").onclick = () => { igx.car = JSON.parse(JSON.stringify({ ...CARROSSEL_FOTO_EXEMPLO, tema: car.tema })); desenhar(); avisar("Estilo foto: troque as fotos e escreva o modelo e o preço de cada coisa."); };
-  $("#car-abrir").onchange = (e) => {
-    const c = igx.carrosseis.find((x) => String(x.id) === e.target.value); if (!c) return;
-    const dados = Array.isArray(c.slides) ? { slides: c.slides } : c.slides || {};
-    igx.car = { id: c.id, titulo: c.titulo, tema: dados.tema || "ryan", slides: JSON.parse(JSON.stringify(dados.slides || [])) }; desenhar();
-  };
+  $(".car-estilos", el).addEventListener("click", (e) => { const b = e.target.closest("[data-estilo]"); if (!b) return; trocarEstilo(car, b.dataset.estilo); desenhar(); });
+  $("#car-abrir").onchange = (e) => { abrirCarrosselSalvo(e.target.value); desenhar(); };
   $("#car-salvar").onclick = async () => {
     const dados = { titulo: (car.titulo || "Carrossel").slice(0, 200), slides: { tema: car.tema, slides: car.slides }, atualizado_em: new Date().toISOString() };
     const { data, error } = await (car.id ? db.from("carrosseis").update(dados).eq("id", car.id).select().single() : db.from("carrosseis").insert(dados).select().single());
@@ -1258,6 +1242,223 @@ function desenharCarrossel(el) {
     } catch (erro) { avisar("Não deu para gerar as imagens: " + (erro.message || erro), true); }
     b.disabled = false; b.textContent = "⬇️ Baixar imagens";
   };
+}
+/* ---------- 🎨 Os 4 estilos (Bastidor, Revista, Conversa, Fotos): editor, celular e perfil ---------- */
+const ESTILOS_CHIPS = () => [...Object.entries(CAR_ESTILOS.ESTILOS).map(([k, e]) => [k, e.nome]), ["classico", "Clássico"]];
+function trocarEstilo(car, novo) {
+  if (novo === (car.estilo || "classico")) return;
+  if (novo === "classico") { if (confirm("O Clássico usa outros modelos de slide. Começar um carrossel Clássico novo?")) igx.car = JSON.parse(JSON.stringify(CARROSSEL_EXEMPLO)); return; }
+  if (!car.estilo) { if (confirm(`Começar um carrossel novo no estilo ${CAR_ESTILOS.ESTILOS[novo].nome}, com um exemplo pra você trocar o texto?`)) igx.car = CAR_ESTILOS.exemplo(novo); return; }
+  car.estilo = novo; // entre os 4 estilos os slides são os mesmos, só muda o desenho
+}
+function pedidoCarrossel(ideia, estilo) {
+  const ultimo = (igx.carrosseis || []).map((c) => (c.slides || {}).estilo).find(Boolean);
+  return `Você é o meu roteirista e designer de carrossel para Instagram. Eu tenho a ideia, você monta o carrossel.
+
+QUEM SOU EU
+${NICHO_PADRAO}
+
+A MINHA IDEIA
+${ideia}
+
+${estilo === "auto" ? `ESTILO: escolha o que combina mais com a ideia${ultimo ? ` (o último carrossel foi ${CAR_ESTILOS.ESTILOS[ultimo].nome}: prefira outro, pro feed não ficar repetido)` : ""}.` : `ESTILO: ${CAR_ESTILOS.ESTILOS[estilo].nome}.`}
+
+${CAR_ESTILOS.formato(estilo === "auto" ? "" : estilo)}
+
+Responda só com o bloco do carrossel e, embaixo, LEGENDA: com a legenda curta (gancho na primeira linha, 1 CTA, até 5 hashtags).`;
+}
+function desenharEstilos(el) {
+  const car = igx.car, E = CAR_ESTILOS.ESTILOS[car.estilo];
+  car.slides.forEach((s) => { if (!CAR_ESTILOS.TIPOS.some((t) => t[0] === s.tipo)) s.tipo = "construcao"; });
+  let vista = "slides"; try { vista = localStorage.getItem("car-vista") || "slides"; } catch (_) {}
+  const pagina = (i) => ["Gancho", "Contexto", "Construção", "Construção", "Tensão", "Recompensa", "CTA"][i] || "Extra";
+
+  const campo = (s, c) => {
+    const rot = CAR_ESTILOS.rotulo(car.estilo, s.tipo, c);
+    if (c === "foto") return `<div class="car-foto">
+        ${s.foto ? `<img src="${esc(s.foto)}" alt="" crossorigin="anonymous">` : `<span class="car-foto-vazia">📷</span>`}
+        <label class="btn pequeno">${s.foto ? "Trocar foto" : "Subir foto"}<input type="file" accept="image/*" data-foto="foto" hidden></label>
+        ${s.foto ? `<button class="btn pequeno" type="button" data-tirar-foto="foto">Tirar</button><select class="campo" data-k="enquadrar" aria-label="Enquadrar">${[["", "Enquadrar: auto"], ["topo", "Mostrar o topo"], ["meio", "Centro"], ["baixo", "Mostrar embaixo"]].map(([v, n]) => `<option value="${v}" ${(s.enquadrar || "") === v ? "selected" : ""}>${n}</option>`).join("")}</select>` : ""}
+        ${s.dicaFoto ? `<small class="sub">Sugestão: ${esc(s.dicaFoto)}</small>` : ""}
+      </div>`;
+    const longo = ["texto", "itens", "msgs"].includes(c);
+    return `<label class="car-rot">${esc(rot)}${longo ? `<textarea class="campo" data-k="${c}" rows="${c === "texto" ? 2 : 3}">${esc(s[c] || "")}</textarea>` : `<input class="campo" data-k="${c}" value="${esc(s[c] || "")}">`}</label>`;
+  };
+
+  el.innerHTML = `
+    <details class="cartao car-ideia" id="car-ideia">
+      <summary><b>💡 Da sua ideia ao carrossel</b> <span class="sub">você escreve a ideia, o Claude monta, você cola aqui</span></summary>
+      <textarea class="campo" id="ci-ideia" rows="3" placeholder="Ex.: quero mostrar como eu respondo marca que pede desconto, com o que eu falo de verdade">${esc(igx.ideiaCar || "")}</textarea>
+      <div class="car-ideia-acoes">
+        <select class="campo" id="ci-estilo" aria-label="Estilo"><option value="auto">Estilo: o Claude escolhe</option>${Object.entries(CAR_ESTILOS.ESTILOS).map(([k, e]) => `<option value="${k}" ${k === car.estilo ? "selected" : ""}>${esc(e.nome)}</option>`).join("")}</select>
+        <button class="btn primario" type="button" id="ci-copiar">📋 Copiar pedido pro Claude</button>
+      </div>
+      <textarea class="campo" id="ci-resposta" rows="3" placeholder="Cole aqui a resposta do Claude (as linhas do CARROSSEL)"></textarea>
+      <button class="btn" type="button" id="ci-montar">✨ Montar carrossel</button>
+    </details>
+
+    <section class="cartao car-barra">
+      <input class="campo" id="car-titulo" value="${esc(car.titulo)}" aria-label="Nome do carrossel" placeholder="Nome do carrossel">
+      <span class="espaco"></span>
+      <select class="campo" id="car-abrir" aria-label="Abrir carrossel salvo"><option value="">📂 Abrir salvo (${igx.carrosseis.length})</option>${igx.carrosseis.map((c) => `<option value="${esc(c.id)}">${esc(c.titulo)} · ${dataBR(String(c.atualizado_em).slice(0, 10)).slice(0, 5)}</option>`).join("")}</select>
+      <button class="btn" type="button" id="car-novo">Novo</button>
+      <button class="btn" type="button" id="car-salvar">💾 Salvar</button>
+      <button class="btn primario" type="button" id="car-baixar">⬇️ Baixar imagens</button>
+    </section>
+    <div class="car-estilos" role="tablist">${ESTILOS_CHIPS().map(([k, n]) => `<button type="button" class="${k === car.estilo ? "on" : ""}" data-estilo="${k}">${n}</button>`).join("")}<span class="sub">${esc(E.quando)}</span></div>
+    <p class="sub car-ajuda">Escreva <b>*palavra*</b> pro destaque dourado e <b>**palavra**</b> pro cinza. Estrutura: gancho, contexto, construção, construção, tensão, recompensa e CTA.</p>
+
+    <div class="car-grade">
+      <div class="car-slides" id="car-slides">${car.slides.map((s, i) => `<div class="cartao car-slide" data-i="${i}">
+          <div class="car-slide-topo"><b>${i + 1}</b> <span class="pilula">${pagina(i)}</span>
+            <select class="campo" data-k="tipo" aria-label="Tipo do slide ${i + 1}">${CAR_ESTILOS.TIPOS.map(([v, n]) => `<option value="${v}" ${s.tipo === v ? "selected" : ""}>${n}</option>`).join("")}</select>
+            <span class="espaco"></span>
+            <button class="btn pequeno" type="button" data-mover="-1" ${i === 0 ? "disabled" : ""} aria-label="Subir">↑</button>
+            <button class="btn pequeno" type="button" data-mover="1" ${i === car.slides.length - 1 ? "disabled" : ""} aria-label="Descer">↓</button>
+            <button class="btn pequeno" type="button" data-copiar-slide aria-label="Duplicar slide">⧉</button>
+            <button class="btn pequeno" type="button" data-tirar aria-label="Tirar slide">✕</button></div>
+          ${CAR_ESTILOS.campos(car.estilo, s.tipo).map((c) => campo(s, c)).join("")}
+          ${palavrasDe(s) > 22 ? `<p class="sub car-dica"><b class="car-muito">${palavrasDe(s)} palavras: carrossel bom é curto.</b></p>` : ""}
+        </div>`).join("")}
+        <div class="car-mais"><button class="btn" type="button" id="car-mais" ${car.slides.length >= 10 ? "disabled" : ""}>${ic("mais")}Slide</button></div>
+      </div>
+      <div class="car-lado">
+        <div class="car-vistas">${[["slides", "🖼️ Slides"], ["celular", "📱 No celular"], ["perfil", "👤 No meu perfil"]].map(([k, n]) => `<button type="button" class="${vista === k ? "on" : ""}" data-vista="${k}">${n}</button>`).join("")}</div>
+        <div class="car-previa" id="car-previa" ${vista === "slides" ? "" : "hidden"}>${car.slides.map((_, i) => `<canvas class="car-tela" data-tela="${i}" width="1080" height="1350" aria-label="Prévia do slide ${i + 1}"></canvas>`).join("")}</div>
+        <div class="car-tel" id="car-tel" ${vista === "slides" ? "hidden" : ""}></div>
+      </div>
+    </div>`;
+
+  const telas = () => [...el.querySelectorAll(".car-tela")];
+  let espera = null;
+  const pintarUm = (i) => { const cv = $(`[data-tela="${i}"]`, el); if (cv && car.slides[i]) CAR_ESTILOS.pintar(cv, car.slides[i], i, car.slides.length, car.estilo, () => { pintarUm(i); atualizarTel(); }, car.slides); };
+  const pintarTudo = () => { car.slides.forEach((_, i) => pintarUm(i)); atualizarTel(); };
+
+  // Celular: o post como aparece no feed, arrastando pro lado
+  function celular() {
+    const urls = telas().map((c) => c.toDataURL("image/jpeg", 0.8)), atual = Number(($("#cel-trilho", el) || {}).dataset?.k || 0);
+    $("#car-tel", el).innerHTML = `<div class="tel"><div class="tela">
+      <div class="tel-topo"><span class="tel-av"></span><div><b>${esc(ASSINATURA.arroba.replace("@", ""))}</b><small>Áudio original</small></div></div>
+      <div class="tel-car"><div class="tel-trilho" id="cel-trilho">${urls.map((u, i) => `<img src="${u}" alt="Slide ${i + 1}">`).join("")}</div><span class="tel-cont" id="cel-cont">1/${urls.length}</span></div>
+      <div class="tel-acoes"><span>♡</span><span>💬</span><span>➤</span><span class="tel-pontos" id="cel-pontos">${urls.map((_, i) => `<i class="${i ? "" : "on"}"></i>`).join("")}</span><span>🔖</span></div>
+      <p class="tel-leg"><b>${esc(ASSINATURA.arroba.replace("@", ""))}</b> ${esc(car.legenda || car.titulo || "")}</p>
+    </div></div><p class="sub">Arraste a foto pro lado, como no Instagram.</p>`;
+    const tr = $("#cel-trilho", el);
+    tr.addEventListener("scroll", () => { const k = Math.round(tr.scrollLeft / tr.clientWidth); tr.dataset.k = k; $("#cel-cont", el).textContent = `${k + 1}/${urls.length}`; [...$("#cel-pontos", el).children].forEach((p, j) => { p.className = j === k ? "on" : ""; }); });
+    if (atual) tr.scrollLeft = atual * tr.clientWidth;
+  }
+  // Perfil: este carrossel no topo do feed, seguido das capas dos carrosséis salvos
+  function perfil() {
+    const capa = (cv) => cv.toDataURL("image/jpeg", 0.7);
+    const salvos = igx.carrosseis.filter((c) => c.id !== car.id).slice(0, 8).map((c) => {
+      const d = Array.isArray(c.slides) ? { slides: c.slides } : c.slides || {}, sl = (d.slides || [])[0];
+      if (!sl) return null;
+      const cv = document.createElement("canvas");
+      if (d.estilo && CAR_ESTILOS.ESTILOS[d.estilo]) CAR_ESTILOS.pintar(cv, sl, 0, d.slides.length, d.estilo, atualizarTel, d.slides);
+      else pintarSlide(cv, sl, 0, d.slides.length, d.tema || "ryan", atualizarTel);
+      return capa(cv);
+    }).filter(Boolean);
+    const celulas = [capa(telas()[0]), ...salvos].slice(0, 9);
+    $("#car-tel", el).innerHTML = `<div class="tel"><div class="tela tela-perfil">
+      <div class="tel-perfil-topo"><span class="tel-av grande"></span><div><b>${esc(ASSINATURA.arroba)}</b><small>Ryan Alves · UGC creator</small></div></div>
+      <div class="tel-grade">${celulas.map((u, i) => `<span class="${i ? "" : "novo"}" style="background-image:url(${u})"></span>`).join("")}${Array.from({ length: Math.max(0, 9 - celulas.length) }, () => `<span class="vazio"></span>`).join("")}</div>
+    </div></div><p class="sub">O primeiro é este carrossel; os outros são os seus carrosséis salvos. Evite dois do mesmo estilo seguidos.</p>`;
+  }
+  const atualizarTel = () => { clearTimeout(atualizarTel.t); atualizarTel.t = setTimeout(() => { if (vista === "celular") celular(); else if (vista === "perfil") perfil(); }, 250); };
+
+  pintarTudo();
+  carregarFontesCarrossel().then(pintarTudo);
+
+  $(".car-vistas", el).addEventListener("click", (e) => {
+    const b = e.target.closest("[data-vista]"); if (!b) return;
+    vista = b.dataset.vista; try { localStorage.setItem("car-vista", vista); } catch (_) {}
+    el.querySelectorAll("[data-vista]").forEach((x) => x.classList.toggle("on", x === b));
+    $("#car-previa", el).hidden = vista !== "slides"; $("#car-tel", el).hidden = vista === "slides";
+    atualizarTel();
+  });
+  $(".car-estilos", el).addEventListener("click", (e) => { const b = e.target.closest("[data-estilo]"); if (!b) return; trocarEstilo(car, b.dataset.estilo); desenhar(); });
+  $("#ci-ideia").oninput = (e) => { igx.ideiaCar = e.target.value; };
+  $("#ci-copiar").onclick = () => {
+    const ideia = $("#ci-ideia").value.trim(); if (!ideia) { avisar("Escreva a sua ideia primeiro.", true); return; }
+    navigator.clipboard.writeText(pedidoCarrossel(ideia, $("#ci-estilo").value)).then(() => avisar("Pedido copiado. Cole no Claude e traga a resposta pra cá."), () => avisar("Não deu para copiar.", true));
+  };
+  $("#ci-montar").onclick = () => {
+    const resp = $("#ci-resposta").value, lido = CAR_ESTILOS.lerTexto(resp)[0];
+    if (!lido) { avisar("Não achei as linhas do carrossel. Cole a resposta inteira do Claude.", true); return; }
+    const leg = (resp.match(/LEGENDA\s*:?\s*\n?([\s\S]+)$/i) || [])[1];
+    const est = lido.estilo || ($("#ci-estilo").value !== "auto" ? $("#ci-estilo").value : car.estilo);
+    igx.car = { titulo: lido.titulo, estilo: est, slides: lido.slides, legenda: leg ? leg.trim().split("\n")[0].replace(/\*\*/g, "") : "" };
+    desenhar(); avisar(`Carrossel montado no estilo ${CAR_ESTILOS.ESTILOS[est].nome}. Suba as fotos e confira no celular.`);
+  };
+  $("#car-titulo").oninput = (e) => { car.titulo = e.target.value; };
+  $("#car-slides").addEventListener("input", (e) => {
+    const box = e.target.closest(".car-slide"), k = e.target.dataset.k;
+    if (!box || !k || e.target.tagName === "SELECT") return;
+    const i = Number(box.dataset.i); car.slides[i][k] = e.target.value;
+    clearTimeout(espera); espera = setTimeout(() => { pintarUm(i); atualizarTel(); }, 150);
+  });
+  $("#car-slides").addEventListener("change", async (e) => {
+    const box = e.target.closest(".car-slide"); if (!box) return;
+    const i = Number(box.dataset.i), s = car.slides[i];
+    if (e.target.dataset.k === "tipo") { s.tipo = e.target.value; desenhar(); return; }
+    if (e.target.tagName === "SELECT" && e.target.dataset.k) { s[e.target.dataset.k] = e.target.value; pintarUm(i); atualizarTel(); return; }
+    if (e.target.dataset.foto && e.target.files && e.target.files[0]) {
+      const rotulo = e.target.closest("label"); rotulo.firstChild.textContent = "Enviando...";
+      try {
+        const url = await enviarArquivo(await prepararFoto(e.target.files[0]), "carrosseis", "foto.jpg");
+        if (url) { s.foto = url; desenhar(); avisar("Foto no slide."); } else rotulo.firstChild.textContent = "Subir foto";
+      } catch (erro) { avisar(erro.message || "Não deu para usar essa foto.", true); rotulo.firstChild.textContent = "Subir foto"; }
+    }
+  });
+  $("#car-slides").addEventListener("click", (e) => {
+    const box = e.target.closest(".car-slide"); if (!box) return;
+    const i = Number(box.dataset.i), mv = e.target.closest("[data-mover]");
+    if (mv) { const j = i + Number(mv.dataset.mover); [car.slides[i], car.slides[j]] = [car.slides[j], car.slides[i]]; desenhar(); return; }
+    if (e.target.closest("[data-copiar-slide]")) { if (car.slides.length >= 10) { avisar("No máximo 10 slides.", true); return; } car.slides.splice(i + 1, 0, JSON.parse(JSON.stringify(car.slides[i]))); desenhar(); return; }
+    if (e.target.closest("[data-tirar-foto]")) { delete car.slides[i].foto; desenhar(); return; }
+    if (e.target.closest("[data-tirar]")) { if (car.slides.length <= 1) { avisar("O carrossel precisa de pelo menos 1 slide.", true); return; } car.slides.splice(i, 1); desenhar(); }
+  });
+  $("#car-mais").onclick = () => { const fim = car.slides[car.slides.length - 1], novo = { tipo: "construcao", titulo: "" }; if (fim && fim.tipo === "cta") car.slides.splice(car.slides.length - 1, 0, novo); else car.slides.push(novo); desenhar(); };
+  $("#car-novo").onclick = () => { igx.car = CAR_ESTILOS.exemplo(car.estilo); desenhar(); avisar("Exemplo novo: troque os textos e as fotos."); };
+  $("#car-abrir").onchange = (e) => { abrirCarrosselSalvo(e.target.value); desenhar(); };
+  $("#car-salvar").onclick = () => salvarCarrossel(car);
+  $("#car-baixar").onclick = (e) => baixarCarrossel(e.target, car, (cv, i) => CAR_ESTILOS.pintar(cv, car.slides[i], i, car.slides.length, car.estilo, null, car.slides));
+}
+function abrirCarrosselSalvo(id) {
+  const c = igx.carrosseis.find((x) => String(x.id) === String(id)); if (!c) return;
+  const d = Array.isArray(c.slides) ? { slides: c.slides } : c.slides || {};
+  igx.car = { id: c.id, titulo: c.titulo, tema: d.tema || "ryan", estilo: d.estilo || undefined, legenda: d.legenda || "", slides: JSON.parse(JSON.stringify(d.slides || [])) };
+}
+async function salvarCarrossel(car) {
+  const dados = { titulo: (car.titulo || "Carrossel").slice(0, 200), slides: { tema: car.tema || "ryan", estilo: car.estilo, legenda: car.legenda || "", slides: car.slides }, atualizado_em: new Date().toISOString() };
+  const { data, error } = await (car.id ? db.from("carrosseis").update(dados).eq("id", car.id).select().single() : db.from("carrosseis").insert(dados).select().single());
+  if (error) { avisar(traduzErro(error), true); return; }
+  car.id = data.id; await carregarCarrosseis(); avisar("Carrossel salvo."); desenhar();
+}
+async function baixarCarrossel(b, car, pintar) {
+  b.disabled = true; b.textContent = "Preparando...";
+  try {
+    await carregarFontesCarrossel(); await esperarFotos(car.slides);
+    const nome = (car.titulo || "carrossel").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^\w]+/g, "-").replace(/^-|-$/g, "").toLowerCase().slice(0, 40) || "carrossel";
+    const arquivos = [];
+    for (let i = 0; i < car.slides.length; i++) {
+      const cv = document.createElement("canvas"); pintar(cv, i);
+      const blob = await new Promise((ok) => cv.toBlob(ok, "image/jpeg", 0.93));
+      arquivos.push(new File([blob], `${nome}-${String(i + 1).padStart(2, "0")}.jpg`, { type: "image/jpeg" }));
+    }
+    // No celular: abre o "compartilhar" para salvar tudo nas Fotos de uma vez
+    if (navigator.canShare && navigator.canShare({ files: arquivos }) && /iPhone|iPad|Android/i.test(navigator.userAgent)) {
+      await navigator.share({ files: arquivos, title: car.titulo }).catch(() => {});
+    } else {
+      for (const f of arquivos) {
+        const a = document.createElement("a"); a.href = URL.createObjectURL(f); a.download = f.name; document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+        await new Promise((ok) => setTimeout(ok, 350));
+      }
+      avisar(`${plural(arquivos.length, "imagem", "imagens")} na pasta Downloads (1080 x 1350, o tamanho certo do Instagram).`);
+    }
+  } catch (erro) { avisar("Não deu para gerar as imagens: " + (erro.message || erro), true); }
+  b.disabled = false; b.textContent = "⬇️ Baixar imagens";
 }
 const palavrasDe = (s) => [s.titulo, s.texto, s.texto2, s.destaque].join(" ").replace(/\*/g, "").split(/\s+/).filter(Boolean).length;
 
@@ -1534,7 +1735,7 @@ function abrirPostDoPlano(plano, it, evento) {
     ${htmlIdeias || `<section class="pp-bloco"><p class="sub" style="margin:0 0 8px">Esse post não está ligado a uma ideia dos Roteiros, então ainda não tem roteiro, legenda nem hashtags.</p>
       <button type="button" class="btn primario" data-voz-novo>✍️ Fazer o roteiro na minha voz</button></section>`}
     ${car ? `<section class="pp-bloco"><div class="pp-bloco-topo"><h4>🎨 Slides do carrossel</h4><button type="button" class="btn pequeno primario" data-abrir-car>Abrir no gerador</button></div>
-      <ol class="pp-slides">${car.slides.map((sl) => `<li><span class="pilula">${esc((MODELOS_SLIDE.find((m) => m[0] === sl.modelo) || [0, sl.modelo])[1])}</span> ${esc([sl.titulo, sl.texto].filter(Boolean).join(" · ").replace(/\*/g, ""))}</li>`).join("")}</ol></section>` : ""}
+      <ol class="pp-slides">${car.slides.map((sl) => `<li><span class="pilula">${esc(sl.tipo ? CAR_ESTILOS.nomeTipo(sl.tipo) : (MODELOS_SLIDE.find((m) => m[0] === sl.modelo) || [0, sl.modelo])[1])}</span> ${esc([sl.titulo, sl.texto].filter(Boolean).join(" · ").replace(/\*/g, ""))}</li>`).join("")}</ol></section>` : ""}
     ${trechos.length ? `<details class="pp-bloco"><summary><b>🔎 O que a pesquisa falou desse post</b></summary><div class="pp-texto">${trechos.map((l) => esc(l.replace(/\*\*/g, ""))).join("<br>")}</div></details>` : ""}`,
     `${evento ? `<button type="button" class="btn" data-editar-evento>Editar data e hora</button>` : `<button type="button" class="btn" data-agenda>📅 Pôr na agenda</button>`}<button type="button" class="btn primario" data-fechar>Fechar</button>`);
   d.classList.add("janela-larga");
@@ -1548,7 +1749,7 @@ function abrirPostDoPlano(plano, it, evento) {
     const voz = e.target.closest("[data-voz]");
     if (voz) { const t = S.transcricoes.find((x) => String(x.id) === voz.dataset.voz); d.close(); if (t) roteiroNaMinhaVoz(t); return; }
     if (e.target.closest("[data-voz-novo]")) { d.close(); roteiroNaMinhaVoz({ titulo: String(it.tema).replace(/#\d+\s*/g, ""), categoria: "organico", minha_versao: [it.gancho && `Gancho sugerido: ${it.gancho}`, it.porque && `Por que vai funcionar: ${it.porque}`].filter(Boolean).join("\n") }); return; }
-    if (e.target.closest("[data-abrir-car]")) { d.close(); igx.car = { titulo: car.titulo, slides: car.slides.map((x) => ({ ...x })) }; igx.sub = "carrossel"; try { localStorage.setItem("ig-sub", "carrossel"); } catch (_) {} irPara("instagram"); return; }
+    if (e.target.closest("[data-abrir-car]")) { d.close(); igx.car = { titulo: car.titulo, estilo: car.estilo || undefined, slides: car.slides.map((x) => ({ ...x })) }; igx.sub = "carrossel"; try { localStorage.setItem("ig-sub", "carrossel"); } catch (_) {} irPara("instagram"); return; }
     if (e.target.closest("[data-editar-evento]")) { d.close(); formCalendarioBase(evento); return; }
     if (e.target.closest("[data-agenda]")) {
       const titulo = `${it.formato}: ${it.tema}`.slice(0, 200);
