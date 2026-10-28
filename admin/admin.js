@@ -4445,7 +4445,7 @@ function cartaoEmail(x) {
         <button type="button" class="btn pequeno" data-acao-email="contrato">Virar contrato</button>
         <button type="button" class="btn pequeno" data-acao-email="marca">Salvar marca</button>
         <button type="button" class="btn pequeno" data-acao-email="ignorar">Não é proposta</button>
-        ${x.de.dominio ? `<button type="button" class="link-btn pequeno-link" data-acao-email="esconder-remetente">esconder sempre ${esc(x.de.dominio)}</button>` : ""}
+        ${x.de.dominio ? `<button type="button" class="link-btn pequeno-link" data-acao-email="esconder-remetente">esconder sempre <span class="sigilo">${esc(x.de.dominio)}</span></button>` : ""}
       </div>`}
     </div>
   </article>`;
