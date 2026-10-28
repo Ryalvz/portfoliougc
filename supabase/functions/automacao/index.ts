@@ -86,6 +86,14 @@ function bate(texto: string, palavras: string) {
   const t = ` ${normal(texto).replace(/[^\p{L}\p{N}]+/gu, " ")} `;
   return palavras.split(/[,\n]/).map((p) => normal(p).replace(/[^\p{L}\p{N}]+/gu, " ").trim()).filter(Boolean).some((p) => t.includes(` ${p} `));
 }
+// Troca {nome} pelo primeiro nome e {usuario} pelo @; sem o dado, some junto com o espaço antes ("Oi {nome}!" vira "Oi!")
+const preencher = (t: string, nome: string, usuario: string) => String(t || "")
+  .replace(/\s*\{nome\}/g, nome ? ` ${nome}` : "").replace(/\s*\{usuario\}/g, usuario ? ` @${usuario}` : "").trim();
+// O Instagram só entrega o nome de quem já conversou com a conta; para os outros, fica sem nome
+async function primeiroNome(id: string, token: string) {
+  if (!id) return "";
+  try { const p = await graph(`${id}?fields=name`, token); return String(p.name || "").trim().split(/\s+/)[0] || ""; } catch (_) { return ""; }
+}
 const sortear = (linhas: string) => { const l = String(linhas || "").split("\n").map((x) => x.trim()).filter(Boolean); return l.length ? l[Math.floor(Math.random() * l.length)] : ""; };
 
 async function tratarComentario(v: any, dono: string, token: string) {
@@ -100,12 +108,13 @@ async function tratarComentario(v: any, dono: string, token: string) {
     automacao_id: a.id, comentario_id: comentario, usuario: autor.username || null, usuario_id: autor.id || null, midia_id: midia || null, texto: texto.slice(0, 500),
   }).select("id").single();
   if (error || !reg) return;
-  const mensagem = String(a.mensagem).replaceAll("{usuario}", autor.username ? `@${autor.username}` : "").trim();
+  const nome = /\{nome\}/.test(`${a.mensagem}${a.respostas || ""}`) ? await primeiroNome(String(autor.id || ""), token) : "";
+  const mensagem = preencher(a.mensagem, nome, autor.username || "");
   try {
     await graph("me/messages", token, { recipient: { comment_id: comentario }, message: { text: mensagem.slice(0, 1000) } });
     let erroPublico = "";
     const publica = sortear(a.respostas);
-    if (publica) { try { await graph(`${comentario}/replies`, token, { message: publica.replaceAll("{usuario}", autor.username ? `@${autor.username}` : "") }); } catch (e) { erroPublico = `direct ok, resposta no comentário falhou: ${(e as Error).message}`; } }
+    if (publica) { try { await graph(`${comentario}/replies`, token, { message: preencher(publica, nome, autor.username || "") }); } catch (e) { erroPublico = `direct ok, resposta no comentário falhou: ${(e as Error).message}`; } }
     await db.from("automacao_envios").update({ status: "enviado", erro: erroPublico || null }).eq("id", reg.id);
   } catch (e) {
     await db.from("automacao_envios").update({ status: "erro", erro: String((e as Error).message).slice(0, 300) }).eq("id", reg.id);
