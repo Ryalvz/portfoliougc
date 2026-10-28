@@ -1419,3 +1419,38 @@ dialog.pf-janela-rapida { width: min(460px, calc(100vw - 20px)); }
 .tel-grade span { aspect-ratio: 3 / 4; background: #1c1c1c center / cover; }
 .tel-grade span.novo { outline: 2px solid #D9C48A; outline-offset: -2px; }
 @media (max-width: 900px) { .car-lado { position: static; } }
+
+/* ---------- Automações do Instagram ---------- */
+.au-conexao summary { cursor: pointer; }
+.au-passos { list-style: none; padding: 0; margin: 12px 0; display: grid; gap: 12px; }
+.au-passos li { padding: 12px 14px; border-radius: var(--radius); background: var(--tint); }
+.au-passos li.ok { background: var(--green-bg); }
+.au-passos li.ok b { color: var(--green); }
+.au-passos .sub { margin-top: 4px; line-height: 1.6; }
+.au-linha { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 6px 0; }
+.au-linha code { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; font-size: 12px; overflow-wrap: anywhere; }
+.au-linha .campo { flex: 1; min-width: 200px; }
+.au-topo { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.au-lista { display: grid; gap: 10px; margin-top: 12px; }
+.au-item { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); }
+.au-item.pausada { opacity: .6; }
+.au-item > img { width: 64px; height: 80px; object-fit: cover; border-radius: 6px; }
+.au-todos { display: grid; place-items: center; width: 64px; height: 80px; border-radius: 6px; background: var(--tint-2); font-size: 11px; font-weight: 700; text-align: center; padding: 4px; }
+.au-meio p { margin: 4px 0; }
+.au-palavras { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0; }
+.au-acoes { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.au-chave { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.au-erro { color: var(--red); }
+.pilula.au-ok { background: var(--green-bg); color: var(--green); }
+.pilula.au-falhou { background: var(--red-bg); color: var(--red); }
+.au-tabela { width: 100%; border-collapse: collapse; font-size: 13px; }
+.au-tabela th, .au-tabela td { text-align: left; padding: 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.au-rot { display: grid; gap: 6px; font-size: 13px; font-weight: 600; margin-bottom: 14px; }
+.au-rot .campo { font-weight: 400; }
+.au-post { display: flex; align-items: center; gap: 10px; font-weight: 400; }
+.au-post img { width: 48px; height: 60px; object-fit: cover; border-radius: 6px; }
+.au-posts { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 6px; max-height: 260px; overflow: auto; }
+.au-posts button { padding: 0; border: 2px solid transparent; border-radius: 6px; background: none; cursor: pointer; }
+.au-posts button:hover { border-color: var(--olive); }
+.au-posts img { width: 100%; aspect-ratio: 4 / 5; object-fit: cover; display: block; border-radius: 4px; }
+@media (max-width: 700px) { .au-item { grid-template-columns: 56px minmax(0, 1fr); } .au-acoes { grid-column: 1 / -1; justify-content: flex-start; } }

@@ -14,7 +14,7 @@
    ============================================================= */
 const igx = { sub: "metricas", pesq: null, reels: null, buscando: false, timer: null, planos: null, semanaVista: "", carrosseis: null, car: null };
 try { igx.sub = localStorage.getItem("ig-sub") || "metricas"; } catch (_) {}
-const SUBS_IG = [["metricas", "📊 Métricas"], ["reels", "🔥 Reels da semana"], ["plano", "🧭 Plano da semana"], ["carrossel", "🎨 Carrossel"]];
+const SUBS_IG = [["metricas", "📊 Métricas"], ["reels", "🔥 Reels da semana"], ["plano", "🧭 Plano da semana"], ["carrossel", "🎨 Carrossel"], ["automacoes", "🤖 Automações"]];
 
 function segundaISO(base) {
   const d = base ? deISO(base) : new Date();
@@ -31,6 +31,7 @@ function desenharInstagram(el) {
   if (igx.sub === "reels") return desenharReelsSemana(corpo);
   if (igx.sub === "plano") return desenharPlanoSemana(corpo);
   if (igx.sub === "carrossel") return desenharCarrossel(corpo);
+  if (igx.sub === "automacoes") return desenharAutomacoes(corpo);
   return desenharMetricasInstagram(corpo);
 }
 
