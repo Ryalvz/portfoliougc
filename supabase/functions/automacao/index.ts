@@ -3,12 +3,14 @@
 // Comentou a palavra, recebe no direct: quando alguém comenta uma
 // palavra-chave num post do @ryalvz, a Meta avisa este ajudante,
 // ele manda o direct (resposta privada ao comentário) e responde
-// o comentário em público. Usa a mesma chave do ajudante
+// o comentário em público. Com botão, o primeiro direct pede um
+// toque; só no toque o Instagram libera o nome (e se a pessoa
+// segue a conta), e aí vai o link. Usa a mesma chave do ajudante
 // "instagram" (tabela config_privada), que já se renova sozinha.
 //
 // Três jeitos de chamar:
 // GET  com hub.challenge   -> a Meta confere o endereço (webhook)
-// POST com assinatura      -> a Meta avisa de um comentário novo
+// POST com assinatura      -> a Meta avisa de um comentário novo ou de um toque no botão
 // POST {acao} do painel    -> só o login do Ryan:
 //   "status":  endereço, código de verificação, segredo e avisos
 //   "segredo": guarda a Chave secreta do app (para conferir a Meta)
@@ -103,6 +105,41 @@ async function primeiroNome(id: string, token: string) {
 }
 const sortear = (linhas: string) => { const l = String(linhas || "").split("\n").map((x) => x.trim()).filter(Boolean); return l.length ? l[Math.floor(Math.random() * l.length)] : ""; };
 
+const BOTAO_PADRAO = "Oi! Vi seu comentário 👀 Toca no botão aqui embaixo que eu te mando agora.";
+const SEGUIR_PADRAO = "Quase lá, {nome}! Me segue aqui no @ryalvz e toca no botão de novo que o link chega na hora 💛";
+// Mensagem com um botão; se a Meta não aceitar o modelo de botão, vai com resposta rápida (o botão aparece embaixo do texto)
+async function enviarComBotao(para: Record<string, string>, texto: string, titulo: string, payload: string, token: string) {
+  try {
+    await graph("me/messages", token, { recipient: para, message: { attachment: { type: "template", payload: { template_type: "button", text: texto.slice(0, 640), buttons: [{ type: "postback", title: titulo.slice(0, 20), payload }] } } } });
+  } catch (_) {
+    await graph("me/messages", token, { recipient: para, message: { text: texto.slice(0, 1000), quick_replies: [{ content_type: "text", title: titulo.slice(0, 20), payload }] } });
+  }
+}
+// A pessoa tocou no botão: agora o Instagram entrega o nome e se ela segue a conta
+async function tratarToque(ev: any, token: string) {
+  const payload = String(ev?.postback?.payload || ev?.message?.quick_reply?.payload || "");
+  const m = payload.match(/^auto:(\d+)$/), quem = String(ev?.sender?.id || "");
+  if (!m || !quem || ev?.message?.is_echo) return;
+  const { data: env } = await db.from("automacao_envios").select("*").eq("id", Number(m[1])).single();
+  if (!env || env.status === "enviado") return;
+  const { data: a } = await db.from("automacoes").select("*").eq("id", env.automacao_id).single();
+  if (!a) return;
+  let perfil: any = {};
+  try { perfil = await graph(`${quem}?fields=name,username,is_user_follow_business`, token); } catch (e) { perfil = { erro: (e as Error).message }; }
+  const nome = String(perfil.name || "").trim().split(/\s+/)[0] || "";
+  try {
+    if (a.exige_seguir && perfil.is_user_follow_business !== true) {
+      await enviarComBotao({ id: quem }, preencher(a.texto_seguir || SEGUIR_PADRAO, nome, env.usuario || ""), "Já sigo!", payload, token);
+      await db.from("automacao_envios").update({ nome: nome || null, erro: perfil.erro ? `não deu pra conferir: ${perfil.erro}` : "esperando seguir" }).eq("id", env.id);
+      return;
+    }
+    await graph("me/messages", token, { recipient: { id: quem }, message: { text: preencher(a.mensagem, nome, env.usuario || "").slice(0, 1000) } });
+    await db.from("automacao_envios").update({ status: "enviado", nome: nome || null, erro: null }).eq("id", env.id);
+  } catch (e) {
+    await db.from("automacao_envios").update({ status: "erro", erro: String((e as Error).message).slice(0, 300) }).eq("id", env.id);
+  }
+}
+
 async function tratarComentario(v: any, dono: string, token: string) {
   const comentario = String(v?.id || ""), texto = String(v?.text || ""), autor = v?.from || {};
   if (!comentario || !texto || String(autor.id || "") === dono) return; // o próprio Ryan comentando não conta
@@ -115,15 +152,18 @@ async function tratarComentario(v: any, dono: string, token: string) {
     automacao_id: a.id, comentario_id: comentario, usuario: autor.username || null, usuario_id: autor.id || null, midia_id: midia || null, texto: texto.slice(0, 500),
   }).select("id").single();
   if (error || !reg) return;
-  const nome = /\{nome\}/.test(`${a.mensagem}${a.respostas || ""}`) ? await primeiroNome(String(autor.id || ""), token) : "";
+  const comBotao = !!(a.com_botao || a.exige_seguir);
+  const nome = !comBotao && /\{nome\}/.test(`${a.mensagem}${a.respostas || ""}`) ? await primeiroNome(String(autor.id || ""), token) : "";
   const mensagem = preencher(a.mensagem, nome, autor.username || "");
   try {
-    await graph("me/messages", token, { recipient: { comment_id: comentario }, message: { text: mensagem.slice(0, 1000) } });
+    // Com botão: primeiro um direct curto; o link só vai quando a pessoa tocar (e aí o Instagram libera o nome)
+    if (comBotao) await enviarComBotao({ comment_id: comentario }, preencher(a.texto_botao || BOTAO_PADRAO, "", ""), "Quero o link", `auto:${reg.id}`, token);
+    else await graph("me/messages", token, { recipient: { comment_id: comentario }, message: { text: mensagem.slice(0, 1000) } });
     let erroPublico = "";
     const publica = sortear(a.respostas);
     if (publica) { try { await graph(`${comentario}/replies`, token, { message: preencher(publica, nome, autor.username || "") }); } catch (e) { erroPublico = `direct ok, resposta no comentário falhou: ${(e as Error).message}`; } }
-    const avisos = [erroPublico, motivoSemNome && /\{nome\}/.test(a.mensagem) ? `sem nome: ${motivoSemNome}` : ""].filter(Boolean).join(" · ");
-    await db.from("automacao_envios").update({ status: "enviado", erro: avisos || null }).eq("id", reg.id);
+    const avisos = [erroPublico, !comBotao && motivoSemNome && /\{nome\}/.test(a.mensagem) ? `sem nome: ${motivoSemNome}` : ""].filter(Boolean).join(" · ");
+    await db.from("automacao_envios").update({ status: comBotao ? "aguardando" : "enviado", erro: avisos || null }).eq("id", reg.id);
   } catch (e) {
     await db.from("automacao_envios").update({ status: "erro", erro: String((e as Error).message).slice(0, 300) }).eq("id", reg.id);
   }
@@ -152,6 +192,7 @@ Deno.serve(async (req) => {
       for (const mudanca of entrada.changes || []) {
         if (mudanca.field === "comments") await tratarComentario(mudanca.value, String(entrada.id || ""), cfg.ig_token).catch(() => {});
       }
+      for (const ev of entrada.messaging || []) await tratarToque(ev, cfg.ig_token).catch(() => {});
     }
     return new Response("ok", { status: 200 });
   }
@@ -172,7 +213,7 @@ Deno.serve(async (req) => {
 
   if (corpo.acao === "assinar") {
     try {
-      const r = await graph("me/subscribed_apps?subscribed_fields=comments", cfg.ig_token, {});
+      const r = await graph("me/subscribed_apps?subscribed_fields=comments,messages,messaging_postbacks", cfg.ig_token, {});
       return resposta({ ok: !!r.success });
     } catch (e) { return resposta({ erro: (e as Error).message }, 400); }
   }
@@ -195,7 +236,10 @@ Deno.serve(async (req) => {
   let verificar = cfg.ig_verify_token;
   if (!verificar) { verificar = crypto.randomUUID().replace(/-/g, ""); await guardar("ig_verify_token", verificar); }
   let assinado: boolean | null = null, erroAssinatura = "";
-  try { const r = await graph("me/subscribed_apps", cfg.ig_token); assinado = (r.data || []).some((x: any) => (x.subscribed_fields || []).includes("comments")); }
-  catch (e) { erroAssinatura = (e as Error).message; }
-  return resposta({ endereco: ENDERECO, verificar, temSegredo: !!cfg.ig_app_secret, assinado, erroAssinatura, ultimoAviso: cfg.ig_ultimo_aviso || null });
+  let mensagens = false;
+  try {
+    const r = await graph("me/subscribed_apps", cfg.ig_token), campos = (r.data || []).flatMap((x: any) => x.subscribed_fields || []);
+    assinado = campos.includes("comments"); mensagens = campos.includes("messages") && campos.includes("messaging_postbacks");
+  } catch (e) { erroAssinatura = (e as Error).message; }
+  return resposta({ endereco: ENDERECO, verificar, temSegredo: !!cfg.ig_app_secret, assinado, mensagens, erroAssinatura, ultimoAviso: cfg.ig_ultimo_aviso || null });
 });
