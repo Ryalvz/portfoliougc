@@ -122,7 +122,7 @@ function desenharAutomacoes(el) {
 }
 
 function editarAutomacao(a) {
-  const atual = a || { nome: "", palavras: "", mensagem: "Oi{usuario}! Aqui está o que você pediu: (link)\n\nQualquer dúvida, me chama aqui.", respostas: "Te mandei no direct! 📩\nAcabei de te mandar no direct 💌\nOlha o direct! ✨", midia_id: null };
+  const atual = a || { nome: "", palavras: "", mensagem: "Oi {nome}! Aqui está o que você pediu: (link)\n\nQualquer dúvida, me chama aqui.", respostas: "Te mandei no direct! 📩\nAcabei de te mandar no direct 💌\nOlha o direct! ✨", midia_id: null };
   let midia = { id: atual.midia_id, legenda: atual.midia_legenda, capa: atual.midia_capa };
   const d = abrirJanelaSimples(a ? "Editar automação" : "Nova automação", `
     <label class="au-rot">Nome (só pra você)<input class="campo" id="af-nome" value="${esc(atual.nome)}" placeholder="Ex.: Modelo de roteiro"></label>
@@ -131,7 +131,7 @@ function editarAutomacao(a) {
       <div class="au-post" id="af-post"></div>
       <button class="btn pequeno" type="button" id="af-escolher">Escolher post</button>
       <div class="au-posts" id="af-posts" hidden></div></div>
-    <label class="au-rot">Mensagem do direct<textarea class="campo" id="af-mensagem" rows="5">${esc(atual.mensagem)}</textarea><small class="sub">Até 1000 letras. {usuario} vira o @ da pessoa. Ponha o link do que você prometeu.</small></label>
+    <label class="au-rot">Mensagem do direct<textarea class="campo" id="af-mensagem" rows="5">${esc(atual.mensagem)}</textarea><small class="sub">Até 1000 letras. {nome} vira o primeiro nome da pessoa (quando o Instagram não informa o nome, ele some e fica só "Oi!"). Ponha o link do que você prometeu.</small></label>
     <label class="au-rot">Resposta no comentário (uma por linha, o painel sorteia)<textarea class="campo" id="af-respostas" rows="3">${esc(atual.respostas || "")}</textarea><small class="sub">Variar a resposta deixa mais natural. Deixe vazio pra não responder em público.</small></label>`,
     `<button class="btn" type="button" data-fechar>Cancelar</button><button class="btn primario" type="button" id="af-salvar">Salvar</button>`);
   const mostrarPost = () => {
