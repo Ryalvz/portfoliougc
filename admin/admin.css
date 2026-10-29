@@ -1473,6 +1473,7 @@ dialog.pf-janela-rapida { width: min(460px, calc(100vw - 20px)); }
 .rg-janela::backdrop { background: rgba(43, 36, 28, .5); }
 .rg-barra { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 10px 16px; background: var(--rg-creme); border-bottom: 1px solid var(--rg-areia); }
 .rg-barra-titulo { font-size: 15px; }
+.rg-barra .espaco { flex: 1; }
 .rg-barra [aria-pressed="true"] { background: var(--rg-cafe); color: var(--rg-creme); border-color: var(--rg-cafe); }
 .rg-folha { max-width: 1080px; margin: 0 auto; padding: 24px 16px 60px; }
 .rg-cabeca { background: var(--rg-papel); border: 1px solid var(--rg-areia); border-radius: 18px; padding: 20px 22px; }
