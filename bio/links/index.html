@@ -51,12 +51,26 @@
   .curso b { font-size: 15.5px; font-weight: 700; }
   .curso small { color: var(--suave); font-size: 13px; line-height: 1.35; }
   .curso .seta { margin-left: auto; flex: none; width: 18px; height: 18px; opacity: .55; }
+  /* Curso em destaque: cartão escuro com a promessa do curso */
+  .curso.destaque { background: var(--cafe); border-color: var(--cafe); color: var(--creme); padding: 22px 20px 20px; }
+  .curso.destaque:hover { border-color: var(--dourado); }
+  .destaque .selo { display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: 1.4px; text-transform: uppercase; color: var(--cafe); background: #D9C48A; border-radius: 999px; padding: 4px 10px; }
+  .destaque .cab { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
+  .destaque .logo { border-color: transparent; }
+  .destaque .cab b { font-size: 17px; }
+  .destaque .cab small { color: rgba(246, 242, 235, .7); }
+  .destaque .promessa { font-family: "Playfair Display", Georgia, serif; font-weight: 500; font-size: 21px; line-height: 1.3; margin: 16px 0 0; }
+  .destaque .promessa em { font-style: italic; color: #D9C48A; }
+  .destaque .detalhe { margin: 10px 0 0; font-size: 13.5px; color: rgba(246, 242, 235, .78); }
+  .destaque .botao { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 18px; min-height: 50px; border-radius: 14px; background: var(--creme); color: var(--cafe); text-decoration: none; font-weight: 700; }
+  .destaque .botao svg { width: 18px; height: 18px; }
+  .destaque .cupom { margin: 14px 0 0; border-color: #D9C48A; }
+  .destaque .cupom button { background: transparent; color: var(--creme); border-color: rgba(246, 242, 235, .3); }
   .cupom { display: flex; align-items: center; gap: 10px; margin: 0 16px 14px; padding: 8px 12px; border: 1px dashed var(--dourado); border-radius: 12px; font-size: 13px; }
   .cupom b { font-size: 14px; letter-spacing: 1px; }
   .cupom button { margin-left: auto; border: 1px solid var(--areia); background: var(--creme); color: var(--cafe); border-radius: 999px; padding: 6px 12px; min-height: 32px; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
 
   .vazio { text-align: center; color: var(--suave); margin: 32px 0; }
-  .aviso { margin: 30px 0 0; padding: 14px 16px; border-radius: 14px; background: var(--areia); color: var(--suave); font-size: 12.5px; text-align: center; }
   footer { margin-top: 30px; text-align: center; font-size: 12px; color: var(--suave); }
   footer em { font-family: "Playfair Display", Georgia, serif; font-style: italic; color: var(--dourado); font-size: 14px; }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
@@ -73,7 +87,6 @@
 
   <div id="lista"><p class="vazio">Carregando...</p></div>
 
-  <p class="aviso">Alguns destes links são de afiliado: se você comprar por eles, eu ganho uma comissão, sem nenhum custo a mais pra você.</p>
   <footer><em>Ryan Alves</em><br>@ryalvz</footer>
 </main>
 <script src="../../js/banco.js?v=2"></script>
@@ -90,7 +103,20 @@
     } catch (_) {}
   };
 
-  const cartao = (x) => `<article class="curso">
+  const SETA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg>';
+  const logo = (x) => `<span class="logo">${x.imagem ? `<img src="${esc(x.imagem)}" alt="" loading="lazy">` : "🎓"}</span>`;
+  const cupom = (x) => (x.cupom ? `<div class="cupom">Cupom <b>${esc(x.cupom)}</b><button type="button" data-cupom="${esc(x.cupom)}">Copiar</button></div>` : "");
+  // *palavra* na promessa vira destaque dourado
+  const realce = (t) => esc(t).replace(/\*([^*]+)\*/g, "<em>$1</em>");
+  const cartaoDestaque = (x) => `<article class="curso destaque">
+    <span class="selo">${esc(x.selo || "O que eu mais indico")}</span>
+    <div class="cab">${logo(x)}<span class="txt"><b>${esc(x.titulo)}</b>${x.texto ? `<small>${esc(x.texto)}</small>` : ""}</span></div>
+    ${x.promessa ? `<p class="promessa">${realce(x.promessa)}</p>` : ""}
+    ${x.detalhe ? `<p class="detalhe">${esc(x.detalhe)}</p>` : ""}
+    ${cupom(x)}
+    <a class="botao" href="${esc(seguro(x.url))}" target="_blank" rel="noopener sponsored" data-clique="${esc(x.titulo)}">${esc(x.botao || "Quero conhecer")}${SETA}</a>
+  </article>`;
+  const cartao = (x) => x.destaque ? cartaoDestaque(x) : `<article class="curso">
     <a class="ir" href="${esc(seguro(x.url))}" target="_blank" rel="noopener sponsored" data-clique="${esc(x.titulo)}">
       <span class="logo">${x.imagem ? `<img src="${esc(x.imagem)}" alt="" loading="lazy">` : "🎓"}</span>
       <span class="txt"><b>${esc(x.titulo)}</b>${x.texto ? `<small>${esc(x.texto)}</small>` : ""}</span>
@@ -105,6 +131,7 @@
     if (!itens.length) { el.innerHTML = `<p class="vazio">Em breve, novidades por aqui.</p>`; return; }
     el.innerHTML = GRUPOS.map(([k, nome]) => {
       const g = itens.filter((x) => (GRUPOS.some(([c]) => c === x.categoria) ? x.categoria : "outro") === k);
+      g.sort((a, b) => (b.destaque === true) - (a.destaque === true));
       return g.length ? `<p class="titulo">${esc(nome)}</p><div class="cursos">${g.map(cartao).join("")}</div>` : "";
     }).join("");
   }).catch(() => { document.getElementById("lista").innerHTML = `<p class="vazio">Não deu pra carregar agora. Tenta de novo em instantes.</p>`; });
