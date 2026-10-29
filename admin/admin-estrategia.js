@@ -1709,7 +1709,7 @@ function abrirPostDoPlano(plano, it, evento) {
     const tags = hashtagsDe(p.legenda);
     return `<div class="pp-ideia">
       <div class="pp-ideia-topo"><b>#${t.id} ${esc(t.titulo || "")}</b><span class="espaco"></span>
-        ${pronto && lerRoteiroGravacao(t.minha_versao).blocos.length ? `<button type="button" class="btn pequeno primario" data-gravacao="${t.id}">🎬 Roteiro de gravação</button>` : ""}
+        ${pronto && lerRoteiroGravacao(t.minha_versao).blocos.length ? `<button type="button" class="btn pequeno primario" data-gravacao="${t.id}">Roteiro de gravação</button>` : ""}
         <button type="button" class="btn pequeno" data-ir-ideia="${t.id}">Abrir nos Roteiros</button></div>
       ${bloco("🔎 O que já deu resultado", p.pesquisa)}
       ${bloco("🕳️ O gap (onde você entra)", p.gap)}

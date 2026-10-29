@@ -1,5 +1,5 @@
 /* =============================================================
-   🎬 ROTEIRO DE GRAVAÇÃO
+   ROTEIRO DE GRAVAÇÃO
    Mostra o roteiro de "Minha versão" no formato do modelo do Ryan:
    cabeçalho (marca, título, objetivo, formato) e uma tabela com a
    FALA de um lado e a CENA do outro, em 3 etapas (gancho,
@@ -121,20 +121,20 @@ function abrirRoteiroGravacao(t, texto) {
   let n = 0;
   const campo = (k, rot) => `<div class="rg-meta-item"><span>${rot}</span><b contenteditable="true" spellcheck="false" data-meta="${k}">${esc(meta[k])}</b></div>`;
   const linha = (l, bloco, mostrarBloco) => { n++; return `<div class="rg-linha">
-      <div class="rg-fala"><span class="rg-rot">🗣️ Fala ${n}${mostrarBloco ? ` <i>${esc(bloco)}</i>` : ""}</span>
+      <div class="rg-fala"><span class="rg-rot">Fala ${n}${mostrarBloco ? ` <i>${esc(bloco)}</i>` : ""}</span>
         <p>${l.fala ? esc(l.fala) : '<span class="rg-vazio">sem fala, só imagem</span>'}</p>
-        ${l.tela.length ? `<div class="rg-tela">💬 Texto na tela: ${l.tela.map((x) => `<b>${esc(x)}</b>`).join(" · ")}</div>` : ""}</div>
-      <div class="rg-cena"><span class="rg-rot">🎥 Cena ${n}</span><p>${l.cena ? esc(l.cena) : '<span class="rg-vazio">sem cena descrita</span>'}</p></div>
+        ${l.tela.length ? `<div class="rg-tela">Texto na tela: ${l.tela.map((x) => `<b>${esc(x)}</b>`).join(" · ")}</div>` : ""}</div>
+      <div class="rg-cena"><span class="rg-rot">Cena ${n}</span><p>${l.cena ? esc(l.cena) : '<span class="rg-vazio">sem cena descrita</span>'}</p></div>
     </div>`; };
 
   const d = document.createElement("dialog");
   d.className = "rg-janela";
   d.innerHTML = `
     <div class="rg-barra">
-      <b class="rg-barra-titulo">🎬 Roteiro de gravação</b><span class="espaco"></span>
-      <button type="button" class="btn" data-rg="grande" aria-pressed="false">🔠 Letra grande</button>
-      <button type="button" class="btn" data-rg="pdf">📄 PDF</button>
-      <button type="button" class="btn" data-rg="word">⬇️ Word</button>
+      <b class="rg-barra-titulo">Roteiro de gravação</b><span class="espaco"></span>
+      <button type="button" class="btn" data-rg="grande" aria-pressed="false">Letra grande</button>
+      <button type="button" class="btn" data-rg="pdf">PDF</button>
+      <button type="button" class="btn" data-rg="word">Word</button>
       <button type="button" class="btn primario" data-rg="fechar">Fechar</button>
     </div>
     <div class="rg-folha">
@@ -144,14 +144,14 @@ function abrirRoteiroGravacao(t, texto) {
         <div class="rg-meta">${campo("marca", "Marca / cliente")}${campo("data", "Data")}${campo("objetivo", "Objetivo do vídeo")}${campo("formato", "Formato / plataforma")}
           <div class="rg-meta-item"><span>Duração</span><b>~${r.segundos}s de fala (${r.palavras} palavras)</b></div></div>
       </header>
-      <div class="rg-colunas" aria-hidden="true"><span>🗣️ Áudio / fala</span><span>🎥 Imagem / cena</span></div>
+      <div class="rg-colunas" aria-hidden="true"><span>Áudio / fala</span><span>Imagem / cena</span></div>
       ${etapas.map((e) => `<section class="rg-etapa">
-        <h2><span>📍 Etapa ${e.n}</span>${esc(e.nome)}${e.tempo ? ` <small>${esc(e.tempo)}</small>` : ""}${e.desc ? ` <small>${esc(e.desc)}</small>` : ""}</h2>
+        <h2><span>Etapa ${e.n}</span>${esc(e.nome)}${e.tempo ? ` <small>${esc(e.tempo)}</small>` : ""}${e.desc ? ` <small>${esc(e.desc)}</small>` : ""}</h2>
         ${e.blocos.map((b) => b.linhas.map((l) => linha(l, b.nome, e.blocos.length > 1)).join("")).join("")}
         ${e.n === 1 && r.ganchos.length > 1 ? `<div class="rg-extra"><b>Outras opções de gancho</b><ol>${r.ganchos.map((g) => `<li>“${esc(g)}”</li>`).join("")}</ol></div>` : ""}
       </section>`).join("")}
-      ${r.chamada ? `<div class="rg-extra rg-chamada"><b>📣 Chamada final</b><p>${esc(r.chamada).replace(/\n/g, "<br>")}</p></div>` : ""}
-      ${r.dicas ? `<details class="rg-extra rg-dicas"><summary><b>🎥 Dicas de gravação</b></summary><p>${esc(r.dicas).replace(/\n/g, "<br>")}</p></details>` : ""}
+      ${r.chamada ? `<div class="rg-extra rg-chamada"><b>Chamada final</b><p>${esc(r.chamada).replace(/\n/g, "<br>")}</p></div>` : ""}
+      ${r.dicas ? `<details class="rg-extra rg-dicas"><summary><b>Dicas de gravação</b></summary><p>${esc(r.dicas).replace(/\n/g, "<br>")}</p></details>` : ""}
       <p class="rg-nota">Dá pra tocar no título e no cabeçalho pra mudar antes de baixar. O roteiro em si você muda em Minha versão.</p>
     </div>`;
   document.body.appendChild(d);
@@ -192,9 +192,9 @@ function baixarRoteiroWord(meta, etapas, r) {
 <tr><td style="${cab}">Formato / Plataforma:</td><td style="${cel}" colspan="3">${e(meta.formato)} · ~${r.segundos}s de fala</td></tr>
 </table><br>
 <table style="border-collapse:collapse;width:100%">
-<tr><td style="${cab}width:50%">🗣️ ÁUDIO / FALA (Speech &amp; Voice Over)</td><td style="${cab}width:50%">🎥 IMAGEM / CENA (Captação &amp; Edição)</td></tr>
-${etapas.map((et) => `<tr><td colspan="2" style="${cel}background:#2B241C;color:#F6F2EB;font-weight:bold">📍 ETAPA ${et.n}: ${e(et.nome.toUpperCase())}${et.tempo ? ` (${e(et.tempo)})` : ""}${et.desc ? `: ${e(et.desc.toUpperCase())}` : ""}</td></tr>
-${et.blocos.map((b) => b.linhas.map((l) => { n++; return `<tr><td style="${cel}"><b>Fala ${n} (Cena ${n}):</b><br>${e(l.fala || "(sem fala)")}${l.tela.length ? `<br><br>💬 <b>Texto na tela:</b> ${e(l.tela.join(" · "))}` : ""}</td><td style="${cel}"><b>Cena ${n}:</b><br>${e(l.cena || "")}</td></tr>`; }).join("")).join("")}`).join("")}
+<tr><td style="${cab}width:50%">ÁUDIO / FALA (Speech &amp; Voice Over)</td><td style="${cab}width:50%">IMAGEM / CENA (Captação &amp; Edição)</td></tr>
+${etapas.map((et) => `<tr><td colspan="2" style="${cel}background:#2B241C;color:#F6F2EB;font-weight:bold">ETAPA ${et.n}: ${e(et.nome.toUpperCase())}${et.tempo ? ` (${e(et.tempo)})` : ""}${et.desc ? `: ${e(et.desc.toUpperCase())}` : ""}</td></tr>
+${et.blocos.map((b) => b.linhas.map((l) => { n++; return `<tr><td style="${cel}"><b>Fala ${n} (Cena ${n}):</b><br>${e(l.fala || "(sem fala)")}${l.tela.length ? `<br><br><b>Texto na tela:</b> ${e(l.tela.join(" · "))}` : ""}</td><td style="${cel}"><b>Cena ${n}:</b><br>${e(l.cena || "")}</td></tr>`; }).join("")).join("")}`).join("")}
 </table>
 ${r.chamada ? `<p style="font-size:10.5pt"><b>Chamada final:</b> ${e(r.chamada)}</p>` : ""}
 </body></html>`;
