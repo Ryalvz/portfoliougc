@@ -44,7 +44,7 @@ async function desenharLinkBio(el) {
         <p class="sub" style="margin:0 0 8px">Seus links de afiliado. Com pelo menos um ligado, aparece o botão <b>Meus links</b> na bio.</p>
         <ul class="sc-lista">${ind.map((x, i) => `<li class="${x.ativo === false ? "bio-desligado" : ""}">
           <span class="sc-logo">${x.imagem ? `<img src="${esc(urlSite(x.imagem))}" alt="">` : "🎓"}</span>
-          <span class="sc-txt"><b>${esc(x.titulo)}</b><small>${esc(nomeCat(x.categoria))}${x.texto ? " · " + esc(x.texto) : ""}${x.ativo === false ? " · desligado" : ""}${cliques("links", x.titulo)}</small></span>
+          <span class="sc-txt"><b>${esc(x.titulo)}</b><small>${esc(nomeCat(x.categoria))}${x.destaque ? " · ⭐ destaque" : ""}${x.texto ? " · " + esc(x.texto) : ""}${x.ativo === false ? " · desligado" : ""}${cliques("links", x.titulo)}</small></span>
           <span class="sc-acoes">${setas("indicacoes", i, ind.length)}<button class="icone-btn" type="button" data-bio-editar="indicacoes:${i}" aria-label="Editar">${ic("editar")}</button></span></li>`).join("") || `<li class="sub">Nenhum curso ainda. Toque em Adicionar e cole o seu link de afiliado.</li>`}</ul>
       </div>
       <div class="cartao">
@@ -82,6 +82,10 @@ function formIndicacao(el, i) {
       { n: "url", r: "Seu link de afiliado", req: true, t: "url", inteiro: true, ph: "https://..." },
       { n: "texto", r: "Frase curta embaixo do nome", inteiro: true, ph: "Ex: Comece a vender agora no TikTok Shop" },
       { n: "cupom", r: "Cupom (opcional)", ph: "Ex: RYAN10" },
+      { n: "destaque", r: "Cartão de destaque (grande, escuro, no topo do grupo)", t: "check" },
+      { n: "promessa", r: "Destaque: a promessa grande", t: "textarea", ph: "Ex: O método que me fez sair da CLT e chegar aos *R$ 50 mil por mês*", ajuda: "Coloque *entre asteriscos* o pedaço que fica dourado." },
+      { n: "detalhe", r: "Destaque: frase de apoio", t: "textarea" },
+      { n: "botao", r: "Destaque: texto do botão", ph: "Quero conhecer" },
       { n: "imagem_arq", r: "Logo do curso (opcional)", t: "file", accept: "image/png,image/jpeg,image/webp", ajuda: x.imagem ? "Já tem capa. Escolha outra só se quiser trocar." : "PNG ou JPG, de preferência quadrada." },
       { n: "ativo", r: "Mostrar na página", t: "check" }
     ],
@@ -89,7 +93,7 @@ function formIndicacao(el, i) {
       if (!linkValido(d.url)) { avisar("O link precisa começar com https://", true); return false; }
       let imagem = x.imagem || "";
       if (d.imagem_arq) { status("Enviando a capa..."); imagem = await enviarArquivo(d.imagem_arq, "indicacoes", d.titulo); if (!imagem) return false; }
-      const novo = { ...x, titulo: d.titulo, categoria: d.categoria || "outro", url: d.url, texto: d.texto || "", cupom: (d.cupom || "").toUpperCase(), imagem, ativo: d.ativo };
+      const novo = { ...x, titulo: d.titulo, categoria: d.categoria || "outro", url: d.url, texto: d.texto || "", cupom: (d.cupom || "").toUpperCase(), destaque: d.destaque, promessa: d.promessa || "", detalhe: d.detalhe || "", botao: d.botao || "", imagem, ativo: d.ativo };
       if (i == null) lista.push(novo); else lista[i] = novo;
       const ok = await salvarSiteConteudo("indicacoes", lista);
       if (ok) desenharLinkBio(el);
