@@ -2418,7 +2418,7 @@ function pintarDetalheTrans() {
           </div>
         </div>` : ""}
         <div class="cartao destaque-versao">
-          <div class="barra" style="margin-bottom:6px"><h2 style="margin:0">Minha versão (meu roteiro)</h2><span class="espaco"></span><button class="btn pequeno primario" type="button" id="t-roteiro-voz">✍️ Roteiro na minha voz</button></div>
+          <div class="barra" style="margin-bottom:6px"><h2 style="margin:0">Minha versão (meu roteiro)</h2><span class="espaco"></span><button class="btn pequeno" type="button" id="t-gravacao">🎬 Ver roteiro de gravação</button><button class="btn pequeno primario" type="button" id="t-roteiro-voz">✍️ Roteiro na minha voz</button></div>
           <textarea class="campo" id="t-versao" rows="9" placeholder="${t.link ? "Escreva aqui a sua versão: o seu gancho, a sua fala, como você vai adaptar essa referência." : "Escreva aqui a sua ideia e o roteiro: gancho, desenvolvimento e chamada final."}">${esc(t.minha_versao || "")}</textarea>
           <div id="t-revisor" hidden></div>
         </div>
@@ -2439,6 +2439,7 @@ function pintarDetalheTrans() {
     </div>`;
 
   ligarRevisor($("#t-versao"), $("#t-revisor"), "roteiro");
+  $("#t-gravacao").onclick = () => abrirRoteiroGravacao({ ...t, titulo: $("#t-titulo").value.trim(), categoria: $("#t-cat").value }, $("#t-versao").value);
   $("#t-roteiro-voz").onclick = () => roteiroNaMinhaVoz({ ...t, titulo: $("#t-titulo").value.trim(), categoria: $("#t-cat").value, minha_versao: $("#t-versao").value.trim(), observacoes: $("#t-obs").value.trim(), transcricao: $("#t-transcricao") ? $("#t-transcricao").value.trim() : t.transcricao });
   const ta = $("#t-transcricao");
   const status = (txt) => { const s = $("#t-status"); if (s) s.textContent = txt; };

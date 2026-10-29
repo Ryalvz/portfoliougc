@@ -1709,6 +1709,7 @@ function abrirPostDoPlano(plano, it, evento) {
     const tags = hashtagsDe(p.legenda);
     return `<div class="pp-ideia">
       <div class="pp-ideia-topo"><b>#${t.id} ${esc(t.titulo || "")}</b><span class="espaco"></span>
+        ${pronto && lerRoteiroGravacao(t.minha_versao).blocos.length ? `<button type="button" class="btn pequeno primario" data-gravacao="${t.id}">🎬 Roteiro de gravação</button>` : ""}
         <button type="button" class="btn pequeno" data-ir-ideia="${t.id}">Abrir nos Roteiros</button></div>
       ${bloco("🔎 O que já deu resultado", p.pesquisa)}
       ${bloco("🕳️ O gap (onde você entra)", p.gap)}
@@ -1745,6 +1746,8 @@ function abrirPostDoPlano(plano, it, evento) {
   d.onclick = async (e) => {
     const c = e.target.closest("[data-copiar]");
     if (c) { try { await navigator.clipboard.writeText(copiaveis[Number(c.dataset.copiar)]); const antes = c.textContent; c.textContent = "copiado ✓"; setTimeout(() => { c.textContent = antes; }, 1500); } catch (_) { avisar("Não deu para copiar.", true); } return; }
+    const grav = e.target.closest("[data-gravacao]");
+    if (grav) { const t = S.transcricoes.find((x) => String(x.id) === grav.dataset.gravacao); if (t) abrirRoteiroGravacao(t); return; }
     const ir = e.target.closest("[data-ir-ideia]");
     if (ir) { d.close(); trans.sel = ir.dataset.irIdeia; irPara("transcricoes"); return; }
     const voz = e.target.closest("[data-voz]");

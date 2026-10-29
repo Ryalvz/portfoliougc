@@ -1466,3 +1466,61 @@ dialog.pf-janela-rapida { width: min(460px, calc(100vw - 20px)); }
 .au-posts img { width: 100%; aspect-ratio: 4 / 5; object-fit: cover; display: block; border-radius: 4px; }
 @media (max-width: 700px) { .au-item { grid-template-columns: 56px minmax(0, 1fr); } .au-acoes { grid-column: 1 / -1; justify-content: flex-start; } }
 .au-rot[hidden] { display: none; }
+
+/* ---------- 🎬 Roteiro de gravação (tela cheia, no modelo do Ryan) ---------- */
+.rg-janela { --rg-cafe: #2B241C; --rg-creme: #F6F2EB; --rg-papel: #FCFAF6; --rg-areia: #ECE5D9; --rg-dourado: #A8864A; --rg-suave: #7A6E60;
+  width: 100vw; height: 100dvh; max-width: none; max-height: none; margin: 0; padding: 0; border: 0; border-radius: 0; background: var(--rg-creme); color: var(--rg-cafe); overflow: auto; }
+.rg-janela::backdrop { background: rgba(43, 36, 28, .5); }
+.rg-barra { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 10px 16px; background: var(--rg-creme); border-bottom: 1px solid var(--rg-areia); }
+.rg-barra-titulo { font-size: 15px; }
+.rg-barra [aria-pressed="true"] { background: var(--rg-cafe); color: var(--rg-creme); border-color: var(--rg-cafe); }
+.rg-folha { max-width: 1080px; margin: 0 auto; padding: 24px 16px 60px; }
+.rg-cabeca { background: var(--rg-papel); border: 1px solid var(--rg-areia); border-radius: 18px; padding: 20px 22px; }
+.rg-assina { margin: 0; font-size: 12px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--rg-dourado); font-weight: 700; }
+.rg-assina em { font-family: Allura, "Playfair Display", serif; font-size: 22px; letter-spacing: 0; text-transform: none; font-style: normal; font-weight: 400; }
+.rg-cabeca h1 { font-family: "Playfair Display", Georgia, serif; font-weight: 600; font-size: 28px; line-height: 1.2; margin: 6px 0 14px; outline: none; }
+.rg-meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+.rg-meta-item { background: var(--rg-creme); border-radius: 12px; padding: 8px 12px; }
+.rg-meta-item span { display: block; font-size: 10.5px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--rg-suave); }
+.rg-meta-item b { display: block; font-size: 14px; outline: none; }
+[contenteditable]:focus { box-shadow: 0 0 0 2px var(--rg-dourado); border-radius: 4px; }
+.rg-colunas { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 22px 0 8px; padding: 0 4px; font-size: 11px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--rg-suave); }
+.rg-etapa { margin-top: 14px; }
+.rg-etapa h2 { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; margin: 0 0 8px; padding: 10px 14px; border-radius: 12px; background: var(--rg-cafe); color: var(--rg-creme); font-size: 16px; }
+.rg-etapa h2 span { color: #D9C48A; font-size: 12px; letter-spacing: 1.2px; text-transform: uppercase; }
+.rg-etapa h2 small { font-size: 12px; font-weight: 500; opacity: .75; }
+.rg-linha { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 10px; }
+.rg-fala, .rg-cena { border-radius: 14px; padding: 12px 16px; border: 1px solid var(--rg-areia); }
+.rg-fala { background: var(--rg-papel); }
+.rg-cena { background: #EFE8DC; }
+.rg-rot { display: block; font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--rg-dourado); }
+.rg-rot i { font-style: normal; color: var(--rg-suave); margin-left: 6px; padding: 1px 8px; border-radius: 999px; background: var(--rg-areia); letter-spacing: .5px; }
+.rg-fala p { margin: 6px 0 0; font-size: 17px; line-height: 1.5; font-weight: 500; }
+.rg-cena p { margin: 6px 0 0; font-size: 14px; line-height: 1.5; color: #4A3F33; }
+.rg-tela { margin-top: 10px; padding: 6px 10px; border-radius: 10px; background: #F3EAD7; font-size: 13px; }
+.rg-vazio { color: var(--rg-suave); font-style: italic; font-weight: 400; }
+.rg-extra { margin-top: 12px; padding: 12px 16px; border-radius: 14px; background: var(--rg-papel); border: 1px dashed var(--rg-dourado); font-size: 14px; }
+.rg-extra ol { margin: 6px 0 0; padding-left: 20px; }
+.rg-extra p { margin: 6px 0 0; }
+.rg-chamada { border-style: solid; }
+.rg-nota { margin: 20px 0 0; text-align: center; font-size: 12px; color: var(--rg-suave); }
+/* Letra grande: pra ler de longe enquanto grava */
+.rg-grande .rg-fala p { font-size: 26px; line-height: 1.4; }
+.rg-grande .rg-cena p { font-size: 18px; }
+@media (max-width: 720px) {
+  .rg-colunas { display: none; }
+  .rg-linha { grid-template-columns: 1fr; gap: 0; }
+  .rg-fala { border-radius: 14px 14px 0 0; }
+  .rg-cena { border-radius: 0 0 14px 14px; border-top: 0; }
+  .rg-cabeca h1 { font-size: 23px; }
+}
+/* PDF: só a folha do roteiro, com as cores */
+@media print {
+  body.imprimindo-rg > *:not(.rg-janela) { display: none !important; }
+  body.imprimindo-rg .rg-janela { position: static; width: auto; height: auto; overflow: visible; background: #fff; }
+  body.imprimindo-rg .rg-barra, body.imprimindo-rg .rg-nota, body.imprimindo-rg .rg-dicas { display: none !important; }
+  body.imprimindo-rg .rg-folha { max-width: none; padding: 0; }
+  body.imprimindo-rg .rg-janela * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body.imprimindo-rg .rg-linha, body.imprimindo-rg .rg-etapa h2 { break-inside: avoid; }
+  body.imprimindo-rg .rg-grande .rg-fala p { font-size: 17px; }
+}
