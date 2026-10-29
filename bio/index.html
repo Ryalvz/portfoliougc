@@ -59,6 +59,9 @@
   .link.principal small { color: rgba(246, 242, 235, .7); }
   .link.principal .ic { background: rgba(246, 242, 235, .12); }
   .link.principal .seta { opacity: .8; }
+  .link.destaque { border-color: var(--dourado); box-shadow: 0 0 0 1px var(--dourado) inset; }
+  .link.destaque .ic { background: #F3EAD7; color: #7A6322; }
+  .link .emoji { font-size: 22px; line-height: 1; }
 
   .email-linha { display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 10px; font-size: 13px; color: var(--suave); }
   .copiar { border: 1px solid var(--areia); background: var(--papel); color: var(--cafe); border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; min-height: 32px; }
@@ -120,12 +123,31 @@
   </div>
   <div class="email-linha">heyryan.ugc@gmail.com <button class="copiar" type="button" id="copiar">Copiar</button></div>
 
+  <!-- Aparece quando tem curso ligado no painel (Link da bio) -->
+  <div id="bloco-meus-links" hidden>
+    <p class="titulo">Pra quem quer criar conteúdo</p>
+    <div class="links">
+      <a class="link destaque" href="links/" data-clique="meus-links">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 9.5 12 5l9 4.5-9 4.5z"/><path d="M7 11.5V16c0 1.2 2.2 2.5 5 2.5s5-1.3 5-2.5v-4.5"/><path d="M21 9.5V15"/></svg></span>
+        <span><b>Meus links</b><small>Cursos de UGC e TikTok Shop que eu indico</small></span>
+        <svg class="seta" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg>
+      </a>
+    </div>
+  </div>
+
+  <!-- Botões extras que você cria no painel (Link da bio) -->
+  <div id="bloco-extras" hidden>
+    <p class="titulo">Mais links</p>
+    <div class="links" id="extras"></div>
+  </div>
+
   <p class="titulo">Marcas que já atendi</p>
   <div class="brands"><div class="brands-track" id="brands-track"></div></div>
   <p class="mais">e mais de 40 marcas</p>
 
   <footer><em>Ryan Alves</em><br>@ryalvz</footer>
 </main>
+<script src="../js/banco.js?v=2"></script>
 <script>
   // Número do WhatsApp só com DDI e DDD, ex.: 5511999999999. Vazio = o botão não aparece.
   const WHATSAPP = "5511913012249";
@@ -192,6 +214,30 @@
     w.href = "https://wa.me/" + WHATSAPP + "?text=" + encodeURIComponent(MSG);
     w.hidden = false;
   }
+  // Conta o clique (o painel mostra em Link da bio). Não segura a pessoa: vai em segundo plano.
+  const contarClique = (link) => {
+    try {
+      fetch(`${BANCO.url}/rest/v1/bio_cliques`, { method: "POST", keepalive: true,
+        headers: { apikey: BANCO.chave, "Content-Type": "application/json", Prefer: "return=minimal" },
+        body: JSON.stringify({ pagina: "bio", link: String(link).slice(0, 200) }) }).catch(() => {});
+    } catch (_) {}
+  };
+  document.addEventListener("click", (e) => { const a = e.target.closest("[data-clique]"); if (a) contarClique(a.dataset.clique); });
+
+  // O que você muda no painel: botões extras e o "Meus links"
+  const SETA = '<svg class="seta" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg>';
+  const seguro = (u) => (/^https?:\/\//i.test(u || "") ? u : "");
+  bancoLer("site_conteudo", "select=chave,valor&chave=in.(bio_links,indicacoes)").then((linhas) => {
+    const d = Object.fromEntries(linhas.map((l) => [l.chave, l.valor]));
+    if ((d.indicacoes || []).some((x) => x.ativo !== false)) document.getElementById("bloco-meus-links").hidden = false;
+    const extras = (d.bio_links || []).filter((x) => x.ativo !== false && seguro(x.url));
+    if (!extras.length) return;
+    document.getElementById("extras").innerHTML = extras.map((x) => `<a class="link" href="${esc(seguro(x.url))}" target="_blank" rel="noopener" data-clique="${esc(x.titulo)}">
+      <span class="ic"><span class="emoji">${esc(x.emoji || "🔗")}</span></span>
+      <span><b>${esc(x.titulo)}</b>${x.sub ? `<small>${esc(x.sub)}</small>` : ""}</span>${SETA}</a>`).join("");
+    document.getElementById("bloco-extras").hidden = false;
+  }).catch(() => {});
+
   document.getElementById("copiar").onclick = async (e) => {
     try { await navigator.clipboard.writeText("heyryan.ugc@gmail.com"); e.target.textContent = "Copiado!"; }
     catch (_) { e.target.textContent = "heyryan.ugc@gmail.com"; }
