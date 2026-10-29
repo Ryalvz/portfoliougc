@@ -1135,6 +1135,7 @@ dialog { border-radius: 16px; }
 .sc-txt b { display: block; font-size: 13px; }
 .sc-txt small { display: block; color: var(--muted); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sc-acoes { display: flex; gap: 2px; flex: none; }
+.sc-lista li.bio-desligado { opacity: .55; }
 .sc-case { display: flex; gap: 12px; align-items: center; }
 .sc-case img { width: 56px; height: 84px; object-fit: cover; border-radius: 8px; }
 .sc-frases { margin: 8px 0 0; padding-left: 18px; font-size: 13px; color: var(--text); }

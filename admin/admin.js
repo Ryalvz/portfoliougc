@@ -358,9 +358,9 @@ function desenhar() {
 // "#campanha-12" abre o financeiro já com a campanha 12 aberta (é o que a notificação do celular manda)
 function irParaEndereco() {
   const alvo = (location.hash || "").slice(1) || "inicio";
-  const parte = alvo.match(/^instagram-(metricas|reels|plano|carrossel)$/);
+  const parte = alvo.match(/^instagram-(metricas|reels|plano|carrossel|automacoes)$/);
   if (parte) { igx.sub = parte[1]; irPara("instagram"); return; }
-  const pp = alvo.match(/^portfolio-(videos|leads|feedbacks|visitas)$/);
+  const pp = alvo.match(/^portfolio-(videos|leads|feedbacks|visitas|bio)$/);
   if (pp) { pf.sub = pp[1] === "visitas" ? "leads" : pp[1]; irPara("portfolio"); return; }
   const m = alvo.match(/^campanha-(\d+)$/);
   if (!m) { irPara(DESENHOS[alvo] ? alvo : "inicio"); return; }
@@ -418,7 +418,7 @@ const nomeNicho = (n) => (NICHOS.find((x) => x[0] === n) || [n, n || "Sem nicho"
 // Filtro da lista "Meus vídeos": "" mostra todos, ou só um nicho para ordenar dentro dele
 const pf = { nicho: "", sub: "videos" };
 try { pf.sub = localStorage.getItem("pf-aba") || "videos"; } catch (_) {}
-const SUBS_PORTFOLIO = [["videos", "Vídeos e curadoria"], ["leads", "Leads e visitas"], ["feedbacks", "Feedbacks e site"]];
+const SUBS_PORTFOLIO = [["videos", "Vídeos e curadoria"], ["leads", "Leads e visitas"], ["feedbacks", "Feedbacks e site"], ["bio", "Link da bio"]];
 
 function desenharPortfolio(el) {
   const hoje = hojeISO();
@@ -456,6 +456,7 @@ function desenharPortfolio(el) {
   if (!SUBS_PORTFOLIO.some(([k]) => k === pf.sub)) pf.sub = "videos";
   const abas = ""; // as partes do Portfólio ficam no menu lateral
   const ligarAbas = () => $$("[data-pf-aba]", el).forEach((b) => b.onclick = () => { pf.sub = b.dataset.pfAba; try { localStorage.setItem("pf-aba", pf.sub); } catch (_) {} desenharPortfolio(el); });
+  if (pf.sub === "bio") { el.innerHTML = `<div id="link-bio"></div>`; desenharLinkBio($("#link-bio")); return; }
   if (pf.sub === "feedbacks") { el.innerHTML = abas + `<div id="conteudo-site"></div>`; ligarAbas(); desenharConteudoSite($("#conteudo-site")); return; }
   if (pf.sub === "leads") {
     el.innerHTML = abas + quadroContatosSite() + `
