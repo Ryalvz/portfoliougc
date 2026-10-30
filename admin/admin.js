@@ -4061,8 +4061,9 @@ const EMAIL_PROPOSTAS = "heyryan.ugc@gmail.com";
 const ESCOPOS_GMAIL = "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/calendar.app.created";
 const temAgendaGoogle = () => gm.escopo.includes("calendar");
 const PALAVRAS_PROPOSTA = ["oportunidade", "candidatura", "convite", "selecionado", "selecionada", "vaga", "invited", "picked", "task", "recompensa", "ugc", "\"user generated\"", "proposta", "parceria", "publi", "publicidade", "publipost", "campanha", "collab", "collaboration", "briefing", "orçamento", "orcamento", "\"mídia kit\"", "\"media kit\"", "midiakit", "influenciador", "influencer", "creator", "\"criador de conteúdo\"", "permuta", "cachê", "cache", "job", "contratar", "freela", "contrato", "assinar", "assinatura", "assinado", "clicksign", "docusign", "zapsign", "autentique", "d4sign"];
-// Contrato ou documento pra assinar (Clicksign, DocuSign...): nunca fica escondido, mesmo vindo de plataforma automática
-const DOCUMENTO_RE = /\bassin(ar|e|atura|ado|ada)\b|contrato|clicksign|docusign|zapsign|autentique|d4sign|adobe ?sign|dropbox ?sign|hellosign|signature request|please sign|sign (the |this )?document/i;
+// Contrato ou documento pra assinar (Clicksign, DocuSign...): nunca fica escondido, mesmo vindo de plataforma automática.
+// Olha só o assunto: "assinatura" no corpo costuma ser plano/renovação, não contrato
+const DOCUMENTO_RE = /assinar (o |seu |este )?documento|\bassine\b|solicita[çc][ãa]o de assinatura|assinatura (pendente|solicitada|do documento|do contrato)|documento assinado|documento (pendente|aguardando)|\bcontrato\b|please sign|signature request|sign(ed)? (the |this |your )?document|docusign/i;
 // Lê a caixa de entrada E a de spam (às vezes o e-mail da marca cai lá)
 // Promoções e Atualizações entram também: é lá que caem as campanhas das plataformas de UGC
 const BUSCA_PROPOSTAS = `{in:inbox in:spam} newer_than:90d -category:social -category:forums (${PALAVRAS_PROPOSTA.join(" OR ")})`;
@@ -4228,7 +4229,7 @@ async function lerPropostas() {
         data: new Date(Number(m.internalDate) || Date.parse(cabecalho(m, "Date")) || Date.now()),
         spam: (m.labelIds || []).includes("SPAM"),
         novo: (m.labelIds || []).includes("UNREAD") && !adiado("lido-" + m.id), automatico: motivoAutomatico(m, de),
-        documento: DOCUMENTO_RE.test(cabecalho(m, "Subject") + " " + (m.snippet || "") + " " + cabecalho(m, "From")) && !ASSUNTO_ROBO.test(cabecalho(m, "Subject")),
+        documento: DOCUMENTO_RE.test(cabecalho(m, "Subject")) && !ASSUNTO_ROBO.test(cabecalho(m, "Subject")),
         oportunidade: OPORTUNIDADE_RE.test(cabecalho(m, "Subject") + " " + (m.snippet || "")) && !NAO_OPORTUNIDADE_RE.test(cabecalho(m, "Subject")),
         importante: /proposta|or[cç]amento|briefing|contrato|campanha|parceria|pagamento|valor|cach[eê]|budget|rate|paid|collab/i.test(cabecalho(m, "Subject") + " " + (m.snippet || "")) };
     }).filter((x) => x.de.email !== EMAIL_PROPOSTAS)
