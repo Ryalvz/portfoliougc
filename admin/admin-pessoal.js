@@ -170,7 +170,7 @@ function devedores() {
   const mapa = new Map();
   const pega = (nome) => {
     const k = chavePessoa(nome);
-    if (!mapa.has(k)) mapa.set(k, { nome: nomePessoa(nome), devido: 0, futuro: 0, pago: 0, compras: [], receb: [] });
+    if (!mapa.has(k)) mapa.set(k, { nome: nomePessoa(nome), devido: 0, futuro: 0, pago: 0, jurosRecebidos: 0, compras: [], receb: [] });
     return mapa.get(k);
   };
   // Na compra dividida, cada pessoa entra só com a parte dela
@@ -184,9 +184,35 @@ function devedores() {
       if (k <= hoje) p.devido += n2(parte.valor_parcela); else if (k <= ate) p.futuro += n2(parte.valor_parcela);
     }
   }));
-  P.receb.forEach((r) => { const p = pega(r.pessoa); p.pago += n2(r.valor); p.receb.push(r); });
+  // O juros que a pessoa pagou por atraso não abate as compras: é à parte
+  P.receb.forEach((r) => { const p = pega(r.pessoa); const j = Math.min(n2(r.juros), n2(r.valor)); p.pago += n2(r.valor) - j; p.jurosRecebidos += j; p.receb.push(r); });
   return [...mapa.values()].map((p) => ({ ...p, falta: r2(p.devido - p.pago) })).sort((a, b) => b.falta - a.falta || b.futuro - a.futuro);
 }
+/* ---------- Quem me deve, fatura por fatura ----------
+   Cada mês de fatura tem o seu valor por pessoa. Os pagamentos cobrem
+   as faturas mais antigas primeiro; o que sobra (adiantado) já abate
+   a próxima. Assim dá pra ver: "na fatura de novembro, a Emillie me
+   deve tanto, até o dia tal". */
+function contaPorMes(p, ate) {
+  const inicio = inicioCobranca();
+  const meses = [];
+  for (let k = inicio; k <= ate; k = somaMes(k, 1)) {
+    const itens = p.compras.map((c) => ({ c, i: idxParcela(c, k) })).filter((x) => x.i >= 0);
+    const valor = r2(itens.reduce((s, x) => s + n2(x.c.valor_parcela), 0));
+    // Vence no dia do vencimento do cartão daquela fatura (se tiver mais de um cartão, o primeiro a vencer)
+    const vence = itens.map((x) => vencimentoNoMes(P.cartoes.find((cc) => String(cc.id) === String(x.c.cartao_id)), k)).sort()[0] || vencimentoNoMes(null, k);
+    meses.push({ k, itens, valor, vence, coberto: 0 });
+  }
+  let sobra = p.pago;
+  meses.forEach((m) => { const x = Math.max(0, Math.min(m.valor, sobra)); m.coberto = r2(x); sobra = r2(sobra - x); m.falta = r2(m.valor - m.coberto); });
+  return meses;
+}
+function msgFatura(p, m) {
+  const nomeM = MESES_LONGOS[Number(m.k.slice(5)) - 1].toLowerCase();
+  const linhas = m.itens.map(({ c, i }) => `${c.descricao}${Number(c.parcelas) > 1 && Number(c.parcelas) < RECORRENTE ? ` (${i + 1}/${c.parcelas})` : ""} ${real(c.valor_parcela)}${c.parteDe ? ` (sua parte de ${real(c.parteDe)})` : ""}`);
+  return `Oi, ${p.nome.split(" ")[0]}! Passando a sua parte da fatura de ${nomeM}: ${linhas.join("; ")}. Total: ${real(m.valor)}.${m.coberto > 0 ? ` Você já tinha adiantado ${real(m.coberto)}, então fica ${real(m.falta)}.` : ""} Consegue me mandar até ${dataBR(m.vence).slice(0, 5)}?`;
+}
+
 /* ---------- Juros por atraso de quem te deve ----------
    Cada parcela da pessoa vence no dia do vencimento da fatura do cartão
    em que ela caiu. Se o pagamento chega depois, corre juros simples por dia
@@ -222,7 +248,7 @@ function jurosDe(p) {
     }
   });
   devidas.sort((a, b) => a.data.localeCompare(b.data));
-  const pags = [...p.receb].map((r) => ({ data: String(r.data).slice(0, 10), valor: n2(r.valor) })).sort((a, b) => a.data.localeCompare(b.data));
+  const pags = [...p.receb].map((r) => ({ data: String(r.data).slice(0, 10), valor: n2(r.valor) - n2(r.juros) })).sort((a, b) => a.data.localeCompare(b.data));
   // Anda dia a dia: abate os pagamentos nas parcelas mais antigas e soma os juros do que ficou vencido
   let juros = 0, sobra = 0, jurosPagos = 0, desde = null;
   const abertas = [];
@@ -240,7 +266,7 @@ function jurosDe(p) {
     // Juros do dia sobre o que venceu e não foi pago (a partir do dia seguinte ao vencimento)
     abertas.forEach((a) => { if (a.valor > 0.005 && a.data < dia) { juros += a.valor * a.dia; if (!desde) desde = a.data; } });
   }
-  juros = r2(juros); jurosPagos = r2(jurosPagos);
+  juros = r2(juros); jurosPagos = r2(jurosPagos + (p.jurosRecebidos || 0));
   return { juros, jurosPagos, pendente: r2(Math.max(0, juros - jurosPagos)), desde };
 }
 
@@ -743,8 +769,33 @@ function formCartaoPF(c) {
 function pfDevem(el) {
   const dev = devedores();
   const hoje = mesHojePF();
-  el.innerHTML = `
-    <div class="barra"><p class="sub" style="margin:0">Cada compra marcada com o nome de alguém entra aqui. "Já venceu" soma as parcelas das faturas de ${nomeMes(inicioCobranca())} até ${nomeMes(hoje)}; "Próximos 12 meses" é o que ainda vai cair.</p><span class="espaco"></span>
+  const mesesFat = Array.from({ length: 5 }, (_, i) => somaMes(hoje, i - 1));
+  // Abre na próxima fatura a vencer (a primeira cujo vencimento ainda não passou)
+  const venceMes = (k) => (P.cartoes.length ? P.cartoes.map((c) => vencimentoNoMes(c, k)).sort()[0] : vencimentoNoMes(null, k));
+  if (!mesesFat.includes(pfx.mesDeve)) pfx.mesDeve = mesesFat.find((k) => venceMes(k) >= hojeISO()) || hoje;
+  const kF = pfx.mesDeve;
+  const linhasFat = dev.map((p) => ({ p, m: contaPorMes(p, kF).find((x) => x.k === kF) })).filter((x) => x.m && x.m.valor > 0);
+  const totFat = linhasFat.reduce((s, x) => s + x.m.valor, 0), totFalta = linhasFat.reduce((s, x) => s + x.m.falta, 0);
+  // O que ficou em aberto de faturas anteriores à escolhida
+  const antes = dev.map((p) => ({ p, l: contaPorMes(p, somaMes(kF, -1)).filter((m) => m.falta > 0.005) })).filter((x) => x.l.length);
+  const quadroFatura = `<div class="cartao pf-por-fatura">
+    <div class="barra" style="margin:0 0 6px"><h2 style="margin:0">Por fatura</h2><span class="espaco"></span>
+      <div class="chips" role="tablist" aria-label="Fatura">${mesesFat.map((m) => `<button class="chip" type="button" data-mes-deve="${m}" aria-pressed="${m === kF}">${MESES_LONGOS[Number(m.slice(5)) - 1]}</button>`).join("")}</div></div>
+    <p class="sub" style="margin:0 0 8px">Quanto cada pessoa te deve só na fatura de ${MESES_LONGOS[Number(kF.slice(5)) - 1].toLowerCase()}. O que ela pagou a mais antes já entra como "já coberto".</p>
+    ${linhasFat.length ? `<div class="tabela-caixa"><table class="pf-fat-pessoas"><thead><tr><th>Pessoa</th><th>Nesta fatura</th><th>Já coberto</th><th>Falta</th><th>Até</th><th></th></tr></thead><tbody>
+      ${linhasFat.map(({ p, m }) => `<tr>
+        <td><b>${esc(p.nome)}</b><small>${m.itens.length === 1 ? "1 compra" : `${m.itens.length} compras`}</small></td>
+        <td>${real(m.valor)}</td>
+        <td>${m.coberto ? real(m.coberto) : "-"}</td>
+        <td>${m.falta > 0.005 ? `<b>${real(m.falta)}</b>` : `<span class="pilula p-pago">pago</span>`}</td>
+        <td>${dataBR(m.vence).slice(0, 5)}${m.falta > 0.005 && m.vence < hojeISO() ? ` <span class="pilula p-vencido">vencido</span>` : ""}</td>
+        <td class="pf-fat-acoes">${m.falta > 0.005 ? `<a class="btn pequeno" href="https://wa.me/?text=${encodeURIComponent(msgFatura(p, m))}" target="_blank" rel="noopener">${ic("whats")}Cobrar</a>` : ""}</td></tr>`).join("")}
+      </tbody><tfoot><tr><td>Total</td><td>${real(totFat)}</td><td></td><td><b>${real(totFalta)}</b></td><td colspan="2"></td></tr></tfoot></table></div>`
+      : `<p class="vazio">Ninguém tem compra na fatura de ${MESES_LONGOS[Number(kF.slice(5)) - 1].toLowerCase()}.</p>`}
+    ${antes.length ? `<p class="pf-antes">Ainda em aberto de faturas anteriores: ${antes.map(({ p, l }) => `<b>${esc(p.nome)}</b> ${real(l.reduce((s, m) => s + m.falta, 0))} (${l.map((m) => MESES_LONGOS[Number(m.k.slice(5)) - 1].toLowerCase()).join(", ")})`).join(" · ")}</p>` : ""}
+  </div>`;
+  el.innerHTML = quadroFatura + `
+    <div class="barra"><p class="sub" style="margin:0">Cada compra marcada com o nome de alguém entra aqui. Nos cartões abaixo, o total de cada pessoa: "Já venceu" soma as faturas de ${nomeMes(inicioCobranca())} até ${nomeMes(hoje)}; "Próximos 12 meses" é o que ainda vai cair.</p><span class="espaco"></span>
       <button class="btn primario" type="button" id="pf-novo-receb">${ic("mais")}Registrar pagamento</button></div>
     ${dev.length ? `<div class="pf-pessoas">${dev.map((p) => {
       const abertas = p.compras.filter((c) => ultimoMes(c) >= hoje);
@@ -756,15 +807,17 @@ function pfDevem(el) {
         ${cobraJuros(p.nome) ? (() => { const j = jurosDe(p); return `<div class="pf-juros"><span>Juros por atraso${j.desde ? ` (desde ${dataBR(j.desde).slice(0, 5)})` : ""}<b>${real(j.pendente)}</b>${j.jurosPagos ? `<small>já pagou ${real(j.jurosPagos)} de juros</small>` : ""}</span><span>Pra quitar hoje<b>${real(Math.max(0, p.falta) + j.pendente)}</b><small>o que falta + juros</small></span></div>`; })() : ""}
         <label class="pf-juros-liga"><input type="checkbox" data-juros-pessoa="${esc(p.nome)}" ${cobraJuros(p.nome) ? "checked" : ""}> Cobrar juros por atraso (taxa do cartão, por dia)</label>
         <ul class="pf-mini">${abertas.slice(0, 8).map((c) => { const i = idxParcela(c, hoje); return `<li><span>${esc(c.descricao)}${c.parteDe ? ` <em>(parte de ${real(c.parteDe)})</em>` : ""}</span><small>${Number(c.parcelas) >= RECORRENTE ? "todo mês" : Number(c.parcelas) > 1 ? (i >= 0 ? `${i + 1}/${c.parcelas}` : `até ${nomeMes(ultimoMes(c), true)}`) : "à vista"}</small><b>${real(c.valor_parcela)}</b></li>`; }).join("")}</ul>
+        ${p.jurosRecebidos ? `<p class="sub" style="margin:4px 0 0">Já te pagou ${real(p.jurosRecebidos)} de juros por atraso (não entra na conta das compras).</p>` : ""}
         ${p.devido > 0 ? `<div class="pf-pago-trilho" title="Pagou ${real(p.pago)} de ${real(p.devido)}"><i style="width:${Math.min(100, (p.pago / p.devido) * 100)}%"></i></div>` : ""}
         ${p.receb.length ? `<div class="pf-pagamentos"><b>Pagamentos</b>
-          <ul>${[...p.receb].sort((a, b) => String(b.data).localeCompare(String(a.data))).map((r) => `<li><span>${dataBR(r.data)}${r.obs ? ` · ${esc(r.obs)}` : ""}</span><strong>${real(r.valor)}</strong><button class="icone-btn" type="button" data-edita-receb="${r.id}" aria-label="Editar pagamento">${ic("editar")}</button></li>`).join("")}</ul>
+          <ul>${[...p.receb].sort((a, b) => String(b.data).localeCompare(String(a.data))).map((r) => `<li><span>${dataBR(r.data)}${n2(r.juros) ? ` · <em>${real(r.juros)} de juros</em>` : ""}${r.obs && !n2(r.juros) ? ` · ${esc(r.obs)}` : ""}</span><strong>${real(r.valor)}</strong><button class="icone-btn" type="button" data-edita-receb="${r.id}" aria-label="Editar pagamento">${ic("editar")}</button></li>`).join("")}</ul>
           <p>${p.falta > 0 ? `Falta agora: <strong>${real(p.falta)}</strong>` : p.falta < 0 ? `Pagou <strong>${real(-p.falta)}</strong> a mais (conta para as próximas parcelas)` : "Tudo pago até agora ✅"}</p></div>` : ""}
         <div class="barra" style="margin:10px 0 0">
           <button class="btn primario" type="button" data-receb="${esc(p.nome)}">${ic("mais")}Pagamento</button>
           <a class="btn" href="https://wa.me/?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">${ic("whats")}Cobrar no WhatsApp</a>
         </div></div>`; }).join("")}</div>`
       : `<p class="vazio">Ninguém te deve nada por aqui. Quando importar a fatura, escreva o nome da pessoa nas compras que não são suas.</p>`}`;
+  $$("[data-mes-deve]", el).forEach((b) => b.onclick = () => { pfx.mesDeve = b.dataset.mesDeve; desenhar(); });
   $("#pf-novo-receb", el).onclick = () => formRecebPF();
   $$("[data-receb]", el).forEach((b) => b.onclick = () => formRecebPF(null, b.dataset.receb, (dev.find((p) => p.nome === b.dataset.receb) || {}).falta || 0));
   $$("[data-edita-receb]", el).forEach((x) => x.onclick = () => formRecebPF(P.receb.find((r) => String(r.id) === x.dataset.editaReceb)));
@@ -785,11 +838,13 @@ function formRecebPF(r, pessoa, falta) {
     campos: [
       { n: "pessoa", r: "Quem pagou", req: true, lista: pessoasConhecidas() },
       { n: "valor", r: "Quanto a pessoa te mandou (R$)", t: "number", req: true, ajuda: !r && falta > 0 ? `Falta ${real(falta)}. Pode ser só uma parte: cada pagamento fica guardado com a data.` : "" },
+      { n: "juros", r: "Desse valor, quanto foi de juros por atraso (R$)", t: "number", ajuda: "Deixe 0 se não teve juros. O juros não abate as próximas faturas." },
       { n: "data", r: "Data", t: "date", req: true },
       { n: "obs", r: "Observação", inteiro: true }
     ],
     valores: r || { pessoa: pessoa || "", valor: "", data: hojeISO() },
     aoSalvar: async (d) => {
+      if (n2(d.juros) > n2(d.valor)) { avisar("O juros não pode ser maior que o valor que a pessoa mandou.", true); return false; }
       const ok = await gravar("pf_recebimentos", { ...d, pessoa: nomePessoa(d.pessoa) }, r ? r.id : null);
       if (ok) {
         await recarregarPF();
