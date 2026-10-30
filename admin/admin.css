@@ -1542,3 +1542,9 @@ dialog.pf-janela-rapida { width: min(460px, calc(100vw - 20px)); }
 .pf-fat-pessoas tfoot td { font-weight: 700; border-top: 1px solid var(--line); }
 .pf-fat-acoes { text-align: right; white-space: nowrap; }
 .pf-antes { margin: 10px 0 0; font-size: 13px; color: var(--red); }
+/* Faturas do mês: tabela por cartão com a situação de cada fatura */
+.pf-fat-tabela td small { display: block; color: var(--muted); font-size: 11.5px; font-weight: 400; }
+.pf-fat-tabela td, .pf-fat-tabela th { white-space: nowrap; }
+.pf-fat-nota { margin: 10px 0 0; padding: 10px 12px; border-radius: var(--radius); background: var(--parchment); font-size: 13px; line-height: 1.5; }
+.pf-escada-caixa { margin-top: 14px; }
+.pf-escada-caixa summary { cursor: pointer; font-weight: 600; font-size: 14px; }

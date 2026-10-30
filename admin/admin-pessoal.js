@@ -174,14 +174,17 @@ function devedores() {
     return mapa.get(k);
   };
   // Na compra dividida, cada pessoa entra só com a parte dela
+  const dia = hojeISO();
   P.compras.forEach((c) => outrosDe(c).forEach((pt) => {
     const p = pega(pt.nome);
     const parte = pt.frac < 1 ? { ...c, valor_parcela: r2(n2(c.valor_parcela) * pt.frac), parteDe: n2(c.valor_parcela) } : c;
     p.compras.push(parte);
+    const cartao = P.cartoes.find((x) => String(x.id) === String(c.cartao_id));
     for (let i = 0; i < Number(c.parcelas || 1); i++) {
       const k = somaMes(mesDe(c.primeiro_mes), i);
       if (k < inicio) continue;
-      if (k <= hoje) p.devido += n2(parte.valor_parcela); else if (k <= ate) p.futuro += n2(parte.valor_parcela);
+      // Já venceu = a fatura daquele mês já passou do dia de vencimento do cartão
+      if (vencimentoNoMes(cartao, k) <= dia) p.devido += n2(parte.valor_parcela); else if (k <= ate) p.futuro += n2(parte.valor_parcela);
     }
   }));
   // O juros que a pessoa pagou por atraso não abate as compras: é à parte
@@ -330,16 +333,16 @@ function desenharPessoal(el) {
 
 /* ---------- Visão geral ---------- */
 function pfVisao(el) {
-  const hoje = mesHojePF();
+  const hoje = mesHojePF(), ref = mesAPagar();
   const proj = projecao(12);
-  const atual = proj[0];
+  const atual = proj.find((m) => m.k === ref) || proj[0];
   const renda = rendaPrevista(), dia = diaADiaEstimado();
   const dev = devedores();
   const aReceber = dev.reduce((s, p) => s + Math.max(0, p.falta), 0);
   const restante = P.compras.filter(temMinha).filter(parcelado).reduce((s, c) => {
-    let t = 0; for (let i = 0; i < Number(c.parcelas); i++) { if (somaMes(mesDe(c.primeiro_mes), i) >= hoje) t += n2(c.valor_parcela) * fracMinha(c); } return s + t;
+    let t = 0; for (let i = 0; i < Number(c.parcelas); i++) { if (somaMes(mesDe(c.primeiro_mes), i) >= ref) t += n2(c.valor_parcela) * fracMinha(c); } return s + t;
   }, 0);
-  const fimParcelas = P.compras.filter((c) => parcelado(c) && Number(c.parcelas) < RECORRENTE).map(ultimoMes).filter((k) => k >= hoje).sort().pop();
+  const fimParcelas = P.compras.filter((c) => parcelado(c) && Number(c.parcelas) < RECORRENTE).map(ultimoMes).filter((k) => k >= ref).sort().pop();
   const reserva = n2(cfg("reserva")), metaMeses = Number(cfg("reserva_meses", 3)) || 3;
   const metaReserva = metaMeses * (fixasNo(hoje) + dia.v);
   const vazio = !P.contas.length && !P.compras.length && !P.entradas.length;
@@ -362,8 +365,8 @@ function pfVisao(el) {
       <li>Clique em <b>Importar fatura</b> e escolha o PDF (ou CSV) da fatura de cada cartão. Marque o nome de quem é cada compra que não é sua.</li></ol></div>` : ""}
     ${cartaoProximasFaturas()}
     <div class="faixa-kpi">
-      <div class="kpi ${atual.sobra < 0 ? "alerta" : ""}"><span>${atual.sobra < 0 ? "Falta" : "Sobra"} em ${MESES_LONGOS[Number(hoje.slice(5)) - 1].toLowerCase()}</span><strong>${real(Math.abs(atual.sobra))}</strong><small>renda ${real(atual.renda)} menos ${real(atual.gasto)}</small></div>
-      <div class="kpi"><span>Comprometido no mês</span><strong>${real(atual.fixas + atual.parc)}</strong><small>${real(atual.fixas)} fixas + ${real(atual.parc)} parcelas</small></div>
+      <div class="kpi ${atual.sobra < 0 ? "alerta" : ""}"><span>${atual.sobra < 0 ? "Falta" : "Sobra"} em ${MESES_LONGOS[Number(ref.slice(5)) - 1].toLowerCase()}</span><strong>${real(Math.abs(atual.sobra))}</strong><small>renda ${real(atual.renda)} menos ${real(atual.gasto)}</small></div>
+      <div class="kpi"><span>Comprometido em ${MESES_LONGOS[Number(ref.slice(5)) - 1].toLowerCase()}</span><strong>${real(atual.fixas + atual.parc)}</strong><small>${real(atual.fixas)} fixas + ${real(atual.parc)} parcelas</small></div>
       <div class="kpi"><span>Parcelas a pagar</span><strong>${real(restante)}</strong><small>${fimParcelas ? `a última acaba em ${nomeMes(fimParcelas, true)}` : "nenhuma parcela sua"}</small></div>
       <div class="kpi ${aReceber > 0 ? "alerta" : ""}"><span>Te devem</span><strong>${real(aReceber)}</strong><small>${dev.filter((p) => p.falta > 0).length ? qtd(dev.filter((p) => p.falta > 0).length, "pessoa", "pessoas") + " com valor vencido" : "ninguém atrasado"}</small></div>
       <div class="kpi"><span>Reserva</span><strong>${real(reserva)}</strong><small>meta ${real(metaReserva)} (${metaMeses} meses)</small></div>
@@ -400,6 +403,26 @@ function faturaPartes(cartaoId, k) {
 }
 // Sua parte da fatura (todos os cartões): parcelas + à vista. É isso que o teto mede.
 const suaFatura = (k) => P.cartoes.reduce((a, c) => { const f = faturaPartes(c.id, k); return { parc: a.parc + f.parc, vista: a.vista + f.vista, eu: a.eu + f.eu }; }, { parc: 0, vista: 0, eu: 0 });
+// A fatura que você paga agora: o primeiro mês em que algum cartão ainda vai vencer
+// (em 30/10 é novembro; em 10/11, com o Bradesco vencendo dia 15, continua novembro)
+function mesAPagar() {
+  const hoje = mesHojePF(), d = hojeISO();
+  for (let i = 0; i < 3; i++) { const k = somaMes(hoje, i); if (P.cartoes.some((c) => vencimentoNoMes(c, k) >= d)) return k; }
+  return somaMes(hoje, 1);
+}
+// Dia em que a fatura do mês k fecha (o fechamento vem antes do vencimento; se o dia é maior, foi no mês anterior)
+function fechamentoNoMes(c, k) {
+  const vence = Number(c.vence_dia) || 10, fecha = Number(c.fecha_dia) || Math.max(1, vence - 7);
+  return vencimentoNoMes({ vence_dia: fecha }, fecha < vence ? k : somaMes(k, -1));
+}
+// Situação da fatura do cartão no mês k: importada, fechada sem importar, ou ainda aberta
+function situacaoFatura(c, k) {
+  const importada = P.compras.some((x) => String(x.cartao_id) === String(c.id) && x.origem === "fatura" && !parcelado(x) && mesDe(x.primeiro_mes) === k);
+  const fecha = fechamentoNoMes(c, k), vence = vencimentoNoMes(c, k), hoje = hojeISO();
+  if (importada) return { tipo: "importada", fecha, vence, texto: "fatura importada" };
+  if (fecha <= hoje) return { tipo: "falta", fecha, vence, texto: `fechou ${dataBR(fecha).slice(0, 5)}, falta importar` };
+  return { tipo: "aberta", fecha, vence, texto: `aberta, fecha ${dataBR(fecha).slice(0, 5)}` };
+}
 // A fatura que está aberta agora (a próxima a fechar)
 const faturaAberta = () => (P.cartoes[0] ? mesFaturaDaCompra(P.cartoes[0], hojeISO()) : somaMes(mesHojePF(), 1));
 function barraTeto(k, teto) {
@@ -414,39 +437,44 @@ function barraTeto(k, teto) {
 }
 function cartaoProximasFaturas() {
   if (!P.cartoes.length) return "";
-  const hoje = mesHojePF();
+  const hoje = mesHojePF(), ref = mesAPagar();
   const validos = Array.from({ length: 12 }, (_, i) => somaMes(hoje, i));
-  if (!validos.includes(pfx.mesFat)) pfx.mesFat = somaMes(hoje, 1);
-  const meses = validos.slice(0, 6);
-  if (!meses.includes(pfx.mesFat)) meses.push(pfx.mesFat);
+  if (!validos.includes(pfx.mesFat)) pfx.mesFat = ref;
+  const meses = validos.filter((m) => m >= ref).slice(0, 6);
+  if (!meses.includes(pfx.mesFat)) meses.unshift(pfx.mesFat);
   const k = pfx.mesFat;
-  const linhas = P.cartoes.map((c) => ({ c, ...faturaPartes(c.id, k) }));
-  const soma = linhas.reduce((a, l) => ({ parc: a.parc + l.parc, vista: a.vista + l.vista, outros: a.outros + l.outros, total: a.total + l.total }), { parc: 0, vista: 0, outros: 0, total: 0 });
-  const maxL = Math.max(1, ...linhas.map((l) => l.total));
+  const nomeK = MESES_LONGOS[Number(k.slice(5)) - 1].toLowerCase();
+  const linhas = P.cartoes.map((c) => ({ c, sit: situacaoFatura(c, k), ...faturaPartes(c.id, k) }));
+  const soma = linhas.reduce((a, l) => ({ parc: a.parc + l.parc, vista: a.vista + l.vista, outros: a.outros + l.outros, eu: a.eu + l.eu, total: a.total + l.total }), { parc: 0, vista: 0, outros: 0, eu: 0, total: 0 });
+  const abertas = linhas.filter((l) => l.sit.tipo !== "importada");
   // Escada: suas parcelas mês a mês (de todos os cartões)
-  const escada = Array.from({ length: 12 }, (_, i) => { const m = somaMes(hoje, i); return { m, v: P.cartoes.reduce((s, c) => s + faturaPartes(c.id, m).parc, 0) }; });
+  const escada = Array.from({ length: 12 }, (_, i) => { const m = somaMes(ref, i); return { m, v: P.cartoes.reduce((s, c) => s + faturaPartes(c.id, m).parc, 0) }; });
   const tetoE = n2(cfg("teto_mes"));
   const maxE = Math.max(1, tetoE, ...escada.map((e) => e.v));
-  const seg = (cls, v, max) => (v > 0 ? `<i class="${cls}" style="width:${(v / max) * 100}%"></i>` : "");
   return `<div class="cartao pf-faturas">
-    <div class="barra" style="margin-bottom:8px"><h2 style="margin:0">Próximas faturas</h2><span class="espaco"></span>
+    <div class="barra" style="margin-bottom:4px"><h2 style="margin:0">Faturas de ${nomeK}${k === ref ? ` <span class="sub">(as que você paga agora)</span>` : ""}</h2><span class="espaco"></span>
       <div class="chips" role="tablist" aria-label="Mês da fatura">${meses.map((m) => `<button class="chip" type="button" data-mes-fat="${m}" aria-pressed="${m === k}">${nomeMes(m, true)}</button>`).join("")}</div></div>
     <div class="pf-fat-topo">
-      <div><span>Suas parcelas em ${MESES_LONGOS[Number(k.slice(5)) - 1].toLowerCase()}</span><strong>${real(soma.parc)}</strong><small>já garantido, não dá mais pra mudar</small></div>
-      ${soma.vista ? `<div><span>Seus gastos à vista</span><strong>${real(soma.vista)}</strong><small>o que já foi lançado nesta fatura</small></div>` : ""}
-      <div><span>De outras pessoas</span><strong>${real(soma.outros)}</strong><small>elas te devolvem</small></div>
-      <div class="pf-fat-total"><span>Já está na fatura</span><strong>${real(soma.total)}</strong><small>somando os ${P.cartoes.length} cartões</small></div>
+      <div class="pf-fat-total"><span>Total das faturas${abertas.length ? " até agora" : ""}</span><strong>${real(soma.total)}</strong><small>o que você paga aos bancos, somando os ${P.cartoes.length} cartões</small></div>
+      <div><span>Volta pra você</span><strong>${real(soma.outros)}</strong><small>a parte das outras pessoas (veja em Quem me deve)</small></div>
+      <div><span>Sai do seu bolso</span><strong>${real(soma.eu)}</strong><small>${real(soma.parc)} de parcelas + ${real(soma.vista)} à vista</small></div>
     </div>
-    ${n2(cfg("teto_mes")) ? barraTeto(k, n2(cfg("teto_mes"))) : ""}
-    <div class="pf-fat-linhas">${linhas.map((l) => `<div class="pf-fat-linha" data-dica="<b>${esc(l.c.nome)}, ${nomeMes(k)}</b><br>Suas parcelas: ${real(l.parc)}${l.vista ? `<br>Seus gastos à vista: ${real(l.vista)}` : ""}<br>De outras pessoas: ${real(l.outros)}<br><b>Total: ${real(l.total)}</b>">
-        <b>${esc(l.c.nome)}</b><small>${l.c.vence_dia ? `vence dia ${l.c.vence_dia}` : ""}</small>
-        <div class="pf-fat-trilho">${seg("pf-parc", l.parc, maxL)}${seg("pf-vista", l.vista, maxL)}${seg("pf-outros", l.outros, maxL)}</div>
-        <span class="pf-fat-valores"><strong>${real(l.eu)}</strong> seu${l.outros ? ` + ${real(l.outros)} dos outros` : ""}</span>
-      </div>`).join("")}</div>
-    <div class="legenda"><span><i class="pf-parc"></i>Suas parcelas</span><span><i class="pf-vista"></i>Seus gastos à vista</span><span><i class="pf-outros"></i>De outras pessoas</span></div>
-    <h3 class="pf-escada-tit">Suas parcelas descendo, mês a mês${tetoE ? ` <span class="sub">o espaço entre a barra e a linha do teto (${real(tetoE)}) é o que sobra pra gastar no cartão</span>` : ""}</h3>
-    <div class="pf-escada">${escada.map((e) => `<button type="button" class="pf-degrau ${e.m === k ? "foco" : ""}" data-mes-fat="${e.m}" data-dica="<b>${nomeMes(e.m)}</b><br>Suas parcelas: ${real(e.v)}${tetoE ? `<br>Sobra pra gastar no cartão: ${real(Math.max(0, tetoE - e.v))}` : ""}">
-      <b class="valor-barra">${privado ? "" : Math.round(e.v).toLocaleString("pt-BR")}</b><span class="pf-degrau-area"><i style="height:${(e.v / maxE) * 100}%"></i>${tetoE ? `<em style="bottom:${(tetoE / maxE) * 100}%"></em>` : ""}</span><span>${nomeMes(e.m, true)}</span></button>`).join("")}</div>
+    <div class="tabela-caixa"><table class="pf-fat-tabela"><thead><tr><th>Cartão</th><th>Vence</th><th>Situação</th><th>Total da fatura</th><th>Sua parte</th><th>Dos outros</th></tr></thead><tbody>
+      ${linhas.map((l) => `<tr>
+        <td><b>${esc(l.c.nome)}</b></td>
+        <td>${dataBR(l.sit.vence).slice(0, 5)}</td>
+        <td><span class="pilula ${l.sit.tipo === "importada" ? "p-pago" : l.sit.tipo === "falta" ? "p-vencido" : "p-pendente"}">${esc(l.sit.texto)}</span></td>
+        <td><b>${real(l.total)}</b>${l.sit.tipo !== "importada" && l.total ? `<small>até agora</small>` : ""}</td>
+        <td>${real(l.eu)}</td>
+        <td>${l.outros ? real(l.outros) : "-"}</td></tr>`).join("")}
+    </tbody></table></div>
+    ${abertas.length ? `<p class="pf-fat-nota">${abertas.map((l) => `<b>${esc(l.c.nome)}</b>: ${l.sit.tipo === "falta" ? `a fatura já fechou (${dataBR(l.sit.fecha).slice(0, 5)}). Importe o PDF pra ter o valor exato.` : `a fatura ainda está aberta até ${dataBR(l.sit.fecha).slice(0, 5)}. Por enquanto entram só as parcelas que já se sabe e os gastos que você lançou; o valor vai subir até fechar.`}`).join("<br>")}</p>` : ""}
+    ${tetoE ? barraTeto(k, tetoE) : ""}
+    <details class="pf-escada-caixa"><summary>Suas parcelas mês a mês</summary>
+      <p class="sub" style="margin:6px 0 0">Quanto das próximas faturas já está comprometido com parcelas (só a sua parte)${tetoE ? `. A linha é o seu teto de ${real(tetoE)}` : ""}.</p>
+      <div class="pf-escada">${escada.map((e) => `<button type="button" class="pf-degrau ${e.m === k ? "foco" : ""}" data-mes-fat="${e.m}" data-dica="<b>${nomeMes(e.m)}</b><br>Suas parcelas: ${real(e.v)}${tetoE ? `<br>Sobra pra gastar no cartão: ${real(Math.max(0, tetoE - e.v))}` : ""}">
+        <b class="valor-barra">${privado ? "" : Math.round(e.v).toLocaleString("pt-BR")}</b><span class="pf-degrau-area"><i style="height:${(e.v / maxE) * 100}%"></i>${tetoE ? `<em style="bottom:${(tetoE / maxE) * 100}%"></em>` : ""}</span><span>${nomeMes(e.m, true)}</span></button>`).join("")}</div>
+    </details>
   </div>`;
 }
 function ligarProximasFaturas(el) {
@@ -490,11 +518,11 @@ function cartaoCartoes() {
   const hoje = mesHojePF();
   return `<div class="cartao"><div class="barra" style="margin-bottom:6px"><h2 style="margin:0">Cartões</h2><span class="espaco"></span><button class="btn" type="button" data-novo-cartao>${ic("mais")}Cartão</button></div>
     ${P.cartoes.length ? `<div class="pf-cartoes">${P.cartoes.map((c) => {
-      const agora = faturaCartaoNo(c, hoje), prox = faturaCartaoNo(c, somaMes(hoje, 1)), preso = presoNoLimite(c);
+      const ref = mesAPagar(), agora = faturaCartaoNo(c, ref), prox = faturaCartaoNo(c, somaMes(ref, 1)), preso = presoNoLimite(c);
       return `<button type="button" class="pf-cartao" data-cartao="${c.id}">
         <b>${esc(c.nome)}</b><small>${c.vence_dia ? `vence dia ${c.vence_dia}` : "sem dia de vencimento"}</small>
-        <span>Fatura de ${MESES_CURTOS[Number(hoje.slice(5)) - 1].toLowerCase()}: <strong>${real(agora)}</strong></span>
-        <span>Já previsto no próximo mês: <strong>${real(prox)}</strong></span>
+        <span>Fatura de ${MESES_LONGOS[Number(ref.slice(5)) - 1].toLowerCase()}${situacaoFatura(c, ref).tipo === "importada" ? "" : " (até agora)"}: <strong>${real(agora)}</strong></span>
+        <span>Já previsto em ${MESES_LONGOS[Number(somaMes(ref, 1).slice(5)) - 1].toLowerCase()}: <strong>${real(prox)}</strong></span>
         <span>${c.limite ? `Limite preso em parcelas: ${real(preso)} de ${real(c.limite)}` : `Preso em parcelas futuras: ${real(preso)}`}</span>
         ${c.limite ? `<i class="pf-trilho"><i style="width:${Math.min(100, (preso / n2(c.limite)) * 100)}%"></i></i>` : ""}
       </button>`; }).join("")}</div>` : `<p class="vazio">Cadastre seus cartões para separar as faturas.</p>`}
@@ -507,9 +535,9 @@ function ligarCartoes(el) {
 
 /* ---------- Plano de ação ---------- */
 function cartaoPlano(proj, dev, x) {
-  const hoje = mesHojePF();
+  const hoje = mesAPagar();
   const itens = [];
-  const atual = proj[0];
+  const atual = proj.find((m) => m.k === hoje) || proj[0];
   // 1. Juros e encargos nas últimas faturas
   const juros = P.compras.filter((c) => /juros|multa|encargo|rotativ|mora\b|atraso|iof\W*(?:de\W*)?(?:financ|rotativ|parcelamento)/i.test(c.descricao) && mesDe(c.primeiro_mes) >= somaMes(hoje, -3) && mesDe(c.primeiro_mes) <= hoje).reduce((s, c) => s + n2(c.valor_parcela), 0);
   if (juros > 0) itens.push({ nivel: "critico", t: "Pare de pagar juros", d: `Nas últimas faturas foram ${real(juros)} de juros, multa ou encargos. Isso vem antes de tudo: pague sempre a fatura inteira e nunca o mínimo. Se não fechar, um parcelamento da fatura costuma ter juros menores que o rotativo; compare o CET antes de aceitar.` });
@@ -627,7 +655,7 @@ function pfGastos(el) {
       <div><span>Compras parceladas novas</span><strong>${real(novasParc)}</strong><small>valor total, você paga aos poucos</small></div>
       <div><span>De outras pessoas</span><strong>${real(dosOutros)}</strong><small>no seu cartão</small></div>
     </div>
-    ${teto ? barraTeto(faturaAberta(), teto) : ""}
+    ${teto ? barraTeto(mesAPagar(), teto) : ""}
     <div class="grade-fin pf-gastos-grade">
       <div class="cartao">
         <div class="barra" style="margin-bottom:6px"><h2 style="margin:0">Onde foi o seu dinheiro <span class="sub">(à vista)</span></h2><span class="espaco"></span><button class="btn" type="button" id="g-metas">${ic("editar")}Metas</button></div>
@@ -770,9 +798,8 @@ function pfDevem(el) {
   const dev = devedores();
   const hoje = mesHojePF();
   const mesesFat = Array.from({ length: 5 }, (_, i) => somaMes(hoje, i - 1));
-  // Abre na próxima fatura a vencer (a primeira cujo vencimento ainda não passou)
-  const venceMes = (k) => (P.cartoes.length ? P.cartoes.map((c) => vencimentoNoMes(c, k)).sort()[0] : vencimentoNoMes(null, k));
-  if (!mesesFat.includes(pfx.mesDeve)) pfx.mesDeve = mesesFat.find((k) => venceMes(k) >= hojeISO()) || hoje;
+  // Abre na fatura que você paga agora
+  if (!mesesFat.includes(pfx.mesDeve)) pfx.mesDeve = mesesFat.includes(mesAPagar()) ? mesAPagar() : hoje;
   const kF = pfx.mesDeve;
   const linhasFat = dev.map((p) => ({ p, m: contaPorMes(p, kF).find((x) => x.k === kF) })).filter((x) => x.m && x.m.valor > 0);
   const totFat = linhasFat.reduce((s, x) => s + x.m.valor, 0), totFalta = linhasFat.reduce((s, x) => s + x.m.falta, 0);
@@ -795,7 +822,7 @@ function pfDevem(el) {
     ${antes.length ? `<p class="pf-antes">Ainda em aberto de faturas anteriores: ${antes.map(({ p, l }) => `<b>${esc(p.nome)}</b> ${real(l.reduce((s, m) => s + m.falta, 0))} (${l.map((m) => MESES_LONGOS[Number(m.k.slice(5)) - 1].toLowerCase()).join(", ")})`).join(" · ")}</p>` : ""}
   </div>`;
   el.innerHTML = quadroFatura + `
-    <div class="barra"><p class="sub" style="margin:0">Cada compra marcada com o nome de alguém entra aqui. Nos cartões abaixo, o total de cada pessoa: "Já venceu" soma as faturas de ${nomeMes(inicioCobranca())} até ${nomeMes(hoje)}; "Próximos 12 meses" é o que ainda vai cair.</p><span class="espaco"></span>
+    <div class="barra"><p class="sub" style="margin:0">Cada compra marcada com o nome de alguém entra aqui. Nos cartões abaixo, o total de cada pessoa: "Já venceu" soma as faturas desde ${nomeMes(inicioCobranca())} que já passaram do dia de vencimento do cartão; "Próximos 12 meses" é o que ainda vai cair.</p><span class="espaco"></span>
       <button class="btn primario" type="button" id="pf-novo-receb">${ic("mais")}Registrar pagamento</button></div>
     ${dev.length ? `<div class="pf-pessoas">${dev.map((p) => {
       const abertas = p.compras.filter((c) => ultimoMes(c) >= hoje);
