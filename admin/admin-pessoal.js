@@ -15,7 +15,7 @@ Object.assign(ESQUEMA, {
   pf_cartoes: ["id", "nome", "vence_dia", "fecha_dia", "limite", "ordem"],
   pf_contas: ["id", "nome", "valor", "dia", "categoria", "inicio", "fim", "obs", "no_cartao"],
   pf_compras: ["id", "criado_em", "cartao_id", "descricao", "valor_parcela", "parcelas", "primeiro_mes", "data_compra", "dono", "categoria", "origem", "chave"],
-  pf_recebimentos: ["id", "pessoa", "valor", "data", "obs"],
+  pf_recebimentos: ["id", "pessoa", "valor", "juros", "data", "obs"],
   pf_entradas: ["id", "data", "valor", "descricao", "origem"],
   pf_config: ["chave", "valor"]
 });
