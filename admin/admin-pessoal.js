@@ -1258,7 +1258,8 @@ function abrirImportarFatura() {
   };
   // Dividir uma compra: marca quem participou (você já vem marcado) e cada um fica com uma parte igual
   const escolherDivisao = (x) => {
-    const atuais = partesDe({ dono: x.dono });
+    const naoEhNome = (n) => /^(dividid[oa]s?|todos|todo mundo|geral|grupo)$/i.test(semAcento(n));
+    const atuais = partesDe({ dono: x.dono }).filter((p) => p.eu || !naoEhNome(p.nome));
     const temEu = atuais.some((p) => p.eu) || !nomePessoa(x.dono);
     const marcados = new Set(atuais.filter((p) => !p.eu).map((p) => chavePessoa(p.nome)));
     const lista = [...new Set([...pessoas(), ...atuais.filter((p) => !p.eu).map((p) => p.nome)])];
