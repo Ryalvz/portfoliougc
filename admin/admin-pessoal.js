@@ -244,7 +244,15 @@ function jurosDe(p) {
   return { juros, jurosPagos, pendente: r2(Math.max(0, juros - jurosPagos)), desde };
 }
 
-const pessoasConhecidas = () => [...new Set([...P.compras.flatMap((c) => outrosDe(c).map((x) => x.nome)), ...P.receb.map((r) => nomePessoa(r.pessoa))])].sort(ordenaTexto);
+// "bob" e "Bob" são a mesma pessoa: fica um nome só (o que começa com maiúscula, se tiver)
+const pessoasConhecidas = () => {
+  const m = new Map();
+  [...P.compras.flatMap((c) => outrosDe(c).map((x) => x.nome)), ...P.receb.map((r) => nomePessoa(r.pessoa))].filter(Boolean).forEach((n) => {
+    const k = chavePessoa(n).toLowerCase(), atual = m.get(k);
+    if (!atual || (atual[0] !== atual[0].toUpperCase() && n[0] === n[0].toUpperCase())) m.set(k, n);
+  });
+  return [...m.values()].sort(ordenaTexto);
+};
 
 /* ---------- Tela ---------- */
 function chipsVisaoFin() {
