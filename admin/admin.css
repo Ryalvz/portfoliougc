@@ -1196,12 +1196,6 @@ td.neg { color: var(--red); }
 .pf-imp-tabela td { font-size: 12.5px; padding: 5px 8px; }
 .pf-imp-tabela tr.pf-credito td { color: var(--muted); }
 .pf-imp-tabela tr.pf-existe td { background: rgba(30, 107, 69, .04); }
-.pf-imp-dono { display: grid; gap: 4px; min-width: 190px; }
-.pf-imp-dono .campo { width: 100%; padding: 5px 8px; font-size: 12.5px; }
-.pf-imp-dono small { font-size: 11.5px; }
-.pf-imp-salvas { margin-top: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius); }
-.pf-imp-salvas summary { cursor: pointer; }
-.pf-imp-salvas[open] .pf-imp-tabela { margin-top: 8px; }
 dialog.pf-janela { width: min(900px, calc(100vw - 24px)); }
 .barra > label.check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
 @media (max-width: 620px) { .pf-nums { grid-template-columns: 1fr 1fr 1fr; } .pf-libera li { grid-template-columns: 50px 1fr auto; } }

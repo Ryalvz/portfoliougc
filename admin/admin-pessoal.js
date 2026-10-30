@@ -1164,38 +1164,14 @@ function abrirImportarFatura() {
     });
     st.itens.forEach((x) => {
       if (novosDonos) {
-        const dono = x.existe ? nomePessoa(x.existe.dono || "") : x.rapido ? nomePessoa(x.rapido.dono || "") : (x.donoSugerido || donoAnterior(x));
-        const t = tipoDaCompra({ dono });
-        x.tipo = t.tipo; x.nomes = t.nomes;
+        // Já salva vem com o nome que já tinha
+        x.dono = x.existe ? nomePessoa(x.existe.dono || "") : x.rapido ? nomePessoa(x.rapido.dono || "") : (x.donoSugerido || donoAnterior(x));
         // Já salva: fica de fora, a não ser que você mude alguma coisa nela
         if (x.existe && !x.pagamento) x.incluir = false;
       }
     });
     pintar();
   };
-  // De quem é: minha, de outra pessoa ou dividida comigo (partes iguais)
-  const donoDe = (x) => donoDoTipo(x.tipo, x.nomes) || "";
-  const valorDe = (x) => (x.credito ? -x.valor : x.valor);
-  const linhaImp = (x, i) => {
-    const partes = x.tipo === "dividida" && nomePessoa(x.nomes) ? partesDe({ dono: donoDe(x) }).length : 0;
-    return `<tr class="${x.credito ? "pf-credito" : ""}">
-      <td><input type="checkbox" data-inc="${i}" ${x.incluir ? "checked" : ""} aria-label="Incluir"></td>
-      <td>${dataBR(x.data)}</td>
-      <td>${esc(x.desc)}${x.pagamento ? ` <span class="pilula p-parada">pagamento da fatura</span>` : x.credito ? ` <span class="pilula p-pago">estorno ou crédito</span>` : ""}${x.rapido ? ` <span class="pilula p-conversando">você lançou: ${esc(x.rapido.descricao)}</span>` : ""}</td>
-      <td>${x.n > 1 ? `${x.k}/${x.n}` : "à vista"}</td>
-      <td>${x.credito ? "−" : ""}${real(x.valor)}</td>
-      <td><div class="pf-imp-dono">
-        <select class="campo" data-tipo="${i}" aria-label="De quem é">
-          <option value="minha" ${x.tipo === "minha" ? "selected" : ""}>Minha</option>
-          <option value="outra" ${x.tipo === "outra" ? "selected" : ""}>De outra pessoa</option>
-          <option value="dividida" ${x.tipo === "dividida" ? "selected" : ""}>Dividida comigo</option>
-        </select>
-        <input class="campo" data-nomes="${i}" list="imp-pessoas" value="${esc(x.nomes)}" ${x.tipo === "minha" ? "hidden" : ""} placeholder="${x.tipo === "dividida" ? "Com quem: Diego, Emillie" : "Nome da pessoa"}" aria-label="Nomes">
-        ${partes ? `<small class="sub" data-partes="${i}">${partes} partes de ${real(Math.abs(valorDe(x)) / partes)}</small>` : x.tipo === "dividida" ? `<small class="sub" data-partes="${i}">escreva com quem</small>` : ""}
-      </div></td></tr>`;
-  };
-  const tabelaImp = (lista) => `<div class="tabela-caixa pf-imp-tabela"><table><thead><tr><th></th><th>Data</th><th>Compra</th><th>Parcela</th><th>Valor</th><th>De quem é</th></tr></thead><tbody>
-    ${lista.map(({ x, i }) => linhaImp(x, i)).join("")}</tbody></table></div>`;
   const pintar = () => {
     const rev = $("#imp-rev", d);
     if (!st.itens.length) { rev.innerHTML = st.arquivo ? `<p class="aviso-falta">Não achei compras neste arquivo. Se for PDF escaneado (imagem), baixe a fatura em CSV no app do banco ou lance as parcelas à mão.</p>` : ""; $("#imp-salvar", d).disabled = true; return; }
@@ -1240,7 +1216,8 @@ function abrirImportarFatura() {
     $$("[data-inc]", rev).forEach((c) => c.onchange = () => { st.itens[c.dataset.inc].incluir = c.checked; pintar(); });
     $$("[data-dono]", rev).forEach((c) => {
       c.oninput = () => { st.itens[c.dataset.dono].dono = c.value; };
-      c.onchange = () => pintar();
+      // Trocou o nome de uma já salva: ela entra pra salvar de novo
+      c.onchange = () => { const x = st.itens[c.dataset.dono]; if (x.existe) x.incluir = true; pintar(); };
     });
     $$("[data-dividir]", rev).forEach((b) => b.onclick = () => escolherDivisao(st.itens[b.dataset.dividir]));
     const salvasEl = $("#imp-salvas", rev);
@@ -1287,6 +1264,7 @@ function abrirImportarFatura() {
       const l = nomes();
       if (l.length < 2) { avisar("Marque pelo menos duas pessoas.", true); return; }
       x.dono = l.join(", ");
+      if (x.existe) x.incluir = true;
       fim(); pintar();
     };
     w.addEventListener("cancel", (e) => { e.preventDefault(); fim(); });
@@ -1340,7 +1318,7 @@ function abrirImportarFatura() {
   $("#imp-mes", d).onchange = (e) => {
     st.mes = e.target.value || hoje;
     // A data das compras sem ano depende do mês da fatura: relê
-    if (st.linhas) { const donos = new Map(st.itens.map((x) => [x.desc + x.valor, [x.tipo, x.nomes]])); prepararItens(itensDasLinhas(st.linhas, st.mes)); st.itens.forEach((x) => { const dn = donos.get(x.desc + x.valor); if (dn) [x.tipo, x.nomes] = dn; }); pintar(); }
+    if (st.linhas) { const donos = new Map(st.itens.map((x) => [x.desc + x.valor, x.dono])); prepararItens(itensDasLinhas(st.linhas, st.mes)); st.itens.forEach((x) => { const dn = donos.get(x.desc + x.valor); if (dn != null) x.dono = dn; }); pintar(); }
     else if (st.csv) prepararItens(itensDoCsv(st.texto, st.mes));
     else recalcular(false);
   };
@@ -1353,7 +1331,7 @@ function abrirImportarFatura() {
       parcelas: x.n,
       primeiro_mes: somaMes(st.mes, -(x.k - 1)) + "-01",
       data_compra: x.data,
-      dono: nomePessoa(donoDe(x)) || null,
+      dono: nomePessoa(x.dono) || null,
       origem: "fatura",
       chave: x.chave
     }));
