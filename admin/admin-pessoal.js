@@ -953,7 +953,11 @@ function devePara(v, a, b) { return (v.gastos || []).filter((g) => mesmaPessoa(g
 function acertoComigo(v) {
   return (v.pessoas || []).filter((n) => !ehEu(n)).map((n) => {
     const teDeve = r2(devePara(v, n, "Eu")), voceDeve = r2(devePara(v, "Eu", n));
-    const jaNoCartao = r2((v.gastos || []).filter((g) => g.compraId && ehEu(g.pagou)).reduce((s, g) => s + partesGasto(g).filter((x) => mesmaPessoa(x.nome, n)).reduce((t, x) => t + x.v, 0), 0));
+    // O que a pessoa já paga dessas compras na fatura (pela divisão da compra no cartão, não a da viagem)
+    const jaNoCartao = r2((v.gastos || []).filter((g) => g.compraId && ehEu(g.pagou)).reduce((s, g) => {
+      const c = P.compras.find((x) => String(x.id) === String(g.compraId));
+      return c ? s + outrosDe(c).filter((x) => mesmaPessoa(x.nome, n)).reduce((t, x) => t + x.frac * n2(c.valor_parcela) * Number(c.parcelas || 1), 0) : s;
+    }, 0));
     return { nome: n, teDeve, voceDeve, jaNoCartao, liquido: r2(teDeve - voceDeve), ajuste: r2(teDeve - jaNoCartao - voceDeve) };
   });
 }
@@ -1074,16 +1078,17 @@ function formGastoViagem(v, g) {
 function trazerDoCartao(v) {
   const usados = new Set((v.gastos || []).map((g) => String(g.compraId || "")));
   const daViagem = (c) => outrosDe(c).some((x) => (v.pessoas || []).some((n) => mesmaPessoa(n, x.nome)));
-  const lista = P.compras.filter((c) => dividida(c) && temMinha(c) && daViagem(c) && !usados.has(String(c.id))).sort((a, b) => String(b.data_compra || "").localeCompare(String(a.data_compra || ""))).slice(0, 60);
+  const desde = isoLocal(new Date(Date.now() - 120 * 864e5));
+  const lista = P.compras.filter((c) => temMinha(c) && !usados.has(String(c.id)) && (dividida(c) ? daViagem(c) : String(c.data_compra || "") >= desde)).sort((a, b) => String(b.data_compra || "").localeCompare(String(a.data_compra || ""))).slice(0, 60);
   const d = abrirJanelaSimples("Trazer do meu cartão", lista.length
-    ? `<p class="sub" style="margin-top:0">Compras do seu cartão divididas com alguém da viagem. Elas entram no acerto, mas não são cobradas de novo: já estão na fatura de cada um.</p>
+    ? `<p class="sub" style="margin-top:0">Compras do seu cartão. As que já estão divididas com alguém não são cobradas de novo. As que são só suas entram divididas entre todos da viagem (dá pra mudar depois tocando no gasto).</p>
       <div class="pf-dividir-lista">${lista.map((c) => `<label class="check"><input type="checkbox" data-trazer="${c.id}"> ${esc(c.descricao)} · ${real(n2(c.valor_parcela) * Number(c.parcelas || 1))} <small class="sub">(${esc(rotuloDono(c))})</small></label>`).join("")}</div>`
     : `<p class="vazio">Nenhuma compra dividida com essas pessoas no seu cartão.</p>`,
     `<button type="button" class="btn" data-fechar>Cancelar</button>${lista.length ? `<button type="button" class="btn primario" id="vg-trazer">Trazer</button>` : ""}`);
   const b = $("#vg-trazer", d);
   if (b) b.onclick = async () => {
     const ids = $$("[data-trazer]", d).filter((x) => x.checked).map((x) => x.dataset.trazer);
-    const novos = ids.map((id) => { const c = P.compras.find((x) => String(x.id) === id); return { id: "g" + c.id, compraId: c.id, descricao: c.descricao, valor: r2(n2(c.valor_parcela) * Number(c.parcelas || 1)), data: c.data_compra || null, pagou: "Eu", divide: partesDe(c).map((x) => (x.eu ? "Eu" : x.nome)) }; });
+    const novos = ids.map((id) => { const c = P.compras.find((x) => String(x.id) === id); return { id: "g" + c.id, compraId: c.id, descricao: c.descricao, valor: r2(n2(c.valor_parcela) * Number(c.parcelas || 1)), data: c.data_compra || null, pagou: "Eu", divide: dividida(c) ? partesDe(c).map((x) => (x.eu ? "Eu" : x.nome)) : [...(v.pessoas || ["Eu"])] }; });
     const vs = viagens().map((x) => (x.id === v.id ? { ...x, gastos: [...(x.gastos || []), ...novos] } : x));
     if (await salvarViagens(vs)) { d.close(); desenhar(); avisar(`${novos.length} ${novos.length === 1 ? "compra trazida" : "compras trazidas"} pra viagem.`); }
   };
