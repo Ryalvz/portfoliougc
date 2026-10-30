@@ -121,12 +121,22 @@ function diaADiaEstimado() {
   const v = meses.reduce((s, k) => s + cartaoNo(k).avEu, 0) / meses.length;
   return { v, fonte: `média das compras à vista ${meses.length === 1 ? "da última fatura" : `das últimas ${meses.length} faturas`}` };
 }
+// Compras à vista suas no mês k, cartão por cartão: fatura importada = valor real;
+// fatura ainda aberta = o que já foi lançado ou a média daquele cartão, o que for maior
+const avistaCartao = (c, k) => cartaoNo(k, (x) => String(x.cartao_id) === String(c.id)).avEu;
+function mediaAvistaCartao(c) {
+  const hoje = mesHojePF();
+  const ms = [...new Set(P.compras.filter((x) => String(x.cartao_id) === String(c.id) && x.origem === "fatura" && !parcelado(x)).map((x) => mesDe(x.primeiro_mes)))].filter((k) => k <= hoje).sort().slice(-3);
+  return ms.length ? ms.reduce((s, k) => s + avistaCartao(c, k), 0) / ms.length : 0;
+}
 function diaADiaNo(k, est) {
   const hoje = mesHojePF();
   const real_ = cartaoNo(k).avEu;
   if (k < hoje) return real_;
-  if (k === hoje) return Math.max(real_, est);
-  return est;
+  // Valor fixo nos ajustes: vale ele (ou o real, se já passou)
+  if (n2(cfg("dia_a_dia")) > 0) return Math.max(real_, est);
+  const semCartao = cartaoNo(k, (x) => !x.cartao_id).avEu;
+  return P.cartoes.reduce((s, c) => { const r = avistaCartao(c, k); return s + (situacaoFatura(c, k).tipo === "importada" ? r : Math.max(r, mediaAvistaCartao(c))); }, 0) + semCartao;
 }
 const entradasNo = (k) => P.entradas.filter((e) => mesDe(e.data) === k).reduce((s, e) => s + n2(e.valor), 0);
 const pjNo = (k) => { const [a, m] = k.split("-").map(Number); return entrouEm(a, m); };
@@ -365,7 +375,7 @@ function pfVisao(el) {
       <li>Clique em <b>Importar fatura</b> e escolha o PDF (ou CSV) da fatura de cada cartão. Marque o nome de quem é cada compra que não é sua.</li></ol></div>` : ""}
     ${cartaoProximasFaturas()}
     <div class="faixa-kpi">
-      <div class="kpi ${atual.sobra < 0 ? "alerta" : ""}"><span>${atual.sobra < 0 ? "Falta" : "Sobra"} em ${MESES_LONGOS[Number(ref.slice(5)) - 1].toLowerCase()}</span><strong>${real(Math.abs(atual.sobra))}</strong><small>renda ${real(atual.renda)} menos ${real(atual.gasto)}</small></div>
+      <div class="kpi ${atual.sobra < 0 ? "alerta" : ""}"><span>${atual.sobra < 0 ? "Falta" : "Sobra"} em ${MESES_LONGOS[Number(ref.slice(5)) - 1].toLowerCase()}</span><strong>${real(Math.abs(atual.sobra))}</strong><small>renda ${real(atual.renda)} menos gastos ${real(atual.gasto)}${(() => { const est = P.cartoes.filter((c) => situacaoFatura(c, ref).tipo !== "importada"); return est.length ? ` (${est.map((c) => c.nome).join(" e ")} ainda estimado${est.length > 1 ? "s" : ""})` : ""; })()}</small></div>
       <div class="kpi"><span>Comprometido em ${MESES_LONGOS[Number(ref.slice(5)) - 1].toLowerCase()}</span><strong>${real(atual.fixas + atual.parc)}</strong><small>${real(atual.fixas)} fixas + ${real(atual.parc)} parcelas</small></div>
       <div class="kpi"><span>Parcelas a pagar</span><strong>${real(restante)}</strong><small>${fimParcelas ? `a última acaba em ${nomeMes(fimParcelas, true)}` : "nenhuma parcela sua"}</small></div>
       <div class="kpi ${aReceber > 0 ? "alerta" : ""}"><span>Te devem</span><strong>${real(aReceber)}</strong><small>${dev.filter((p) => p.falta > 0).length ? qtd(dev.filter((p) => p.falta > 0).length, "pessoa", "pessoas") + " com valor vencido" : "ninguém atrasado"}</small></div>
