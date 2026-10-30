@@ -185,7 +185,11 @@ function devedores() {
   };
   // Na compra dividida, cada pessoa entra só com a parte dela
   const dia = hojeISO();
+  // Compra do seu cartão que foi pra uma viagem: pra quem está na viagem, ela conta só dentro do acerto da viagem (não aparece duas vezes)
+  const naViagem = new Set();
+  viagens().forEach((v) => (v.gastos || []).forEach((g) => { if (g.compraId && ehEu(g.pagou)) (v.pessoas || []).forEach((n) => naViagem.add(`${g.compraId}|${chavePessoa(n)}`)); }));
   P.compras.forEach((c) => outrosDe(c).forEach((pt) => {
+    if (naViagem.has(`${c.id}|${chavePessoa(pt.nome)}`)) return;
     const p = pega(pt.nome);
     const parte = pt.frac < 1 ? { ...c, valor_parcela: r2(n2(c.valor_parcela) * pt.frac), parteDe: n2(c.valor_parcela) } : c;
     p.compras.push(parte);
@@ -198,13 +202,13 @@ function devedores() {
     }
   }));
   // O juros que a pessoa pagou por atraso não abate as compras: é à parte
-  // Viagens: o que sobra do acerto com cada pessoa (fora o que já está no seu cartão) entra como uma linha
+  // Viagens: o acerto inteiro com cada pessoa (o que ela te deve menos o que você deve a ela) entra como uma linha só
   viagens().forEach((v) => acertoComigo(v).forEach((a) => {
-    if (Math.abs(a.ajuste) < 0.005) return;
+    if (Math.abs(a.liquido) < 0.005) return;
     const p = pega(a.nome);
-    const c = { id: `viagem-${v.id}-${chavePessoa(a.nome)}`, descricao: `Viagem ${v.nome} (acerto)`, valor_parcela: a.ajuste, parcelas: 1, primeiro_mes: v.mes + "-01", cartao_id: null, viagem: v.id };
+    const c = { id: `viagem-${v.id}-${chavePessoa(a.nome)}`, descricao: `Viagem ${v.nome}`, valor_parcela: a.liquido, parcelas: 1, primeiro_mes: v.mes + "-01", cartao_id: null, viagem: v.id };
     p.compras.push(c);
-    if (vencimentoNoMes(null, v.mes) <= dia) p.devido += a.ajuste; else p.futuro += a.ajuste;
+    if (vencimentoNoMes(null, v.mes) <= dia) p.devido += a.liquido; else p.futuro += a.liquido;
   }));
   P.receb.forEach((r) => { const p = pega(r.pessoa); const j = Math.min(n2(r.juros), n2(r.valor)); p.pago += n2(r.valor) - j; p.jurosRecebidos += j; p.receb.push(r); });
   return [...mapa.values()].map((p) => ({ ...p, falta: r2(p.devido - p.pago) })).sort((a, b) => b.falta - a.falta || b.futuro - a.futuro);
@@ -876,12 +880,13 @@ function pfDevem(el) {
         : `Oi, ${p.nome.split(" ")[0]}! \n${cb.aberto > 0.005 ? `Ficou em aberto da fatura de ${mesesTexto(cb.antes)}: ${real(cb.aberto)}. ` : ""}${cb.juros > 0.005 ? `\nJuros por atraso: ${real(cb.juros)}. ` : ""}\n*Total: ${real(cb.total)}*. \n\nConsegue me mandar até o vencimento?`;
       return `<div class="cartao pf-pessoa ${p.falta > 0 ? "atrasado" : ""}">
         <div class="barra" style="margin:0 0 6px"><h2 style="margin:0">${esc(p.nome)}</h2><span class="espaco"></span>
-          ${p.falta > 0 ? `<span class="pilula p-vencido">deve ${real(p.falta)}</span>` : p.falta < 0 && p.devido < 0 ? `<span class="pilula p-pendente">você deve ${real(-p.falta)}</span>` : p.falta < 0 ? `<span class="pilula p-pago">pagou ${real(-p.falta)} adiantado</span>` : `<span class="pilula p-pago">em dia</span>`}</div>
+          ${p.falta > 0 ? `<span class="pilula p-vencido">atrasado ${real(p.falta)}</span>` : p.falta < 0 && p.devido < 0 ? `<span class="pilula p-pendente">você deve ${real(-p.falta)}</span>` : p.falta < 0 ? `<span class="pilula p-pago">pagou ${real(-p.falta)} adiantado</span>` : `<span class="pilula p-pago">em dia</span>`}</div>
         <div class="pf-nums"><span>Em aberto de antes<b>${real(cb.aberto)}</b>${cb.antes.length ? `<small>${esc(mesesTexto(cb.antes))}</small>` : ""}</span><span>Fatura de ${nomeRef}<b>${mRef.falta < -0.005 ? `<em class="pf-voce-deve">você deve ${real(-mRef.falta)}</em>` : real(mRef.falta)}</b>${mRef.coberto > 0 ? `<small>já descontado ${real(mRef.coberto)}</small>` : ""}</span><span>Total pra cobrar<b>${real(Math.max(0, cb.total))}</b>${cb.juros > 0.005 ? `<small>com ${real(cb.juros)} de juros</small>` : ""}</span></div>
         <p class="sub" style="margin:2px 0 0">Já pagou ${real(p.pago)} até hoje · depois de ${nomeRef}, ainda vai cair ${real(Math.max(0, p.futuro - Math.max(0, mRef.valor)))} nos próximos meses.</p>
         ${cobraJuros(p.nome) ? (() => { const j = jurosDe(p); return `<div class="pf-juros"><span>Juros por atraso${j.desde ? ` (desde ${dataBR(j.desde).slice(0, 5)})` : ""}<b>${real(j.pendente)}</b>${j.jurosPagos ? `<small>já pagou ${real(j.jurosPagos)} de juros</small>` : ""}</span><span>Pra quitar hoje<b>${real(Math.max(0, p.falta) + j.pendente)}</b><small>o que falta + juros</small></span></div>`; })() : ""}
         <label class="pf-juros-liga"><input type="checkbox" data-juros-pessoa="${esc(p.nome)}" ${cobraJuros(p.nome) ? "checked" : ""}> Cobrar juros por atraso (taxa do cartão, por dia)</label>
-        <ul class="pf-mini">${abertas.slice(0, 8).map((c) => { const i = idxParcela(c, hoje); return `<li><span>${esc(c.descricao)}${c.parteDe ? ` <em>(parte de ${real(c.parteDe)})</em>` : ""}</span><small>${Number(c.parcelas) >= RECORRENTE ? "todo mês" : Number(c.parcelas) > 1 ? (i >= 0 ? `${i + 1}/${c.parcelas}` : `até ${nomeMes(ultimoMes(c), true)}`) : "à vista"}</small><b>${real(c.valor_parcela)}</b></li>`; }).join("")}</ul>
+        <ul class="pf-mini">${cb.aberto > 0.005 ? `<li><span>Em aberto da fatura de ${esc(mesesTexto(cb.antes))}</span><small>atrasado</small><b>${real(cb.aberto)}</b></li>` : ""}${mRef.itens.map(({ c, i }) => `<li><span>${esc(c.descricao)}${c.parteDe ? ` <em>(parte de ${real(c.parteDe)})</em>` : ""}</span><small>${Number(c.parcelas) >= RECORRENTE ? "todo mês" : Number(c.parcelas) > 1 ? `${i + 1}/${c.parcelas}` : c.viagem ? "viagem" : "à vista"}</small><b>${real(c.valor_parcela)}</b></li>`).join("")}${mRef.coberto > 0 ? `<li><span>Já tinha mandado a mais</span><small></small><b>-${real(mRef.coberto)}</b></li>` : ""}</ul>
+        ${(() => { const prox = p.compras.filter((c) => mesDe(c.primeiro_mes) > kRef && Number(c.parcelas || 1) === 1); return prox.length ? `<p class="sub" style="margin:4px 0 0">Fica pra fatura de ${MESES_LONGOS[Number(somaMes(kRef, 1).slice(5)) - 1].toLowerCase()}: ${prox.map((c) => `${esc(c.descricao)} ${real(c.valor_parcela)}`).join(", ")}.</p>` : ""; })()}
         ${p.jurosRecebidos ? `<p class="sub" style="margin:4px 0 0">Já te pagou ${real(p.jurosRecebidos)} de juros por atraso (não entra na conta das compras).</p>` : ""}
         ${p.devido > 0 ? `<div class="pf-pago-trilho" title="Pagou ${real(p.pago)} de ${real(p.devido)}"><i style="width:${Math.min(100, (p.pago / p.devido) * 100)}%"></i></div>` : ""}
         ${p.receb.length ? `<div class="pf-pagamentos"><b>Pagamentos</b>
@@ -1006,13 +1011,13 @@ function pfViagens(el) {
     <div class="grade-fin">
       <div class="cartao">
         <div class="barra" style="margin-bottom:6px"><h2 style="margin:0">Seu acerto com cada um</h2></div>
-        ${meus.length ? `<div class="tabela-caixa"><table class="pf-fat-pessoas"><thead><tr><th>Pessoa</th><th>Te deve</th><th>Você deve</th><th>Acerto</th><th>Total em ${nomeMesAc}</th></tr></thead><tbody>
-          ${meus.map((a) => `<tr><td><b>${esc(a.nome)}</b>${a.jaNoCartao ? `<small>${real(a.jaNoCartao)} já na fatura do seu cartão</small>` : ""}</td>
+        ${meus.length ? `<div class="tabela-caixa"><table class="pf-fat-pessoas"><thead><tr><th>Pessoa</th><th>Te deve</th><th>Você deve</th><th>Acerto da viagem</th><th>Total em ${nomeMesAc} (com tudo)</th></tr></thead><tbody>
+          ${meus.map((a) => `<tr><td><b>${esc(a.nome)}</b></td>
             <td>${real(a.teDeve)}</td><td>${real(a.voceDeve)}</td>
             <td>${Math.abs(a.liquido) < 0.005 ? `<span class="pilula p-pago">zerado</span>` : a.liquido > 0 ? `<b>${esc(a.nome)} te paga ${real(a.liquido)}</b>` : `<b class="pf-voce-deve">você paga ${real(-a.liquido)}</b>`}</td>
             <td>${(() => { const p = devedores().find((x) => mesmaPessoa(x.nome, a.nome)); if (!p) return "-"; const t = cobrancaDe(p, v.mes).total; return t < -0.005 ? `<b class="pf-voce-deve">você paga ${real(-t)}</b>` : `<b>${real(t)}</b>`; })()}</td></tr>`).join("")}
         </tbody></table></div>
-        <p class="sub" style="margin:8px 0 0">"Total em ${nomeMesAc}" já cruza tudo: a viagem, o resto da fatura de ${nomeMesAc} e o que ficou em aberto antes. É o valor que vai na cobrança. O acerto entra em Quem me deve na fatura de ${nomeMesAc}${meus.some((a) => a.jaNoCartao) ? ", descontando o que já está na fatura do seu cartão" : ""}. Se você deve, o valor abate o que a pessoa te deve.</p>` : `<p class="vazio">Adicione as pessoas da viagem em Editar viagem.</p>`}
+        <p class="sub" style="margin:8px 0 0">"Total em ${nomeMesAc}" já cruza tudo: a viagem, o resto da fatura de ${nomeMesAc} e o que ficou em aberto antes. É o valor que vai na cobrança. Compra do seu cartão que está na viagem conta só aqui, não aparece de novo na fatura da pessoa. Se você deve, o valor abate o que a pessoa te deve.</p>` : `<p class="vazio">Adicione as pessoas da viagem em Editar viagem.</p>`}
         ${pares.length ? `<h3 class="pf-escada-tit">Entre os outros</h3><ul class="pf-vg-pares">${pares.map((x) => `<li>${esc(x.de)} paga <b>${real(x.v)}</b> pra ${esc(x.para)}</li>`).join("")}</ul>` : ""}
       </div>
       <div class="cartao">
