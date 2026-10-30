@@ -1124,7 +1124,8 @@ function abrirImportarFatura() {
   $("#imp-cartao", d).value = st.cartao;
   d.showModal();
 
-  const pessoas = () => pessoasConhecidas();
+  // "dividido", "todos"... não são pessoas: ficam fora da lista (pra dividir, use o botão Dividir)
+  const pessoas = () => pessoasConhecidas().filter((p) => !/^(dividid[oa]s?|todos|todo mundo|geral|grupo)$/i.test(semAcento(p)));
   const donoAnterior = (x) => {
     const b = baseDesc(x.desc);
     const igual = P.compras.filter((c) => baseDesc(c.descricao) === b && (!st.cartao || String(c.cartao_id) === st.cartao));
@@ -1162,51 +1163,133 @@ function abrirImportarFatura() {
       if (c) { usados.add(c.id); x.rapido = c; }
     });
     st.itens.forEach((x) => {
-      if (novosDonos) x.dono = x.existe ? nomePessoa(x.existe.dono || "") : x.rapido ? nomePessoa(x.rapido.dono || "") : (x.donoSugerido || donoAnterior(x));
+      if (novosDonos) {
+        const dono = x.existe ? nomePessoa(x.existe.dono || "") : x.rapido ? nomePessoa(x.rapido.dono || "") : (x.donoSugerido || donoAnterior(x));
+        const t = tipoDaCompra({ dono });
+        x.tipo = t.tipo; x.nomes = t.nomes;
+        // Já salva: fica de fora, a não ser que você mude alguma coisa nela
+        if (x.existe && !x.pagamento) x.incluir = false;
+      }
     });
     pintar();
   };
+  // De quem é: minha, de outra pessoa ou dividida comigo (partes iguais)
+  const donoDe = (x) => donoDoTipo(x.tipo, x.nomes) || "";
+  const valorDe = (x) => (x.credito ? -x.valor : x.valor);
+  const linhaImp = (x, i) => {
+    const partes = x.tipo === "dividida" && nomePessoa(x.nomes) ? partesDe({ dono: donoDe(x) }).length : 0;
+    return `<tr class="${x.credito ? "pf-credito" : ""}">
+      <td><input type="checkbox" data-inc="${i}" ${x.incluir ? "checked" : ""} aria-label="Incluir"></td>
+      <td>${dataBR(x.data)}</td>
+      <td>${esc(x.desc)}${x.pagamento ? ` <span class="pilula p-parada">pagamento da fatura</span>` : x.credito ? ` <span class="pilula p-pago">estorno ou crédito</span>` : ""}${x.rapido ? ` <span class="pilula p-conversando">você lançou: ${esc(x.rapido.descricao)}</span>` : ""}</td>
+      <td>${x.n > 1 ? `${x.k}/${x.n}` : "à vista"}</td>
+      <td>${x.credito ? "−" : ""}${real(x.valor)}</td>
+      <td><div class="pf-imp-dono">
+        <select class="campo" data-tipo="${i}" aria-label="De quem é">
+          <option value="minha" ${x.tipo === "minha" ? "selected" : ""}>Minha</option>
+          <option value="outra" ${x.tipo === "outra" ? "selected" : ""}>De outra pessoa</option>
+          <option value="dividida" ${x.tipo === "dividida" ? "selected" : ""}>Dividida comigo</option>
+        </select>
+        <input class="campo" data-nomes="${i}" list="imp-pessoas" value="${esc(x.nomes)}" ${x.tipo === "minha" ? "hidden" : ""} placeholder="${x.tipo === "dividida" ? "Com quem: Diego, Emillie" : "Nome da pessoa"}" aria-label="Nomes">
+        ${partes ? `<small class="sub" data-partes="${i}">${partes} partes de ${real(Math.abs(valorDe(x)) / partes)}</small>` : x.tipo === "dividida" ? `<small class="sub" data-partes="${i}">escreva com quem</small>` : ""}
+      </div></td></tr>`;
+  };
+  const tabelaImp = (lista) => `<div class="tabela-caixa pf-imp-tabela"><table><thead><tr><th></th><th>Data</th><th>Compra</th><th>Parcela</th><th>Valor</th><th>De quem é</th></tr></thead><tbody>
+    ${lista.map(({ x, i }) => linhaImp(x, i)).join("")}</tbody></table></div>`;
   const pintar = () => {
     const rev = $("#imp-rev", d);
     if (!st.itens.length) { rev.innerHTML = st.arquivo ? `<p class="aviso-falta">Não achei compras neste arquivo. Se for PDF escaneado (imagem), baixe a fatura em CSV no app do banco ou lance as parcelas à mão.</p>` : ""; $("#imp-salvar", d).disabled = true; return; }
     const inc = st.itens.filter((x) => x.incluir);
     const soma = inc.reduce((s, x) => s + (x.credito ? -x.valor : x.valor), 0);
-    const novos = inc.filter((x) => !x.existe).length;
+    const novos = st.itens.map((x, i) => [x, i]).filter(([x]) => !x.existe);
+    const salvas = st.itens.map((x, i) => [x, i]).filter(([x]) => x.existe);
+    const linha = ([x, i]) => {
+      const partes = partesDe({ dono: x.dono });
+      const cada = partes.length > 1 ? `<small class="pf-imp-cada">${partes.length} partes de ${real(x.valor / partes.length)}: ${partes.map((p) => (p.eu ? "você" : esc(p.nome))).join(", ")}</small>` : "";
+      return `<tr class="${x.credito ? "pf-credito" : ""} ${x.existe ? "pf-existe" : ""}">
+        <td><input type="checkbox" data-inc="${i}" ${x.incluir ? "checked" : ""} aria-label="Incluir"></td>
+        <td>${dataBR(x.data)}</td>
+        <td>${esc(x.desc)}${x.pagamento ? ` <span class="pilula p-parada">pagamento da fatura</span>` : x.credito ? ` <span class="pilula p-pago">estorno ou crédito</span>` : ""}${x.rapido ? ` <span class="pilula p-conversando">você lançou: ${esc(x.rapido.descricao)}</span>` : ""}</td>
+        <td>${x.n > 1 ? `${x.k}/${x.n}` : "à vista"}</td>
+        <td>${x.credito ? "−" : ""}${real(x.valor)}</td>
+        <td><div class="pf-imp-dono"><input class="campo" data-dono="${i}" list="imp-pessoas" value="${esc(x.dono)}" placeholder="Eu" style="min-width:120px"><button type="button" class="btn pequeno" data-dividir="${i}">Dividir</button></div>${cada}</td></tr>`;
+    };
+    const tabela = (lista) => `<div class="tabela-caixa pf-imp-tabela"><table><thead><tr><th></th><th>Data</th><th>Compra</th><th>Parcela</th><th>Valor</th><th>De quem (vazio = sua)</th></tr></thead><tbody>${lista.map(linha).join("")}</tbody></table></div>`;
     rev.innerHTML = `
       <div class="pf-imp-resumo">
         <span><b>${st.itens.length}</b> lançamentos lidos</span>
         <span><b>${real(soma)}</b> marcados${st.total ? ` (a fatura diz ${real(st.total)}${Math.abs(st.total - soma) > 1 ? ", confira" : ""})` : ""}</span>
-        <span><b>${novos}</b> novos, ${inc.length - novos} já estavam salvos</span>
-      </div>
-      <div class="barra" style="margin:8px 0">
-        <label class="check"><input type="checkbox" id="imp-todos" ${inc.length === st.itens.length ? "checked" : ""}> Todos</label>
-        <span class="espaco"></span>
-        <input class="campo" id="imp-lote" list="imp-pessoas" placeholder="Nome da pessoa" style="max-width:180px">
-        <button class="btn" type="button" id="imp-aplicar">Pôr nas marcadas sem nome</button>
+        <span><b>${novos.length}</b> novos, ${salvas.length} já estavam salvos</span>
       </div>
       <datalist id="imp-pessoas">${pessoas().map((p) => `<option value="${esc(p)}">`).join("")}</datalist>
-      <div class="tabela-caixa pf-imp-tabela"><table><thead><tr><th></th><th>Data</th><th>Compra</th><th>Parcela</th><th>Valor</th><th>De quem (vazio = sua)</th></tr></thead><tbody>
-      ${st.itens.map((x, i) => `<tr class="${x.credito ? "pf-credito" : ""} ${x.existe ? "pf-existe" : ""}">
-        <td><input type="checkbox" data-inc="${i}" ${x.incluir ? "checked" : ""} aria-label="Incluir"></td>
-        <td>${dataBR(x.data)}</td>
-        <td>${esc(x.desc)}${x.pagamento ? ` <span class="pilula p-parada">pagamento da fatura</span>` : x.credito ? ` <span class="pilula p-pago">estorno ou crédito</span>` : ""}${x.existe ? ` <span class="pilula p-pago">já salva</span>` : ""}${x.rapido ? ` <span class="pilula p-conversando">você lançou: ${esc(x.rapido.descricao)}</span>` : ""}</td>
-        <td>${x.n > 1 ? `${x.k}/${x.n}` : "à vista"}</td>
-        <td>${x.credito ? "−" : ""}${real(x.valor)}</td>
-        <td><input class="campo" data-dono="${i}" list="imp-pessoas" value="${esc(x.dono)}" placeholder="Eu" style="min-width:120px"></td></tr>`).join("")}
-      </tbody></table></div>
-      <p class="sub">Parcelado: salvo uma vez com todas as parcelas; na fatura do mês que vem ele é reconhecido e não duplica. Pagamentos da fatura já vêm desmarcados; estornos entram negativos e abatem a compra.</p>`;
+      ${novos.length ? `
+        <div class="barra" style="margin:8px 0">
+          <h3 class="pf-imp-titulo">Novas, ainda não salvas <span class="sub">${novos.length}</span></h3>
+          <label class="check"><input type="checkbox" id="imp-todos" ${novos.every(([x]) => x.incluir) ? "checked" : ""}> Todas</label>
+          <span class="espaco"></span>
+          <input class="campo" id="imp-lote" list="imp-pessoas" placeholder="Nome da pessoa" style="max-width:180px">
+          <button class="btn" type="button" id="imp-aplicar">Pôr nas marcadas sem nome</button>
+        </div>
+        ${tabela(novos)}`
+      : `<p class="pf-imp-ok">Tudo desta fatura já está salvo. Se quiser conferir de quem é cada compra, abra a lista abaixo.</p>`}
+      ${salvas.length ? `<details class="pf-imp-salvas" id="imp-salvas" ${st.verSalvas ? "open" : ""}>
+        <summary><b>Já salvas</b> <span class="sub">${salvas.length}: abra pra conferir ou trocar de quem é</span></summary>
+        ${tabela(salvas)}</details>` : ""}
+      <p class="sub">Compra dividida: toque em <b>Dividir</b> e marque quem participou, ou escreva os nomes separados por vírgula (ex.: Eu, Diego, Emillie). Cada um fica com uma parte igual. Parcelado é salvo uma vez com todas as parcelas e não duplica no mês que vem. Pagamentos da fatura já vêm desmarcados; estornos entram negativos e abatem a compra.</p>`;
     $("#imp-salvar", d).disabled = !inc.length;
     $$("[data-inc]", rev).forEach((c) => c.onchange = () => { st.itens[c.dataset.inc].incluir = c.checked; pintar(); });
-    $$("[data-dono]", rev).forEach((c) => c.oninput = () => { st.itens[c.dataset.dono].dono = c.value; });
-    $("#imp-todos", rev).onchange = (e) => { st.itens.forEach((x) => { x.incluir = e.target.checked; }); pintar(); };
-    $("#imp-aplicar", rev).onclick = () => {
+    $$("[data-dono]", rev).forEach((c) => {
+      c.oninput = () => { st.itens[c.dataset.dono].dono = c.value; };
+      c.onchange = () => pintar();
+    });
+    $$("[data-dividir]", rev).forEach((b) => b.onclick = () => escolherDivisao(st.itens[b.dataset.dividir]));
+    const salvasEl = $("#imp-salvas", rev);
+    if (salvasEl) salvasEl.ontoggle = () => { st.verSalvas = salvasEl.open; };
+    const todos = $("#imp-todos", rev);
+    if (todos) todos.onchange = (e) => { novos.forEach(([x]) => { x.incluir = e.target.checked; }); pintar(); };
+    const aplicar = $("#imp-aplicar", rev);
+    if (aplicar) aplicar.onclick = () => {
       const nome = nomePessoa($("#imp-lote", rev).value);
-      // Só nas linhas marcadas que ainda não têm nome; para trocar uma, edite na própria linha
-      const alvo = st.itens.filter((x) => x.incluir && !x.dono);
+      // Só nas novas marcadas que ainda não têm nome; para trocar uma, edite na própria linha
       if (!nome) { avisar("Digite o nome da pessoa.", true); return; }
-      alvo.forEach((x) => { x.dono = nome; });
+      novos.forEach(([x]) => { if (x.incluir && !x.dono) x.dono = nome; });
       pintar();
     };
+  };
+  // Dividir uma compra: marca quem participou (você já vem marcado) e cada um fica com uma parte igual
+  const escolherDivisao = (x) => {
+    const atuais = partesDe({ dono: x.dono });
+    const temEu = atuais.some((p) => p.eu) || !nomePessoa(x.dono);
+    const marcados = new Set(atuais.filter((p) => !p.eu).map((p) => chavePessoa(p.nome)));
+    const lista = [...new Set([...pessoas(), ...atuais.filter((p) => !p.eu).map((p) => p.nome)])];
+    const w = document.createElement("dialog");
+    w.className = "pf-dividir";
+    w.innerHTML = `<div class="janela-topo"><h3>Dividir ${esc(x.desc)}</h3></div>
+      <div class="janela-corpo">
+        <p class="sub" style="margin-top:0">${real(x.valor)}. Marque quem entra na divisão.</p>
+        <div class="pf-dividir-lista">
+          <label class="check"><input type="checkbox" data-quem="Eu" ${temEu ? "checked" : ""}> Eu</label>
+          ${lista.map((n) => `<label class="check"><input type="checkbox" data-quem="${esc(n)}" ${marcados.has(chavePessoa(n)) ? "checked" : ""}> ${esc(n)}</label>`).join("")}
+        </div>
+        <label for="div-outros" style="display:block;margin-top:10px">Mais alguém (separe por vírgula)</label>
+        <input class="campo" id="div-outros" style="width:100%" placeholder="Ex.: Ana, Bruno">
+        <p class="pf-dividir-conta" id="div-conta"></p>
+      </div>
+      <div class="janela-pe"><button type="button" class="btn" data-n>Cancelar</button><button type="button" class="btn primario" data-s>Dividir</button></div>`;
+    document.body.appendChild(w);
+    const nomes = () => [...$$("[data-quem]", w).filter((c) => c.checked).map((c) => c.dataset.quem), ...$("#div-outros", w).value.split(/\s*[,;]\s*/).map(nomePessoa).filter(Boolean)];
+    const conta = () => { const n = nomes().length; $("#div-conta", w).textContent = n > 1 ? `${n} pessoas: ${real(x.valor / n)} pra cada.` : "Marque pelo menos duas pessoas."; };
+    w.oninput = conta; w.onchange = conta; conta();
+    const fim = () => { w.close(); w.remove(); };
+    $("[data-n]", w).onclick = fim;
+    $("[data-s]", w).onclick = () => {
+      const l = nomes();
+      if (l.length < 2) { avisar("Marque pelo menos duas pessoas.", true); return; }
+      x.dono = l.join(", ");
+      fim(); pintar();
+    };
+    w.addEventListener("cancel", (e) => { e.preventDefault(); fim(); });
+    w.showModal();
   };
 
   const processar = async (senha) => {
@@ -1256,7 +1339,7 @@ function abrirImportarFatura() {
   $("#imp-mes", d).onchange = (e) => {
     st.mes = e.target.value || hoje;
     // A data das compras sem ano depende do mês da fatura: relê
-    if (st.linhas) { const donos = new Map(st.itens.map((x) => [x.desc + x.valor, x.dono])); prepararItens(itensDasLinhas(st.linhas, st.mes)); st.itens.forEach((x) => { const dn = donos.get(x.desc + x.valor); if (dn != null) x.dono = dn; }); pintar(); }
+    if (st.linhas) { const donos = new Map(st.itens.map((x) => [x.desc + x.valor, [x.tipo, x.nomes]])); prepararItens(itensDasLinhas(st.linhas, st.mes)); st.itens.forEach((x) => { const dn = donos.get(x.desc + x.valor); if (dn) [x.tipo, x.nomes] = dn; }); pintar(); }
     else if (st.csv) prepararItens(itensDoCsv(st.texto, st.mes));
     else recalcular(false);
   };
@@ -1269,7 +1352,7 @@ function abrirImportarFatura() {
       parcelas: x.n,
       primeiro_mes: somaMes(st.mes, -(x.k - 1)) + "-01",
       data_compra: x.data,
-      dono: nomePessoa(x.dono) || null,
+      dono: nomePessoa(donoDe(x)) || null,
       origem: "fatura",
       chave: x.chave
     }));
