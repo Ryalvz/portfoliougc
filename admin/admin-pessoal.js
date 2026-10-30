@@ -969,13 +969,14 @@ function devePara(v, a, b) { return (v.gastos || []).filter((g) => mesmaPessoa(g
 // O seu acerto com cada pessoa. "jaNoCartao" = parte dela em gasto do seu cartão (já cobrada pela fatura)
 function acertoComigo(v) {
   return (v.pessoas || []).filter((n) => !ehEu(n)).map((n) => {
-    const teDeve = r2(devePara(v, n, "Eu")), voceDeve = r2(devePara(v, "Eu", n));
+    const teDeveX = devePara(v, n, "Eu"), voceDeveX = devePara(v, "Eu", n);
+    const teDeve = r2(teDeveX), voceDeve = r2(voceDeveX);
     // O que a pessoa já paga dessas compras na fatura (pela divisão da compra no cartão, não a da viagem)
     const jaNoCartao = r2((v.gastos || []).filter((g) => g.compraId && ehEu(g.pagou)).reduce((s, g) => {
       const c = P.compras.find((x) => String(x.id) === String(g.compraId));
       return c ? s + outrosDe(c).filter((x) => mesmaPessoa(x.nome, n)).reduce((t, x) => t + x.frac * n2(c.valor_parcela) * Number(c.parcelas || 1), 0) : s;
     }, 0));
-    return { nome: n, teDeve, voceDeve, jaNoCartao, liquido: r2(teDeve - voceDeve), ajuste: r2(teDeve - jaNoCartao - voceDeve) };
+    return { nome: n, teDeve, voceDeve, jaNoCartao, liquido: r2(teDeveX - voceDeveX), ajuste: r2(teDeveX - jaNoCartao - voceDeveX) };
   });
 }
 function pfViagens(el) {
