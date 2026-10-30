@@ -1089,8 +1089,12 @@ function trazerDoCartao(v) {
   if (b) b.onclick = async () => {
     const ids = $$("[data-trazer]", d).filter((x) => x.checked).map((x) => x.dataset.trazer);
     const novos = ids.map((id) => { const c = P.compras.find((x) => String(x.id) === id); return { id: "g" + c.id, compraId: c.id, descricao: c.descricao, valor: r2(n2(c.valor_parcela) * Number(c.parcelas || 1)), data: c.data_compra || null, pagou: "Eu", divide: dividida(c) ? partesDe(c).map((x) => (x.eu ? "Eu" : x.nome)) : [...(v.pessoas || ["Eu"])] }; });
-    const vs = viagens().map((x) => (x.id === v.id ? { ...x, gastos: [...(x.gastos || []), ...novos] } : x));
-    if (await salvarViagens(vs)) { d.close(); desenhar(); avisar(`${novos.length} ${novos.length === 1 ? "compra trazida" : "compras trazidas"} pra viagem.`); }
+    // Nome da compra que não está na viagem (ex.: "konstantin" com a viagem dizendo "kostya") entra na lista, pra não sumir do acerto
+    const pessoas = [...(v.pessoas || ["Eu"])];
+    novos.forEach((g) => g.divide.forEach((n) => { if (!pessoas.some((x) => mesmaPessoa(x, n))) pessoas.push(n); }));
+    const novosNomes = pessoas.slice((v.pessoas || []).length);
+    const vs = viagens().map((x) => (x.id === v.id ? { ...x, pessoas, gastos: [...(x.gastos || []), ...novos] } : x));
+    if (await salvarViagens(vs)) { d.close(); desenhar(); avisar(`${novos.length} ${novos.length === 1 ? "compra trazida" : "compras trazidas"} pra viagem.${novosNomes.length ? ` Entrou na viagem: ${novosNomes.join(", ")}. Se for alguém que já está com outro nome, ajuste em Editar viagem.` : ""}`); }
   };
 }
 
