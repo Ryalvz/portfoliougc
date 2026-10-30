@@ -1548,3 +1548,10 @@ dialog.pf-janela-rapida { width: min(460px, calc(100vw - 20px)); }
 .pf-fat-nota { margin: 10px 0 0; padding: 10px 12px; border-radius: var(--radius); background: var(--parchment); font-size: 13px; line-height: 1.5; }
 .pf-escada-caixa { margin-top: 14px; }
 .pf-escada-caixa summary { cursor: pointer; font-weight: 600; font-size: 14px; }
+/* Viagens: gastos em grupo e acerto */
+.pf-voce-deve { color: var(--red); }
+.pf-vg-gastos { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.pf-vg-gastos button { width: 100%; display: flex; align-items: center; gap: 10px; text-align: left; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--parchment); cursor: pointer; font: inherit; color: inherit; }
+.pf-vg-gastos button span { flex: 1; min-width: 0; }
+.pf-vg-gastos small { display: block; color: var(--muted); font-size: 12px; }
+.pf-vg-pares { margin: 6px 0 0; padding-left: 18px; font-size: 14px; }

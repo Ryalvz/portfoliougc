@@ -22,7 +22,7 @@ Object.assign(ESQUEMA, {
 const P = { ok: false, carregando: null, cartoes: [], contas: [], compras: [], receb: [], entradas: [], config: {} };
 const pfx = { sub: "visao", cartao: "", dono: "", tipo: "parceladas", mesFat: "", mesGasto: "", gDono: "", gCartao: "" };
 try { pfx.sub = localStorage.getItem("pf-sub") || "visao"; } catch (_) {}
-const SUBS_PF = [["visao", "Visão geral"], ["gastos", "Gastos do mês"], ["compras", "Parcelas"], ["devem", "Quem me deve"], ["contas", "Contas fixas"], ["entradas", "Entradas"]];
+const SUBS_PF = [["visao", "Visão geral"], ["gastos", "Gastos do mês"], ["compras", "Parcelas"], ["devem", "Quem me deve"], ["viagens", "Viagens"], ["contas", "Contas fixas"], ["entradas", "Entradas"]];
 
 /* ---------- Meses como "2026-10" ---------- */
 const mesDe = (iso) => String(iso || "").slice(0, 7);
@@ -198,6 +198,14 @@ function devedores() {
     }
   }));
   // O juros que a pessoa pagou por atraso não abate as compras: é à parte
+  // Viagens: o que sobra do acerto com cada pessoa (fora o que já está no seu cartão) entra como uma linha
+  viagens().forEach((v) => acertoComigo(v).forEach((a) => {
+    if (Math.abs(a.ajuste) < 0.005) return;
+    const p = pega(a.nome);
+    const c = { id: `viagem-${v.id}-${chavePessoa(a.nome)}`, descricao: `Viagem ${v.nome} (acerto)`, valor_parcela: a.ajuste, parcelas: 1, primeiro_mes: v.mes + "-01", cartao_id: null, viagem: v.id };
+    p.compras.push(c);
+    if (vencimentoNoMes(null, v.mes) <= dia) p.devido += a.ajuste; else p.futuro += a.ajuste;
+  }));
   P.receb.forEach((r) => { const p = pega(r.pessoa); const j = Math.min(n2(r.juros), n2(r.valor)); p.pago += n2(r.valor) - j; p.jurosRecebidos += j; p.receb.push(r); });
   return [...mapa.values()].map((p) => ({ ...p, falta: r2(p.devido - p.pago) })).sort((a, b) => b.falta - a.falta || b.futuro - a.futuro);
 }
@@ -266,7 +274,7 @@ function jurosDe(p) {
       const k = somaMes(mesDe(c.primeiro_mes), i);
       if (k < inicio) continue;
       const venc = vencimentoNoMes(cartao, k);
-      if (venc > hoje) continue;
+      if (venc > hoje || n2(c.valor_parcela) <= 0) continue;
       devidas.push({ data: venc, valor: n2(c.valor_parcela), dia: taxaDoCartao(cartao) / 100 / 30 });
     }
   });
@@ -347,7 +355,7 @@ function desenharPessoal(el) {
   $("#pf-telegram", el).onclick = () => abrirTelegram();
   $("#pf-ajustes", el).onclick = () => formAjustesPF();
   const corpo = $("#pf-corpo", el);
-  ({ visao: pfVisao, gastos: pfGastos, compras: pfCompras, devem: pfDevem, contas: pfContas, entradas: pfEntradas })[pfx.sub](corpo);
+  ({ visao: pfVisao, gastos: pfGastos, compras: pfCompras, devem: pfDevem, viagens: pfViagens, contas: pfContas, entradas: pfEntradas })[pfx.sub](corpo);
   ligarDicas(el);
 }
 
@@ -821,7 +829,7 @@ function pfDevem(el) {
   // Abre na fatura que você paga agora
   if (!mesesFat.includes(pfx.mesDeve)) pfx.mesDeve = mesesFat.includes(mesAPagar()) ? mesAPagar() : hoje;
   const kF = pfx.mesDeve;
-  const linhasFat = dev.map((p) => ({ p, m: contaPorMes(p, kF).find((x) => x.k === kF) })).filter((x) => x.m && x.m.valor > 0);
+  const linhasFat = dev.map((p) => ({ p, m: contaPorMes(p, kF).find((x) => x.k === kF) })).filter((x) => x.m && Math.abs(x.m.valor) > 0.005);
   const totFat = linhasFat.reduce((s, x) => s + x.m.valor, 0), totFalta = linhasFat.reduce((s, x) => s + x.m.falta, 0);
   // O que ficou em aberto de faturas anteriores à escolhida
   const antes = dev.map((p) => ({ p, l: contaPorMes(p, somaMes(kF, -1)).filter((m) => m.falta > 0.005) })).filter((x) => x.l.length);
@@ -834,7 +842,7 @@ function pfDevem(el) {
         <td><b>${esc(p.nome)}</b><small>${m.itens.length === 1 ? "1 compra" : `${m.itens.length} compras`}</small></td>
         <td>${real(m.valor)}</td>
         <td>${m.coberto ? real(m.coberto) : "-"}</td>
-        <td>${m.falta > 0.005 ? `<b>${real(m.falta)}</b>` : `<span class="pilula p-pago">pago</span>`}</td>
+        <td>${m.falta > 0.005 ? `<b>${real(m.falta)}</b>` : m.falta < -0.005 ? `<b class="pf-voce-deve">você deve ${real(-m.falta)}</b>` : `<span class="pilula p-pago">pago</span>`}</td>
         <td>${dataBR(m.vence).slice(0, 5)}${m.falta > 0.005 && m.vence < hojeISO() ? ` <span class="pilula p-vencido">vencido</span>` : ""}</td>
         <td class="pf-fat-acoes">${m.falta > 0.005 ? `<a class="btn pequeno" href="https://wa.me/?text=${encodeURIComponent(msgFatura(p, m))}" target="_blank" rel="noopener">${ic("whats")}Cobrar</a>` : ""}</td></tr>`).join("")}
       </tbody><tfoot><tr><td>Total</td><td>${real(totFat)}</td><td></td><td><b>${real(totFalta)}</b></td><td colspan="2"></td></tr></tfoot></table></div>`
@@ -857,7 +865,7 @@ function pfDevem(el) {
         : `Oi, ${p.nome.split(" ")[0]}! \n${extra.join("\n") || `Em aberto até agora: *${real(Math.max(0, p.falta))}*. `}\n\nConsegue me mandar até o vencimento?`;
       return `<div class="cartao pf-pessoa ${p.falta > 0 ? "atrasado" : ""}">
         <div class="barra" style="margin:0 0 6px"><h2 style="margin:0">${esc(p.nome)}</h2><span class="espaco"></span>
-          ${p.falta > 0 ? `<span class="pilula p-vencido">deve ${real(p.falta)}</span>` : p.falta < 0 ? `<span class="pilula p-pago">pagou ${real(-p.falta)} adiantado</span>` : `<span class="pilula p-pago">em dia</span>`}</div>
+          ${p.falta > 0 ? `<span class="pilula p-vencido">deve ${real(p.falta)}</span>` : p.falta < 0 && p.devido < 0 ? `<span class="pilula p-pendente">você deve ${real(-p.falta)}</span>` : p.falta < 0 ? `<span class="pilula p-pago">pagou ${real(-p.falta)} adiantado</span>` : `<span class="pilula p-pago">em dia</span>`}</div>
         <div class="pf-nums"><span>Já venceu<b>${real(p.devido)}</b></span><span>Já pagou<b>${real(p.pago)}</b></span><span>Próximos 12 meses<b>${real(p.futuro)}</b></span></div>
         ${cobraJuros(p.nome) ? (() => { const j = jurosDe(p); return `<div class="pf-juros"><span>Juros por atraso${j.desde ? ` (desde ${dataBR(j.desde).slice(0, 5)})` : ""}<b>${real(j.pendente)}</b>${j.jurosPagos ? `<small>já pagou ${real(j.jurosPagos)} de juros</small>` : ""}</span><span>Pra quitar hoje<b>${real(Math.max(0, p.falta) + j.pendente)}</b><small>o que falta + juros</small></span></div>`; })() : ""}
         <label class="pf-juros-liga"><input type="checkbox" data-juros-pessoa="${esc(p.nome)}" ${cobraJuros(p.nome) ? "checked" : ""}> Cobrar juros por atraso (taxa do cartão, por dia)</label>
@@ -910,6 +918,175 @@ function formRecebPF(r, pessoa, falta) {
     },
     aoApagar: r ? async () => { const ok = await apagarLinha("pf_recebimentos", r.id); if (ok) await recarregarPF(); return ok; } : null
   });
+}
+
+/* =============================================================
+   VIAGENS: gasto em grupo, pago por qualquer um
+   Cada gasto diz quem pagou e entre quem divide. O acerto é feito
+   par a par: o que a pessoa te deve menos o que você deve a ela.
+   Gasto do seu cartão que já tem os nomes (ex.: "Eu, bob") pode ser
+   trazido pra viagem: ele aparece no acerto, mas não é cobrado de
+   novo (já está na fatura). Tudo fica no pf_config, chave "viagens".
+   ============================================================= */
+const viagens = () => (Array.isArray(cfg("viagens", [])) ? cfg("viagens", []) : []);
+const ehEu = (n) => EU_NOMES.has(semAcento(nomePessoa(n)));
+const mesmaPessoa = (a, b) => (ehEu(a) && ehEu(b)) || chavePessoa(a) === chavePessoa(b);
+async function salvarViagens(lista) {
+  const { error } = await db.from("pf_config").upsert({ chave: "viagens", valor: lista }, { onConflict: "chave" });
+  if (error) { avisar(traduzErro(error), true); return false; }
+  P.config.viagens = lista;
+  return true;
+}
+// Gasto da viagem: valor, quem pagou e as partes iguais de cada um
+const partesGasto = (g) => { const l = (g.divide || []).filter(Boolean); return l.map((n) => ({ nome: n, v: n2(g.valor) / (l.length || 1) })); };
+// Saldo de cada pessoa no grupo: o que pagou menos a parte dela
+function saldosViagem(v) {
+  const m = new Map();
+  const pega = (n) => { const k = ehEu(n) ? "eu" : chavePessoa(n); if (!m.has(k)) m.set(k, { nome: ehEu(n) ? "Eu" : nomePessoa(n), pagou: 0, parte: 0 }); return m.get(k); };
+  (v.pessoas || []).forEach(pega);
+  (v.gastos || []).forEach((g) => { pega(g.pagou).pagou += n2(g.valor); partesGasto(g).forEach((x) => { pega(x.nome).parte += x.v; }); });
+  return [...m.values()].map((x) => ({ ...x, saldo: r2(x.pagou - x.parte) }));
+}
+// Par a par: quanto A deve a B (as partes de A nos gastos que B pagou)
+function devePara(v, a, b) { return (v.gastos || []).filter((g) => mesmaPessoa(g.pagou, b)).reduce((s, g) => s + partesGasto(g).filter((x) => mesmaPessoa(x.nome, a)).reduce((t, x) => t + x.v, 0), 0); }
+// O seu acerto com cada pessoa. "jaNoCartao" = parte dela em gasto do seu cartão (já cobrada pela fatura)
+function acertoComigo(v) {
+  return (v.pessoas || []).filter((n) => !ehEu(n)).map((n) => {
+    const teDeve = r2(devePara(v, n, "Eu")), voceDeve = r2(devePara(v, "Eu", n));
+    const jaNoCartao = r2((v.gastos || []).filter((g) => g.compraId && ehEu(g.pagou)).reduce((s, g) => s + partesGasto(g).filter((x) => mesmaPessoa(x.nome, n)).reduce((t, x) => t + x.v, 0), 0));
+    return { nome: n, teDeve, voceDeve, jaNoCartao, liquido: r2(teDeve - voceDeve), ajuste: r2(teDeve - jaNoCartao - voceDeve) };
+  });
+}
+function pfViagens(el) {
+  const lista = viagens();
+  if (!lista.some((v) => v.id === pfx.viagem)) pfx.viagem = lista.length ? lista[lista.length - 1].id : null;
+  const v = lista.find((x) => x.id === pfx.viagem);
+  if (!v) {
+    el.innerHTML = `<div class="cartao pf-comeco"><h2>Viagens e gastos em grupo</h2>
+      <p>Para viagem em que cada um pagou umas coisas no próprio cartão. Você lança cada gasto dizendo quem pagou e entre quem divide, e o painel faz o acerto: quem deve pra quem, já descontando um do outro.</p>
+      <button class="btn primario" type="button" id="vg-nova">${ic("mais")}Nova viagem</button></div>`;
+    $("#vg-nova", el).onclick = () => formViagem(null);
+    return;
+  }
+  const nomeMesAc = MESES_LONGOS[Number(v.mes.slice(5)) - 1].toLowerCase();
+  const total = (v.gastos || []).reduce((s, g) => s + n2(g.valor), 0);
+  const saldos = saldosViagem(v), meus = acertoComigo(v);
+  const outros = (v.pessoas || []).filter((n) => !ehEu(n));
+  const pares = [];
+  outros.forEach((a, i) => outros.slice(i + 1).forEach((b) => { const x = r2(devePara(v, a, b) - devePara(v, b, a)); if (Math.abs(x) >= 0.01) pares.push(x > 0 ? { de: a, para: b, v: x } : { de: b, para: a, v: -x }); }));
+  const quem = (n) => (ehEu(n) ? "Você" : esc(n));
+  el.innerHTML = `
+    <div class="barra">
+      <div class="chips" role="tablist" aria-label="Viagem">${lista.map((x) => `<button class="chip" type="button" data-vg="${x.id}" aria-pressed="${x.id === v.id}">${esc(x.nome)}</button>`).join("")}</div>
+      <span class="espaco"></span>
+      <button class="btn" type="button" id="vg-nova">${ic("mais")}Nova viagem</button>
+      <button class="btn" type="button" id="vg-editar">${ic("editar")}Editar viagem</button>
+    </div>
+    <div class="pf-fat-topo">
+      <div class="pf-fat-total"><span>Gasto total da viagem</span><strong>${real(total)}</strong><small>${(v.gastos || []).length} gastos, ${(v.pessoas || []).length} pessoas</small></div>
+      <div><span>Sua parte</span><strong>${real((saldos.find((x) => ehEu(x.nome)) || {}).parte || 0)}</strong><small>você pagou ${real((saldos.find((x) => ehEu(x.nome)) || {}).pagou || 0)}</small></div>
+      <div><span>Acerto entra em</span><strong>${MESES_LONGOS[Number(v.mes.slice(5)) - 1]}</strong><small>na conta de cada um em Quem me deve</small></div>
+    </div>
+    <div class="grade-fin">
+      <div class="cartao">
+        <div class="barra" style="margin-bottom:6px"><h2 style="margin:0">Seu acerto com cada um</h2></div>
+        ${meus.length ? `<div class="tabela-caixa"><table class="pf-fat-pessoas"><thead><tr><th>Pessoa</th><th>Te deve</th><th>Você deve</th><th>Acerto</th></tr></thead><tbody>
+          ${meus.map((a) => `<tr><td><b>${esc(a.nome)}</b>${a.jaNoCartao ? `<small>${real(a.jaNoCartao)} já na fatura do seu cartão</small>` : ""}</td>
+            <td>${real(a.teDeve)}</td><td>${real(a.voceDeve)}</td>
+            <td>${Math.abs(a.liquido) < 0.005 ? `<span class="pilula p-pago">zerado</span>` : a.liquido > 0 ? `<b>${esc(a.nome)} te paga ${real(a.liquido)}</b>` : `<b class="pf-voce-deve">você paga ${real(-a.liquido)}</b>`}</td></tr>`).join("")}
+        </tbody></table></div>
+        <p class="sub" style="margin:8px 0 0">O acerto entra em Quem me deve na fatura de ${nomeMesAc}${meus.some((a) => a.jaNoCartao) ? ", descontando o que já está na fatura do seu cartão" : ""}. Se você deve, o valor abate o que a pessoa te deve.</p>` : `<p class="vazio">Adicione as pessoas da viagem em Editar viagem.</p>`}
+        ${pares.length ? `<h3 class="pf-escada-tit">Entre os outros</h3><ul class="pf-vg-pares">${pares.map((x) => `<li>${esc(x.de)} paga <b>${real(x.v)}</b> pra ${esc(x.para)}</li>`).join("")}</ul>` : ""}
+      </div>
+      <div class="cartao">
+        <div class="barra" style="margin-bottom:6px"><h2 style="margin:0">Gastos</h2><span class="espaco"></span>
+          <button class="btn" type="button" id="vg-cartao">Trazer do meu cartão</button>
+          <button class="btn primario" type="button" id="vg-gasto">${ic("mais")}Gasto</button></div>
+        ${(v.gastos || []).length ? `<ul class="pf-vg-gastos">${[...v.gastos].sort((a, b) => String(b.data || "").localeCompare(String(a.data || ""))).map((g) => `<li><button type="button" data-vg-gasto="${g.id}">
+          <span><b>${esc(g.descricao)}</b><small>${g.data ? dataBR(g.data).slice(0, 5) + " · " : ""}${quem(g.pagou)} pagou · divide entre ${(g.divide || []).map(quem).join(", ")}${g.compraId ? " · do seu cartão" : ""}</small></span>
+          <strong>${real(g.valor)}</strong></button></li>`).join("")}</ul>`
+          : `<p class="vazio">Nenhum gasto ainda. Lance o que cada um pagou, ou traga as compras divididas do seu cartão.</p>`}
+      </div>
+    </div>`;
+  $$("[data-vg]", el).forEach((b) => b.onclick = () => { pfx.viagem = b.dataset.vg; desenhar(); });
+  $("#vg-nova", el).onclick = () => formViagem(null);
+  $("#vg-editar", el).onclick = () => formViagem(v);
+  $("#vg-gasto", el).onclick = () => formGastoViagem(v, null);
+  $("#vg-cartao", el).onclick = () => trazerDoCartao(v);
+  $$("[data-vg-gasto]", el).forEach((b) => b.onclick = () => formGastoViagem(v, v.gastos.find((g) => g.id === b.dataset.vgGasto)));
+}
+function formViagem(v) {
+  const lista = [...viagens()];
+  const padrao = pessoasConhecidas().filter((n) => !/^(dividid[oa]s?|todos)$/i.test(semAcento(n)));
+  abrirForm({
+    titulo: v ? `Editar ${v.nome}` : "Nova viagem",
+    valores: v ? { nome: v.nome, pessoas: (v.pessoas || []).filter((n) => !ehEu(n)).join(", "), mes: v.mes } : { nome: "", pessoas: "", mes: mesAPagar() },
+    campos: [
+      { n: "nome", r: "Nome da viagem", req: true, ph: "Ex: Viagem família" },
+      { n: "pessoas", r: "Quem foi, além de você (separe por vírgula)", req: true, inteiro: true, ph: padrao.slice(0, 4).join(", "), ajuda: padrao.length ? `Nomes que o painel já conhece: ${padrao.join(", ")}. Use o mesmo nome pra juntar com o que a pessoa já te deve.` : "" },
+      { n: "mes", r: "Acertar na fatura de", t: "month", ajuda: "O acerto de cada pessoa entra em Quem me deve nesse mês." }
+    ],
+    aoSalvar: async (d) => {
+      const pessoas = ["Eu", ...String(d.pessoas).split(/\s*[,;]\s*/).map(nomePessoa).filter((n) => n && !ehEu(n))];
+      const novo = { ...(v || { id: "v" + Date.now(), gastos: [] }), nome: d.nome, pessoas: [...new Map(pessoas.map((n) => [ehEu(n) ? "eu" : chavePessoa(n), n])).values()], mes: d.mes || mesAPagar() };
+      const i = lista.findIndex((x) => x.id === novo.id);
+      if (i >= 0) lista[i] = novo; else lista.push(novo);
+      pfx.viagem = novo.id;
+      const ok = await salvarViagens(lista);
+      if (ok) desenhar();
+      return ok;
+    },
+    aoApagar: v ? async () => { const ok = await salvarViagens(lista.filter((x) => x.id !== v.id)); if (ok) desenhar(); return ok; } : null
+  });
+}
+function formGastoViagem(v, g) {
+  const pessoas = v.pessoas || ["Eu"];
+  const d = janela();
+  const marcados = new Set((g ? g.divide : pessoas).map((n) => (ehEu(n) ? "eu" : chavePessoa(n))));
+  d.innerHTML = `<form class="form-janela" novalidate>
+    <div class="janela-topo"><h3>${g ? "Editar gasto" : "Novo gasto da viagem"}</h3><button type="button" class="icone-btn" data-fechar aria-label="Fechar">${ic("fechar")}</button></div>
+    <div class="janela-corpo"><div class="form-grade">
+      <div class="inteiro"><label for="vg-desc">O que foi *</label><input class="campo" id="vg-desc" value="${esc(g ? g.descricao : "")}" placeholder="Ex: Hospedagem, mercado, gasolina"></div>
+      <div><label for="vg-valor">Valor (R$) *</label><input class="campo" id="vg-valor" type="number" step="0.01" min="0" value="${g ? g.valor : ""}"></div>
+      <div><label for="vg-data">Data</label><input class="campo" id="vg-data" type="date" value="${esc(g ? g.data || "" : hojeISO())}"></div>
+      <div class="inteiro"><label for="vg-pagou">Quem pagou</label><select class="campo" id="vg-pagou" style="width:100%" ${g && g.compraId ? "disabled" : ""}>${pessoas.map((n) => `<option value="${esc(n)}" ${g ? (mesmaPessoa(g.pagou, n) ? "selected" : "") : ehEu(n) ? "selected" : ""}>${ehEu(n) ? "Eu" : esc(n)}</option>`).join("")}</select></div>
+      <div class="inteiro"><label>Divide entre</label><div class="pf-dividir-lista">${pessoas.map((n) => `<label class="check"><input type="checkbox" data-vg-divide="${esc(n)}" ${marcados.has(ehEu(n) ? "eu" : chavePessoa(n)) ? "checked" : ""}> ${ehEu(n) ? "Eu" : esc(n)}</label>`).join("")}</div>
+        <small class="ajuda" id="vg-conta"></small></div>
+    </div></div>
+    <div class="janela-pe">${g ? `<button type="button" class="btn perigo esq" data-apagar>${ic("apagar")}Tirar da viagem</button>` : ""}<button type="button" class="btn" data-fechar>Cancelar</button><button type="submit" class="btn primario">Salvar</button></div></form>`;
+  const conta = () => { const n = $$("[data-vg-divide]", d).filter((c) => c.checked).length, val = n2($("#vg-valor", d).value); $("#vg-conta", d).textContent = n ? `${n} ${n === 1 ? "pessoa" : "pessoas"}: ${real(val / n)} pra cada.` : "Marque quem divide."; };
+  d.oninput = conta; conta();
+  $$("[data-fechar]", d).forEach((b) => b.onclick = () => d.close());
+  const salvar = async (lista) => { const vs = viagens().map((x) => (x.id === v.id ? { ...x, gastos: lista } : x)); if (await salvarViagens(vs)) { d.close(); desenhar(); } };
+  if (g) $("[data-apagar]", d).onclick = () => salvar(v.gastos.filter((x) => x.id !== g.id));
+  $("form", d).onsubmit = async (e) => {
+    e.preventDefault();
+    const descricao = $("#vg-desc", d).value.trim(), valor = n2($("#vg-valor", d).value);
+    const divide = $$("[data-vg-divide]", d).filter((c) => c.checked).map((c) => c.dataset.vgDivide);
+    if (!descricao || !(valor > 0)) { avisar("Preencha o que foi e o valor.", true); return; }
+    if (!divide.length) { avisar("Marque quem divide.", true); return; }
+    const novo = { ...(g || { id: "g" + Date.now() }), descricao, valor: r2(valor), data: $("#vg-data", d).value || null, pagou: g && g.compraId ? g.pagou : $("#vg-pagou", d).value, divide };
+    await salvar(g ? v.gastos.map((x) => (x.id === g.id ? novo : x)) : [...(v.gastos || []), novo]);
+  };
+  d.showModal();
+}
+// Compras do seu cartão já divididas com alguém da viagem: entram no acerto sem cobrar duas vezes
+function trazerDoCartao(v) {
+  const usados = new Set((v.gastos || []).map((g) => String(g.compraId || "")));
+  const daViagem = (c) => outrosDe(c).some((x) => (v.pessoas || []).some((n) => mesmaPessoa(n, x.nome)));
+  const lista = P.compras.filter((c) => dividida(c) && temMinha(c) && daViagem(c) && !usados.has(String(c.id))).sort((a, b) => String(b.data_compra || "").localeCompare(String(a.data_compra || ""))).slice(0, 60);
+  const d = abrirJanelaSimples("Trazer do meu cartão", lista.length
+    ? `<p class="sub" style="margin-top:0">Compras do seu cartão divididas com alguém da viagem. Elas entram no acerto, mas não são cobradas de novo: já estão na fatura de cada um.</p>
+      <div class="pf-dividir-lista">${lista.map((c) => `<label class="check"><input type="checkbox" data-trazer="${c.id}"> ${esc(c.descricao)} · ${real(n2(c.valor_parcela) * Number(c.parcelas || 1))} <small class="sub">(${esc(rotuloDono(c))})</small></label>`).join("")}</div>`
+    : `<p class="vazio">Nenhuma compra dividida com essas pessoas no seu cartão.</p>`,
+    `<button type="button" class="btn" data-fechar>Cancelar</button>${lista.length ? `<button type="button" class="btn primario" id="vg-trazer">Trazer</button>` : ""}`);
+  const b = $("#vg-trazer", d);
+  if (b) b.onclick = async () => {
+    const ids = $$("[data-trazer]", d).filter((x) => x.checked).map((x) => x.dataset.trazer);
+    const novos = ids.map((id) => { const c = P.compras.find((x) => String(x.id) === id); return { id: "g" + c.id, compraId: c.id, descricao: c.descricao, valor: r2(n2(c.valor_parcela) * Number(c.parcelas || 1)), data: c.data_compra || null, pagou: "Eu", divide: partesDe(c).map((x) => (x.eu ? "Eu" : x.nome)) }; });
+    const vs = viagens().map((x) => (x.id === v.id ? { ...x, gastos: [...(x.gastos || []), ...novos] } : x));
+    if (await salvarViagens(vs)) { d.close(); desenhar(); avisar(`${novos.length} ${novos.length === 1 ? "compra trazida" : "compras trazidas"} pra viagem.`); }
+  };
 }
 
 /* ---------- Contas fixas ---------- */
