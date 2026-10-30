@@ -220,10 +220,20 @@ function contaPorMes(p, ate) {
   meses.forEach((m) => { const x = Math.max(0, Math.min(m.valor, sobra)); m.coberto = r2(x); sobra = r2(sobra - x); m.falta = r2(m.valor - m.coberto); });
   return meses;
 }
-function msgFatura(p, m) {
+// Mensagem de cobrança no WhatsApp: uma compra por linha e o total em negrito (*...*)
+function msgFatura(p, m, extra = []) {
   const nomeM = MESES_LONGOS[Number(m.k.slice(5)) - 1].toLowerCase();
   const linhas = m.itens.map(({ c, i }) => `${c.descricao}${Number(c.parcelas) > 1 && Number(c.parcelas) < RECORRENTE ? ` (${i + 1}/${c.parcelas})` : ""} ${real(c.valor_parcela)}${c.parteDe ? ` (sua parte de ${real(c.parteDe)})` : ""}`);
-  return `Oi, ${p.nome.split(" ")[0]}! Passando a sua parte da fatura de ${nomeM}: ${linhas.join("; ")}. Total: ${real(m.valor)}.${m.coberto > 0 ? ` Você já tinha adiantado ${real(m.coberto)}, então fica ${real(m.falta)}.` : ""} Consegue me mandar até ${dataBR(m.vence).slice(0, 5)}?`;
+  return [
+    `Oi, ${p.nome.split(" ")[0]}! `,
+    `Passando a sua parte da fatura de ${nomeM}: `,
+    ...linhas.map((l, n) => l + (n === linhas.length - 1 ? ". " : "; ")),
+    `*Total: ${real(m.valor)}*. `,
+    ...(m.coberto > 0 ? [`Você já tinha me mandado ${real(m.coberto)} a mais, então fica *${real(m.falta)}*. `] : []),
+    ...extra,
+    "",
+    `Consegue me mandar até ${dataBR(m.vence).slice(0, 5)}?`
+  ].join("\n");
 }
 
 /* ---------- Juros por atraso de quem te deve ----------
@@ -836,7 +846,15 @@ function pfDevem(el) {
       <button class="btn primario" type="button" id="pf-novo-receb">${ic("mais")}Registrar pagamento</button></div>
     ${dev.length ? `<div class="pf-pessoas">${dev.map((p) => {
       const abertas = p.compras.filter((c) => ultimoMes(c) >= hoje);
-      const msg = `Oi, ${p.nome.split(" ")[0]}! Passando o resumo do cartão: ${abertas.map((c) => { const i = idxParcela(c, hoje); return `${c.descricao}${Number(c.parcelas) > 1 && Number(c.parcelas) < RECORRENTE && i >= 0 ? ` (${i + 1}/${c.parcelas})` : ""} ${real(c.valor_parcela)}${c.parteDe ? ` (sua parte de ${real(c.parteDe)})` : ""}`; }).join("; ")}. Em aberto até agora: ${real(Math.max(0, p.falta))}.${cobraJuros(p.nome) && jurosDe(p).pendente > 0 ? ` Juros por atraso: ${real(jurosDe(p).pendente)}. Total pra quitar hoje: ${real(Math.max(0, p.falta) + jurosDe(p).pendente)}.` : ""} Consegue me mandar até o vencimento?`;
+      const contas = contaPorMes(p, mesAPagar());
+      const mRef = contas.find((x) => x.k === mesAPagar());
+      const antesP = contas.filter((x) => x.k < mesAPagar() && x.falta > 0.005);
+      const extra = [
+        ...(antesP.length ? [`Ficou também ${real(antesP.reduce((s, x) => s + x.falta, 0))} da fatura de ${antesP.map((x) => MESES_LONGOS[Number(x.k.slice(5)) - 1].toLowerCase()).join(" e ")} em aberto. `] : []),
+        ...(cobraJuros(p.nome) && jurosDe(p).pendente > 0 ? [`Juros por atraso: ${real(jurosDe(p).pendente)}. `] : [])
+      ];
+      const msg = mRef && mRef.valor > 0 ? msgFatura(p, mRef, extra)
+        : `Oi, ${p.nome.split(" ")[0]}! \n${extra.join("\n") || `Em aberto até agora: *${real(Math.max(0, p.falta))}*. `}\n\nConsegue me mandar até o vencimento?`;
       return `<div class="cartao pf-pessoa ${p.falta > 0 ? "atrasado" : ""}">
         <div class="barra" style="margin:0 0 6px"><h2 style="margin:0">${esc(p.nome)}</h2><span class="espaco"></span>
           ${p.falta > 0 ? `<span class="pilula p-vencido">deve ${real(p.falta)}</span>` : p.falta < 0 ? `<span class="pilula p-pago">pagou ${real(-p.falta)} adiantado</span>` : `<span class="pilula p-pago">em dia</span>`}</div>
