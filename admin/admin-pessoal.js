@@ -225,7 +225,7 @@ function contaPorMes(p, ate) {
     const itens = p.compras.map((c) => ({ c, i: idxParcela(c, k) })).filter((x) => x.i >= 0);
     const valor = r2(itens.reduce((s, x) => s + n2(x.c.valor_parcela), 0));
     // Vence no dia do vencimento do cartão daquela fatura (se tiver mais de um cartão, o primeiro a vencer)
-    const vence = itens.map((x) => vencimentoNoMes(P.cartoes.find((cc) => String(cc.id) === String(x.c.cartao_id)), k)).sort()[0] || vencimentoNoMes(null, k);
+    const vence = itens.filter((x) => x.c.cartao_id).map((x) => vencimentoNoMes(P.cartoes.find((cc) => String(cc.id) === String(x.c.cartao_id)), k)).sort()[0] || vencimentoNoMes(null, k);
     meses.push({ k, itens, valor, vence, coberto: 0 });
   }
   let sobra = p.pago;
