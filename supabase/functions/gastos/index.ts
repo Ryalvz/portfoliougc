@@ -30,6 +30,14 @@ const URL_BANCO = Deno.env.get("SUPABASE_URL")!;
 const TOKEN = Deno.env.get("TELEGRAM_TOKEN") || "";
 const TG = `https://api.telegram.org/bot${TOKEN}`;
 
+// Nenhuma chamada de fora pode travar o bot: a IA tem até 30s, o resto 15s
+const fetchOriginal = globalThis.fetch;
+globalThis.fetch = (u: any, o: any = {}) => {
+  const ia = /generativelanguage|anthropic/.test(String(u?.url || u));
+  return fetchOriginal(u, { ...o, signal: o.signal ?? AbortSignal.timeout(ia ? 30000 : 15000) });
+};
+const etapa = (t: string) => console.log("[gastos]", t);
+
 function chaveInterna() {
   const nova = Deno.env.get("SUPABASE_SECRET_KEYS");
   if (nova) { try { const k = Object.values(JSON.parse(nova))[0]; if (k) return String(k); } catch (_) { /* segue */ } }
@@ -409,8 +417,11 @@ async function tratarMensagem(msg: any) {
     const foto = msg.photo[msg.photo.length - 1];
     let lido: any = null;
     try {
+      etapa("baixando foto");
       const { b64, mime } = await baixarFoto(foto.file_id);
+      etapa("lendo foto com a IA");
       lido = await lerFoto(b64, mime);
+      etapa("foto lida");
     } catch (err) { await enviar(chat, "Não consegui ler a foto (" + String((err as Error).message || err).slice(0, 120) + "). Manda o valor por texto, ex.: 45,90 ifood"); return; }
     if (lido === null) { await enviar(chat, "Ainda não tenho uma IA ligada pra ler fotos. Enquanto isso, manda por texto: 45,90 ifood"); return; }
     if (!e.valor) e.valor = Number(lido.valor_total) || 0;
@@ -516,12 +527,23 @@ Deno.serve(async (req) => {
   const assinatura = req.headers.get("x-telegram-bot-api-secret-token");
   if (assinatura !== null) {
     if (assinatura !== await segredoWebhook()) return new Response("não", { status: 401 });
-    try {
-      const upd = await req.json();
-      const msg = upd.message; // mensagem editada não lança de novo
-      if (msg) await tratarMensagem(msg);
-      else if (upd.callback_query) await tratarBotao(upd.callback_query);
-    } catch (err) { console.error(err); }
+    // Responde ao Telegram na hora e trabalha em segundo plano: se algo demorar, as próximas mensagens não ficam presas na fila
+    let upd: any = {};
+    try { upd = await req.json(); } catch (_) { return new Response("ok"); }
+    const trabalho = (async () => {
+      const chat = upd.message?.chat?.id || upd.callback_query?.message?.chat?.id;
+      try {
+        etapa("recebi " + (upd.message ? (upd.message.photo ? "foto" : "texto") : "botão"));
+        if (upd.message) await tratarMensagem(upd.message); // mensagem editada não lança de novo
+        else if (upd.callback_query) await tratarBotao(upd.callback_query);
+        etapa("pronto");
+      } catch (err) {
+        console.error("[gastos] erro", err);
+        if (chat) { try { await enviar(Number(chat), "Deu um erro aqui e não lancei (" + String((err as Error).message || err).slice(0, 120) + "). Manda de novo, ou por texto: 45,90 ifood"); } catch (_) { /* sem rede */ } }
+      }
+    })();
+    // @ts-ignore EdgeRuntime existe no Supabase
+    if (typeof EdgeRuntime !== "undefined") EdgeRuntime.waitUntil(trabalho); else await trabalho;
     return new Response("ok");
   }
 
