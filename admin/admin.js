@@ -4060,7 +4060,9 @@ const EMAIL_PROPOSTAS = "heyryan.ugc@gmail.com";
 // Gmail (ler e responder) + Google Agenda (só os calendários criados pelo painel, como o "Trabalhos")
 const ESCOPOS_GMAIL = "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/calendar.app.created";
 const temAgendaGoogle = () => gm.escopo.includes("calendar");
-const PALAVRAS_PROPOSTA = ["oportunidade", "candidatura", "convite", "selecionado", "selecionada", "vaga", "invited", "picked", "task", "recompensa", "ugc", "\"user generated\"", "proposta", "parceria", "publi", "publicidade", "publipost", "campanha", "collab", "collaboration", "briefing", "orçamento", "orcamento", "\"mídia kit\"", "\"media kit\"", "midiakit", "influenciador", "influencer", "creator", "\"criador de conteúdo\"", "permuta", "cachê", "cache", "job", "contratar", "freela"];
+const PALAVRAS_PROPOSTA = ["oportunidade", "candidatura", "convite", "selecionado", "selecionada", "vaga", "invited", "picked", "task", "recompensa", "ugc", "\"user generated\"", "proposta", "parceria", "publi", "publicidade", "publipost", "campanha", "collab", "collaboration", "briefing", "orçamento", "orcamento", "\"mídia kit\"", "\"media kit\"", "midiakit", "influenciador", "influencer", "creator", "\"criador de conteúdo\"", "permuta", "cachê", "cache", "job", "contratar", "freela", "contrato", "assinar", "assinatura", "assinado", "clicksign", "docusign", "zapsign", "autentique", "d4sign"];
+// Contrato ou documento pra assinar (Clicksign, DocuSign...): nunca fica escondido, mesmo vindo de plataforma automática
+const DOCUMENTO_RE = /\bassin(ar|e|atura|ado|ada)\b|contrato|clicksign|docusign|zapsign|autentique|d4sign|adobe ?sign|dropbox ?sign|hellosign|signature request|please sign|sign (the |this )?document/i;
 // Lê a caixa de entrada E a de spam (às vezes o e-mail da marca cai lá)
 // Promoções e Atualizações entram também: é lá que caem as campanhas das plataformas de UGC
 const BUSCA_PROPOSTAS = `{in:inbox in:spam} newer_than:90d -category:social -category:forums (${PALAVRAS_PROPOSTA.join(" OR ")})`;
@@ -4226,6 +4228,7 @@ async function lerPropostas() {
         data: new Date(Number(m.internalDate) || Date.parse(cabecalho(m, "Date")) || Date.now()),
         spam: (m.labelIds || []).includes("SPAM"),
         novo: (m.labelIds || []).includes("UNREAD") && !adiado("lido-" + m.id), automatico: motivoAutomatico(m, de),
+        documento: DOCUMENTO_RE.test(cabecalho(m, "Subject") + " " + (m.snippet || "") + " " + cabecalho(m, "From")) && !ASSUNTO_ROBO.test(cabecalho(m, "Subject")),
         oportunidade: OPORTUNIDADE_RE.test(cabecalho(m, "Subject") + " " + (m.snippet || "")) && !NAO_OPORTUNIDADE_RE.test(cabecalho(m, "Subject")),
         importante: /proposta|or[cç]amento|briefing|contrato|campanha|parceria|pagamento|valor|cach[eê]|budget|rate|paid|collab/i.test(cabecalho(m, "Subject") + " " + (m.snippet || "")) };
     }).filter((x) => x.de.email !== EMAIL_PROPOSTAS)
@@ -4239,8 +4242,8 @@ async function lerPropostas() {
   desenhar();
 }
 
-const propostasVisiveis = () => (gm.emails || []).filter((x) => !x.automatico && !adiado("email-" + x.id));
-const oportunidadesVisiveis = () => (gm.emails || []).filter((x) => x.automatico && x.oportunidade && !adiado("email-" + x.id));
+const propostasVisiveis = () => (gm.emails || []).filter((x) => (!x.automatico || x.documento) && !adiado("email-" + x.id));
+const oportunidadesVisiveis = () => (gm.emails || []).filter((x) => x.automatico && !x.documento && x.oportunidade && !adiado("email-" + x.id));
 const marcarEmailTratado = (id, aviso) => adiarLembrete("email-" + id, "2999-12-31", aviso);
 
 /* ---------- Conversa aberta e resposta ---------- */
@@ -4439,7 +4442,7 @@ function cartaoEmail(x) {
     <div class="email-corpo">
       <button type="button" class="email-abrir" data-acao-email="abrir">
         <span class="email-topo"><b>${esc(x.de.nome)}</b><span class="sub">${esc(x.de.email)}</span><span class="espaco"></span><span class="sub">${x.data.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}</span></span>
-        <span class="email-assunto">${x.novo ? `<i class="ponto-novo" aria-label="não lido"></i>` : ""}${esc(x.assunto)}${x.importante && !x.automatico ? ` <span class="etq amarela">importante</span>` : ""}${x.spam ? ` <span class="etq vermelha">estava no spam</span>` : ""}</span>
+        <span class="email-assunto">${x.novo ? `<i class="ponto-novo" aria-label="não lido"></i>` : ""}${esc(x.assunto)}${x.documento ? ` <span class="etq vermelha">${/assinad[oa]|signed|conclu[ií]d|completed/i.test(x.assunto) ? "contrato assinado" : "contrato pra assinar"}</span>` : x.importante && !x.automatico ? ` <span class="etq amarela">importante</span>` : ""}${x.spam ? ` <span class="etq vermelha">estava no spam</span>` : ""}</span>
         <span class="email-trecho">${esc(x.trecho)}</span>
       </button>
       ${x.automatico ? `<p class="sub" style="margin:0">escondido: ${esc(x.automatico)}</p>` : `<div class="lembrete-acoes" style="justify-content:flex-start">
@@ -4475,7 +4478,7 @@ function desenharPropostas(el) {
   if (!gm.emails && !gm.carregando && !gm.erro) lerPropostas();
 
   const visiveis = propostasVisiveis();
-  const automaticos = (gm.emails || []).filter((x) => x.automatico && !x.oportunidade && !adiado("email-" + x.id));
+  const automaticos = (gm.emails || []).filter((x) => x.automatico && !x.documento && !x.oportunidade && !adiado("email-" + x.id));
   // Campanhas e convites das plataformas de UGC (Air, Creatify, Vyre, TikTok Shop...): não são de pessoa, mas são trabalho
   const oportunidades = oportunidadesVisiveis();
   const minutos = Math.max(1, Math.round((gm.expira - Date.now()) / 60000));
