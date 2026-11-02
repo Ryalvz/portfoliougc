@@ -100,6 +100,7 @@ function formProduto(el, i) {
     titulo: i == null ? "Novo produto indicado" : `Produto: ${x.titulo}`,
     valores: {
       titulo: x.titulo, grupo: x.grupo, texto: x.texto, slug: x.slug, ativo: x.ativo !== false,
+      foto_x: x.foto_x ?? 50, foto_y: x.foto_y ?? 50, foto_zoom: x.foto_zoom ? Math.round(x.foto_zoom * 100) : 100,
       shopee: loja("shopee").url, shopee_cupom: loja("shopee").cupom,
       mercadolivre: loja("mercadolivre").url, mercadolivre_cupom: loja("mercadolivre").cupom,
       amazon: loja("amazon").url, amazon_cupom: loja("amazon").cupom,
@@ -119,6 +120,9 @@ function formProduto(el, i) {
       { n: "outra", r: "Outra loja: link", t: "url", ph: "https://..." },
       { n: "outra_cupom", r: "Outra loja: cupom (opcional)" },
       { n: "imagem_arq", r: "Foto do produto (opcional)", t: "file", accept: "image/png,image/jpeg,image/webp", ajuda: x.imagem ? "Já tem foto. Escolha outra só se quiser trocar." : "De preferência quadrada, com fundo claro." },
+      { n: "foto_x", r: "Foto: mover para os lados", t: "range", inteiro: true },
+      { n: "foto_y", r: "Foto: mover para cima e para baixo", t: "range", inteiro: true },
+      { n: "foto_zoom", r: "Foto: zoom", t: "range", inteiro: true, ajuda: "Ajuste vendo o quadrinho acima. É assim que a foto aparece na página." },
       { n: "slug", r: "Final do link (opcional)", ph: "Ex: insta360", ajuda: "Fica ugc.ryalvz.com.br/indica/?p=este-texto. Vazio, eu faço a partir do nome." },
       { n: "ativo", r: "Mostrar na página", t: "check" }
     ],
@@ -134,7 +138,8 @@ function formProduto(el, i) {
       if (lista.some((p, j) => j !== i && p.slug === slug)) { avisar(`Já existe um produto com o link "${slug}". Troque o final do link.`, true); return false; }
       let imagem = x.imagem || "";
       if (d.imagem_arq) { status("Enviando a foto..."); imagem = await enviarArquivo(d.imagem_arq, "indicacoes", d.titulo); if (!imagem) return false; }
-      const novo = { slug, titulo: d.titulo, grupo: d.grupo || "", texto: d.texto || "", imagem, lojas, ativo: d.ativo };
+      const novo = { slug, titulo: d.titulo, grupo: d.grupo || "", texto: d.texto || "", imagem, lojas, ativo: d.ativo,
+        foto_x: Number(d.foto_x ?? 50), foto_y: Number(d.foto_y ?? 50), foto_zoom: Number(d.foto_zoom || 100) / 100 };
       if (i == null) lista.push(novo); else lista[i] = novo;
       const ok = await salvarSiteConteudo("produtos", lista);
       if (ok) { desenharLinkBio(el); try { await navigator.clipboard.writeText(linkProduto(slug)); setTimeout(() => avisar("Salvo. Link copiado: " + linkProduto(slug)), 400); } catch (_) {} }
@@ -142,6 +147,30 @@ function formProduto(el, i) {
     },
     aoApagar: i == null ? null : async () => { lista.splice(i, 1); const ok = await salvarSiteConteudo("produtos", lista); if (ok) desenharLinkBio(el); return ok; }
   });
+  quadroDaFoto(x.imagem ? urlSite(x.imagem) : "");
+}
+
+// Quadrinho ao vivo no formulário: mostra a foto do jeito que vai aparecer na página
+function quadroDaFoto(urlAtual) {
+  const d = [...document.querySelectorAll("dialog[open]")].pop();
+  if (!d) return;
+  const f = $("form", d), zoom = f.elements.foto_zoom, campoX = f.elements.foto_x;
+  zoom.min = 100; zoom.max = 300; zoom.step = 5; zoom.value = zoom.getAttribute("value") || 100;
+  const caixa = document.createElement("div");
+  caixa.className = "inteiro";
+  caixa.innerHTML = `<label>Como a foto aparece</label><div style="display:flex;align-items:center;gap:12px">
+    <span style="width:92px;height:92px;border-radius:14px;overflow:hidden;border:1px solid #ECE5D9;background:#fff;display:grid;place-items:center;flex:none"><img alt="" style="width:100%;height:100%;object-fit:cover;display:none"><small class="sub">sem foto</small></span>
+    <small class="sub">Arraste os controles abaixo pra escolher a parte da foto que aparece.</small></div>`;
+  campoX.closest("div").before(caixa);
+  const img = $("img", caixa), semFoto = $("small", caixa);
+  const pintar = () => {
+    const px = campoX.value, py = f.elements.foto_y.value, z = zoom.value / 100;
+    Object.assign(img.style, { objectPosition: `${px}% ${py}%`, transform: `scale(${z})`, transformOrigin: `${px}% ${py}%` });
+  };
+  const usar = (url) => { img.src = url; img.style.display = url ? "block" : "none"; semFoto.style.display = url ? "none" : "block"; pintar(); };
+  usar(urlAtual);
+  ["foto_x", "foto_y", "foto_zoom"].forEach((n) => f.elements[n].addEventListener("input", pintar));
+  f.elements.imagem_arq.addEventListener("change", (e) => { const a = e.target.files[0]; if (a) usar(URL.createObjectURL(a)); });
 }
 
 const linkValido = (u) => /^https?:\/\/\S+\.\S+/i.test(String(u || ""));
