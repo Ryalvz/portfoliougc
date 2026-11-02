@@ -24,7 +24,7 @@ async function desenharLinkBio(el) {
     await Promise.all([sc.dados ? null : carregarSiteConteudo(), carregarCliquesBio()]);
   }
   if (sc.erro) { el.innerHTML = `<div class="aviso-falta">Não consegui ler o conteúdo do site: ${esc(sc.erro)}</div>`; return; }
-  const extras = sc.dados.bio_links || [], ind = sc.dados.indicacoes || [];
+  const extras = sc.dados.bio_links || [], ind = sc.dados.indicacoes || [], prods = sc.dados.produtos || [];
   const setas = (tipo, i, n) => `<button class="icone-btn" type="button" data-bio-sobe="${tipo}:${i}" ${i === 0 ? "disabled" : ""} aria-label="Subir">↑</button><button class="icone-btn" type="button" data-bio-desce="${tipo}:${i}" ${i === n - 1 ? "disabled" : ""} aria-label="Descer">↓</button>`;
   const cliques = (pagina, link) => bioX.faltaBanco ? "" : ` · ${plural(cliquesDe(pagina, link), "clique", "cliques")} em 30 dias`;
   const nomeCat = (c) => (CATEGORIAS_IND.find(([k]) => k === c) || [0, "Outro"])[1];
@@ -38,6 +38,14 @@ async function desenharLinkBio(el) {
       </div>
     </section>
     ${bioX.faltaBanco ? `<div class="aviso-falta">Falta rodar a parte 38 do banco.sql no Supabase para salvar os links e contar os cliques.</div>` : ""}
+    <div class="cartao" style="margin-bottom:16px">
+      <div class="barra"><h2 style="margin:0">Produtos que eu indico</h2><span class="sub">página Indicações, fora da bio</span><span class="espaco"></span><a class="btn pequeno" href="../indica/" target="_blank" rel="noopener">${ic("link")}Ver a página</a><button class="btn primario pequeno" type="button" data-prod-novo>${ic("mais")}Adicionar</button></div>
+      <p class="sub" style="margin:0 0 8px">Cada produto ganha um link próprio com os botões da Shopee, do Mercado Livre e da Amazon. Copie o link e cole na mensagem da automação do post (Instagram > Automações). Essa página não aparece na bio.</p>
+      <ul class="sc-lista">${prods.map((x, i) => `<li class="${x.ativo === false ? "bio-desligado" : ""}">
+        <span class="sc-logo">${x.imagem ? `<img src="${esc(urlSite(x.imagem))}" alt="">` : esc((x.titulo || "?").charAt(0).toUpperCase())}</span>
+        <span class="sc-txt"><b>${esc(x.titulo)}</b><small>${esc(x.grupo || "Sem grupo")} · ${esc((x.lojas || []).map((l) => LOJAS_PROD[l.loja] || l.nome || "Outra").join(", ") || "sem loja")}${x.ativo === false ? " · desligado" : ""}${bioX.faltaBanco ? "" : ` · ${plural(cliquesProduto(x.slug), "clique", "cliques")} em 30 dias`}</small></span>
+        <span class="sc-acoes">${setas("produtos", i, prods.length)}<button class="btn pequeno" type="button" data-prod-copiar="${esc(x.slug)}">Copiar link</button><button class="icone-btn" type="button" data-prod-editar="${i}" aria-label="Editar">${ic("editar")}</button></span></li>`).join("") || `<li class="sub">Nenhum produto ainda. Toque em Adicionar e cole os links de cada loja.</li>`}</ul>
+    </div>
     <div class="sc-grade">
       <div class="cartao">
         <div class="barra"><h2 style="margin:0">Cursos que eu indico</h2><span class="sub">página Meus links</span><span class="espaco"></span><button class="btn primario pequeno" type="button" data-bio-novo="indicacoes">${ic("mais")}Adicionar</button></div>
@@ -66,7 +74,74 @@ async function desenharLinkBio(el) {
   $$("[data-bio-sobe]", el).forEach((b) => b.onclick = () => mover(b.dataset.bioSobe, -1));
   $$("[data-bio-desce]", el).forEach((b) => b.onclick = () => mover(b.dataset.bioDesce, 1));
   $$("[data-bio-novo]", el).forEach((b) => b.onclick = () => (b.dataset.bioNovo === "indicacoes" ? formIndicacao(el, null) : formLinkBio(el, null)));
+  $$("[data-prod-novo]", el).forEach((b) => b.onclick = () => formProduto(el, null));
+  $$("[data-prod-editar]", el).forEach((b) => b.onclick = () => formProduto(el, Number(b.dataset.prodEditar)));
+  $$("[data-prod-copiar]", el).forEach((b) => b.onclick = async () => {
+    const url = linkProduto(b.dataset.prodCopiar);
+    try { await navigator.clipboard.writeText(url); avisar("Link copiado: " + url); } catch (_) { avisar(url); }
+  });
   $$("[data-bio-editar]", el).forEach((b) => b.onclick = () => { const [tipo, i] = b.dataset.bioEditar.split(":"); tipo === "indicacoes" ? formIndicacao(el, Number(i)) : formLinkBio(el, Number(i)); });
+}
+
+/* ---------- Produtos que eu indico (página /indica/, fora da bio) ----------
+   site_conteudo "produtos": [{ slug, titulo, grupo, texto, imagem, ativo,
+   lojas: [{ loja: "shopee" | "mercadolivre" | "amazon" | "outra", nome, url, cupom }] }]
+   Cada clique numa loja chega em bio_cliques como pagina "indica", link "slug:loja". */
+const LOJAS_PROD = { shopee: "Shopee", mercadolivre: "Mercado Livre", amazon: "Amazon" };
+const linkProduto = (slug) => `https://ugc.ryalvz.com.br/indica/?p=${encodeURIComponent(slug)}`;
+const slugDe = (t) => String(t || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "produto";
+const cliquesProduto = (slug) => Object.entries(bioX.cliques || {}).reduce((t, [k, n]) => t + (k.startsWith("indica:" + slug + ":") ? n : 0), 0);
+
+function formProduto(el, i) {
+  const lista = [...(sc.dados.produtos || [])], x = i == null ? { ativo: true, lojas: [] } : lista[i];
+  const loja = (k) => (x.lojas || []).find((l) => l.loja === k) || {};
+  const grupos = [...new Set(lista.map((p) => p.grupo).filter(Boolean))];
+  abrirForm({
+    titulo: i == null ? "Novo produto indicado" : `Produto: ${x.titulo}`,
+    valores: {
+      titulo: x.titulo, grupo: x.grupo, texto: x.texto, slug: x.slug, ativo: x.ativo !== false,
+      shopee: loja("shopee").url, shopee_cupom: loja("shopee").cupom,
+      mercadolivre: loja("mercadolivre").url, mercadolivre_cupom: loja("mercadolivre").cupom,
+      amazon: loja("amazon").url, amazon_cupom: loja("amazon").cupom,
+      outra_nome: loja("outra").nome, outra: loja("outra").url, outra_cupom: loja("outra").cupom
+    },
+    campos: [
+      { n: "titulo", r: "Nome do produto", req: true, ph: "Ex: Insta360 Ace Pro 2" },
+      { n: "grupo", r: "Grupo", ph: grupos.length ? "Ex: " + grupos.slice(0, 3).join(", ") : "Ex: Câmeras, Setup, Celular", ajuda: grupos.length ? "Grupos que você já tem: " + grupos.join(", ") + ". Escreva igual pra ficar junto." : "Os produtos do mesmo grupo aparecem juntos." },
+      { n: "texto", r: "O que eu achei (curto, opcional)", t: "textarea", inteiro: true, ph: "Ex: Uso pra gravar os bastidores. O que mais gostei foi a estabilização." },
+      { n: "shopee", r: "Link da Shopee", t: "url", ph: "https://..." },
+      { n: "shopee_cupom", r: "Cupom Shopee (opcional)" },
+      { n: "mercadolivre", r: "Link do Mercado Livre", t: "url", ph: "https://..." },
+      { n: "mercadolivre_cupom", r: "Cupom Mercado Livre (opcional)" },
+      { n: "amazon", r: "Link da Amazon", t: "url", ph: "https://..." },
+      { n: "amazon_cupom", r: "Cupom Amazon (opcional)" },
+      { n: "outra_nome", r: "Outra loja: nome (opcional)", ph: "Ex: Site oficial" },
+      { n: "outra", r: "Outra loja: link", t: "url", ph: "https://..." },
+      { n: "outra_cupom", r: "Outra loja: cupom (opcional)" },
+      { n: "imagem_arq", r: "Foto do produto (opcional)", t: "file", accept: "image/png,image/jpeg,image/webp", ajuda: x.imagem ? "Já tem foto. Escolha outra só se quiser trocar." : "De preferência quadrada, com fundo claro." },
+      { n: "slug", r: "Final do link (opcional)", ph: "Ex: insta360", ajuda: "Fica ugc.ryalvz.com.br/indica/?p=este-texto. Vazio, eu faço a partir do nome." },
+      { n: "ativo", r: "Mostrar na página", t: "check" }
+    ],
+    aoSalvar: async (d, status) => {
+      const lojas = [];
+      for (const k of ["shopee", "mercadolivre", "amazon", "outra"]) {
+        if (!d[k]) continue;
+        if (!linkValido(d[k])) { avisar(`O link da ${LOJAS_PROD[k] || "outra loja"} precisa começar com https://`, true); return false; }
+        lojas.push({ loja: k, nome: k === "outra" ? (d.outra_nome || "Outra loja") : LOJAS_PROD[k], url: d[k], cupom: (d[k + "_cupom"] || "").toUpperCase() });
+      }
+      if (!lojas.length) { avisar("Coloque o link de pelo menos uma loja.", true); return false; }
+      const slug = slugDe(d.slug || x.slug || d.titulo);
+      if (lista.some((p, j) => j !== i && p.slug === slug)) { avisar(`Já existe um produto com o link "${slug}". Troque o final do link.`, true); return false; }
+      let imagem = x.imagem || "";
+      if (d.imagem_arq) { status("Enviando a foto..."); imagem = await enviarArquivo(d.imagem_arq, "indicacoes", d.titulo); if (!imagem) return false; }
+      const novo = { slug, titulo: d.titulo, grupo: d.grupo || "", texto: d.texto || "", imagem, lojas, ativo: d.ativo };
+      if (i == null) lista.push(novo); else lista[i] = novo;
+      const ok = await salvarSiteConteudo("produtos", lista);
+      if (ok) { desenharLinkBio(el); try { await navigator.clipboard.writeText(linkProduto(slug)); setTimeout(() => avisar("Salvo. Link copiado: " + linkProduto(slug)), 400); } catch (_) {} }
+      return ok;
+    },
+    aoApagar: i == null ? null : async () => { lista.splice(i, 1); const ok = await salvarSiteConteudo("produtos", lista); if (ok) desenharLinkBio(el); return ok; }
+  });
 }
 
 const linkValido = (u) => /^https?:\/\/\S+\.\S+/i.test(String(u || ""));
