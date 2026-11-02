@@ -122,7 +122,7 @@ function formProduto(el, i) {
       { n: "imagem_arq", r: "Foto do produto (opcional)", t: "file", accept: "image/png,image/jpeg,image/webp", ajuda: x.imagem ? "Já tem foto. Escolha outra só se quiser trocar." : "De preferência quadrada, com fundo claro." },
       { n: "foto_x", r: "Foto: mover para os lados", t: "range", inteiro: true },
       { n: "foto_y", r: "Foto: mover para cima e para baixo", t: "range", inteiro: true },
-      { n: "foto_zoom", r: "Foto: zoom", t: "range", inteiro: true, ajuda: "Ajuste vendo o quadrinho acima. É assim que a foto aparece na página." },
+      { n: "foto_zoom", r: "Foto: zoom", t: "range", inteiro: true },
       { n: "slug", r: "Final do link (opcional)", ph: "Ex: insta360", ajuda: "Fica ugc.ryalvz.com.br/indica/?p=este-texto. Vazio, eu faço a partir do nome." },
       { n: "ativo", r: "Mostrar na página", t: "check" }
     ],
@@ -150,27 +150,60 @@ function formProduto(el, i) {
   quadroDaFoto(x.imagem ? urlSite(x.imagem) : "");
 }
 
-// Quadrinho ao vivo no formulário: mostra a foto do jeito que vai aparecer na página
+// Quadro da foto no formulário: arrasta a foto pra escolher a parte que aparece,
+// zoom com + e -, rodinha do mouse ou pinça. Os valores vão nos campos foto_x, foto_y e foto_zoom (escondidos).
 function quadroDaFoto(urlAtual) {
   const d = [...document.querySelectorAll("dialog[open]")].pop();
   if (!d) return;
-  const f = $("form", d), zoom = f.elements.foto_zoom, campoX = f.elements.foto_x;
-  zoom.min = 100; zoom.max = 300; zoom.step = 5; zoom.value = zoom.getAttribute("value") || 100;
+  const f = $("form", d), cx = f.elements.foto_x, cy = f.elements.foto_y, cz = f.elements.foto_zoom;
+  cz.min = 100; cz.max = 300; cz.value = cz.getAttribute("value") || 100;
+  [cx, cy, cz].forEach((c) => { c.closest("div").hidden = true; });
+  const LADO = 220;
   const caixa = document.createElement("div");
   caixa.className = "inteiro";
-  caixa.innerHTML = `<label>Como a foto aparece</label><div style="display:flex;align-items:center;gap:12px">
-    <span style="width:92px;height:92px;border-radius:14px;overflow:hidden;border:1px solid #ECE5D9;background:#fff;display:grid;place-items:center;flex:none"><img alt="" style="width:100%;height:100%;object-fit:cover;display:none"><small class="sub">sem foto</small></span>
-    <small class="sub">Arraste os controles abaixo pra escolher a parte da foto que aparece.</small></div>`;
-  campoX.closest("div").before(caixa);
-  const img = $("img", caixa), semFoto = $("small", caixa);
+  caixa.innerHTML = `<label>Como a foto aparece</label>
+    <div style="display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap">
+      <div data-quadro style="width:${LADO}px;height:${LADO}px;border-radius:24px;overflow:hidden;border:1px solid #ECE5D9;background:#fff;display:grid;place-items:center;cursor:grab;touch-action:none;user-select:none">
+        <img alt="" draggable="false" style="width:100%;height:100%;object-fit:cover;display:none;pointer-events:none"><small class="sub">sem foto</small></div>
+      <div style="display:grid;gap:8px">
+        <div style="display:flex;gap:8px"><button type="button" class="btn pequeno" data-zoom="-1" aria-label="Diminuir zoom">−</button><button type="button" class="btn pequeno" data-zoom="1" aria-label="Aumentar zoom">+</button></div>
+        <button type="button" class="btn pequeno" data-centro>Centralizar</button>
+      </div>
+    </div>
+    <small class="ajuda">Arraste a foto dentro do quadro. Zoom no + e −, na rodinha do mouse ou com dois dedos.</small>`;
+  cx.closest("div").before(caixa);
+  const quadro = $("[data-quadro]", caixa), img = $("img", caixa), semFoto = $("small", quadro);
+  const lim = (v, a, b) => Math.min(b, Math.max(a, v));
+  let px = Number(cx.value) || 50, py = Number(cy.value) || 50, z = Number(cz.value) / 100 || 1;
+  if (cx.value === "0") px = 0; if (cy.value === "0") py = 0;
   const pintar = () => {
-    const px = campoX.value, py = f.elements.foto_y.value, z = zoom.value / 100;
+    cx.value = Math.round(px); cy.value = Math.round(py); cz.value = Math.round(z * 100);
     Object.assign(img.style, { objectPosition: `${px}% ${py}%`, transform: `scale(${z})`, transformOrigin: `${px}% ${py}%` });
   };
   const usar = (url) => { img.src = url; img.style.display = url ? "block" : "none"; semFoto.style.display = url ? "none" : "block"; pintar(); };
+  const zoom = (fator) => { z = lim(z * fator, 1, 3); pintar(); };
+  // Arrastar (um dedo ou o mouse) e pinça (dois dedos)
+  const toques = new Map(); let pinca = 0;
+  quadro.addEventListener("pointerdown", (e) => { quadro.setPointerCapture(e.pointerId); toques.set(e.pointerId, [e.clientX, e.clientY]); quadro.style.cursor = "grabbing"; });
+  quadro.addEventListener("pointermove", (e) => {
+    const antes = toques.get(e.pointerId); if (!antes) return;
+    toques.set(e.pointerId, [e.clientX, e.clientY]);
+    if (toques.size === 2) {
+      const [a, b] = [...toques.values()], dist = Math.hypot(a[0] - b[0], a[1] - b[1]);
+      if (pinca) zoom(dist / pinca);
+      pinca = dist; return;
+    }
+    px = lim(px - (e.clientX - antes[0]) * 100 / (LADO * z), 0, 100);
+    py = lim(py - (e.clientY - antes[1]) * 100 / (LADO * z), 0, 100);
+    pintar();
+  });
+  const soltar = (e) => { toques.delete(e.pointerId); pinca = 0; quadro.style.cursor = "grab"; };
+  quadro.addEventListener("pointerup", soltar); quadro.addEventListener("pointercancel", soltar);
+  quadro.addEventListener("wheel", (e) => { e.preventDefault(); zoom(e.deltaY < 0 ? 1.08 : 1 / 1.08); }, { passive: false });
+  $$("[data-zoom]", caixa).forEach((b) => b.onclick = () => zoom(b.dataset.zoom === "1" ? 1.2 : 1 / 1.2));
+  $("[data-centro]", caixa).onclick = () => { px = 50; py = 50; z = 1; pintar(); };
   usar(urlAtual);
-  ["foto_x", "foto_y", "foto_zoom"].forEach((n) => f.elements[n].addEventListener("input", pintar));
-  f.elements.imagem_arq.addEventListener("change", (e) => { const a = e.target.files[0]; if (a) usar(URL.createObjectURL(a)); });
+  f.elements.imagem_arq.addEventListener("change", (e) => { const a = e.target.files[0]; if (a) { px = 50; py = 50; z = 1; usar(URL.createObjectURL(a)); } });
 }
 
 const linkValido = (u) => /^https?:\/\/\S+\.\S+/i.test(String(u || ""));
