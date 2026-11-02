@@ -139,6 +139,7 @@ function editarAutomacao(a) {
     <label class="au-rot" id="af-rot-botao">1º direct, com o botão [Quero o link]<textarea class="campo" id="af-texto-botao" rows="2">${esc(atual.texto_botao || BOTAO)}</textarea><small class="sub">Ainda sem o nome: o Instagram só libera o nome quando a pessoa toca no botão.</small></label>
     <label class="au-rot" id="af-rot-seguir">Se ainda não te segue (vai com o botão [Já sigo!])<textarea class="campo" id="af-texto-seguir" rows="2">${esc(atual.texto_seguir || SEGUIR)}</textarea></label>
     <label class="au-rot"><span id="af-rot-msg">Mensagem do direct</span><textarea class="campo" id="af-mensagem" rows="5">${esc(atual.mensagem)}</textarea><small class="sub">Até 1000 letras. {nome} vira o primeiro nome da pessoa(sem o botão, o Instagram quase nunca informa o nome, e aí fica só "Oi!"). Ponha o link do que você prometeu.</small></label>
+    <label class="au-rot">Texto do botão do link<input class="campo" id="af-botao-link" maxlength="20" value="${esc(atual.botao_link || "")}" placeholder="Ex.: Ver as lojas"><small class="sub">O link da mensagem vai dentro de um botão com esse texto, em vez de aparecer solto. Até 20 letras. Vazio fica "Abrir o link".</small></label>
     <label class="au-rot">Resposta no comentário (uma por linha, o painel sorteia)<textarea class="campo" id="af-respostas" rows="3">${esc(atual.respostas || "")}</textarea><small class="sub">Variar a resposta deixa mais natural. Deixe vazio pra não responder em público.</small></label>`,
     `<button class="btn" type="button" data-fechar>Cancelar</button><button class="btn primario" type="button" id="af-salvar">Salvar</button>`);
   const mostrarPost = () => {
@@ -176,7 +177,8 @@ function editarAutomacao(a) {
       palavras: $("#af-palavras", d).value.trim(), mensagem: $("#af-mensagem", d).value.trim(), respostas: $("#af-respostas", d).value.trim() || null,
       midia_id: midia.id || null, midia_legenda: midia.id ? midia.legenda || null : null, midia_capa: midia.id ? midia.capa || null : null,
       com_botao: $("#af-botao", d).checked, exige_seguir: $("#af-seguir", d).checked,
-      texto_botao: $("#af-texto-botao", d).value.trim() || null, texto_seguir: $("#af-texto-seguir", d).value.trim() || null
+      texto_botao: $("#af-texto-botao", d).value.trim() || null, texto_seguir: $("#af-texto-seguir", d).value.trim() || null,
+      botao_link: $("#af-botao-link", d).value.trim() || null
     };
     if (!dados.palavras) { avisar("Escreva pelo menos uma palavra.", true); return; }
     if (!dados.mensagem) { avisar("Escreva a mensagem do direct.", true); return; }
