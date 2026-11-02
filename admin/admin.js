@@ -551,7 +551,14 @@ function traduzErroArquivo(e) {
   return "Não deu para enviar o arquivo: " + ((e && e.message) || "erro desconhecido");
 }
 
+// Vídeo pesado gasta a cota grátis de tráfego do Supabase (5 GB por mês) a cada visita no site
+const LIMITE_VIDEO_MB = 25;
+
 async function enviarArquivo(arquivo, pasta, nomeBase) {
+  if (pasta === "videos" && arquivo.size > LIMITE_VIDEO_MB * 1e6) {
+    avisar(`Esse vídeo tem ${Math.round(arquivo.size / 1e6)} MB. Exporte em 1080p com taxa de bits Recomendada ou Baixa (no CapCut) pra ficar abaixo de ${LIMITE_VIDEO_MB} MB e tente de novo. Vídeo pesado estoura o limite grátis do Supabase.`, true);
+    return null;
+  }
   const nome = (nomeBase || arquivo.name || "arquivo").toLowerCase()
     .normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9.]+/g, "-").replace(/^-+|-+$/g, "") || "arquivo";
   const ext = (nome.split(".").pop() || "").toLowerCase();
