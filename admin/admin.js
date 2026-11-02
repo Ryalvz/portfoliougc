@@ -3737,8 +3737,13 @@ function pintarLembretes() {
     const b = e.target.closest("[data-lembrete]");
     if (!b) return;
     const l = lembretesAtuais[Number(b.dataset.lembrete)];
-    fecharLembretes();
-    if (l) l.acoes[Number(b.dataset.acao)][2]();
+    if (!l) return;
+    // A central fica aberta pra você seguir no próximo lembrete. Só fecha se a ação abriu uma janela ou foi pra outra aba
+    const abaAntes = abaAtual;
+    const fecharSePreciso = () => { if (document.querySelector("dialog[open]") || abaAtual !== abaAntes) fecharLembretes(); };
+    const fim = l.acoes[Number(b.dataset.acao)][2]();
+    fecharSePreciso();
+    Promise.resolve(fim).finally(fecharSePreciso);
   };
 }
 
@@ -4024,7 +4029,8 @@ function ligarCabecalho() {
     painel.hidden = !painel.hidden;
     botao.setAttribute("aria-expanded", String(!painel.hidden));
   });
-  document.addEventListener("click", (e) => { if (!e.target.closest(".sino-caixa")) fecharLembretes(); });
+  // Botão que sumiu porque a lista do sino se redesenhou também conta como "dentro"
+  document.addEventListener("click", (e) => { if (e.target.isConnected && !e.target.closest(".sino-caixa")) fecharLembretes(); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") fecharLembretes(); });
 
   const olho = $("#modo-privado");
