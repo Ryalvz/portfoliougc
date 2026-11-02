@@ -54,7 +54,7 @@
   .item { display: flex; align-items: center; gap: 14px; padding: 12px 14px; background: var(--papel); border: 1px solid var(--areia); border-radius: 16px; text-decoration: none; transition: border-color .2s, transform .2s; }
   .item:hover { border-color: var(--dourado); transform: translateY(-2px); }
   .mini { flex: none; display: grid; place-items: center; width: 64px; height: 64px; border-radius: 12px; background: #fff; border: 1px solid var(--areia); overflow: hidden; font-family: "Playfair Display", Georgia, serif; font-size: 24px; color: var(--dourado); }
-  .mini img { width: 100%; height: 100%; object-fit: contain; }
+  .mini img { width: 100%; height: 100%; object-fit: cover; }
   .item .txt { display: grid; min-width: 0; }
   .item b { font-size: 15px; }
   .item small { color: var(--suave); font-size: 12.5px; }
@@ -62,11 +62,14 @@
 
   /* Um produto aberto */
   .produto { margin-top: 22px; background: var(--papel); border: 1px solid var(--areia); border-radius: 20px; overflow: hidden; }
-  .produto .capa { display: grid; place-items: center; aspect-ratio: 1 / 1; background: #fff; border-bottom: 1px solid var(--areia); }
-  .produto .capa img { width: 100%; height: 100%; object-fit: contain; }
-  .produto .capa span { font-family: "Playfair Display", Georgia, serif; font-size: 64px; color: var(--dourado); }
   .produto .corpo { padding: 18px 18px 20px; }
-  .produto h2 { font-family: "Playfair Display", Georgia, serif; font-weight: 600; font-size: 25px; line-height: 1.2; margin: 6px 0 0; }
+  /* Foto pequena ao lado do nome */
+  .produto .cab { display: flex; align-items: center; gap: 14px; }
+  .produto .capa { flex: none; display: grid; place-items: center; width: 92px; height: 92px; border-radius: 14px; overflow: hidden; background: #fff; border: 1px solid var(--areia); }
+  .produto .capa img { display: block; width: 100%; height: 100%; object-fit: cover; }
+  .produto .capa span { font-family: "Playfair Display", Georgia, serif; font-size: 36px; color: var(--dourado); }
+  .produto .cab > div { min-width: 0; }
+  .produto h2 { font-family: "Playfair Display", Georgia, serif; font-weight: 600; font-size: 23px; line-height: 1.2; margin: 4px 0 0; }
   .opiniao { margin: 12px 0 0; font-size: 14.5px; }
   .opiniao::before { content: "O que eu achei"; display: block; margin-bottom: 4px; font-size: 10.5px; font-weight: 700; letter-spacing: 1.4px; text-transform: uppercase; color: var(--dourado); }
   .comparar { margin: 20px 0 10px; font-size: 13px; font-weight: 600; color: var(--suave); text-align: center; }
@@ -123,12 +126,17 @@
     } catch (_) {}
   };
 
+  // Enquadramento escolhido no painel: que parte da foto aparece e o zoom
+  const quadro = (x) => {
+    const px = Number.isFinite(+x.foto_x) ? +x.foto_x : 50, py = Number.isFinite(+x.foto_y) ? +x.foto_y : 50, z = +x.foto_zoom || 1;
+    return ` style="object-position:${px}% ${py}%;transform:scale(${z});transform-origin:${px}% ${py}%"`;
+  };
   const inicial = (x) => esc((x.titulo || "?").trim().charAt(0).toUpperCase());
   const lojasDe = (x) => (x.lojas || []).filter((l) => seguro(l.url));
   const nomeLoja = (l) => LOJAS[l.loja] || l.nome || "Outra loja";
 
   const itemLista = (x) => `<a class="item" href="?p=${encodeURIComponent(x.slug)}">
-    <span class="mini">${x.imagem ? `<img src="${esc(x.imagem)}" alt="" loading="lazy">` : inicial(x)}</span>
+    <span class="mini">${x.imagem ? `<img src="${esc(x.imagem)}" alt="" loading="lazy"${quadro(x)}>` : inicial(x)}</span>
     <span class="txt"><b>${esc(x.titulo)}</b><small>${lojasDe(x).map(nomeLoja).map(esc).join(" · ")}</small></span>
     ${SETA.replace("<svg", '<svg class="seta"')}
   </a>`;
@@ -140,10 +148,11 @@
     const lojas = lojasDe(x);
     const outros = todos.filter((o) => o.slug !== x.slug && o.grupo === x.grupo);
     el.innerHTML = `<article class="produto">
-      <div class="capa">${x.imagem ? `<img src="${esc(x.imagem)}" alt="${esc(x.titulo)}">` : `<span>${inicial(x)}</span>`}</div>
       <div class="corpo">
-        ${x.grupo ? `<span class="selo">${esc(x.grupo)}</span>` : ""}
-        <h2>${esc(x.titulo)}</h2>
+        <div class="cab">
+          <div class="capa">${x.imagem ? `<img src="${esc(x.imagem)}" alt="${esc(x.titulo)}"${quadro(x)}>` : `<span>${inicial(x)}</span>`}</div>
+          <div>${x.grupo ? `<span class="selo">${esc(x.grupo)}</span>` : ""}<h2>${esc(x.titulo)}</h2></div>
+        </div>
         ${x.texto ? `<p class="opiniao">${esc(x.texto)}</p>` : ""}
         <p class="comparar">${lojas.length > 1 ? "Compare o preço e escolha a sua loja" : "Onde comprar"}</p>
         <div class="lojas">${lojas.map((l) => `<div class="loja">
