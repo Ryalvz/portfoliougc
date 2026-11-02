@@ -115,6 +115,19 @@ async function enviarComBotao(para: Record<string, string>, texto: string, titul
     await graph("me/messages", token, { recipient: para, message: { text: texto.slice(0, 1000), quick_replies: [{ content_type: "text", title: titulo.slice(0, 20), payload }] } });
   }
 }
+// Mensagem com o link: o primeiro link do texto vira um botão (o texto do botão vem da automação).
+// Sem link, ou se a Meta não aceitar o botão, vai como texto normal com o link solto.
+async function enviarComLink(para: Record<string, string>, texto: string, titulo: string, token: string) {
+  const url = (texto.match(/https?:\/\/[^\s<>"]+/) || [""])[0].replace(/[.,;:!?)]+$/, "");
+  if (url) {
+    const semLink = texto.replace(url, "").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim() || "Aqui está o que você pediu:";
+    try {
+      await graph("me/messages", token, { recipient: para, message: { attachment: { type: "template", payload: { template_type: "button", text: semLink.slice(0, 640), buttons: [{ type: "web_url", url, title: (titulo || "Abrir o link").slice(0, 20) }] } } } });
+      return;
+    } catch (_) { /* cai no texto normal */ }
+  }
+  await graph("me/messages", token, { recipient: para, message: { text: texto.slice(0, 1000) } });
+}
 // A pessoa tocou no botão: agora o Instagram entrega o nome e se ela segue a conta
 async function tratarToque(ev: any, token: string) {
   const payload = String(ev?.postback?.payload || ev?.message?.quick_reply?.payload || "");
@@ -133,7 +146,7 @@ async function tratarToque(ev: any, token: string) {
       await db.from("automacao_envios").update({ nome: nome || null, erro: perfil.erro ? `não deu pra conferir: ${perfil.erro}` : "esperando seguir" }).eq("id", env.id);
       return;
     }
-    await graph("me/messages", token, { recipient: { id: quem }, message: { text: preencher(a.mensagem, nome, env.usuario || "").slice(0, 1000) } });
+    await enviarComLink({ id: quem }, preencher(a.mensagem, nome, env.usuario || ""), a.botao_link || "", token);
     await db.from("automacao_envios").update({ status: "enviado", nome: nome || null, erro: null }).eq("id", env.id);
   } catch (e) {
     await db.from("automacao_envios").update({ status: "erro", erro: String((e as Error).message).slice(0, 300) }).eq("id", env.id);
@@ -158,7 +171,7 @@ async function tratarComentario(v: any, dono: string, token: string) {
   try {
     // Com botão: primeiro um direct curto; o link só vai quando a pessoa tocar (e aí o Instagram libera o nome)
     if (comBotao) await enviarComBotao({ comment_id: comentario }, preencher(a.texto_botao || BOTAO_PADRAO, "", ""), "Quero o link", `auto:${reg.id}`, token);
-    else await graph("me/messages", token, { recipient: { comment_id: comentario }, message: { text: mensagem.slice(0, 1000) } });
+    else await enviarComLink({ comment_id: comentario }, mensagem, a.botao_link || "", token);
     let erroPublico = "";
     const publica = sortear(a.respostas);
     if (publica) { try { await graph(`${comentario}/replies`, token, { message: preencher(publica, nome, autor.username || "") }); } catch (e) { erroPublico = `direct ok, resposta no comentário falhou: ${(e as Error).message}`; } }
