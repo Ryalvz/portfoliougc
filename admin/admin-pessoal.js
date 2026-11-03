@@ -946,6 +946,8 @@ function formRecebPF(r, pessoa, falta) {
    novo (já está na fatura). Tudo fica no pf_config, chave "viagens".
    ============================================================= */
 const viagens = () => (Array.isArray(cfg("viagens", [])) ? cfg("viagens", []) : []);
+// Viagem em que a compra do cartão já entrou (a divisão fica lá, não na compra)
+const viagemDaCompra = (c) => (c ? viagens().find((v) => (v.gastos || []).some((g) => g.compraId && String(g.compraId) === String(c.id))) : null);
 const ehEu = (n) => EU_NOMES.has(semAcento(nomePessoa(n)));
 const mesmaPessoa = (a, b) => (ehEu(a) && ehEu(b)) || chavePessoa(a) === chavePessoa(b);
 async function salvarViagens(lista) {
@@ -1544,7 +1546,7 @@ function abrirImportarFatura() {
       return `<tr class="${x.credito ? "pf-credito" : ""} ${x.existe ? "pf-existe" : ""}">
         <td><input type="checkbox" data-inc="${i}" ${x.incluir ? "checked" : ""} aria-label="Incluir"></td>
         <td>${dataBR(x.data)}</td>
-        <td>${esc(x.desc)}${x.pagamento ? ` <span class="pilula p-parada">pagamento da fatura</span>` : x.credito ? ` <span class="pilula p-pago">estorno ou crédito</span>` : ""}${x.rapido ? ` <span class="pilula p-conversando">você lançou: ${esc(x.rapido.descricao)}</span>` : ""}</td>
+        <td>${esc(x.desc)}${x.pagamento ? ` <span class="pilula p-parada">pagamento da fatura</span>` : x.credito ? ` <span class="pilula p-pago">estorno ou crédito</span>` : ""}${x.rapido ? ` <span class="pilula p-conversando">você lançou: ${esc(x.rapido.descricao)}</span>` : ""}${(() => { const v = viagemDaCompra(x.rapido || x.existe); return v ? ` <span class="pilula p-pago">dividida na viagem ${esc(v.nome)}: deixe "Eu"</span>` : ""; })()}</td>
         <td>${x.n > 1 ? `${x.k}/${x.n}` : "à vista"}</td>
         <td>${x.credito ? "−" : ""}${real(x.valor)}</td>
         <td><div class="pf-imp-dono"><input class="campo" data-dono="${i}" list="imp-pessoas" value="${esc(x.dono)}" placeholder="Eu" style="min-width:120px"><button type="button" class="btn pequeno" data-dividir="${i}">Dividir</button></div>${cada}</td></tr>`;
