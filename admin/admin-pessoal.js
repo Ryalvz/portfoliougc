@@ -957,7 +957,18 @@ async function salvarViagens(lista) {
   return true;
 }
 // Gasto da viagem: valor, quem pagou e as partes iguais de cada um
-const partesGasto = (g) => { const l = (g.divide || []).filter(Boolean); return l.map((n) => ({ nome: n, v: n2(g.valor) / (l.length || 1) })); };
+// "cobertos": quem não paga a própria parte; ela é dividida igual entre os "cobrem" (ex.: a parte da mãe, você e o irmão pagam)
+const partesGasto = (g) => {
+  const l = (g.divide || []).filter(Boolean), cada = n2(g.valor) / (l.length || 1);
+  const cobertos = l.filter((n) => (g.cobertos || []).some((c) => mesmaPessoa(c, n)));
+  const cobrem = (g.cobrem || []).filter((n) => n && !cobertos.some((c) => mesmaPessoa(c, n)));
+  if (!cobertos.length || !cobrem.length) return l.map((n) => ({ nome: n, v: cada }));
+  const extra = (cada * cobertos.length) / cobrem.length;
+  const r = l.filter((n) => !cobertos.some((c) => mesmaPessoa(c, n))).map((n) => ({ nome: n, v: cada }));
+  cobrem.forEach((n) => { const x = r.find((y) => mesmaPessoa(y.nome, n)); if (x) x.v += extra; else r.push({ nome: n, v: extra }); });
+  return r;
+};
+const textoCobertura = (g, quem) => ((g.cobertos || []).length && (g.cobrem || []).length ? ` · a parte de ${g.cobertos.map(quem).join(" e ")} quem paga é ${g.cobrem.map(quem).join(" e ")}` : "");
 // Saldo de cada pessoa no grupo: o que pagou menos a parte dela
 function saldosViagem(v) {
   const m = new Map();
@@ -1028,7 +1039,7 @@ function pfViagens(el) {
           <button class="btn" type="button" id="vg-cartao">Trazer do meu cartão</button>
           <button class="btn primario" type="button" id="vg-gasto">${ic("mais")}Gasto</button></div>
         ${(v.gastos || []).length ? `<ul class="pf-vg-gastos">${[...v.gastos].sort((a, b) => String(b.data || "").localeCompare(String(a.data || ""))).map((g) => `<li><button type="button" data-vg-gasto="${g.id}">
-          <span><b>${esc(g.descricao)}</b><small>${g.data ? dataBR(g.data).slice(0, 5) + " · " : ""}${quem(g.pagou)} pagou · divide entre ${(g.divide || []).map(quem).join(", ")}${g.compraId ? " · do seu cartão" : ""}</small></span>
+          <span><b>${esc(g.descricao)}</b><small>${g.data ? dataBR(g.data).slice(0, 5) + " · " : ""}${quem(g.pagou)} pagou · divide entre ${(g.divide || []).map(quem).join(", ")}${textoCobertura(g, quem)}${g.compraId ? " · do seu cartão" : ""}</small></span>
           <strong>${real(g.valor)}</strong></button></li>`).join("")}</ul>`
           : `<p class="vazio">Nenhum gasto ainda. Lance o que cada um pagou, ou traga as compras divididas do seu cartão.</p>`}
       </div>
@@ -1077,9 +1088,21 @@ function formGastoViagem(v, g) {
       <div class="inteiro"><label for="vg-pagou">Quem pagou</label><select class="campo" id="vg-pagou" style="width:100%" ${g && g.compraId ? "disabled" : ""}>${pessoas.map((n) => `<option value="${esc(n)}" ${g ? (mesmaPessoa(g.pagou, n) ? "selected" : "") : ehEu(n) ? "selected" : ""}>${ehEu(n) ? "Eu" : esc(n)}</option>`).join("")}</select></div>
       <div class="inteiro"><label>Divide entre</label><div class="pf-dividir-lista">${pessoas.map((n) => `<label class="check"><input type="checkbox" data-vg-divide="${esc(n)}" ${marcados.has(ehEu(n) ? "eu" : chavePessoa(n)) ? "checked" : ""}> ${ehEu(n) ? "Eu" : esc(n)}</label>`).join("")}</div>
         <small class="ajuda" id="vg-conta"></small></div>
+      <details class="inteiro" ${(g && (g.cobertos || []).length) ? "open" : ""}><summary><b>Alguém paga a parte de outro?</b></summary>
+        <p class="sub" style="margin:6px 0">Ex.: a parte da sua mãe, você e seu irmão pagam. Cada um continua com uma parte igual; a parte de quem você marcar em cima é dividida entre quem você marcar embaixo.</p>
+        <label>Parte de quem</label><div class="pf-dividir-lista">${pessoas.map((n) => `<label class="check"><input type="checkbox" data-vg-coberto="${esc(n)}" ${g && (g.cobertos || []).some((c) => mesmaPessoa(c, n)) ? "checked" : ""}> ${ehEu(n) ? "Eu" : esc(n)}</label>`).join("")}</div>
+        <label style="display:block;margin-top:8px">Quem paga essas partes</label><div class="pf-dividir-lista">${pessoas.map((n) => `<label class="check"><input type="checkbox" data-vg-cobre="${esc(n)}" ${g && (g.cobrem || []).some((c) => mesmaPessoa(c, n)) ? "checked" : ""}> ${ehEu(n) ? "Eu" : esc(n)}</label>`).join("")}</div>
+      </details>
     </div></div>
     <div class="janela-pe">${g ? `<button type="button" class="btn perigo esq" data-apagar>${ic("apagar")}Tirar da viagem</button>` : ""}<button type="button" class="btn" data-fechar>Cancelar</button><button type="submit" class="btn primario">Salvar</button></div></form>`;
-  const conta = () => { const n = $$("[data-vg-divide]", d).filter((c) => c.checked).length, val = n2($("#vg-valor", d).value); $("#vg-conta", d).textContent = n ? `${n} ${n === 1 ? "pessoa" : "pessoas"}: ${real(val / n)} pra cada.` : "Marque quem divide."; };
+  const marcadosDe = (attr) => $$(`[data-${attr}]`, d).filter((c) => c.checked).map((c) => c.dataset[attr.replace(/-(\w)/g, (_, l) => l.toUpperCase())]);
+  const conta = () => {
+    const n = $$("[data-vg-divide]", d).filter((c) => c.checked).length, val = n2($("#vg-valor", d).value);
+    if (!n) { $("#vg-conta", d).textContent = "Marque quem divide."; return; }
+    const partes = partesGasto({ valor: val, divide: marcadosDe("vg-divide"), cobertos: marcadosDe("vg-coberto"), cobrem: marcadosDe("vg-cobre") });
+    const iguais = partes.length === n && partes.every((x) => Math.abs(x.v - val / n) < 0.005);
+    $("#vg-conta", d).textContent = iguais ? `${n} ${n === 1 ? "pessoa" : "pessoas"}: ${real(val / n)} pra cada.` : `Fica assim: ${partes.map((x) => `${ehEu(x.nome) ? "Eu" : x.nome} ${real(x.v)}`).join(", ")}.`;
+  };
   d.oninput = conta; conta();
   $$("[data-fechar]", d).forEach((b) => b.onclick = () => d.close());
   const salvar = async (lista) => { const vs = viagens().map((x) => (x.id === v.id ? { ...x, gastos: lista } : x)); if (await salvarViagens(vs)) { d.close(); desenhar(); } };
@@ -1090,7 +1113,11 @@ function formGastoViagem(v, g) {
     const divide = $$("[data-vg-divide]", d).filter((c) => c.checked).map((c) => c.dataset.vgDivide);
     if (!descricao || !(valor > 0)) { avisar("Preencha o que foi e o valor.", true); return; }
     if (!divide.length) { avisar("Marque quem divide.", true); return; }
+    const cobertos = marcadosDe("vg-coberto").filter((n) => divide.some((x) => mesmaPessoa(x, n))), cobrem = marcadosDe("vg-cobre");
+    if (cobertos.length && !cobrem.length) { avisar("Marque quem paga a parte de " + cobertos.map((n) => (ehEu(n) ? "você" : n)).join(" e ") + ".", true); return; }
+    if (cobrem.some((n) => cobertos.some((c) => mesmaPessoa(c, n)))) { avisar("Quem tem a parte paga por outro não pode estar também em quem paga.", true); return; }
     const novo = { ...(g || { id: "g" + Date.now() }), descricao, valor: r2(valor), data: $("#vg-data", d).value || null, pagou: g && g.compraId ? g.pagou : $("#vg-pagou", d).value, divide };
+    if (cobertos.length) { novo.cobertos = cobertos; novo.cobrem = cobrem; } else { delete novo.cobertos; delete novo.cobrem; }
     await salvar(g ? v.gastos.map((x) => (x.id === g.id ? novo : x)) : [...(v.gastos || []), novo]);
   };
   d.showModal();
