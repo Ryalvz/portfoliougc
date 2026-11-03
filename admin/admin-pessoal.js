@@ -1534,6 +1534,8 @@ function abrirImportarFatura() {
     if (!st.itens.length) { rev.innerHTML = st.arquivo ? `<p class="aviso-falta">Não achei compras neste arquivo. Se for PDF escaneado (imagem), baixe a fatura em CSV no app do banco ou lance as parcelas à mão.</p>` : ""; $("#imp-salvar", d).disabled = true; return; }
     const inc = st.itens.filter((x) => x.incluir);
     const soma = inc.reduce((s, x) => s + (x.credito ? -x.valor : x.valor), 0);
+    // O total do banco inclui as já salvas: a conferência é com tudo que a fatura tem (menos o pagamento)
+    const somaTudo = st.itens.filter((x) => !x.pagamento).reduce((s, x) => s + (x.credito ? -x.valor : x.valor), 0);
     const novos = st.itens.map((x, i) => [x, i]).filter(([x]) => !x.existe);
     const salvas = st.itens.map((x, i) => [x, i]).filter(([x]) => x.existe);
     const linha = ([x, i]) => {
@@ -1551,7 +1553,8 @@ function abrirImportarFatura() {
     rev.innerHTML = `
       <div class="pf-imp-resumo">
         <span><b>${st.itens.length}</b> lançamentos lidos</span>
-        <span><b>${real(soma)}</b> marcados${st.total ? ` (a fatura diz ${real(st.total)}${Math.abs(st.total - soma) > 1 ? ", confira" : ""})` : ""}</span>
+        <span><b>${real(soma)}</b> marcados pra salvar</span>
+        ${st.total ? `<span>Fatura toda: <b>${real(somaTudo)}</b>${Math.abs(st.total - somaTudo) > 1 ? ` (o banco diz ${real(st.total)}, confira)` : ", bate com o banco"}</span>` : ""}
         <span><b>${novos.length}</b> novos, ${salvas.length} já estavam salvos</span>
       </div>
       <datalist id="imp-pessoas">${pessoas().map((p) => `<option value="${esc(p)}">`).join("")}</datalist>
