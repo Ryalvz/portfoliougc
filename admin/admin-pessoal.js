@@ -1343,12 +1343,31 @@ function lerLinhaFatura(t, mesFatura) {
   const credito = pagamento || negativo || RE_CREDITO.test(desc);
   return { data: `${ano}-${pad(mes)}-${pad(dia)}`, desc, k: n ? k : 1, n: n || 1, valor, credito, pagamento };
 }
+// Extrato em aberto do app Bradesco Cartões: "29/10 LOJA 0,00 R$ 0,00 47,97" (US$, cotação e R$ lado a lado; vale o último).
+// Às vezes o nome vem na linha de cima e a parcela ("1/3 84,18") na de baixo.
+const RE_COLUNAS_BRADESCO = /\s+(?:-?[\d.]+,\d{2}\s+)?-?[\d.]+,\d{2}\s+R\$\s+[\d.]+,\d{2}\s+(-?[\d.]+,\d{2})$/;
+function linhasDoExtratoBradesco(linhas) {
+  const soValor = /^(BRL|-?[\d.]+,\d{2})$/;
+  return linhas.map((l, i) => {
+    const m = l.match(RE_COLUNAS_BRADESCO), dt = l.match(/^\d{1,2}\/\d{1,2}(?=\s)/);
+    if (!m || !dt) return l;
+    let desc = l.slice(dt[0].length, m.index).replace(/\s+BRL\b/g, "").trim();
+    const acima = (linhas[i - 1] || "").replace(/\s+BRL$/, "").trim();
+    if (!desc && acima && !soValor.test(acima) && !/^\d{1,2}\/\d{1,2}\s/.test(acima)) desc = acima;
+    const parc = (linhas[i + 1] || "").match(/^(\d{1,2}\/\d{1,2})\s+-?[\d.]+,\d{2}$/);
+    if (parc && !/\d\/\d{1,2}$/.test(desc)) desc += " " + parc[1];
+    return `${dt[0]} ${desc} ${m[1]}`;
+  });
+}
 // Junta as linhas da fatura. "Compras de Diego O P Moreira R$ 1.019,38" (cartão adicional do Nubank)
 // marca as compras seguintes com o nome da pessoa, até o próximo título.
 function itensDasLinhas(linhas, mesFatura) {
   let dono = "";
   const r = [];
+  if (linhas.filter((l) => RE_COLUNAS_BRADESCO.test(l)).length >= 3) linhas = linhasDoExtratoBradesco(linhas);
   linhas.forEach((l) => {
+    // "SALDO ANTERIOR" é a fatura passada (já sai com o pagamento): não é compra
+    if (/saldo anterior/i.test(l)) return;
     const tit = l.match(/^([A-Za-zÀ-ú .']+?)\s+[-−]?R\$\s?[\d.]+,\d{2}$/);
     if (tit) { const c = tit[1].match(/^compras de\s+(\S+)/i); dono = c ? c[1][0].toUpperCase() + c[1].slice(1).toLowerCase() : ""; return; }
     const x = lerLinhaFatura(l, mesFatura);
@@ -1460,7 +1479,7 @@ function abrirImportarFatura() {
     lista.forEach((x) => { if (x.n > 1) { const g = `${x.data}|${baseDesc(x.desc)}|${x.n}`; (grupos[g] = grupos[g] || new Set()).add(x.k); } });
     lista.forEach((x) => {
       const g = grupos[`${x.data}|${baseDesc(x.desc)}|${x.n}`];
-      if (x.n > 1 && g && g.size >= 3 && Math.max(...g) === x.n) { x.desc = `${x.desc} (parcela ${x.k}/${x.n} cobrada junto)`; x.k = 1; x.n = 1; }
+      if (x.n > 1 && g && g.size >= 3 && Math.max(...g) === x.n) { x.desc = `${x.desc} (parcela ${x.k}/${x.n} cobrada junto)`; x.junto = { k: x.k, n: x.n }; x.k = 1; x.n = 1; }
     });
     const ordens = {};
     st.itens = lista.map((x) => {
@@ -1475,14 +1494,29 @@ function abrirImportarFatura() {
       x.chave = chaveCompra(x, st.cartao, st.mes, x.ordem);
       x.existe = P.compras.find((c) => c.chave === x.chave) || null;
     });
-    // Gasto que você lançou na hora (+ Gasto): a linha da fatura toma o lugar dele, sem duplicar
+    // A mesma compra já salva por outro arquivo do banco: a fatura fechada e o extrato em aberto escrevem o nome
+    // diferente ("TRISTAO SHOES VV LTD VILA VELHA" x "TRISTAO SHOES VV LTDA") e a 1ª parcela pode ter centavos a mais.
+    // Vale se bate cartão, data, mês da parcela, número de parcelas, valor (até 1 centavo por parcela) e o começo do nome.
+    const jaAchadas = new Set(st.itens.filter((x) => x.existe).map((x) => x.existe.id));
+    st.itens.forEach((x) => {
+      if (x.existe) return;
+      const v = x.credito ? -x.valor : x.valor, pm = somaMes(st.mes, -(x.k - 1)), ini = baseDesc(x.desc).slice(0, 6);
+      const c = P.compras.find((r) => r.origem === "fatura" && !jaAchadas.has(r.id) && String(r.cartao_id) === st.cartao && Number(r.parcelas) === x.n
+        && mesDe(r.primeiro_mes) === pm && (!r.data_compra || !x.data || r.data_compra === x.data)
+        && Math.abs(n2(r.valor_parcela) - v) <= 0.01 * x.n + 0.001 && baseDesc(r.descricao).slice(0, 6) === ini);
+      if (c) { jaAchadas.add(c.id); x.existe = c; x.chave = c.chave; }
+    });
+    // Gasto que você lançou na hora (+ Gasto ou foto no Telegram): a linha da fatura toma o lugar dele, sem duplicar.
+    // A data do lançamento pode ser a do envio da foto, dias depois: aceita até 7 dias e fica com o mais próximo
     const usados = new Set();
     st.itens.forEach((x) => {
       x.rapido = null;
       if (x.existe) return;
       const v = x.credito ? -x.valor : x.valor;
-      const c = P.compras.find((r) => r.origem === "rapido" && !usados.has(r.id) && (!r.cartao_id || String(r.cartao_id) === st.cartao)
-        && Math.abs(n2(r.valor_parcela) - v) < 0.015 && Number(r.parcelas) === x.n && (!r.data_compra || !x.data || Math.abs(diasEntre(r.data_compra, x.data)) <= 5));
+      const dist = (r) => (r.data_compra && x.data ? Math.abs(diasEntre(r.data_compra, x.data)) : 0);
+      const c = P.compras.filter((r) => r.origem === "rapido" && !usados.has(r.id) && (!r.cartao_id || String(r.cartao_id) === st.cartao)
+        // Parcelado lançado na hora que veio todo junto (estorno): a 1ª parcela da fatura fica no lugar dele
+        && Math.abs(n2(r.valor_parcela) - v) < 0.015 && (Number(r.parcelas) === x.n || (x.junto && x.junto.k === 1 && Number(r.parcelas) === x.junto.n)) && dist(r) <= 7).sort((a, b) => dist(a) - dist(b))[0];
       if (c) { usados.add(c.id); x.rapido = c; }
     });
     st.itens.forEach((x) => {
@@ -1659,10 +1693,17 @@ function abrirImportarFatura() {
       chave: x.chave
     }));
     btn.disabled = true; btn.textContent = "Salvando...";
-    const { error } = await db.from("pf_compras").upsert(linhas, { onConflict: "chave" });
+    const { data: salvas, error } = await db.from("pf_compras").upsert(linhas, { onConflict: "chave" }).select("id, chave");
     btn.disabled = false; btn.textContent = "Salvar compras";
     if (error) { avisar(traduzErro(error), true); return; }
-    const trocados = st.itens.filter((x) => x.incluir && x.rapido).map((x) => x.rapido.id);
+    const trocadas = st.itens.filter((x) => x.incluir && x.rapido);
+    // Gasto de viagem que apontava pro lançamento na hora passa a apontar pra linha da fatura
+    const novoId = new Map(trocadas.map((x) => [String(x.rapido.id), ((salvas || []).find((s) => s.chave === x.chave) || {}).id]).filter(([, id]) => id));
+    if (novoId.size && viagens().some((v) => (v.gastos || []).some((g) => novoId.has(String(g.compraId))))) {
+      const ok = await salvarViagens(viagens().map((v) => ({ ...v, gastos: (v.gastos || []).map((g) => (novoId.has(String(g.compraId)) ? { ...g, compraId: novoId.get(String(g.compraId)) } : g)) })));
+      if (!ok) return;
+    }
+    const trocados = trocadas.map((x) => x.rapido.id).filter((id) => novoId.has(String(id)));
     if (trocados.length) await db.from("pf_compras").delete().in("id", trocados);
     d.close();
     avisar(`${linhas.length} compras salvas${trocados.length ? `, ${trocados.length} que você lançou na hora foram reconhecidas` : ""}.`);
