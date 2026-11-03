@@ -1100,12 +1100,16 @@ function trazerDoCartao(v) {
   const usados = new Set((v.gastos || []).map((g) => String(g.compraId || "")));
   const daViagem = (c) => outrosDe(c).some((x) => (v.pessoas || []).some((n) => mesmaPessoa(n, x.nome)));
   const desde = isoLocal(new Date(Date.now() - 120 * 864e5));
-  const lista = P.compras.filter((c) => temMinha(c) && !usados.has(String(c.id)) && (dividida(c) ? daViagem(c) : String(c.data_compra || "") >= desde)).sort((a, b) => String(b.data_compra || "").localeCompare(String(a.data_compra || ""))).slice(0, 60);
+  const lista = P.compras.filter((c) => temMinha(c) && !usados.has(String(c.id)) && (dividida(c) ? daViagem(c) : String(c.data_compra || "") >= desde)).sort((a, b) => String(b.data_compra || "").localeCompare(String(a.data_compra || "")));
   const d = abrirJanelaSimples("Trazer do meu cartão", lista.length
     ? `<p class="sub" style="margin-top:0">Compras do seu cartão. As que já estão divididas com alguém não são cobradas de novo. As que são só suas entram divididas entre todos da viagem (dá pra mudar depois tocando no gasto).</p>
-      <div class="pf-dividir-lista">${lista.map((c) => `<label class="check"><input type="checkbox" data-trazer="${c.id}"> ${esc(c.descricao)} · ${real(n2(c.valor_parcela) * Number(c.parcelas || 1))} <small class="sub">(${esc(rotuloDono(c))})</small></label>`).join("")}</div>`
+      <input class="campo" id="vg-busca" type="search" placeholder="Buscar compra (ex.: airbnb, posto, 259)" style="width:100%;margin-bottom:8px">
+      <div class="pf-dividir-lista">${lista.map((c) => `<label class="check" data-busca="${esc(semAcento(`${c.descricao} ${real(n2(c.valor_parcela) * Number(c.parcelas || 1))} ${real(c.valor_parcela)} ${dataBR(c.data_compra || "")}`))}"><input type="checkbox" data-trazer="${c.id}"> ${esc(c.descricao)} · ${real(n2(c.valor_parcela) * Number(c.parcelas || 1))} <small class="sub">(${esc(rotuloDono(c))})</small></label>`).join("")}</div>`
     : `<p class="vazio">Nenhuma compra dividida com essas pessoas no seu cartão.</p>`,
     `<button type="button" class="btn" data-fechar>Cancelar</button>${lista.length ? `<button type="button" class="btn primario" id="vg-trazer">Trazer</button>` : ""}`);
+  const busca = $("#vg-busca", d);
+  // Marcada continua aparecendo, mesmo que a busca mude
+  if (busca) busca.oninput = () => { const q = semAcento(busca.value.trim()); $$("[data-busca]", d).forEach((l) => { l.style.display = q && !l.dataset.busca.includes(q) && !l.querySelector("input").checked ? "none" : ""; }); };
   const b = $("#vg-trazer", d);
   if (b) b.onclick = async () => {
     const ids = $$("[data-trazer]", d).filter((x) => x.checked).map((x) => x.dataset.trazer);
