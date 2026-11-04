@@ -19,6 +19,8 @@ Formato da planilha (é para eu importar no meu painel): um arquivo CSV com este
 marca, nicho, cidade_uf, instagram, seguidores, site, link_produto, contato_nome, contato_cargo, linkedin, email, email_verificado, whatsapp, ja_usa_creator, loja_online, observacao
 
 Regras das colunas:
+seguidores: só o número, sem ponto, vírgula ou "mil" (ex.: 12500).
+Se algum texto tiver vírgula, coloque esse texto entre aspas.
 email_verificado: escreva "sim" só se você viu esse e-mail publicado no site oficial, no perfil ou numa página da própria marca. Se não conseguiu confirmar, escreva "não".
 ja_usa_creator: sim, não ou não sei.
 loja_online: site, marketplace ou só DM.
