@@ -957,18 +957,25 @@ async function salvarViagens(lista) {
   return true;
 }
 // Gasto da viagem: valor, quem pagou e as partes iguais de cada um
-// "cobertos": quem não paga a própria parte; ela é dividida igual entre os "cobrem" (ex.: a parte da mãe, você e o irmão pagam)
+// Quem não paga a própria parte e quem paga por ela, pessoa por pessoa:
+// cobre: [{ de: "mother", por: ["Eu", "bob"] }, { de: "aninha", por: ["Eu"] }]. A parte de "de" é dividida igual entre os "por".
+// (Gasto antigo guardava um grupo só: cobertos + cobrem.)
+const coberturas = (g) => {
+  const l = (g.divide || []).filter(Boolean);
+  const lista = Array.isArray(g.cobre) ? g.cobre : (g.cobertos || []).map((de) => ({ de, por: g.cobrem || [] }));
+  const cob = lista.filter((x) => x && x.de && l.some((n) => mesmaPessoa(n, x.de)));
+  // Quem tem a parte paga por outro não paga a de ninguém
+  return cob.map((x) => ({ de: x.de, por: (x.por || []).filter((n) => n && !cob.some((y) => mesmaPessoa(y.de, n))) })).filter((x) => x.por.length);
+};
 const partesGasto = (g) => {
   const l = (g.divide || []).filter(Boolean), cada = n2(g.valor) / (l.length || 1);
-  const cobertos = l.filter((n) => (g.cobertos || []).some((c) => mesmaPessoa(c, n)));
-  const cobrem = (g.cobrem || []).filter((n) => n && !cobertos.some((c) => mesmaPessoa(c, n)));
-  if (!cobertos.length || !cobrem.length) return l.map((n) => ({ nome: n, v: cada }));
-  const extra = (cada * cobertos.length) / cobrem.length;
-  const r = l.filter((n) => !cobertos.some((c) => mesmaPessoa(c, n))).map((n) => ({ nome: n, v: cada }));
-  cobrem.forEach((n) => { const x = r.find((y) => mesmaPessoa(y.nome, n)); if (x) x.v += extra; else r.push({ nome: n, v: extra }); });
+  const cob = coberturas(g);
+  if (!cob.length) return l.map((n) => ({ nome: n, v: cada }));
+  const r = l.filter((n) => !cob.some((x) => mesmaPessoa(x.de, n))).map((n) => ({ nome: n, v: cada }));
+  cob.forEach((x) => x.por.forEach((n) => { const y = r.find((z) => mesmaPessoa(z.nome, n)); if (y) y.v += cada / x.por.length; else r.push({ nome: n, v: cada / x.por.length }); }));
   return r;
 };
-const textoCobertura = (g, quem) => ((g.cobertos || []).length && (g.cobrem || []).length ? ` · a parte de ${g.cobertos.map(quem).join(" e ")} quem paga é ${g.cobrem.map(quem).join(" e ")}` : "");
+const textoCobertura = (g, quem) => coberturas(g).map((x) => ` · a parte de ${quem(x.de)} quem paga é ${x.por.map(quem).join(" e ")}`).join("");
 // Saldo de cada pessoa no grupo: o que pagou menos a parte dela
 function saldosViagem(v) {
   const m = new Map();
@@ -1140,18 +1147,20 @@ function formGastoViagem(v, g) {
       <div class="inteiro"><label for="vg-pagou">Quem pagou</label><select class="campo" id="vg-pagou" style="width:100%" ${g && g.compraId ? "disabled" : ""}>${pessoas.map((n) => `<option value="${esc(n)}" ${g ? (mesmaPessoa(g.pagou, n) ? "selected" : "") : ehEu(n) ? "selected" : ""}>${ehEu(n) ? "Eu" : esc(n)}</option>`).join("")}</select></div>
       <div class="inteiro"><label>Divide entre</label><div class="pf-dividir-lista">${pessoas.map((n) => `<label class="check"><input type="checkbox" data-vg-divide="${esc(n)}" ${marcados.has(ehEu(n) ? "eu" : chavePessoa(n)) ? "checked" : ""}> ${ehEu(n) ? "Eu" : esc(n)}</label>`).join("")}</div>
         <small class="ajuda" id="vg-conta"></small></div>
-      <details class="inteiro" ${(g && (g.cobertos || []).length) ? "open" : ""}><summary><b>Alguém paga a parte de outro?</b></summary>
-        <p class="sub" style="margin:6px 0">Ex.: a parte da sua mãe, você e seu irmão pagam. Cada um continua com uma parte igual; a parte de quem você marcar em cima é dividida entre quem você marcar embaixo.</p>
-        <label>Quem NÃO paga a própria parte (ex.: sua mãe)</label><div class="pf-dividir-lista">${pessoas.map((n) => `<label class="check"><input type="checkbox" data-vg-coberto="${esc(n)}" ${g && (g.cobertos || []).some((c) => mesmaPessoa(c, n)) ? "checked" : ""}> ${ehEu(n) ? "Eu" : esc(n)}</label>`).join("")}</div>
-        <label style="display:block;margin-top:8px">Quem paga por eles (ex.: você e seu irmão)</label><div class="pf-dividir-lista">${pessoas.map((n) => `<label class="check"><input type="checkbox" data-vg-cobre="${esc(n)}" ${g && (g.cobrem || []).some((c) => mesmaPessoa(c, n)) ? "checked" : ""}> ${ehEu(n) ? "Eu" : esc(n)}</label>`).join("")}</div>
+      <details class="inteiro" ${g && coberturas(g).length ? "open" : ""}><summary><b>Alguém paga a parte de outro?</b></summary>
+        <p class="sub" style="margin:6px 0">Ex.: a parte da sua mãe, você e seu irmão pagam; a da Aninha, só você. Na linha de quem não paga, marque quem paga por ela. Linha sem nada marcado: a pessoa paga a própria parte.</p>
+        <div class="pf-vg-cob">${pessoas.map((n) => { const atual = g ? coberturas(g).find((x) => mesmaPessoa(x.de, n)) : null;
+          return `<div class="pf-vg-cob-linha"><span>Parte de <b>${ehEu(n) ? "Eu" : esc(n)}</b>, quem paga:</span><div class="pf-dividir-lista">${pessoas.filter((m) => !mesmaPessoa(m, n)).map((m) => `<label class="check"><input type="checkbox" data-vg-cob-de="${esc(n)}" data-vg-cob-por="${esc(m)}" ${atual && atual.por.some((p) => mesmaPessoa(p, m)) ? "checked" : ""}> ${ehEu(m) ? "Eu" : esc(m)}</label>`).join("")}</div></div>`; }).join("")}</div>
       </details>
     </div></div>
     <div class="janela-pe">${g ? `<button type="button" class="btn perigo esq" data-apagar>${ic("apagar")}Tirar da viagem</button>` : ""}<button type="button" class="btn" data-fechar>Cancelar</button><button type="submit" class="btn primario">Salvar</button></div></form>`;
   const marcadosDe = (attr) => $$(`[data-${attr}]`, d).filter((c) => c.checked).map((c) => c.dataset[attr.replace(/-(\w)/g, (_, l) => l.toUpperCase())]);
+  // [{ de, por: [...] }] de quem tem alguém marcado pagando a parte dela
+  const lerCobre = () => pessoas.map((n) => ({ de: n, por: $$("[data-vg-cob-de]", d).filter((c) => c.checked && mesmaPessoa(c.dataset.vgCobDe, n)).map((c) => c.dataset.vgCobPor) })).filter((x) => x.por.length);
   const conta = () => {
     const n = $$("[data-vg-divide]", d).filter((c) => c.checked).length, val = n2($("#vg-valor", d).value);
     if (!n) { $("#vg-conta", d).textContent = "Marque quem divide."; return; }
-    const partes = partesGasto({ valor: val, divide: marcadosDe("vg-divide"), cobertos: marcadosDe("vg-coberto"), cobrem: marcadosDe("vg-cobre") });
+    const partes = partesGasto({ valor: val, divide: marcadosDe("vg-divide"), cobre: lerCobre() });
     const iguais = partes.length === n && partes.every((x) => Math.abs(x.v - val / n) < 0.005);
     $("#vg-conta", d).textContent = iguais ? `${n} ${n === 1 ? "pessoa" : "pessoas"}: ${real(val / n)} pra cada.` : `Fica assim: ${partes.map((x) => `${ehEu(x.nome) ? "Eu" : x.nome} ${real(x.v)}`).join(", ")}.`;
   };
@@ -1165,11 +1174,12 @@ function formGastoViagem(v, g) {
     const divide = $$("[data-vg-divide]", d).filter((c) => c.checked).map((c) => c.dataset.vgDivide);
     if (!descricao || !(valor > 0)) { avisar("Preencha o que foi e o valor.", true); return; }
     if (!divide.length) { avisar("Marque quem divide.", true); return; }
-    const cobertos = marcadosDe("vg-coberto").filter((n) => divide.some((x) => mesmaPessoa(x, n))), cobrem = marcadosDe("vg-cobre");
-    if (cobertos.length && !cobrem.length) { avisar("Marque quem paga a parte de " + cobertos.map((n) => (ehEu(n) ? "você" : n)).join(" e ") + ".", true); return; }
-    if (cobrem.some((n) => cobertos.some((c) => mesmaPessoa(c, n)))) { avisar("Quem tem a parte paga por outro não pode estar também em quem paga.", true); return; }
+    const cobre = lerCobre().filter((x) => divide.some((n) => mesmaPessoa(n, x.de)));
+    const enrolado = cobre.find((x) => x.por.some((p) => cobre.some((y) => mesmaPessoa(y.de, p))));
+    if (enrolado) { avisar("Quem tem a parte paga por outro não pode pagar a parte de mais ninguém. Confira a linha de " + (ehEu(enrolado.de) ? "você" : enrolado.de) + ".", true); return; }
     const novo = { ...(g || { id: "g" + Date.now() }), descricao, valor: r2(valor), data: $("#vg-data", d).value || null, pagou: g && g.compraId ? g.pagou : $("#vg-pagou", d).value, divide };
-    if (cobertos.length) { novo.cobertos = cobertos; novo.cobrem = cobrem; } else { delete novo.cobertos; delete novo.cobrem; }
+    delete novo.cobertos; delete novo.cobrem;
+    if (cobre.length) novo.cobre = cobre; else delete novo.cobre;
     await salvar(g ? v.gastos.map((x) => (x.id === g.id ? novo : x)) : [...(v.gastos || []), novo]);
   };
   d.showModal();

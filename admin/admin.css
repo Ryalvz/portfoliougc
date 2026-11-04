@@ -1564,3 +1564,6 @@ dialog.pf-janela-rapida { width: min(460px, calc(100vw - 20px)); }
 .pf-vg-nome[aria-expanded="true"] { text-decoration-color: currentColor; }
 .pf-vg-detalhe > td { background: var(--tint); padding: 12px 14px 16px; }
 .pf-vg-resumo table { font-size: 13px; }
+.pf-vg-cob { display: grid; gap: 8px; }
+.pf-vg-cob-linha { display: grid; gap: 4px; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius); }
+.pf-vg-cob-linha > span { font-size: 13px; }
