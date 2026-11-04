@@ -1009,7 +1009,7 @@ function pintarBarraSelecao() {
     desenhar();
   };
   const ir = $("[data-ir-prosp]", caixa);
-  if (ir) ir.onclick = () => { pro.publico = "selecionadas"; irPara("prospeccao"); };
+  if (ir) ir.onclick = () => { pro.publico = "selecionadas"; pro.sub = "disparo"; irPara("prospeccao"); };
 }
 
 function desenharMarcas(el) {
@@ -5179,14 +5179,37 @@ function desenharProspeccao(el) {
   const numero = (v, ok) => ok ? num(v) : traco;
   const temEnvios = !!pro.envios, temOptout = !!pro.optout;
 
+  // A aba é dividida em três partes, uma de cada vez na tela
+  const SUBS_PRO = [["buscar", "Buscar marcas", "busca"], ["acompanhar", "Acompanhar", "grafico"], ["disparo", "Disparo de e-mail", "email"]];
+  const temCaminhos = typeof painelCaminhosHTML === "function";
+  if (!pro.sub) { try { pro.sub = localStorage.getItem("pro-sub") || ""; } catch (_) {} }
+  if (!temCaminhos || !SUBS_PRO.some((x) => x[0] === pro.sub)) pro.sub = temCaminhos ? "buscar" : "disparo";
+  const textos = {
+    buscar: ["Buscar marcas", "Escolha um caminho, copie o prompt, cole no Claude no Chrome e traga a planilha que voltar.", ["5 caminhos", "Prompt pronto pra copiar", "Repetidas ficam de fora"]],
+    acompanhar: ["Acompanhar", "Quem precisa de follow-up hoje e qual caminho realmente vira cliente.", ["Follow-up vencido em destaque", "Funil por caminho"]],
+    disparo: ["Disparo de e-mail", "Mande o seu e-mail de apresentação para as marcas da sua base, cada uma chamada pelo nome, sem copiar e colar uma por uma.", ["Teste antes, sempre", "A chave vive no Supabase", "Quem responde SAIR sai da lista"]]
+  }[pro.sub];
+  const follow = temCaminhos ? marcasFollowup().length : 0;
   const capa = `<section class="pro-capa">
     <div class="pro-capa-texto">
-      <span class="pro-capa-icone">${ic("email")}</span>
-      <div><h2>Prospecção</h2><p>Mande o seu e-mail de apresentação para as marcas da sua base, cada uma chamada pelo nome, sem copiar e colar uma por uma.</p>
-        <div class="pro-etiquetas"><span>Teste antes, sempre</span><span>A chave vive no Supabase</span><span>Quem responde SAIR sai da lista</span></div></div>
+      <span class="pro-capa-icone">${ic(SUBS_PRO.find((x) => x[0] === pro.sub)[2])}</span>
+      <div><h2>${esc(textos[0])}</h2><p>${esc(textos[1])}</p>
+        <div class="pro-etiquetas">${textos[2].map((t) => `<span>${esc(t)}</span>`).join("")}</div></div>
     </div>
-    <div class="pro-capa-numero"><strong>${temEnvios && okEnvios.length ? num(okEnvios.length) : traco}</strong><span>enviados até agora</span></div>
-  </section>`;
+    <div class="pro-capa-numero">${pro.sub === "disparo" ? `<strong>${temEnvios && okEnvios.length ? num(okEnvios.length) : traco}</strong><span>enviados até agora</span>`
+      : pro.sub === "acompanhar" ? `<strong>${num(follow)}</strong><span>follow-up pra fazer</span>`
+      : `<strong>${num(S.marcas.length)}</strong><span>marcas na base</span>`}</div>
+  </section>
+  ${temCaminhos ? `<div class="pro-subabas" role="tablist" aria-label="Partes da prospecção">${SUBS_PRO.map(([k, r, i]) => `<button type="button" role="tab" data-pro-sub="${k}" aria-selected="${pro.sub === k}">${ic(i)}${esc(r)}${k === "acompanhar" && follow ? `<span class="pro-subabas-n">${follow}</span>` : ""}</button>`).join("")}</div>` : ""}`;
+  const ligarSubabas = () => $$("[data-pro-sub]", el).forEach((b) => b.onclick = () => { pro.sub = b.dataset.proSub; try { localStorage.setItem("pro-sub", pro.sub); } catch (_) {} desenhar(); window.scrollTo(0, 0); });
+  if (pro.sub !== "disparo") {
+    el.innerHTML = capa + (pro.sub === "buscar" ? painelCaminhosHTML()
+      : (followupHTML() || `<div class="cartao pc-followups"><h2 style="margin:0 0 4px">${ic("relogio")} Follow-up pra fazer</h2><p class="sub" style="margin:0">Nenhuma marca com follow-up vencido ou pra hoje. Marque a data do próximo contato na ficha da marca.</p></div>`) + funilHTML());
+    ligarSubabas();
+    if (pro.sub === "buscar") ligarPainelCaminhos(el);
+    ligarExtrasProspeccao(el);
+    return;
+  }
 
   const cartoes = `<div class="pro-cartoes">
     ${[["cor-principal", numero(comEmail.length, true), "Marcas com e-mail", `${num(S.marcas.length - comEmail.length)} sem e-mail na base`],
@@ -5197,21 +5220,20 @@ function desenharProspeccao(el) {
       .map(([cor, v, r, ctx]) => `<div class="pro-cartao ${cor === "cor-principal" ? "" : cor}"><strong>${v}</strong><span>${r}</span>${ctx ? `<small>${ctx}</small>` : ""}</div>`).join("")}
   </div>`;
 
-  const caminhos = typeof painelCaminhosHTML === "function" ? followupHTML() + painelCaminhosHTML() + funilHTML() : "";
   const aviso = pro.falta.length ? `<div class="aviso-falta" role="alert"><b>Falta preparar o banco para a prospecção:</b> ${pro.falta.map(esc).join(", ")}. Rode o arquivo <b>disparo.sql</b> no SQL Editor do Supabase. O resto da aba continua funcionando.</div>` : "";
 
   // Base sem e-mail nenhum: nada de tela de envio vazia
   if (!comEmail.length) {
-    el.innerHTML = capa + cartoes + aviso + caminhos + `<div class="cartao pro-vazio"><h2>Sua base ainda está sem e-mail</h2>
+    el.innerHTML = capa + cartoes + aviso + `<div class="cartao pro-vazio"><h2>Sua base ainda está sem e-mail</h2>
       <p class="sub">Os e-mails da prospecção vêm da sua aba Marcas. Cadastre o e-mail das marcas ou importe a sua planilha primeiro.</p>
       <button class="btn primario" type="button" data-ir-aba="marcas">${ic("marcas")}Ir para Marcas</button></div>`;
     $$("[data-ir-aba]", el).forEach((b) => b.onclick = () => irPara(b.dataset.irAba));
-    if (caminhos) { ligarPainelCaminhos(el); ligarExtrasProspeccao(el); }
+    ligarSubabas();
     return;
   }
 
   if (!opcoesPublico().some((x) => x[0] === pro.publico)) pro.publico = "selecionadas";
-  el.innerHTML = capa + cartoes + aviso + caminhos + `
+  el.innerHTML = capa + cartoes + aviso + `
     <div class="cartao pro-prompts">
       <div class="barra"><h2 style="margin:0">${ic("transcricao")} Pedir pro Claude</h2></div>
       <p class="sub" style="margin:2px 0 12px">Escolha o texto, copie e cole no Claude. Só troque o que estiver entre colchetes.</p>
@@ -5292,7 +5314,7 @@ function desenharProspeccao(el) {
       <div class="tabela-caixa"><table><thead><tr><th>Para</th><th>Assunto</th><th>Quando</th><th>Situação</th></tr></thead><tbody id="pro-hist"></tbody></table></div>
     </div>`;
 
-  if (caminhos) { ligarPainelCaminhos(el); ligarExtrasProspeccao(el); }
+  ligarSubabas();
   // Pedir pro Claude: troca de aba sem redesenhar a página
   $$("[data-aba-prompt]", el).forEach((b) => b.onclick = () => {
     pro.abaPrompt = b.dataset.abaPrompt;

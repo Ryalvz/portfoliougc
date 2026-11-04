@@ -786,7 +786,7 @@ tr.selecionada td { background: rgba(43, 36, 28, .1); }
 .pro-capa {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 20px;
   padding: 26px 28px; margin-bottom: 16px; border-radius: 18px; color: #fff;
-  background: linear-gradient(135deg, var(--cobalt) 0%, #142a8a 100%);
+  background: linear-gradient(135deg, var(--cobalt) 0%, #7A6322 100%);
   box-shadow: 0 14px 34px rgba(43, 36, 28, .22);
 }
 .pro-capa-texto { display: flex; gap: 16px; align-items: flex-start; flex: 1 1 420px; min-width: 0; }
@@ -809,7 +809,7 @@ tr.selecionada td { background: rgba(43, 36, 28, .1); }
 .pro-cartao small { font-size: 11.5px; color: var(--muted); }
 .pro-cartao.verde { --cor: var(--green); }
 .pro-cartao.ambar { --cor: #b7791f; }
-.pro-cartao.azul { --cor: #2f7bd6; }
+.pro-cartao.azul { --cor: var(--olive); }
 .pro-cartao.vermelho { --cor: #c4473a; }
 
 /* Formulário + prévia lado a lado */
@@ -1635,3 +1635,10 @@ td .pc-follow { display: table; }
 .pc-follow-item .pc-follow { margin: 0; }
 .pc-h-prox { display: flex; align-items: center; gap: 6px; grid-column: 1 / -1; }
 .pc-h-prox input { width: 160px; }
+/* Prospecção: as três partes da aba */
+.pro-subabas { display: flex; flex-wrap: wrap; gap: 6px; margin: -4px 0 16px; padding: 4px; background: var(--tint); border-radius: 12px; }
+.pro-subabas button { flex: 1 1 160px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 14px; border: 0; border-radius: 9px; background: transparent; color: var(--muted); font: inherit; font-weight: 700; font-size: 14px; cursor: pointer; }
+.pro-subabas button .i { width: 16px; height: 16px; }
+.pro-subabas button:hover { color: var(--text); }
+.pro-subabas button[aria-selected="true"] { background: var(--card); color: var(--cobalt); box-shadow: 0 1px 4px rgba(43, 36, 28, .12); }
+.pro-subabas-n { min-width: 18px; padding: 0 6px; border-radius: 999px; background: var(--red); color: #fff; font-size: 11px; line-height: 18px; }
