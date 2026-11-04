@@ -1567,3 +1567,51 @@ dialog.pf-janela-rapida { width: min(460px, calc(100vw - 20px)); }
 .pf-vg-cob { display: grid; gap: 8px; }
 .pf-vg-cob-linha { display: grid; gap: 4px; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius); }
 .pf-vg-cob-linha > span { font-size: 13px; }
+
+/* ---------- Prospecção por caminhos ---------- */
+.pc-painel { margin-bottom: 16px; }
+.pc-lista { display: grid; gap: 8px; }
+.pc-card { border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); }
+.pc-card > summary { display: flex; align-items: center; gap: 12px; padding: 10px 12px; cursor: pointer; list-style: none; }
+.pc-card > summary::-webkit-details-marker { display: none; }
+.pc-card[open] > summary { border-bottom: 1px solid var(--line); }
+.pc-icone { display: grid; place-items: center; width: 34px; height: 34px; flex: none; border-radius: 8px; background: var(--olive-tint); color: var(--cobalt); }
+.pc-nome { display: grid; min-width: 0; flex: 1; }
+.pc-nome small { color: var(--muted); font-size: 12px; }
+.pc-meta-mini { display: grid; gap: 4px; width: 84px; flex: none; text-align: right; font-size: 13px; }
+.pc-corpo { display: grid; gap: 12px; padding: 12px; }
+.pc-campos { display: flex; flex-wrap: wrap; gap: 10px; }
+.pc-campos label { display: grid; gap: 4px; flex: 1 1 200px; }
+.pc-campos label:last-child { flex: 0 0 110px; }
+.pc-rotulo { display: block; font-size: 12px; font-weight: 700; color: var(--muted); margin-bottom: 4px; }
+.pc-bloco { display: grid; gap: 6px; }
+.pc-bloco .check { align-items: flex-start; }
+.pc-passos { margin: 0; padding-left: 20px; font-size: 13px; display: grid; gap: 3px; }
+.pc-prompt { max-height: 260px; overflow-y: auto; }
+.pc-meta-linha { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.pc-meta-linha input { width: 76px; }
+.pc-filtros { display: flex; flex-wrap: wrap; gap: 8px; margin: -4px 0 12px; }
+.pc-filtros .campo { flex: 0 1 auto; }
+.pc-linha-info { display: block; font-size: 11.5px; margin-top: 2px; }
+.importar-caminho { display: grid; gap: 4px; margin-bottom: 12px; max-width: 340px; }
+.pc-ficha .janela-corpo { display: grid; gap: 16px; }
+.pc-ficha .pc-bloco { border-top: 1px solid var(--line); padding-top: 12px; }
+.pc-hist-novo { display: grid; grid-template-columns: 140px 150px 1fr auto; gap: 8px; align-items: center; }
+.pc-hist-lista { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 4px; }
+.pc-hist-lista li { display: grid; grid-template-columns: 78px auto 1fr auto; gap: 8px; align-items: center; padding: 6px 8px; border-radius: 6px; background: var(--tint); font-size: 13px; }
+.pc-hist-lista .etq { margin: 0; background: var(--card); }
+.pc-h-data { color: var(--muted); font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) {
+  .pc-hist-novo { grid-template-columns: 1fr 1fr; }
+  .pc-hist-novo #pc-h-texto { grid-column: 1 / -1; }
+  .pc-hist-lista li { grid-template-columns: auto 1fr; }
+  .pc-meta-mini { width: 60px; }
+}
+/* Etapas da marca */
+.e-nova { background: var(--olive-tint); color: #5e5a3a; }
+.e-verificada { background: var(--tint-2); color: var(--cobalt); }
+.e-contatada { background: var(--amber-bg); color: var(--amber); }
+.e-respondeu { background: #e4ecf7; color: #234a7a; }
+.e-negociando { background: #efe4f5; color: #5b2d7a; }
+.e-fechou { background: var(--green-bg); color: var(--green); }
+.e-descartada { background: var(--gray-bg); color: var(--gray); }
