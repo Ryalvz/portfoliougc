@@ -1123,8 +1123,8 @@ function formGastoViagem(v, g) {
         <small class="ajuda" id="vg-conta"></small></div>
       <details class="inteiro" ${(g && (g.cobertos || []).length) ? "open" : ""}><summary><b>Alguém paga a parte de outro?</b></summary>
         <p class="sub" style="margin:6px 0">Ex.: a parte da sua mãe, você e seu irmão pagam. Cada um continua com uma parte igual; a parte de quem você marcar em cima é dividida entre quem você marcar embaixo.</p>
-        <label>Parte de quem</label><div class="pf-dividir-lista">${pessoas.map((n) => `<label class="check"><input type="checkbox" data-vg-coberto="${esc(n)}" ${g && (g.cobertos || []).some((c) => mesmaPessoa(c, n)) ? "checked" : ""}> ${ehEu(n) ? "Eu" : esc(n)}</label>`).join("")}</div>
-        <label style="display:block;margin-top:8px">Quem paga essas partes</label><div class="pf-dividir-lista">${pessoas.map((n) => `<label class="check"><input type="checkbox" data-vg-cobre="${esc(n)}" ${g && (g.cobrem || []).some((c) => mesmaPessoa(c, n)) ? "checked" : ""}> ${ehEu(n) ? "Eu" : esc(n)}</label>`).join("")}</div>
+        <label>Quem NÃO paga a própria parte (ex.: sua mãe)</label><div class="pf-dividir-lista">${pessoas.map((n) => `<label class="check"><input type="checkbox" data-vg-coberto="${esc(n)}" ${g && (g.cobertos || []).some((c) => mesmaPessoa(c, n)) ? "checked" : ""}> ${ehEu(n) ? "Eu" : esc(n)}</label>`).join("")}</div>
+        <label style="display:block;margin-top:8px">Quem paga por eles (ex.: você e seu irmão)</label><div class="pf-dividir-lista">${pessoas.map((n) => `<label class="check"><input type="checkbox" data-vg-cobre="${esc(n)}" ${g && (g.cobrem || []).some((c) => mesmaPessoa(c, n)) ? "checked" : ""}> ${ehEu(n) ? "Eu" : esc(n)}</label>`).join("")}</div>
       </details>
     </div></div>
     <div class="janela-pe">${g ? `<button type="button" class="btn perigo esq" data-apagar>${ic("apagar")}Tirar da viagem</button>` : ""}<button type="button" class="btn" data-fechar>Cancelar</button><button type="submit" class="btn primario">Salvar</button></div></form>`;
