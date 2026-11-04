@@ -5,8 +5,8 @@
    e a trava de e-mail não verificado. Tudo usa a mesma tabela
    "marcas": nada é duplicado.
    ============================================================= */
-const ETAPAS = [["nova", "Nova"], ["verificada", "Verificada"], ["contatada", "Contatada"], ["respondeu", "Respondeu"], ["negociando", "Negociando"], ["fechou", "Fechou"], ["descartada", "Descartada"]];
-const nomeEtapa = (e) => (ETAPAS.find((x) => x[0] === e) || [e, e || "Nova"])[1];
+const ETAPAS_MARCA = [["nova", "Nova"], ["verificada", "Verificada"], ["contatada", "Contatada"], ["respondeu", "Respondeu"], ["negociando", "Negociando"], ["fechou", "Fechou"], ["descartada", "Descartada"]];
+const nomeEtapaMarca = (e) => (ETAPAS_MARCA.find((x) => x[0] === e) || [e, e || "Nova"])[1];
 const OPCOES_CREATOR = [["", "Não informado"], ["sim", "Sim"], ["nao", "Não"], ["nao_sei", "Não sei"]];
 const OPCOES_LOJA = [["", "Não informado"], ["site", "Site próprio"], ["marketplace", "Marketplace"], ["so_dm", "Só por DM"]];
 const CANAIS = [["email", "E-mail"], ["whatsapp", "WhatsApp"], ["dm", "DM do Instagram"], ["linkedin", "LinkedIn"], ["ligacao", "Ligação"], ["presencial", "Presencial"], ["outro", "Outro"]];
@@ -275,7 +275,7 @@ function passaFiltrosExtras(m, f) {
   if (f.verificado && (f.verificado === "sim" ? m.email_verificado !== true : f.verificado === "nao" ? m.email_verificado !== false : m.email_verificado != null)) return false;
   return true;
 }
-const pilulaEtapa = (m) => `<span class="pilula e-${esc(m.etapa || "nova")}">${esc(nomeEtapa(m.etapa))}</span>`;
+const pilulaEtapa = (m) => `<span class="pilula e-${esc(m.etapa || "nova")}">${esc(nomeEtapaMarca(m.etapa))}</span>`;
 function detalheMarcaLinha(m) {
   const partes = [];
   if (m.caminho_origem && m.caminho_origem !== "nao_informado") partes.push(nomeCaminho(m.caminho_origem));
@@ -307,7 +307,7 @@ function fichaMarca(m, extra = {}) {
   const sel = (n, r, op) => ({ n, r, t: "select", op });
   const campos = [
     { n: "nome", r: "Marca", req: true },
-    t("etapa") ? sel("etapa", "Etapa", ETAPAS) : sel("situacao", "Situação", SITUACOES),
+    t("etapa") ? sel("etapa", "Etapa", ETAPAS_MARCA) : sel("situacao", "Situação", SITUACOES),
     sel("caminho_origem", "Caminho de origem", OPCOES_CAMINHO),
     { n: "nicho", r: "Nicho", ph: "Tech, Moda, Casa e decoração...", lista: [...new Set(NICHOS_MARCAS.concat(S.marcas.map((x) => nichoPadrao(x.nicho)).filter(Boolean)))] },
     { n: "cidade_uf", r: "Cidade/UF", ph: "Vila Velha/ES" },
