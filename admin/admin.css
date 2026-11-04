@@ -1642,3 +1642,80 @@ td .pc-follow { display: table; }
 .pro-subabas button:hover { color: var(--text); }
 .pro-subabas button[aria-selected="true"] { background: var(--card); color: var(--cobalt); box-shadow: 0 1px 4px rgba(43, 36, 28, .12); }
 .pro-subabas-n { min-width: 18px; padding: 0 6px; border-radius: 999px; background: var(--red); color: #fff; font-size: 11px; line-height: 18px; }
+
+/* ---------- Página inicial nova ---------- */
+.ini-topo { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px; margin: 4px 0 20px; }
+.ini-sobre { display: flex; align-items: center; gap: 10px; margin: 0 0 10px; font-size: 11.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--olive); }
+.ini-traco { width: 28px; height: 2px; background: var(--olive); border-radius: 2px; }
+.ini-ola { font-family: "Playfair Display", Georgia, serif; font-weight: 500; font-size: clamp(34px, 5vw, 56px); line-height: 1.02; letter-spacing: -.02em; margin: 0; color: var(--cobalt); }
+.ini-frase { margin: 10px 0 0; color: var(--muted); font-size: 15px; }
+.ini-grade { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(270px, .82fr); gap: 16px; align-items: stretch; margin-bottom: 16px; }
+.ini-lado { display: grid; gap: 16px; align-content: start; }
+.ini-card { position: relative; background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 20px 22px; min-width: 0; box-shadow: 0 1px 2px rgba(43, 36, 28, .04); }
+.ini-card h2 { margin: 0; font-size: 17px; }
+.ini-card-topo { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 16px; }
+.ini-rot { display: block; font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-top: 4px; }
+.ini-grande { display: block; font-size: 46px; font-weight: 700; line-height: 1; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.ini-medio { display: block; font-size: 27px; font-weight: 700; line-height: 1.05; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+.ini-selo { display: inline-block; margin-top: 6px; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; background: var(--tint); color: var(--muted); font-variant-numeric: tabular-nums; }
+.ini-selo.sobe { background: var(--green-bg); color: var(--green); }
+.ini-selo.desce { background: var(--red-bg); color: var(--red); }
+.ini-periodo { display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px; background: var(--tint); }
+.ini-periodo button { border: 0; background: transparent; font: inherit; font-size: 12px; font-weight: 700; padding: 5px 11px; border-radius: 999px; color: var(--muted); cursor: pointer; }
+.ini-periodo button[aria-pressed="true"] { background: var(--cobalt); color: var(--parchment); }
+.ini-legenda { margin: 6px 0 0; font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.ini-atualizando { text-transform: none; letter-spacing: 0; font-weight: 600; margin-left: 6px; }
+.ini-carregando { color: var(--muted); margin: 40px 0; text-align: center; }
+.ini-vazio-graf { font-size: 12.5px; color: var(--muted); margin: 18px 0; }
+.ini-graf-caixa { position: relative; margin-top: 16px; }
+.ini-graf { display: block; width: 100%; height: 96px; overflow: visible; }
+.ini-dica { position: absolute; top: -30px; transform: translateX(-50%); white-space: nowrap; padding: 4px 9px; border-radius: 6px; background: var(--cobalt); color: var(--parchment); font-size: 11.5px; font-weight: 600; pointer-events: none; z-index: 2; }
+/* Seguidores: o cartão escuro */
+.ini-seg { background: linear-gradient(160deg, #2B241C 0%, #4a3b28 100%); border-color: transparent; color: var(--parchment); }
+.ini-seg h2 { color: var(--parchment); }
+.ini-seg .ini-rot, .ini-seg .ini-legenda { color: rgba(246, 242, 235, .62); }
+.ini-seg .ini-periodo { background: rgba(246, 242, 235, .1); }
+.ini-seg .ini-periodo button { color: rgba(246, 242, 235, .7); }
+.ini-seg .ini-periodo button[aria-pressed="true"] { background: var(--parchment); color: var(--cobalt); }
+.ini-seg .ini-selo { background: rgba(246, 242, 235, .12); color: rgba(246, 242, 235, .85); }
+.ini-seg .ini-selo.sobe { background: rgba(120, 200, 150, .18); color: #a9e2bf; }
+.ini-seg .ini-selo.desce { background: rgba(240, 130, 115, .18); color: #f4b3a8; }
+.ini-seg .ini-dica { background: var(--parchment); color: var(--cobalt); }
+.ini-seg-nums { display: flex; gap: 28px; align-items: flex-start; }
+.ini-seg-perdeu { margin-top: 18px; }
+.ini-seg-perdeu .ini-medio { font-size: 22px; }
+.ini-barra { fill: var(--parchment); opacity: .9; }
+.ini-barra.neg { fill: var(--olive); opacity: 1; }
+.ini-seg .ini-base { stroke: rgba(246, 242, 235, .25); stroke-width: 1; }
+.ini-sem-ig p { margin: 8px 0 12px; }
+/* Alcance: o cartão claro */
+.ini-alc { background: linear-gradient(160deg, var(--card) 0%, #efe6d6 100%); }
+.ini-alc-nums { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.ini-alc-views { margin-top: 18px; }
+.ini-area { fill: var(--olive-tint); }
+.ini-linha { fill: none; stroke: var(--cobalt); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.ini-mira { stroke: var(--olive); stroke-width: 1; stroke-dasharray: 3 3; }
+.ini-ponto { position: absolute; width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; border-radius: 50%; background: var(--cobalt); box-shadow: 0 0 0 2px var(--card); pointer-events: none; }
+.ini-alc .link-btn { margin-top: 8px; }
+/* Para fazer e calendário */
+.ini-fazer .lista-dia { max-height: 220px; overflow-y: auto; }
+.ini-follow { display: flex; align-items: center; gap: 8px; width: 100%; margin-top: 10px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--amber-bg); color: var(--amber); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; text-align: left; }
+.ini-cal-topo { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.ini-cal-mes { padding: 5px 14px; border-radius: 999px; background: var(--cobalt); color: var(--parchment); font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.ini-cal-sem, .ini-cal-grade { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); text-align: center; }
+.ini-cal-sem span { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding-bottom: 6px; }
+.ini-cal-grade { row-gap: 2px; }
+.ini-dia { position: relative; height: 36px; border: 0; background: transparent; font: inherit; font-size: 13px; color: var(--text); border-radius: 10px; cursor: pointer; padding: 0 0 6px; font-variant-numeric: tabular-nums; }
+.ini-dia:hover { background: var(--tint); }
+.ini-dia.hoje { background: var(--cobalt); color: var(--parchment); font-weight: 700; }
+.ini-dia i { position: absolute; left: 0; right: 0; bottom: 5px; display: flex; justify-content: center; gap: 2px; }
+.ini-dia i b { width: 4px; height: 4px; border-radius: 50%; background: var(--olive); }
+.ini-dia.hoje i b { background: var(--parchment); }
+.ini-dia.fora { cursor: default; }
+.ini-cal-novo { width: 100%; justify-content: center; margin-top: 12px; }
+@media (max-width: 1180px) { .ini-grade { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .ini-lado { grid-column: 1 / -1; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+@media (max-width: 760px) { .ini-grade, .ini-lado { grid-template-columns: minmax(0, 1fr); } .ini-card { padding: 18px; } .ini-grande { font-size: 40px; } .ini-alc-nums { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.ini-seg, .ini-alc { display: flex; flex-direction: column; }
+.ini-seg .ini-graf-caixa, .ini-alc .ini-graf-caixa { flex: 1 1 auto; min-height: 96px; display: flex; }
+.ini-seg .ini-graf, .ini-alc .ini-graf { height: auto; min-height: 96px; flex: 1 1 auto; }
+.ini-alc .link-btn { align-self: flex-start; }
