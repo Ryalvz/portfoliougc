@@ -206,9 +206,12 @@ function devedores() {
   viagens().forEach((v) => acertoComigo(v).forEach((a) => {
     if (Math.abs(a.liquido) < 0.005) return;
     const p = pega(a.nome);
-    const c = { id: `viagem-${v.id}-${chavePessoa(a.nome)}`, descricao: `Viagem ${v.nome}`, valor_parcela: a.liquido, parcelas: 1, primeiro_mes: v.mes + "-01", cartao_id: null, viagem: v.id };
-    p.compras.push(c);
-    if (vencimentoNoMes(null, v.mes) <= dia) p.devido += a.liquido; else p.futuro += a.liquido;
+    planoAcertoViagem(v, a).forEach((l) => {
+      const c = { id: `viagem-${v.id}-${chavePessoa(a.nome)}-${l.k}`, descricao: `Viagem ${v.nome}${l.parcelas.length ? ` (${l.avista ? "gastos + " : ""}${l.parcelas.join(", ")})` : ""}`,
+        valor_parcela: l.valor, parcelas: 1, primeiro_mes: l.k + "-01", cartao_id: null, viagem: v.id, rotulo: l.parcelas.length ? "parcela da viagem" : "viagem" };
+      p.compras.push(c);
+      if (vencimentoNoMes(null, l.k) <= dia) p.devido += l.valor; else if (l.k <= ate) p.futuro += l.valor;
+    });
   }));
   P.receb.forEach((r) => { const p = pega(r.pessoa); const j = Math.min(n2(r.juros), n2(r.valor)); p.pago += n2(r.valor) - j; p.jurosRecebidos += j; p.receb.push(r); });
   return [...mapa.values()].map((p) => ({ ...p, falta: r2(p.devido - p.pago) })).sort((a, b) => b.falta - a.falta || b.futuro - a.futuro);
@@ -885,7 +888,7 @@ function pfDevem(el) {
         <p class="sub" style="margin:2px 0 0">Já pagou ${real(p.pago)} até hoje · depois de ${nomeRef}, ainda vai cair ${real(Math.max(0, p.futuro - Math.max(0, mRef.valor)))} nos próximos meses.</p>
         ${cobraJuros(p.nome) ? (() => { const j = jurosDe(p); return `<div class="pf-juros"><span>Juros por atraso${j.desde ? ` (desde ${dataBR(j.desde).slice(0, 5)})` : ""}<b>${real(j.pendente)}</b>${j.jurosPagos ? `<small>já pagou ${real(j.jurosPagos)} de juros</small>` : ""}</span><span>Pra quitar hoje<b>${real(Math.max(0, p.falta) + j.pendente)}</b><small>o que falta + juros</small></span></div>`; })() : ""}
         <label class="pf-juros-liga"><input type="checkbox" data-juros-pessoa="${esc(p.nome)}" ${cobraJuros(p.nome) ? "checked" : ""}> Cobrar juros por atraso (taxa do cartão, por dia)</label>
-        <ul class="pf-mini">${cb.aberto > 0.005 ? `<li><span>Em aberto da fatura de ${esc(mesesTexto(cb.antes))}</span><small>atrasado</small><b>${real(cb.aberto)}</b></li>` : ""}${mRef.itens.map(({ c, i }) => `<li><span>${esc(c.descricao)}${c.parteDe ? ` <em>(parte de ${real(c.parteDe)})</em>` : ""}</span><small>${Number(c.parcelas) >= RECORRENTE ? "todo mês" : Number(c.parcelas) > 1 ? `${i + 1}/${c.parcelas}` : c.viagem ? "viagem" : "à vista"}</small><b>${real(c.valor_parcela)}</b></li>`).join("")}${mRef.coberto > 0 ? `<li><span>Já tinha mandado a mais</span><small></small><b>-${real(mRef.coberto)}</b></li>` : ""}</ul>
+        <ul class="pf-mini">${cb.aberto > 0.005 ? `<li><span>Em aberto da fatura de ${esc(mesesTexto(cb.antes))}</span><small>atrasado</small><b>${real(cb.aberto)}</b></li>` : ""}${mRef.itens.map(({ c, i }) => `<li><span>${esc(c.descricao)}${c.parteDe ? ` <em>(parte de ${real(c.parteDe)})</em>` : ""}</span><small>${Number(c.parcelas) >= RECORRENTE ? "todo mês" : Number(c.parcelas) > 1 ? `${i + 1}/${c.parcelas}` : c.viagem ? (c.rotulo || "viagem") : "à vista"}</small><b>${real(c.valor_parcela)}</b></li>`).join("")}${mRef.coberto > 0 ? `<li><span>Já tinha mandado a mais</span><small></small><b>-${real(mRef.coberto)}</b></li>` : ""}</ul>
         ${(() => { const prox = p.compras.filter((c) => mesDe(c.primeiro_mes) > kRef && Number(c.parcelas || 1) === 1); return prox.length ? `<p class="sub" style="margin:4px 0 0">Fica pra fatura de ${MESES_LONGOS[Number(somaMes(kRef, 1).slice(5)) - 1].toLowerCase()}: ${prox.map((c) => `${esc(c.descricao)} ${real(c.valor_parcela)}`).join(", ")}.</p>` : ""; })()}
         ${p.jurosRecebidos ? `<p class="sub" style="margin:4px 0 0">Já te pagou ${real(p.jurosRecebidos)} de juros por atraso (não entra na conta das compras).</p>` : ""}
         ${p.devido > 0 ? `<div class="pf-pago-trilho" title="Pagou ${real(p.pago)} de ${real(p.devido)}"><i style="width:${Math.min(100, (p.pago / p.devido) * 100)}%"></i></div>` : ""}
@@ -984,6 +987,38 @@ function saldosViagem(v) {
   (v.gastos || []).forEach((g) => { pega(g.pagou).pagou += n2(g.valor); partesGasto(g).forEach((x) => { pega(x.nome).parte += x.v; }); });
   return [...m.values()].map((x) => ({ ...x, saldo: r2(x.pagou - x.parte) }));
 }
+// O acerto da pessoa, mês a mês. Gasto à vista entra no mês da viagem. A parte dela numa compra
+// parcelada do seu cartão é cobrada igual à parcela: dividida no mesmo número de vezes, cada uma
+// no mês da fatura daquela parcela (a que já passou entra no mês da viagem). O que você deve a ela
+// abate primeiro o mês da viagem, depois os seguintes. A soma é sempre o acerto, centavo por centavo.
+function planoAcertoViagem(v, a) {
+  const total = Math.round(n2(a.liquido) * 100);
+  if (total <= 0) return total ? [{ k: v.mes, valor: total / 100, parcelas: [], avista: true }] : [];
+  const meses = new Map();
+  const mes = (k) => { if (!meses.has(k)) meses.set(k, { k, c: 0, parcelas: [], avista: false }); return meses.get(k); };
+  let bruto = 0;
+  (v.gastos || []).filter((g) => ehEu(g.pagou)).forEach((g) => {
+    const parte = Math.round(partesGasto(g).filter((x) => mesmaPessoa(x.nome, a.nome)).reduce((t, x) => t + x.v, 0) * 100);
+    if (parte <= 0) return;
+    bruto += parte;
+    const c = g.compraId ? P.compras.find((x) => String(x.id) === String(g.compraId)) : null;
+    const n = c ? Number(c.parcelas || 1) : 1;
+    if (!c || n < 2 || n >= RECORRENTE) { const m = mes(v.mes); m.c += parte; m.avista = true; return; }
+    const cada = Math.floor(parte / n);
+    for (let i = 0; i < n; i++) {
+      const k = somaMes(mesDe(c.primeiro_mes), i);
+      const m = mes(k < v.mes ? v.mes : k);
+      m.c += i === n - 1 ? parte - cada * (n - 1) : cada;
+      m.parcelas.push(`${g.descricao} ${i + 1}/${n}`);
+    }
+  });
+  let abate = bruto - total;
+  const lista = [...meses.values()].sort((x, y) => x.k.localeCompare(y.k));
+  if (!lista.length) lista.push(mes(v.mes));
+  if (abate < 0) lista[0].c -= abate; // arredondamento a favor do acerto
+  for (const m of lista) { if (abate <= 0) break; const t = Math.min(abate, m.c); m.c -= t; abate -= t; }
+  return lista.filter((m) => m.c !== 0).map((m) => ({ k: m.k, valor: m.c / 100, parcelas: m.parcelas, avista: m.avista }));
+}
 // Par a par: quanto A deve a B (as partes de A nos gastos que B pagou)
 function devePara(v, a, b) { return (v.gastos || []).filter((g) => mesmaPessoa(g.pagou, b)).reduce((s, g) => s + partesGasto(g).filter((x) => mesmaPessoa(x.nome, a)).reduce((t, x) => t + x.v, 0), 0); }
 // O seu acerto com cada pessoa. "jaNoCartao" = parte dela em gasto do seu cartão (já cobrada pela fatura)
@@ -1027,7 +1062,7 @@ function pfViagens(el) {
     <div class="pf-fat-topo">
       <div class="pf-fat-total"><span>Gasto total da viagem</span><strong>${real(total)}</strong><small>${(v.gastos || []).length} gastos, ${(v.pessoas || []).length} pessoas</small></div>
       <div><span>Sua parte</span><strong>${real((saldos.find((x) => ehEu(x.nome)) || {}).parte || 0)}</strong><small>você pagou ${real((saldos.find((x) => ehEu(x.nome)) || {}).pagou || 0)}</small></div>
-      <div><span>Acerto entra em</span><strong>${MESES_LONGOS[Number(v.mes.slice(5)) - 1]}</strong><small>na conta de cada um em Quem me deve</small></div>
+      <div><span>Acerto começa em</span><strong>${MESES_LONGOS[Number(v.mes.slice(5)) - 1]}</strong><small>as compras parceladas seguem as parcelas</small></div>
     </div>
     <div class="grade-fin">
       <div class="cartao">
@@ -1035,13 +1070,13 @@ function pfViagens(el) {
         ${meus.length ? `<div class="tabela-caixa"><table class="pf-fat-pessoas"><thead><tr><th>Pessoa</th><th>Te deve</th><th>Você deve</th><th>Acerto da viagem</th><th>Total em ${nomeMesAc} (com tudo)</th></tr></thead><tbody>
           ${meus.map((a) => `<tr><td><button type="button" class="pf-vg-nome" data-vg-pessoa="${esc(a.nome)}" aria-expanded="${mesmaPessoa(pfx.vgAberto || "", a.nome)}" title="Ver o resumo de ${esc(a.nome)}"><b>${esc(a.nome)}</b></button></td>
             <td>${real(a.teDeve)}</td><td>${real(a.voceDeve)}</td>
-            <td>${Math.abs(a.liquido) < 0.005 ? `<span class="pilula p-pago">zerado</span>` : a.liquido > 0 ? `<b>${esc(a.nome)} te paga ${real(a.liquido)}</b>` : `<b class="pf-voce-deve">você paga ${real(-a.liquido)}</b>`}</td>
-            <td>${(() => { const p = devedores().find((x) => mesmaPessoa(x.nome, a.nome)); if (!p) return "-"; const t = cobrancaDe(p, v.mes).total, resto = r2(t - a.liquido);
+            <td>${Math.abs(a.liquido) < 0.005 ? `<span class="pilula p-pago">zerado</span>` : a.liquido > 0 ? `<b>${esc(a.nome)} te paga ${real(a.liquido)}</b>` : `<b class="pf-voce-deve">você paga ${real(-a.liquido)}</b>`}${textoPlanoViagem(v, a)}</td>
+            <td>${(() => { const p = devedores().find((x) => mesmaPessoa(x.nome, a.nome)); if (!p) return "-"; const noMes = viagemNoMes(v, a), t = cobrancaDe(p, v.mes).total, resto = r2(t - noMes);
               // De onde vem o total: a viagem + o resto (fatura do mês, o que ficou em aberto e juros)
-              const conta = Math.abs(resto) >= 0.005 ? `<small class="sub" style="display:block">${real(a.liquido)} da viagem ${resto > 0 ? "+" : "-"} ${real(Math.abs(resto))} ${resto > 0 ? "de outras contas (cartão e em aberto)" : "que já te pagou ou você deve"}</small>` : `<small class="sub" style="display:block">só a viagem</small>`;
+              const conta = Math.abs(resto) >= 0.005 ? `<small class="sub" style="display:block">${real(noMes)} da viagem ${resto > 0 ? "+" : "-"} ${real(Math.abs(resto))} ${resto > 0 ? "de outras contas (cartão e em aberto)" : "que já te pagou ou você deve"}</small>` : `<small class="sub" style="display:block">só a viagem</small>`;
               return (t < -0.005 ? `<b class="pf-voce-deve">você paga ${real(-t)}</b>` : `<b>${real(t)}</b>`) + conta; })()}</td></tr>${pfx.vgAberto && mesmaPessoa(pfx.vgAberto, a.nome) ? `<tr class="pf-vg-detalhe"><td colspan="5">${resumoPessoaViagemHTML(v, a.nome)}</td></tr>` : ""}`).join("")}
         </tbody></table></div>
-        <p class="sub" style="margin:8px 0 0">"Total em ${nomeMesAc}" já cruza tudo: a viagem, o resto da fatura de ${nomeMesAc} e o que ficou em aberto antes. É o valor que vai na cobrança. Compra do seu cartão que está na viagem conta só aqui, não aparece de novo na fatura da pessoa. Se você deve, o valor abate o que a pessoa te deve.</p>` : `<p class="vazio">Adicione as pessoas da viagem em Editar viagem.</p>`}
+        <p class="sub" style="margin:8px 0 0">"Total em ${nomeMesAc}" já cruza tudo: a parte da viagem que cai em ${nomeMesAc}, o resto da fatura de ${nomeMesAc} e o que ficou em aberto antes. É o valor que vai na cobrança. A parte de cada um numa compra parcelada do seu cartão é cobrada igual à parcela, mês a mês. Compra do seu cartão que está na viagem conta só aqui, não aparece de novo na fatura da pessoa. Se você deve, o valor abate o que a pessoa te deve.</p>` : `<p class="vazio">Adicione as pessoas da viagem em Editar viagem.</p>`}
         ${pares.length ? `<h3 class="pf-escada-tit">Entre os outros</h3><ul class="pf-vg-pares">${pares.map((x) => `<li>${esc(x.de)} paga <b>${real(x.v)}</b> pra ${esc(x.para)}</li>`).join("")}</ul>` : ""}
       </div>
       <div class="cartao">
@@ -1062,6 +1097,13 @@ function pfViagens(el) {
   $$("[data-vg-gasto]", el).forEach((b) => b.onclick = () => formGastoViagem(v, v.gastos.find((g) => g.id === b.dataset.vgGasto)));
   $$("[data-vg-pessoa]", el).forEach((b) => b.onclick = () => { pfx.vgAberto = mesmaPessoa(pfx.vgAberto || "", b.dataset.vgPessoa) ? null : b.dataset.vgPessoa; desenhar(); });
   $$("[data-vg-copiar]", el).forEach((b) => b.onclick = () => copiarResumoViagem(v, b.dataset.vgCopiar));
+}
+// Quanto do acerto cai no mês da viagem, e o texto dos meses seguintes
+const viagemNoMes = (v, a) => r2(planoAcertoViagem(v, a).filter((l) => l.k === v.mes).reduce((s, l) => s + l.valor, 0));
+function textoPlanoViagem(v, a) {
+  const pl = planoAcertoViagem(v, a);
+  if (pl.length < 2) return "";
+  return `<small class="sub" style="display:block">${pl.map((l) => `${nomeMes(l.k, true)} ${real(l.valor)}`).join(" · ")}</small>`;
 }
 // Compra parcelada do cartão na viagem: "5x de R$ 259,06 · parcela 1/5 na fatura de nov., última em mar."
 function parcelasDoGasto(v, g) {
@@ -1089,7 +1131,8 @@ function resumoPessoaViagemHTML(v, n) {
   const { gastos, parte, pagou, acertos, cob } = dadosResumoViagem(v, n);
   const quem = (x) => (ehEu(x) ? "Você" : esc(x));
   const nomeMesAc = MESES_LONGOS[Number(v.mes.slice(5)) - 1].toLowerCase();
-  const via = r2(devePara(v, n, "Eu") - devePara(v, "Eu", n));
+  const acEu = acertoComigo(v).find((x) => mesmaPessoa(x.nome, n));
+  const plano = acEu ? planoAcertoViagem(v, acEu) : [], via = acEu ? viagemNoMes(v, acEu) : 0;
   return `<div class="pf-vg-resumo">
     <p class="sub" style="margin:0 0 8px">Parte de ${esc(n)} na viagem: <b>${real(parte)}</b>${pagou ? ` · pagou <b>${real(pagou)}</b>` : " · não pagou nenhum gasto"}</p>
     <div class="tabela-caixa"><table><thead><tr><th>Gasto</th><th>Quem pagou</th><th>Total</th><th>Parte de ${esc(n)}</th></tr></thead><tbody>
@@ -1098,7 +1141,8 @@ function resumoPessoaViagemHTML(v, n) {
         <td><b>${x.parte > 0.004 ? real(x.parte) : "-"}</b>${x.pc && x.parte > 0.004 ? `<small class="sub" style="display:block">equivale a ${x.pc.n}x de ${real(x.parte / x.pc.n)}</small>` : ""}</td></tr>`).join("")}
     </tbody></table></div>
     <p style="margin:10px 0 4px"><b>Acerto:</b> ${acertos.length ? acertos.map((x) => (x.v > 0 ? `paga <b>${real(x.v)}</b> pra ${ehEu(x.p) ? "você" : esc(x.p)}` : `recebe <b>${real(-x.v)}</b> de ${ehEu(x.p) ? "você" : esc(x.p)}`)).join("; ") : "tudo zerado"}.</p>
-    ${cob ? `<p class="sub" style="margin:0">Total pra cobrar em ${nomeMesAc}: <b>${real(cob.total)}</b>${Math.abs(cob.total - via) >= 0.005 ? ` (${real(via)} da viagem ${cob.total - via > 0 ? "+" : "-"} ${real(Math.abs(cob.total - via))} de outras contas)` : ""}. A viagem inteira entra na fatura de ${nomeMesAc}.</p>` : ""}
+    ${cob ? `<p class="sub" style="margin:0">Total pra cobrar em ${nomeMesAc}: <b>${real(cob.total)}</b>${Math.abs(cob.total - via) >= 0.005 ? ` (${real(via)} da viagem ${cob.total - via > 0 ? "+" : "-"} ${real(Math.abs(cob.total - via))} de outras contas)` : ""}.</p>` : ""}
+    ${plano.length > 1 ? `<p class="sub" style="margin:4px 0 0">O acerto da viagem com você fica assim, mês a mês: ${plano.map((l) => `<b>${nomeMes(l.k, true)}</b> ${real(l.valor)}`).join(" · ")}.</p>` : ""}
     <button type="button" class="btn pequeno" style="margin-top:8px" data-vg-copiar="${esc(n)}">Copiar resumo</button>
   </div>`;
 }
@@ -1107,7 +1151,8 @@ async function copiarResumoViagem(v, n) {
   const pq = (x) => (ehEu(x) ? "eu paguei" : `${nomePessoa(x)} pagou`);
   const txt = [`Oi, ${nomePessoa(n).split(" ")[0]}! Resumo da viagem ${v.nome}:`, ...gastos.filter((x) => x.parte > 0.004).map((x) => `${x.g.descricao}: sua parte ${real(x.parte)} (${pq(x.g.pagou)}${x.pc ? `, no cartão em ${x.pc.n}x` : ""})`),
     `Sua parte no total: ${real(parte)}.${pagou ? ` Você pagou ${real(pagou)}.` : ""}`,
-    ...(acertos.length ? ["Fica assim:", ...acertos.map((x) => (x.v > 0 ? `Você paga ${real(x.v)} pra ${ehEu(x.p) ? "mim" : nomePessoa(x.p)}.` : `${ehEu(x.p) ? "Eu te pago" : `${nomePessoa(x.p)} te paga`} ${real(-x.v)}.`))] : ["Está tudo zerado."])].join("\n");
+    ...(acertos.length ? ["Fica assim:", ...acertos.map((x) => (x.v > 0 ? `Você paga ${real(x.v)} pra ${ehEu(x.p) ? "mim" : nomePessoa(x.p)}.` : `${ehEu(x.p) ? "Eu te pago" : `${nomePessoa(x.p)} te paga`} ${real(-x.v)}.`))] : ["Está tudo zerado."]),
+    ...(() => { const ac = acertoComigo(v).find((x) => mesmaPessoa(x.nome, n)), pl = ac ? planoAcertoViagem(v, ac) : []; return pl.length > 1 ? [`O que é comigo vai junto com as parcelas do cartão: ${pl.map((l) => `${nomeMes(l.k, true)} ${real(l.valor)}`).join(", ")}.`] : []; })()].join("\n");
   try { await navigator.clipboard.writeText(txt); avisar("Resumo copiado. É só colar no WhatsApp."); } catch (_) { avisar("Não deu pra copiar. Tente de novo.", true); }
 }
 function formViagem(v) {
