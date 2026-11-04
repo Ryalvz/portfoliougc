@@ -1269,6 +1269,7 @@ ${CAR_ESTILOS.formato(estilo === "auto" ? "" : estilo)}
 Responda só com o bloco do carrossel e, embaixo, LEGENDA: com a legenda curta (gancho na primeira linha, 1 CTA, até 5 hashtags).`;
 }
 function desenharEstilos(el) {
+  if (typeof desenharEstudio === "function" && modoCarrossel() === "estudio") return desenharEstudio(el);
   const car = igx.car, E = CAR_ESTILOS.ESTILOS[car.estilo];
   car.slides.forEach((s) => { if (!CAR_ESTILOS.TIPOS.some((t) => t[0] === s.tipo)) s.tipo = "construcao"; });
   let vista = "slides"; try { vista = localStorage.getItem("car-vista") || "slides"; } catch (_) {}
@@ -1302,6 +1303,7 @@ function desenharEstilos(el) {
       <input class="campo" id="car-titulo" value="${esc(car.titulo)}" aria-label="Nome do carrossel" placeholder="Nome do carrossel">
       <span class="espaco"></span>
       <select class="campo" id="car-abrir" aria-label="Abrir carrossel salvo"><option value="">📂 Abrir salvo (${igx.carrosseis.length})</option>${igx.carrosseis.map((c) => `<option value="${esc(c.id)}">${esc(c.titulo)} · ${dataBR(String(c.atualizado_em).slice(0, 10)).slice(0, 5)}</option>`).join("")}</select>
+      ${typeof desenharEstudio === "function" ? `<button class="btn" type="button" id="car-estudio">Abrir no estúdio</button>` : ""}
       <button class="btn" type="button" id="car-novo">Novo</button>
       <button class="btn" type="button" id="car-salvar">💾 Salvar</button>
       <button class="btn primario" type="button" id="car-baixar">⬇️ Baixar imagens</button>
@@ -1420,6 +1422,7 @@ function desenharEstilos(el) {
     if (e.target.closest("[data-tirar]")) { if (car.slides.length <= 1) { avisar("O carrossel precisa de pelo menos 1 slide.", true); return; } car.slides.splice(i, 1); desenhar(); }
   });
   $("#car-mais").onclick = () => { const fim = car.slides[car.slides.length - 1], novo = { tipo: "construcao", titulo: "" }; if (fim && fim.tipo === "cta") car.slides.splice(car.slides.length - 1, 0, novo); else car.slides.push(novo); desenhar(); };
+  if ($("#car-estudio")) $("#car-estudio").onclick = () => { guardarModoCarrossel("estudio"); desenhar(); };
   $("#car-novo").onclick = () => { igx.car = CAR_ESTILOS.exemplo(car.estilo); desenhar(); avisar("Exemplo novo: troque os textos e as fotos."); };
   $("#car-abrir").onchange = (e) => { abrirCarrosselSalvo(e.target.value); desenhar(); };
   $("#car-salvar").onclick = () => salvarCarrossel(car);

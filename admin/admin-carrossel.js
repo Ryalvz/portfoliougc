@@ -375,11 +375,19 @@ const CAR_ESTILOS = (() => {
       { tipo: "cta", nota: "bastidor", titulo: "Quer ver o *resultado*?", texto: "Os vídeos estão no portfólio, link na bio." }] }
   };
 
+  // Cor de destaque por slide: [no fundo claro, no fundo escuro]. Dourado é o padrão de cada estilo.
+  const DESTAQUES = { dourado: { nome: "Dourado", cores: ["#7A6322", "#D9C48A"] }, terracota: { nome: "Terracota", cores: ["#A4532F", "#E7A47F"] }, oliva: { nome: "Oliva", cores: ["#5E6B3A", "#C2CB93"] }, vinho: { nome: "Vinho", cores: ["#7A2E3A", "#E2A3AC"] }, cafe: { nome: "Café", cores: ["#4A3B28", "#CDB99A"] } };
   function pintar(cv, s, i, total, estilo, aoCarregar, todos = []) {
     const E = ESTILOS[estilo] || ESTILOS.bastidor, ctx = cv.getContext("2d");
     cv.width = W; cv.height = H;
     const img = fotoCarrossel(s.foto, aoCarregar), foco = { topo: 0.15, meio: 0.45, baixo: 0.8 }[s.enquadrar] ?? 0.3;
-    E.desenho(ctx, s, i, total, img, foco, todos);
+    // Estúdio: "trocar" inverte o claro e o escuro deste slide; "destaque" troca a cor dourada
+    const guarda = { claro: { ...R.claro }, escuro: { ...R.escuro } };
+    if (s.fundo === "trocar") { Object.assign(R.claro, guarda.escuro); Object.assign(R.escuro, guarda.claro); }
+    const d = DESTAQUES[s.destaque];
+    if (d && s.destaque !== "dourado") [R.claro, R.escuro].forEach((c) => { const escuro = c.fundo === guarda.escuro.fundo; c.faixa = c.ouro = d.cores[escuro ? 1 : 0]; });
+    try { E.desenho(ctx, s, i, total, img, foco, todos); }
+    finally { Object.assign(R.claro, guarda.claro); Object.assign(R.escuro, guarda.escuro); }
   }
 
   /* ---------- Texto <-> slides: o formato que o Claude escreve ----------
@@ -427,7 +435,7 @@ Nos itens e nas mensagens, separe com ponto e vírgula; num item com explicaçã
   }
 
   return {
-    ESTILOS, TIPOS, ESTRUTURA, pintar, lerTexto, lerSlide, emTexto, formato,
+    ESTILOS, TIPOS, ESTRUTURA, DESTAQUES, pintar, lerTexto, lerSlide, emTexto, formato,
     campos: (e, t) => (ESTILOS[e] || ESTILOS.bastidor).campos[t] || ["titulo", "texto"],
     rotulo: (e, t, c) => { const r = (ESTILOS[e] || {}).rotulos || {}; return (r[t] || {})[c] || (r._ || {})[c] || ROTULO[c] || c; },
     exemplo: (e) => ({ estilo: e, titulo: EXEMPLOS[e].titulo, slides: JSON.parse(JSON.stringify(EXEMPLOS[e].slides)) }),
