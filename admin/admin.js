@@ -712,7 +712,7 @@ function ligarArraste(corpo) {
    ============================================================= */
 const SITUACOES = [["lead", "Lead"], ["conversando", "Conversando"], ["cliente", "Cliente"], ["parada", "Parada"]];
 const nomeSituacao = (s) => (SITUACOES.find((x) => x[0] === s) || [s, s || ""])[1];
-const filtroMarcas = { busca: "", situacao: "", nicho: "", etapa: "", caminho: "", cidade: "", creator: "", verificado: "" };
+const filtroMarcas = { busca: "", situacao: "", nicho: "", etapa: "", caminho: "", cidade: "", creator: "", verificado: "", follow: "", visao: (() => { try { return localStorage.getItem("marcas-visao") || "tabela"; } catch (_) { return "tabela"; } })() };
 // Nichos sugeridos (você pode escrever outro qualquer no cadastro)
 const NICHOS_MARCAS = ["Agência", "Tech", "Casa e decoração", "Moda", "Beleza", "Alimentação", "Bebidas", "Fitness", "Saúde", "Pets", "Infantil", "Finanças", "Educação", "Viagem", "Games", "Automotivo", "Varejo", "Imóveis", "Serviços"];
 // Junta "tech", "Tecnologia" e "TECH" no mesmo nicho
@@ -895,7 +895,7 @@ function montarMarcas(blocos, mapas, caminho) {
   return { novas, repetidas, vazias };
 }
 
-async function importarPlanilha(arq) {
+async function importarPlanilha(arq, caminhoPadrao) {
   avisar("Lendo a planilha...");
   let blocos;
   try { blocos = await lerPlanilha(arq); } catch (e) { avisar("Não consegui ler esse arquivo. Salve como Excel (.xlsx) ou CSV e tente de novo. " + (e.message || ""), true); return; }
@@ -907,7 +907,7 @@ async function importarPlanilha(arq) {
   const d = janela();
   // De qual caminho veio essa planilha (o nome do arquivo às vezes já diz)
   const nomeArq = semAcento(arq.name);
-  let caminho = /linkedin/.test(nomeArq) ? "linkedin" : /shopee|amazon|mercado|ecommerce|marketplace/.test(nomeArq) ? "ecommerce" : /capixab|espirito|vitoria|vila velha/.test(nomeArq) ? "es_local" : /insta/.test(nomeArq) ? "instagram" : "nao_informado";
+  let caminho = caminhoPadrao && caminhoPadrao !== "nao_informado" ? caminhoPadrao : /linkedin/.test(nomeArq) ? "linkedin" : /shopee|amazon|mercado|ecommerce|marketplace/.test(nomeArq) ? "ecommerce" : /capixab|espirito|vitoria|vila velha/.test(nomeArq) ? "es_local" : /insta/.test(nomeArq) ? "instagram" : "nao_informado";
   const pintar = () => {
     const { novas, repetidas, vazias } = montarMarcas(blocos, mapas, caminho);
     d.innerHTML = `<form class="form-janela importar" novalidate>
@@ -1036,13 +1036,16 @@ function desenharMarcas(el) {
       </select>`}
       <span class="espaco"></span>
       <button class="btn" type="button" id="csv-marcas">${ic("baixar")}Baixar CSV</button>
+      ${typeof pintarQuadroMarcas === "function" && temCampo("marcas", "etapa") ? `<div class="chips" role="group" aria-label="Como ver"><button class="chip" type="button" data-visao="tabela" aria-pressed="${filtroMarcas.visao !== "quadro"}">Tabela</button><button class="chip" type="button" data-visao="quadro" aria-pressed="${filtroMarcas.visao === "quadro"}">Quadro</button></div>` : ""}
       <button class="btn" type="button" id="importar-marcas">${ic("subir")}Importar planilha</button>
+      ${typeof colarPlanilha === "function" ? `<button class="btn" type="button" id="colar-marcas">${ic("transcricao")}Colar planilha</button>` : ""}
       <input type="file" id="arquivo-marcas" accept=".xlsx,.xls,.csv,.tsv,.ods,.numbers" hidden>
       <button class="btn primario" type="button" id="add-marca">${ic("mais")}Adicionar marca</button>
     </div>
     ${filtrosExtrasHTML(filtroMarcas)}
     ${temProspeccao() ? `<div class="barra-selecao" id="barra-selecao"></div>` : ""}
-    <div class="tabela-caixa">
+    <div id="pc-quadro-marcas" ${filtroMarcas.visao === "quadro" && typeof pintarQuadroMarcas === "function" ? "" : "hidden"}></div>
+    <div class="tabela-caixa" ${filtroMarcas.visao === "quadro" && typeof pintarQuadroMarcas === "function" ? "hidden" : ""}>
       <table>
         <thead><tr>${temProspeccao() ? `<th class="col-sel"><span class="sr">Selecionar</span></th>` : ""}<th class="col-acoes-marca"><span class="sr">Favoritar e fixar</span></th><th>Marca</th><th>Nicho</th>${temInstaMarcas() ? "<th>Instagram</th>" : ""}<th>E-mail</th><th>Telefone</th><th>${temCampo("marcas", "etapa") ? "Etapa" : "Situação"}</th><th>Observação</th><th>Último contato</th></tr></thead>
         <tbody id="lista-marcas"></tbody>
@@ -1055,12 +1058,14 @@ function desenharMarcas(el) {
     const lista = S.marcas.filter((m) => {
       if (filtroMarcas.situacao && m.situacao !== filtroMarcas.situacao) return false;
       if (!passaFiltrosExtras(m, filtroMarcas)) return false;
+      if (filtroMarcas.follow && typeof estadoFollowup === "function" && (filtroMarcas.follow === "pendente" ? !estadoFollowup(m) : !(m.proximo_contato && !ETAPAS_ENCERRADAS.has(m.etapa)))) return false;
       if (filtroMarcas.nicho === "★") { if (!m.favorita) return false; }
       else if (filtroMarcas.nicho && (nichoPadrao(m.nicho) || "Sem nicho") !== filtroMarcas.nicho) return false;
       if (!q) return true;
       return [m.nome, m.instagram, m.email, m.site, m.cidade_uf, m.contato_nome].some((x) => String(x || "").toLowerCase().replace(/^@/, "").includes(q));
     }).sort((a, b) => (b.fixada === true) - (a.fixada === true)); // fixadas sempre no topo
     listaMarcasVisivel = lista;
+    if (filtroMarcas.visao === "quadro" && typeof pintarQuadroMarcas === "function") pintarQuadroMarcas($("#pc-quadro-marcas"), lista);
     $("#lista-marcas").innerHTML = lista.length === 0
       ? `<tr><td colspan="10"><p class="vazio">${S.marcas.length ? "Nenhuma marca com esse filtro." : "Sua base está vazia. Quem mandar o formulário do site aparece aqui como Lead."}</p></td></tr>`
       : lista.map((m) => {
@@ -1072,7 +1077,7 @@ function desenharMarcas(el) {
               <button class="icone-btn estrela ${m.favorita ? "on" : ""}" type="button" data-marca-fav aria-pressed="${!!m.favorita}" aria-label="${m.favorita ? "Tirar dos favoritos" : "Favoritar"} ${esc(m.nome)}" title="${m.favorita ? "Tirar dos favoritos" : "Favoritar"}">${ic("estrela")}</button>
               <button class="icone-btn alfinete ${m.fixada ? "on" : ""}" type="button" data-marca-fixar aria-pressed="${!!m.fixada}" aria-label="${m.fixada ? "Desafixar" : "Fixar no topo"} ${esc(m.nome)}" title="${m.fixada ? "Desafixar" : "Fixar no topo"}">${ic("fixar")}</button>
             </td>
-            <td><b>${esc(m.nome)}</b>${m.exemplo ? '<span class="pilula p-exemplo">exemplo</span>' : ""}${detalheMarcaLinha(m)}</td>
+            <td><b>${esc(m.nome)}</b>${m.exemplo ? '<span class="pilula p-exemplo">exemplo</span>' : ""}${detalheMarcaLinha(m)}${typeof seloFollowup === "function" ? seloFollowup(m) : ""}</td>
             <td>${m.nicho ? `<span class="etq">${esc(nichoPadrao(m.nicho))}</span>` : ""}</td>
             ${temInstaMarcas() ? `<td>${ig ? `<a href="${ig}" target="_blank" rel="noopener">${esc(m.instagram)}</a>` : esc(m.instagram || "")}</td>` : ""}
             <td class="col-email">${emailsDaMarca(m)}</td>
@@ -1095,6 +1100,8 @@ function desenharMarcas(el) {
   $$("[data-filtro]", el).forEach((s) => s.addEventListener("change", () => { filtroMarcas[s.dataset.filtro] = s.value; pintar(); }));
   $("#add-marca").addEventListener("click", () => formMarca());
   $("#importar-marcas").addEventListener("click", () => $("#arquivo-marcas").click());
+  if ($("#colar-marcas")) $("#colar-marcas").addEventListener("click", () => colarPlanilha());
+  $$("[data-visao]", el).forEach((b) => b.addEventListener("click", () => { filtroMarcas.visao = b.dataset.visao; try { localStorage.setItem("marcas-visao", filtroMarcas.visao); } catch (_) {} desenhar(); }));
   $("#arquivo-marcas").addEventListener("change", (e) => { const arq = e.target.files[0]; e.target.value = ""; if (arq) importarPlanilha(arq); });
   $("#csv-marcas").addEventListener("click", () => baixarCSV("marcas",
     ["Marca", "Nicho", "Instagram", "E-mail", "Telefone", "Situação", "Observação", "Último contato", "Etapa", "Caminho", "Cidade/UF", "Seguidores", "Site", "Link do produto", "Com quem falar", "Cargo", "LinkedIn", "E-mail verificado", "Já usa creator", "Onde vende", "Gancho", "Próximo contato"],
@@ -5190,7 +5197,7 @@ function desenharProspeccao(el) {
       .map(([cor, v, r, ctx]) => `<div class="pro-cartao ${cor === "cor-principal" ? "" : cor}"><strong>${v}</strong><span>${r}</span>${ctx ? `<small>${ctx}</small>` : ""}</div>`).join("")}
   </div>`;
 
-  const caminhos = typeof painelCaminhosHTML === "function" ? painelCaminhosHTML() : "";
+  const caminhos = typeof painelCaminhosHTML === "function" ? followupHTML() + painelCaminhosHTML() + funilHTML() : "";
   const aviso = pro.falta.length ? `<div class="aviso-falta" role="alert"><b>Falta preparar o banco para a prospecção:</b> ${pro.falta.map(esc).join(", ")}. Rode o arquivo <b>disparo.sql</b> no SQL Editor do Supabase. O resto da aba continua funcionando.</div>` : "";
 
   // Base sem e-mail nenhum: nada de tela de envio vazia
@@ -5199,7 +5206,7 @@ function desenharProspeccao(el) {
       <p class="sub">Os e-mails da prospecção vêm da sua aba Marcas. Cadastre o e-mail das marcas ou importe a sua planilha primeiro.</p>
       <button class="btn primario" type="button" data-ir-aba="marcas">${ic("marcas")}Ir para Marcas</button></div>`;
     $$("[data-ir-aba]", el).forEach((b) => b.onclick = () => irPara(b.dataset.irAba));
-    if (caminhos) ligarPainelCaminhos(el);
+    if (caminhos) { ligarPainelCaminhos(el); ligarExtrasProspeccao(el); }
     return;
   }
 
@@ -5285,7 +5292,7 @@ function desenharProspeccao(el) {
       <div class="tabela-caixa"><table><thead><tr><th>Para</th><th>Assunto</th><th>Quando</th><th>Situação</th></tr></thead><tbody id="pro-hist"></tbody></table></div>
     </div>`;
 
-  if (caminhos) ligarPainelCaminhos(el);
+  if (caminhos) { ligarPainelCaminhos(el); ligarExtrasProspeccao(el); }
   // Pedir pro Claude: troca de aba sem redesenhar a página
   $$("[data-aba-prompt]", el).forEach((b) => b.onclick = () => {
     pro.abaPrompt = b.dataset.abaPrompt;

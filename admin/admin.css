@@ -1615,3 +1615,23 @@ dialog.pf-janela-rapida { width: min(460px, calc(100vw - 20px)); }
 .e-negociando { background: #efe4f5; color: #5b2d7a; }
 .e-fechou { background: var(--green-bg); color: var(--green); }
 .e-descartada { background: var(--gray-bg); color: var(--gray); }
+/* Prospecção parte 2: quadro, follow-up e funil */
+.pc-quadro { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(230px, 1fr); gap: 10px; overflow-x: auto; padding-bottom: 6px; align-items: start; }
+.pc-quadro .coluna { min-height: 220px; }
+.pc-quadro .coluna-corpo { max-height: 70vh; overflow-y: auto; }
+.pc-cartao-marca .pc-email { overflow-wrap: anywhere; }
+.pc-cartao-marca.fixada { border-color: var(--olive); }
+.pc-estrela { color: var(--olive); margin-right: 4px; }
+.pc-estrela .i { width: 12px; height: 12px; vertical-align: -1px; }
+.pc-follow { display: inline-block; margin-top: 3px; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.pc-follow-vencido { background: var(--red-bg); color: var(--red); }
+.pc-follow-hoje { background: var(--amber-bg); color: var(--amber); }
+td .pc-follow { display: table; }
+.pc-followups, .pc-funil { margin-bottom: 16px; }
+.pc-follow-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.pc-follow-item { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; text-align: left; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); cursor: pointer; font: inherit; color: inherit; }
+.pc-follow-item:hover { border-color: var(--cobalt); }
+.pc-follow-item > span { display: grid; min-width: 0; }
+.pc-follow-item .pc-follow { margin: 0; }
+.pc-h-prox { display: flex; align-items: center; gap: 6px; grid-column: 1 / -1; }
+.pc-h-prox input { width: 160px; }

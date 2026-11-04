@@ -200,7 +200,7 @@ function painelCaminhosHTML() {
             ? `<select class="campo" data-pc-campo="${f.k}">${f.op.map((o) => `<option ${String(st.campos[f.k]) === o ? "selected" : ""}>${o}</option>`).join("")}</select>`
             : `<input class="campo" data-pc-campo="${f.k}" value="${esc(st.campos[f.k] || "")}" placeholder="${esc(f.ph || "")}">`}</label>`).join("")}</div>
           <pre class="pro-prompt pc-prompt">${esc(montarPrompt(cam, st.campos))}</pre>
-          <div class="pro-prompt-acoes"><button class="btn primario" type="button" data-pc-copiar>${ic("transcricao")}Copiar prompt</button><a class="btn" href="https://claude.ai/new" target="_blank" rel="noopener">Abrir o Claude</a></div>
+          <div class="pro-prompt-acoes"><button class="btn primario" type="button" data-pc-copiar>${ic("transcricao")}Copiar prompt</button><a class="btn" href="https://claude.ai/new" target="_blank" rel="noopener">Abrir o Claude</a><button class="btn" type="button" data-pc-colar="${cam.id}">${ic("subir")}Colar a planilha que voltou</button></div>
           ${cam.checagens.length ? `<div class="pc-bloco"><b class="pc-rotulo">${cam.id === "linkedin" ? "Regras de contato" : "Checagens"}</b>${cam.checagens.map((t, i) => `<label class="check"><input type="checkbox" data-pc-check="${i}" ${st.checks[i] ? "checked" : ""}> ${esc(t)}</label>`).join("")}
             <small class="sub">Marque cada uma também na ficha da marca, uma por uma.</small></div>` : ""}
           ${cam.nota ? `<p class="porque">${esc(cam.nota)}</p>` : ""}
@@ -264,6 +264,7 @@ function filtrosExtrasHTML(f) {
     ${sel("cidade", "Qualquer lugar", f.cidade, [["es", "Só do ES"], ["fora", "Fora do ES"]])}
     ${sel("creator", "Usa creator?", f.creator, OPCOES_CREATOR.slice(1).concat([["vazio", "Não informado"]]))}
     ${sel("verificado", "E-mail verificado?", f.verificado, [["sim", "Verificado"], ["nao", "Não verificado (fora do disparo)"], ["vazio", "Ninguém checou"]])}
+    ${temCampo("marcas", "proximo_contato") ? sel("follow", "Follow-up", f.follow, [["pendente", "Vencido ou pra hoje"], ["marcado", "Com data marcada"]]) : ""}
   </div>`;
 }
 function passaFiltrosExtras(m, f) {
@@ -382,7 +383,8 @@ function fichaMarca(m, extra = {}) {
       <div class="pc-hist-novo"><input class="campo" type="date" id="pc-h-data" value="${hojeISO()}" aria-label="Data do contato">
         <select class="campo" id="pc-h-canal" aria-label="Canal">${CANAIS.map(([k, r]) => `<option value="${k}">${r}</option>`).join("")}</select>
         <input class="campo" id="pc-h-texto" placeholder="O que foi enviado ou respondido" aria-label="O que aconteceu">
-        <button type="button" class="btn pequeno" id="pc-h-add">${ic("mais")}Registrar</button></div>`}
+        <button type="button" class="btn pequeno" id="pc-h-add">${ic("mais")}Registrar</button>
+        <label class="pc-h-prox"><span class="sub">Próximo contato</span><input class="campo" type="date" id="pc-h-prox" value="${esc(String(m.proximo_contato || "").slice(0, 10))}" aria-label="Próximo contato"></label></div>`}
       ${lista.length ? `<ul class="pc-hist-lista">${lista.map((x) => `<li><span class="pc-h-data">${dataBR(x.data)}</span><span class="etq">${esc((CANAIS.find((c) => c[0] === x.canal) || [0, x.canal])[1])}</span><span class="pc-h-texto">${esc(x.texto || "")}</span>${x.auto ? "" : `<button type="button" class="icone-btn" data-h-apagar="${x.id}" aria-label="Apagar esse registro">${ic("apagar")}</button>`}</li>`).join("")}</ul>` : `<p class="sub">Nenhum contato registrado ainda.</p>`}`;
     const add = $("#pc-h-add", caixa);
     if (add) add.onclick = async () => {
@@ -391,11 +393,14 @@ function fichaMarca(m, extra = {}) {
       add.disabled = true;
       const { error } = await db.from("marca_contatos").insert({ marca_id: m.id, data, canal, texto: texto.slice(0, 2000) });
       if (error) { avisar(traduzErro(error), true); add.disabled = false; return; }
-      // O último contato acompanha o registro mais recente
-      if (!m.ultimo_contato || data > String(m.ultimo_contato)) {
-        await db.from("marcas").update({ ultimo_contato: data }).eq("id", m.id);
-        m.ultimo_contato = data;
-        if (f.elements.ultimo_contato) f.elements.ultimo_contato.value = data;
+      // O último contato acompanha o registro mais recente; o próximo contato vai junto
+      const prox = $("#pc-h-prox", caixa).value || null, mudar = {};
+      if (!m.ultimo_contato || data > String(m.ultimo_contato)) mudar.ultimo_contato = data;
+      if (prox !== (m.proximo_contato ? String(m.proximo_contato).slice(0, 10) : null)) mudar.proximo_contato = prox;
+      if (Object.keys(mudar).length) {
+        await db.from("marcas").update(mudar).eq("id", m.id);
+        Object.assign(m, mudar);
+        Object.entries(mudar).forEach(([k, x]) => { if (f.elements[k]) f.elements[k].value = x || ""; });
       }
       await lerContatosMarca(m.id); pintarHist(); avisar("Contato registrado.");
     };
@@ -472,4 +477,142 @@ function lojaDe(v) {
   if (/marketplace|shopee|mercado livre|amazon|magalu/.test(t)) return "marketplace";
   if (/site|loja|virtual|sim|nuvemshop|shopify|www\./.test(t)) return "site";
   return null;
+}
+
+/* =============================================================
+   PARTE 2: quadro por etapa, follow-up, funil por caminho e
+   colar a planilha que o Claude devolve
+   ============================================================= */
+// Situação antiga que acompanha cada etapa (o banco faz o mesmo sozinho)
+const situacaoDaEtapa = (e) => (e === "respondeu" || e === "negociando" ? "conversando" : e === "fechou" ? "cliente" : e === "descartada" ? "parada" : "lead");
+
+/* ---------- Follow-up ---------- */
+const ETAPAS_ENCERRADAS = new Set(["fechou", "descartada"]);
+function estadoFollowup(m) {
+  if (!m.proximo_contato || ETAPAS_ENCERRADAS.has(m.etapa)) return "";
+  const d = String(m.proximo_contato).slice(0, 10), hoje = hojeISO();
+  return d < hoje ? "vencido" : d === hoje ? "hoje" : "";
+}
+function seloFollowup(m) {
+  const e = estadoFollowup(m);
+  if (!e) return m.proximo_contato && !ETAPAS_ENCERRADAS.has(m.etapa) ? `<small class="sub pc-linha-info">Próximo contato ${dataBR(m.proximo_contato).slice(0, 5)}</small>` : "";
+  return `<span class="pc-follow pc-follow-${e}">${e === "vencido" ? `Follow-up vencido (${dataBR(m.proximo_contato).slice(0, 5)})` : "Follow-up hoje"}</span>`;
+}
+const marcasFollowup = () => S.marcas.filter((m) => estadoFollowup(m)).sort((a, b) => String(a.proximo_contato).localeCompare(String(b.proximo_contato)));
+function followupHTML() {
+  if (!temCampo("marcas", "proximo_contato")) return "";
+  const l = marcasFollowup();
+  if (!l.length) return "";
+  return `<div class="cartao pc-followups">
+    <div class="barra" style="margin-bottom:6px"><h2 style="margin:0">${ic("relogio")} Follow-up pra fazer</h2><span class="espaco"></span><small class="sub">${plural(l.filter((m) => estadoFollowup(m) === "vencido").length, "vencido", "vencidos")} · ${plural(l.filter((m) => estadoFollowup(m) === "hoje").length, "pra hoje", "pra hoje")}</small></div>
+    <ul class="pc-follow-lista">${l.slice(0, 30).map((m) => `<li><button type="button" class="pc-follow-item" data-follow="${esc(m.id)}">
+      <span><b>${esc(m.nome)}</b><small class="sub">${esc(nomeEtapaMarca(m.etapa))}${m.caminho_origem && m.caminho_origem !== "nao_informado" ? " · " + esc(nomeCaminho(m.caminho_origem)) : ""}${m.ultimo_contato ? " · último contato " + dataBR(m.ultimo_contato).slice(0, 5) : ""}</small></span>
+      ${seloFollowup(m)}</button></li>`).join("")}</ul>
+  </div>`;
+}
+
+/* ---------- Funil por caminho ---------- */
+const ORDEM_ETAPA = Object.fromEntries(ETAPAS_MARCA.map(([k], i) => [k, i]));
+const foiContatada = (m) => !!m.email_enviado_em || (m.etapa !== "descartada" && ORDEM_ETAPA[m.etapa || "nova"] >= ORDEM_ETAPA.contatada);
+const marcaRespondeu = (m) => ["respondeu", "negociando", "fechou"].includes(m.etapa);
+function funilHTML() {
+  if (!temCampo("marcas", "caminho_origem")) return "";
+  const grupos = OPCOES_CAMINHO.map(([id, nome]) => {
+    const l = S.marcas.filter((m) => !m.exemplo && (m.caminho_origem || "nao_informado") === id);
+    return { id, nome, vieram: l.length, contatadas: l.filter(foiContatada).length, responderam: l.filter(marcaRespondeu).length, fecharam: l.filter((m) => m.etapa === "fechou").length };
+  }).filter((g) => g.vieram);
+  const pct = (a, b) => (b ? Math.round((a / b) * 100) + "%" : "-");
+  const melhor = grupos.filter((g) => g.id !== "nao_informado" && g.contatadas >= 5).sort((a, b) => b.fecharam / b.contatadas - a.fecharam / a.contatadas || b.responderam / b.contatadas - a.responderam / a.contatadas)[0];
+  return `<div class="cartao pc-funil">
+    <div class="barra" style="margin-bottom:6px"><h2 style="margin:0">${ic("grafico")} Funil por caminho</h2></div>
+    <p class="sub" style="margin:0 0 10px">Qual caminho realmente vira cliente. Conta todas as marcas, não só a rodada.${melhor ? ` Até agora quem mais converte é <b>${esc(melhor.nome)}</b>.` : " Precisa de pelo menos 5 marcas contatadas num caminho pra comparar."}</p>
+    <div class="tabela-caixa"><table><thead><tr><th>Caminho</th><th>Vieram</th><th>Contatadas</th><th>Responderam</th><th>Fecharam</th><th>Responde</th><th>Fecha</th></tr></thead><tbody>
+      ${grupos.map((g) => `<tr><td><b>${esc(g.nome)}</b></td><td>${g.vieram}</td><td>${g.contatadas}</td><td>${g.responderam}</td><td>${g.fecharam}</td>
+        <td title="das contatadas, quantas responderam">${pct(g.responderam, g.contatadas)}</td><td title="das contatadas, quantas fecharam">${pct(g.fecharam, g.contatadas)}</td></tr>`).join("")}
+    </tbody></table></div>
+  </div>`;
+}
+function ligarExtrasProspeccao(el) {
+  $$("[data-follow]", el).forEach((b) => b.onclick = () => fichaMarca(S.marcas.find((m) => String(m.id) === b.dataset.follow), { depois: () => desenhar() }));
+  $$("[data-pc-colar]", el).forEach((b) => b.onclick = () => colarPlanilha(b.dataset.pcColar));
+}
+
+/* ---------- Quadro por etapa (aba Marcas) ---------- */
+const pcq = { verDescartadas: false, arrastando: null };
+function cartaoMarcaQuadro(m) {
+  const info = [nichoPadrao(m.nicho), m.caminho_origem && m.caminho_origem !== "nao_informado" ? nomeCaminho(m.caminho_origem) : "", m.cidade_uf].filter(Boolean).join(" · ");
+  return `<article class="cartao-ideia pc-cartao-marca ${m.fixada ? "fixada" : ""}" draggable="true" data-marca="${esc(m.id)}" tabindex="0" aria-label="Abrir ${esc(m.nome)}">
+    <b>${m.favorita ? `<span class="pc-estrela">${ic("estrela")}</span>` : ""}${esc(m.nome)}</b>
+    ${info ? `<small>${esc(info)}</small>` : ""}
+    ${primeiroEmail(m) ? `<small class="pc-email">${esc(primeiroEmail(m))}${emailBarrado(m) ? " (não verificado)" : ""}</small>` : `<small class="pc-email">sem e-mail</small>`}
+    ${seloFollowup(m)}
+    <select class="campo etapa-cartao" data-mover-marca="${esc(m.id)}" aria-label="Mudar a etapa de ${esc(m.nome)}">${ETAPAS_MARCA.map(([k, r]) => `<option value="${k}" ${(m.etapa || "nova") === k ? "selected" : ""}>${r}</option>`).join("")}</select>
+  </article>`;
+}
+function pintarQuadroMarcas(caixa, lista) {
+  const colunas = ETAPAS_MARCA.filter(([k]) => k !== "descartada" || pcq.verDescartadas);
+  const desc = lista.filter((m) => m.etapa === "descartada").length;
+  caixa.innerHTML = `<div class="pc-quadro">${colunas.map(([k, nome]) => {
+    const l = lista.filter((m) => (m.etapa || "nova") === k);
+    return `<section class="coluna pc-col-${k}" data-etapa-col="${k}"><header><span class="pilula e-${k}">${esc(nome)}</span><b>${l.length}</b></header>
+      <div class="coluna-corpo">${l.length ? l.map(cartaoMarcaQuadro).join("") : `<p class="coluna-vazia">Arraste uma marca pra cá</p>`}</div></section>`;
+  }).join("")}</div>
+  <p class="sub" style="margin:8px 0 0">${pcq.verDescartadas ? `<button type="button" class="link-btn" data-ver-desc>Esconder as descartadas</button>` : desc ? `<button type="button" class="link-btn" data-ver-desc>Mostrar as ${desc} descartadas</button>` : ""} Arraste o cartão pra outra coluna, ou troque a etapa embaixo do cartão. Clique no cartão pra abrir a ficha.</p>`;
+  const b = $("[data-ver-desc]", caixa);
+  if (b) b.onclick = () => { pcq.verDescartadas = !pcq.verDescartadas; pintarQuadroMarcas(caixa, lista); };
+  ligarQuadroMarcas(caixa, lista);
+}
+async function moverMarca(id, etapa) {
+  const m = S.marcas.find((x) => String(x.id) === String(id));
+  if (!m || (m.etapa || "nova") === etapa) return false;
+  if (!(await gravar("marcas", { etapa }, m.id))) return false;
+  m.etapa = etapa; m.situacao = situacaoDaEtapa(etapa);
+  avisar(`${m.nome} foi para ${nomeEtapaMarca(etapa)}.`);
+  return true;
+}
+function ligarQuadroMarcas(caixa, lista) {
+  const repintar = () => pintarQuadroMarcas(caixa, lista);
+  caixa.ondragstart = (e) => { const c = e.target.closest("[data-marca]"); if (!c) return; pcq.arrastando = c.dataset.marca; c.classList.add("arrastando"); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", pcq.arrastando); };
+  caixa.ondragend = () => { $$(".arrastando, .sobre", caixa).forEach((x) => x.classList.remove("arrastando", "sobre")); };
+  caixa.ondragover = (e) => { const col = e.target.closest("[data-etapa-col]"); if (!col) return; e.preventDefault(); $$(".coluna.sobre", caixa).forEach((x) => x !== col && x.classList.remove("sobre")); col.classList.add("sobre"); };
+  caixa.ondrop = async (e) => {
+    const col = e.target.closest("[data-etapa-col]"); if (!col) return;
+    e.preventDefault();
+    const id = e.dataTransfer.getData("text/plain") || pcq.arrastando;
+    pcq.arrastando = null;
+    if (await moverMarca(id, col.dataset.etapaCol)) repintar(); else caixa.ondragend();
+  };
+  caixa.onchange = async (e) => { const s = e.target.closest("[data-mover-marca]"); if (!s) return; if (await moverMarca(s.dataset.moverMarca, s.value)) repintar(); };
+  caixa.onclick = (e) => {
+    if (e.target.closest("select, button, a")) return;
+    const c = e.target.closest("[data-marca]");
+    if (c) formMarca(S.marcas.find((m) => String(m.id) === c.dataset.marca));
+  };
+  caixa.onkeydown = (e) => { if (e.key !== "Enter") return; const c = e.target.closest("[data-marca]"); if (c && e.target === c) formMarca(S.marcas.find((m) => String(m.id) === c.dataset.marca)); };
+}
+
+/* ---------- Colar a planilha (CSV, tabela do Claude ou copiado do Excel) ---------- */
+function textoParaCSV(t) {
+  const linhas = String(t || "").replace(/\r/g, "").split("\n").map((l) => l.trim()).filter(Boolean);
+  // Tabela em Markdown (| a | b |): tira as barras e a linha de traços
+  if (linhas.filter((l) => l.startsWith("|")).length >= 2) {
+    return linhas.filter((l) => l.startsWith("|") && !/^\|[\s:|-]+\|?$/.test(l))
+      .map((l) => l.replace(/^\||\|$/g, "").split("|").map((c) => c.trim().replace(/\t/g, " ")).join("\t")).join("\n");
+  }
+  return linhas.join("\n");
+}
+function colarPlanilha(caminho) {
+  const d = abrirJanelaSimples("Colar a planilha", `<p class="sub" style="margin:0 0 8px">Cole aqui a planilha que o Claude devolveu: o CSV, a tabela do chat ou as linhas copiadas do Excel, com os títulos na primeira linha.</p>
+    <textarea class="campo" id="pc-colado" rows="12" style="width:100%;font-family:ui-monospace,Menlo,monospace;font-size:12px" placeholder="marca, nicho, cidade_uf, instagram, ..."></textarea>`,
+    `<button type="button" class="btn" data-fechar>Cancelar</button><button type="button" class="btn primario" id="pc-colado-ok">${ic("subir")}Conferir as colunas</button>`);
+  $$("[data-fechar]", d).forEach((b) => b.addEventListener("click", () => d.close()));
+  $("#pc-colado", d).focus();
+  $("#pc-colado-ok", d).onclick = () => {
+    const t = textoParaCSV($("#pc-colado", d).value);
+    if (t.split("\n").length < 2) { avisar("Cole a planilha com a linha de títulos e pelo menos uma marca.", true); return; }
+    const tab = t.split("\n")[0].includes("\t");
+    const arq = new File([(tab ? "" : "﻿") + t], tab ? "colado.tsv" : "colado.csv", { type: tab ? "text/tab-separated-values" : "text/csv" });
+    d.close();
+    setTimeout(() => importarPlanilha(arq, caminho), 50);
+  };
 }
