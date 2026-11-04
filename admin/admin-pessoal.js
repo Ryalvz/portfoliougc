@@ -1026,13 +1026,13 @@ function pfViagens(el) {
       <div class="cartao">
         <div class="barra" style="margin-bottom:6px"><h2 style="margin:0">Seu acerto com cada um</h2></div>
         ${meus.length ? `<div class="tabela-caixa"><table class="pf-fat-pessoas"><thead><tr><th>Pessoa</th><th>Te deve</th><th>Você deve</th><th>Acerto da viagem</th><th>Total em ${nomeMesAc} (com tudo)</th></tr></thead><tbody>
-          ${meus.map((a) => `<tr><td><button type="button" class="pf-vg-nome" data-vg-pessoa="${esc(a.nome)}" title="Ver o resumo de ${esc(a.nome)}"><b>${esc(a.nome)}</b></button></td>
+          ${meus.map((a) => `<tr><td><button type="button" class="pf-vg-nome" data-vg-pessoa="${esc(a.nome)}" aria-expanded="${mesmaPessoa(pfx.vgAberto || "", a.nome)}" title="Ver o resumo de ${esc(a.nome)}"><b>${esc(a.nome)}</b></button></td>
             <td>${real(a.teDeve)}</td><td>${real(a.voceDeve)}</td>
             <td>${Math.abs(a.liquido) < 0.005 ? `<span class="pilula p-pago">zerado</span>` : a.liquido > 0 ? `<b>${esc(a.nome)} te paga ${real(a.liquido)}</b>` : `<b class="pf-voce-deve">você paga ${real(-a.liquido)}</b>`}</td>
             <td>${(() => { const p = devedores().find((x) => mesmaPessoa(x.nome, a.nome)); if (!p) return "-"; const t = cobrancaDe(p, v.mes).total, resto = r2(t - a.liquido);
               // De onde vem o total: a viagem + o resto (fatura do mês, o que ficou em aberto e juros)
               const conta = Math.abs(resto) >= 0.005 ? `<small class="sub" style="display:block">${real(a.liquido)} da viagem ${resto > 0 ? "+" : "-"} ${real(Math.abs(resto))} ${resto > 0 ? "de outras contas (cartão e em aberto)" : "que já te pagou ou você deve"}</small>` : `<small class="sub" style="display:block">só a viagem</small>`;
-              return (t < -0.005 ? `<b class="pf-voce-deve">você paga ${real(-t)}</b>` : `<b>${real(t)}</b>`) + conta; })()}</td></tr>`).join("")}
+              return (t < -0.005 ? `<b class="pf-voce-deve">você paga ${real(-t)}</b>` : `<b>${real(t)}</b>`) + conta; })()}</td></tr>${pfx.vgAberto && mesmaPessoa(pfx.vgAberto, a.nome) ? `<tr class="pf-vg-detalhe"><td colspan="5">${resumoPessoaViagemHTML(v, a.nome)}</td></tr>` : ""}`).join("")}
         </tbody></table></div>
         <p class="sub" style="margin:8px 0 0">"Total em ${nomeMesAc}" já cruza tudo: a viagem, o resto da fatura de ${nomeMesAc} e o que ficou em aberto antes. É o valor que vai na cobrança. Compra do seu cartão que está na viagem conta só aqui, não aparece de novo na fatura da pessoa. Se você deve, o valor abate o que a pessoa te deve.</p>` : `<p class="vazio">Adicione as pessoas da viagem em Editar viagem.</p>`}
         ${pares.length ? `<h3 class="pf-escada-tit">Entre os outros</h3><ul class="pf-vg-pares">${pares.map((x) => `<li>${esc(x.de)} paga <b>${real(x.v)}</b> pra ${esc(x.para)}</li>`).join("")}</ul>` : ""}
@@ -1042,7 +1042,7 @@ function pfViagens(el) {
           <button class="btn" type="button" id="vg-cartao">Trazer do meu cartão</button>
           <button class="btn primario" type="button" id="vg-gasto">${ic("mais")}Gasto</button></div>
         ${(v.gastos || []).length ? `<ul class="pf-vg-gastos">${[...v.gastos].sort((a, b) => String(b.data || "").localeCompare(String(a.data || ""))).map((g) => `<li><button type="button" data-vg-gasto="${g.id}">
-          <span><b>${esc(g.descricao)}</b><small>${g.data ? dataBR(g.data).slice(0, 5) + " · " : ""}${quem(g.pagou)} pagou · divide entre ${(g.divide || []).map(quem).join(", ")}${textoCobertura(g, quem)}${g.compraId ? " · do seu cartão" : ""}</small></span>
+          <span><b>${esc(g.descricao)}</b><small>${g.data ? dataBR(g.data).slice(0, 5) + " · " : ""}${quem(g.pagou)} pagou · divide entre ${(g.divide || []).map(quem).join(", ")}${textoCobertura(g, quem)}${g.compraId ? " · do seu cartão" : ""}${(() => { const pc = parcelasDoGasto(v, g); return pc ? `<br>${textoParcelas(v, pc)}` : ""; })()}</small></span>
           <strong>${real(g.valor)}</strong></button></li>`).join("")}</ul>`
           : `<p class="vazio">Nenhum gasto ainda. Lance o que cada um pagou, ou traga as compras divididas do seu cartão.</p>`}
       </div>
@@ -1053,39 +1053,55 @@ function pfViagens(el) {
   $("#vg-gasto", el).onclick = () => formGastoViagem(v, null);
   $("#vg-cartao", el).onclick = () => trazerDoCartao(v);
   $$("[data-vg-gasto]", el).forEach((b) => b.onclick = () => formGastoViagem(v, v.gastos.find((g) => g.id === b.dataset.vgGasto)));
-  $$("[data-vg-pessoa]", el).forEach((b) => b.onclick = () => resumoPessoaViagem(v, b.dataset.vgPessoa));
+  $$("[data-vg-pessoa]", el).forEach((b) => b.onclick = () => { pfx.vgAberto = mesmaPessoa(pfx.vgAberto || "", b.dataset.vgPessoa) ? null : b.dataset.vgPessoa; desenhar(); });
+  $$("[data-vg-copiar]", el).forEach((b) => b.onclick = () => copiarResumoViagem(v, b.dataset.vgCopiar));
 }
+// Compra parcelada do cartão na viagem: "5x de R$ 259,06 · parcela 1/5 na fatura de nov., última em mar."
+function parcelasDoGasto(v, g) {
+  const c = g.compraId ? P.compras.find((x) => String(x.id) === String(g.compraId)) : null;
+  const n = c ? Number(c.parcelas || 1) : 1;
+  if (!c || n < 2 || n >= RECORRENTE) return null;
+  const i = idxParcela(c, v.mes);
+  return { n, valor: n2(c.valor_parcela), k: i >= 0 ? i + 1 : 0, ultimo: ultimoMes(c) };
+}
+const textoParcelas = (v, pc) => `${pc.n}x de ${real(pc.valor)}${pc.k ? ` · parcela ${pc.k}/${pc.n} na fatura de ${nomeMes(v.mes, true)}` : ""}, última em ${nomeMes(pc.ultimo, true)}`;
 // Resumo de uma pessoa na viagem: a parte dela em cada gasto, quem pagou e pra quem ela acerta
-function resumoPessoaViagem(v, n) {
-  const quem = (x) => (ehEu(x) ? "Você" : esc(x));
+function dadosResumoViagem(v, n) {
   const gastos = [...(v.gastos || [])].sort((a, b) => String(a.data || "").localeCompare(String(b.data || ""))).map((g) => {
     const parte = partesGasto(g).filter((x) => mesmaPessoa(x.nome, n)).reduce((s, x) => s + x.v, 0);
-    return { g, parte, pagou: mesmaPessoa(g.pagou, n) };
+    return { g, parte, pagou: mesmaPessoa(g.pagou, n), pc: parcelasDoGasto(v, g) };
   }).filter((x) => x.parte > 0.004 || x.pagou);
   const parte = gastos.reduce((s, x) => s + x.parte, 0), pagou = gastos.filter((x) => x.pagou).reduce((s, x) => s + n2(x.g.valor), 0);
   // Acerto com cada um, já descontando um do outro
   const acertos = (v.pessoas || []).filter((p) => !mesmaPessoa(p, n)).map((p) => ({ p, v: r2(devePara(v, n, p) - devePara(v, p, n)) })).filter((x) => Math.abs(x.v) >= 0.01);
   const pc = devedores().find((x) => mesmaPessoa(x.nome, n)), cob = pc ? cobrancaDe(pc, v.mes) : null;
+  return { gastos, parte, pagou, acertos, cob };
+}
+// Abre embaixo do nome, na própria tabela
+function resumoPessoaViagemHTML(v, n) {
+  const { gastos, parte, pagou, acertos, cob } = dadosResumoViagem(v, n);
+  const quem = (x) => (ehEu(x) ? "Você" : esc(x));
   const nomeMesAc = MESES_LONGOS[Number(v.mes.slice(5)) - 1].toLowerCase();
-  const d = abrirJanelaSimples(`${esc(nomePessoa(n))} na viagem ${esc(v.nome)}`, `
-    <div class="pf-fat-topo" style="margin-top:0">
-      <div><span>Parte dele(a)</span><strong>${real(parte)}</strong><small>somando todos os gastos</small></div>
-      <div><span>Pagou</span><strong>${real(pagou)}</strong><small>${gastos.filter((x) => x.pagou).length ? "gastos que ele(a) pagou" : "não pagou nenhum gasto"}</small></div>
-    </div>
-    <div class="tabela-caixa"><table><thead><tr><th>Gasto</th><th>Quem pagou</th><th>Total</th><th>Parte dele(a)</th></tr></thead><tbody>
-      ${gastos.map((x) => `<tr><td>${esc(x.g.descricao)}${x.g.data ? ` <small class="sub">${dataBR(x.g.data).slice(0, 5)}</small>` : ""}</td><td>${quem(x.g.pagou)}</td><td>${real(x.g.valor)}</td><td><b>${x.parte > 0.004 ? real(x.parte) : "-"}</b></td></tr>`).join("")}
+  const via = r2(devePara(v, n, "Eu") - devePara(v, "Eu", n));
+  return `<div class="pf-vg-resumo">
+    <p class="sub" style="margin:0 0 8px">Parte de ${esc(n)} na viagem: <b>${real(parte)}</b>${pagou ? ` · pagou <b>${real(pagou)}</b>` : " · não pagou nenhum gasto"}</p>
+    <div class="tabela-caixa"><table><thead><tr><th>Gasto</th><th>Quem pagou</th><th>Total</th><th>Parte de ${esc(n)}</th></tr></thead><tbody>
+      ${gastos.map((x) => `<tr><td>${esc(x.g.descricao)}${x.g.data ? ` <small class="sub">${dataBR(x.g.data).slice(0, 5)}</small>` : ""}${x.pc ? `<small class="sub" style="display:block">${textoParcelas(v, x.pc)}</small>` : ""}</td>
+        <td>${quem(x.g.pagou)}</td><td>${real(x.g.valor)}</td>
+        <td><b>${x.parte > 0.004 ? real(x.parte) : "-"}</b>${x.pc && x.parte > 0.004 ? `<small class="sub" style="display:block">equivale a ${x.pc.n}x de ${real(x.parte / x.pc.n)}</small>` : ""}</td></tr>`).join("")}
     </tbody></table></div>
-    <h3 class="pf-escada-tit">Acerto</h3>
-    ${acertos.length ? `<ul class="pf-vg-pares">${acertos.map((x) => `<li>${x.v > 0 ? `Paga <b>${real(x.v)}</b> pra ${ehEu(x.p) ? "você" : esc(x.p)}` : `Recebe <b>${real(-x.v)}</b> de ${ehEu(x.p) ? "você" : esc(x.p)}`}</li>`).join("")}</ul>` : `<p class="sub">Está tudo zerado na viagem.</p>`}
-    ${cob ? `<p class="sub">Com você, somando a fatura de ${nomeMesAc} e o que ficou em aberto, o total pra cobrar é <b>${real(cob.total)}</b>${(() => { const via = r2(devePara(v, n, "Eu") - devePara(v, "Eu", n)), resto = r2(cob.total - via); return Math.abs(resto) >= 0.005 ? `: ${real(via)} da viagem ${resto > 0 ? "+" : "-"} ${real(Math.abs(resto))} de outras contas` : ""; })()} (está em Quem me deve).</p>` : ""}`,
-    `<button type="button" class="btn" data-fechar>Fechar</button><button type="button" class="btn primario" id="vg-copiar-resumo">Copiar resumo</button>`);
-  $("#vg-copiar-resumo", d).onclick = async () => {
-    const pq = (x) => (ehEu(x) ? "eu paguei" : `${nomePessoa(x)} pagou`);
-    const txt = [`Oi, ${nomePessoa(n).split(" ")[0]}! Resumo da viagem ${v.nome}:`, ...gastos.filter((x) => x.parte > 0.004).map((x) => `${x.g.descricao}: sua parte ${real(x.parte)} (${pq(x.g.pagou)})`),
-      `Sua parte no total: ${real(parte)}.${pagou ? ` Você pagou ${real(pagou)}.` : ""}`,
-      ...(acertos.length ? ["Fica assim:", ...acertos.map((x) => (x.v > 0 ? `Você paga ${real(x.v)} pra ${ehEu(x.p) ? "mim" : nomePessoa(x.p)}.` : `${ehEu(x.p) ? "Eu te pago" : `${nomePessoa(x.p)} te paga`} ${real(-x.v)}.`))] : ["Está tudo zerado."])].join("\n");
-    try { await navigator.clipboard.writeText(txt); avisar("Resumo copiado. É só colar no WhatsApp."); } catch (_) { avisar("Não deu pra copiar. Tente de novo.", true); }
-  };
+    <p style="margin:10px 0 4px"><b>Acerto:</b> ${acertos.length ? acertos.map((x) => (x.v > 0 ? `paga <b>${real(x.v)}</b> pra ${ehEu(x.p) ? "você" : esc(x.p)}` : `recebe <b>${real(-x.v)}</b> de ${ehEu(x.p) ? "você" : esc(x.p)}`)).join("; ") : "tudo zerado"}.</p>
+    ${cob ? `<p class="sub" style="margin:0">Total pra cobrar em ${nomeMesAc}: <b>${real(cob.total)}</b>${Math.abs(cob.total - via) >= 0.005 ? ` (${real(via)} da viagem ${cob.total - via > 0 ? "+" : "-"} ${real(Math.abs(cob.total - via))} de outras contas)` : ""}. A viagem inteira entra na fatura de ${nomeMesAc}.</p>` : ""}
+    <button type="button" class="btn pequeno" style="margin-top:8px" data-vg-copiar="${esc(n)}">Copiar resumo</button>
+  </div>`;
+}
+async function copiarResumoViagem(v, n) {
+  const { gastos, parte, pagou, acertos } = dadosResumoViagem(v, n);
+  const pq = (x) => (ehEu(x) ? "eu paguei" : `${nomePessoa(x)} pagou`);
+  const txt = [`Oi, ${nomePessoa(n).split(" ")[0]}! Resumo da viagem ${v.nome}:`, ...gastos.filter((x) => x.parte > 0.004).map((x) => `${x.g.descricao}: sua parte ${real(x.parte)} (${pq(x.g.pagou)}${x.pc ? `, no cartão em ${x.pc.n}x` : ""})`),
+    `Sua parte no total: ${real(parte)}.${pagou ? ` Você pagou ${real(pagou)}.` : ""}`,
+    ...(acertos.length ? ["Fica assim:", ...acertos.map((x) => (x.v > 0 ? `Você paga ${real(x.v)} pra ${ehEu(x.p) ? "mim" : nomePessoa(x.p)}.` : `${ehEu(x.p) ? "Eu te pago" : `${nomePessoa(x.p)} te paga`} ${real(-x.v)}.`))] : ["Está tudo zerado."])].join("\n");
+  try { await navigator.clipboard.writeText(txt); avisar("Resumo copiado. É só colar no WhatsApp."); } catch (_) { avisar("Não deu pra copiar. Tente de novo.", true); }
 }
 function formViagem(v) {
   const lista = [...viagens()];

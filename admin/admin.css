@@ -1561,3 +1561,6 @@ dialog.pf-janela-rapida { width: min(460px, calc(100vw - 20px)); }
 /* Nome da pessoa na viagem: abre o resumo dela */
 .pf-vg-nome { background: none; border: 0; padding: 0; font: inherit; color: inherit; cursor: pointer; text-decoration: underline; text-decoration-color: var(--muted); text-underline-offset: 3px; }
 .pf-vg-nome:hover, .pf-vg-nome:focus-visible { text-decoration-color: currentColor; }
+.pf-vg-nome[aria-expanded="true"] { text-decoration-color: currentColor; }
+.pf-vg-detalhe > td { background: var(--tint); padding: 12px 14px 16px; }
+.pf-vg-resumo table { font-size: 13px; }
