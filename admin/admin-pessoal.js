@@ -1591,6 +1591,9 @@ function abrirImportarFatura() {
         x.dono = x.existe ? nomePessoa(x.existe.dono || "") : x.rapido ? nomePessoa(x.rapido.dono || "") : (x.donoSugerido || donoAnterior(x));
         // Já salva: fica de fora, a não ser que você mude alguma coisa nela
         if (x.existe && !x.pagamento) x.incluir = false;
+        // Parcela 2 em diante com centavos diferentes da salva (a 1ª parcela traz o arredondamento): entra pra acertar o valor
+        x.centavos = !!(x.existe && x.k >= 2 && Math.abs(n2(x.existe.valor_parcela) - (x.credito ? -x.valor : x.valor)) > 0.001);
+        if (x.centavos) x.incluir = true;
       }
     });
     pintar();
@@ -1610,7 +1613,7 @@ function abrirImportarFatura() {
       return `<tr class="${x.credito ? "pf-credito" : ""} ${x.existe ? "pf-existe" : ""}">
         <td><input type="checkbox" data-inc="${i}" ${x.incluir ? "checked" : ""} aria-label="Incluir"></td>
         <td>${dataBR(x.data)}</td>
-        <td>${esc(x.desc)}${x.pagamento ? ` <span class="pilula p-parada">pagamento da fatura</span>` : x.credito ? ` <span class="pilula p-pago">estorno ou crédito</span>` : ""}${x.rapido ? ` <span class="pilula p-conversando">você lançou: ${esc(x.rapido.descricao)}</span>` : ""}${(() => { const v = viagemDaCompra(x.rapido || x.existe); return v ? ` <span class="pilula p-pago">dividida na viagem ${esc(v.nome)}: deixe "Eu"</span>` : ""; })()}</td>
+        <td>${esc(x.desc)}${x.pagamento ? ` <span class="pilula p-parada">pagamento da fatura</span>` : x.credito ? ` <span class="pilula p-pago">estorno ou crédito</span>` : ""}${x.rapido ? ` <span class="pilula p-conversando">você lançou: ${esc(x.rapido.descricao)}</span>` : ""}${x.centavos ? ` <span class="pilula p-status">acerta o valor salvo de ${real(x.existe.valor_parcela)} pra ${real(x.valor)}</span>` : ""}${(() => { const v = viagemDaCompra(x.rapido || x.existe); return v ? ` <span class="pilula p-pago">dividida na viagem ${esc(v.nome)}: deixe "Eu"</span>` : ""; })()}</td>
         <td>${x.n > 1 ? `${x.k}/${x.n}` : "à vista"}</td>
         <td>${x.credito ? "−" : ""}${real(x.valor)}</td>
         <td><div class="pf-imp-dono"><input class="campo" data-dono="${i}" list="imp-pessoas" value="${esc(x.dono)}" placeholder="Eu" style="min-width:120px"><button type="button" class="btn pequeno" data-dividir="${i}">Dividir</button></div>${cada}</td></tr>`;
