@@ -1029,7 +1029,10 @@ function pfViagens(el) {
           ${meus.map((a) => `<tr><td><button type="button" class="pf-vg-nome" data-vg-pessoa="${esc(a.nome)}" title="Ver o resumo de ${esc(a.nome)}"><b>${esc(a.nome)}</b></button></td>
             <td>${real(a.teDeve)}</td><td>${real(a.voceDeve)}</td>
             <td>${Math.abs(a.liquido) < 0.005 ? `<span class="pilula p-pago">zerado</span>` : a.liquido > 0 ? `<b>${esc(a.nome)} te paga ${real(a.liquido)}</b>` : `<b class="pf-voce-deve">você paga ${real(-a.liquido)}</b>`}</td>
-            <td>${(() => { const p = devedores().find((x) => mesmaPessoa(x.nome, a.nome)); if (!p) return "-"; const t = cobrancaDe(p, v.mes).total; return t < -0.005 ? `<b class="pf-voce-deve">você paga ${real(-t)}</b>` : `<b>${real(t)}</b>`; })()}</td></tr>`).join("")}
+            <td>${(() => { const p = devedores().find((x) => mesmaPessoa(x.nome, a.nome)); if (!p) return "-"; const t = cobrancaDe(p, v.mes).total, resto = r2(t - a.liquido);
+              // De onde vem o total: a viagem + o resto (fatura do mês, o que ficou em aberto e juros)
+              const conta = Math.abs(resto) >= 0.005 ? `<small class="sub" style="display:block">${real(a.liquido)} da viagem ${resto > 0 ? "+" : "-"} ${real(Math.abs(resto))} ${resto > 0 ? "de outras contas (cartão e em aberto)" : "que já te pagou ou você deve"}</small>` : `<small class="sub" style="display:block">só a viagem</small>`;
+              return (t < -0.005 ? `<b class="pf-voce-deve">você paga ${real(-t)}</b>` : `<b>${real(t)}</b>`) + conta; })()}</td></tr>`).join("")}
         </tbody></table></div>
         <p class="sub" style="margin:8px 0 0">"Total em ${nomeMesAc}" já cruza tudo: a viagem, o resto da fatura de ${nomeMesAc} e o que ficou em aberto antes. É o valor que vai na cobrança. Compra do seu cartão que está na viagem conta só aqui, não aparece de novo na fatura da pessoa. Se você deve, o valor abate o que a pessoa te deve.</p>` : `<p class="vazio">Adicione as pessoas da viagem em Editar viagem.</p>`}
         ${pares.length ? `<h3 class="pf-escada-tit">Entre os outros</h3><ul class="pf-vg-pares">${pares.map((x) => `<li>${esc(x.de)} paga <b>${real(x.v)}</b> pra ${esc(x.para)}</li>`).join("")}</ul>` : ""}
@@ -1074,7 +1077,7 @@ function resumoPessoaViagem(v, n) {
     </tbody></table></div>
     <h3 class="pf-escada-tit">Acerto</h3>
     ${acertos.length ? `<ul class="pf-vg-pares">${acertos.map((x) => `<li>${x.v > 0 ? `Paga <b>${real(x.v)}</b> pra ${ehEu(x.p) ? "você" : esc(x.p)}` : `Recebe <b>${real(-x.v)}</b> de ${ehEu(x.p) ? "você" : esc(x.p)}`}</li>`).join("")}</ul>` : `<p class="sub">Está tudo zerado na viagem.</p>`}
-    ${cob ? `<p class="sub">Com você, somando a fatura de ${nomeMesAc} e o que ficou em aberto, o total pra cobrar é <b>${real(cob.total)}</b> (está em Quem me deve).</p>` : ""}`,
+    ${cob ? `<p class="sub">Com você, somando a fatura de ${nomeMesAc} e o que ficou em aberto, o total pra cobrar é <b>${real(cob.total)}</b>${(() => { const via = r2(devePara(v, n, "Eu") - devePara(v, "Eu", n)), resto = r2(cob.total - via); return Math.abs(resto) >= 0.005 ? `: ${real(via)} da viagem ${resto > 0 ? "+" : "-"} ${real(Math.abs(resto))} de outras contas` : ""; })()} (está em Quem me deve).</p>` : ""}`,
     `<button type="button" class="btn" data-fechar>Fechar</button><button type="button" class="btn primario" id="vg-copiar-resumo">Copiar resumo</button>`);
   $("#vg-copiar-resumo", d).onclick = async () => {
     const pq = (x) => (ehEu(x) ? "eu paguei" : `${nomePessoa(x)} pagou`);
