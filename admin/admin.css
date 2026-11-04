@@ -1557,3 +1557,7 @@ dialog.pf-janela-rapida { width: min(460px, calc(100vw - 20px)); }
 .pf-vg-gastos button span { flex: 1; min-width: 0; }
 .pf-vg-gastos small { display: block; color: var(--muted); font-size: 12px; }
 .pf-vg-pares { margin: 6px 0 0; padding-left: 18px; font-size: 14px; }
+
+/* Nome da pessoa na viagem: abre o resumo dela */
+.pf-vg-nome { background: none; border: 0; padding: 0; font: inherit; color: inherit; cursor: pointer; text-decoration: underline; text-decoration-color: var(--muted); text-underline-offset: 3px; }
+.pf-vg-nome:hover, .pf-vg-nome:focus-visible { text-decoration-color: currentColor; }

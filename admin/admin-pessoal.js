@@ -1026,7 +1026,7 @@ function pfViagens(el) {
       <div class="cartao">
         <div class="barra" style="margin-bottom:6px"><h2 style="margin:0">Seu acerto com cada um</h2></div>
         ${meus.length ? `<div class="tabela-caixa"><table class="pf-fat-pessoas"><thead><tr><th>Pessoa</th><th>Te deve</th><th>Você deve</th><th>Acerto da viagem</th><th>Total em ${nomeMesAc} (com tudo)</th></tr></thead><tbody>
-          ${meus.map((a) => `<tr><td><b>${esc(a.nome)}</b></td>
+          ${meus.map((a) => `<tr><td><button type="button" class="pf-vg-nome" data-vg-pessoa="${esc(a.nome)}" title="Ver o resumo de ${esc(a.nome)}"><b>${esc(a.nome)}</b></button></td>
             <td>${real(a.teDeve)}</td><td>${real(a.voceDeve)}</td>
             <td>${Math.abs(a.liquido) < 0.005 ? `<span class="pilula p-pago">zerado</span>` : a.liquido > 0 ? `<b>${esc(a.nome)} te paga ${real(a.liquido)}</b>` : `<b class="pf-voce-deve">você paga ${real(-a.liquido)}</b>`}</td>
             <td>${(() => { const p = devedores().find((x) => mesmaPessoa(x.nome, a.nome)); if (!p) return "-"; const t = cobrancaDe(p, v.mes).total; return t < -0.005 ? `<b class="pf-voce-deve">você paga ${real(-t)}</b>` : `<b>${real(t)}</b>`; })()}</td></tr>`).join("")}
@@ -1050,6 +1050,39 @@ function pfViagens(el) {
   $("#vg-gasto", el).onclick = () => formGastoViagem(v, null);
   $("#vg-cartao", el).onclick = () => trazerDoCartao(v);
   $$("[data-vg-gasto]", el).forEach((b) => b.onclick = () => formGastoViagem(v, v.gastos.find((g) => g.id === b.dataset.vgGasto)));
+  $$("[data-vg-pessoa]", el).forEach((b) => b.onclick = () => resumoPessoaViagem(v, b.dataset.vgPessoa));
+}
+// Resumo de uma pessoa na viagem: a parte dela em cada gasto, quem pagou e pra quem ela acerta
+function resumoPessoaViagem(v, n) {
+  const quem = (x) => (ehEu(x) ? "Você" : esc(x));
+  const gastos = [...(v.gastos || [])].sort((a, b) => String(a.data || "").localeCompare(String(b.data || ""))).map((g) => {
+    const parte = partesGasto(g).filter((x) => mesmaPessoa(x.nome, n)).reduce((s, x) => s + x.v, 0);
+    return { g, parte, pagou: mesmaPessoa(g.pagou, n) };
+  }).filter((x) => x.parte > 0.004 || x.pagou);
+  const parte = gastos.reduce((s, x) => s + x.parte, 0), pagou = gastos.filter((x) => x.pagou).reduce((s, x) => s + n2(x.g.valor), 0);
+  // Acerto com cada um, já descontando um do outro
+  const acertos = (v.pessoas || []).filter((p) => !mesmaPessoa(p, n)).map((p) => ({ p, v: r2(devePara(v, n, p) - devePara(v, p, n)) })).filter((x) => Math.abs(x.v) >= 0.01);
+  const pc = devedores().find((x) => mesmaPessoa(x.nome, n)), cob = pc ? cobrancaDe(pc, v.mes) : null;
+  const nomeMesAc = MESES_LONGOS[Number(v.mes.slice(5)) - 1].toLowerCase();
+  const d = abrirJanelaSimples(`${esc(nomePessoa(n))} na viagem ${esc(v.nome)}`, `
+    <div class="pf-fat-topo" style="margin-top:0">
+      <div><span>Parte dele(a)</span><strong>${real(parte)}</strong><small>somando todos os gastos</small></div>
+      <div><span>Pagou</span><strong>${real(pagou)}</strong><small>${gastos.filter((x) => x.pagou).length ? "gastos que ele(a) pagou" : "não pagou nenhum gasto"}</small></div>
+    </div>
+    <div class="tabela-caixa"><table><thead><tr><th>Gasto</th><th>Quem pagou</th><th>Total</th><th>Parte dele(a)</th></tr></thead><tbody>
+      ${gastos.map((x) => `<tr><td>${esc(x.g.descricao)}${x.g.data ? ` <small class="sub">${dataBR(x.g.data).slice(0, 5)}</small>` : ""}</td><td>${quem(x.g.pagou)}</td><td>${real(x.g.valor)}</td><td><b>${x.parte > 0.004 ? real(x.parte) : "-"}</b></td></tr>`).join("")}
+    </tbody></table></div>
+    <h3 class="pf-escada-tit">Acerto</h3>
+    ${acertos.length ? `<ul class="pf-vg-pares">${acertos.map((x) => `<li>${x.v > 0 ? `Paga <b>${real(x.v)}</b> pra ${ehEu(x.p) ? "você" : esc(x.p)}` : `Recebe <b>${real(-x.v)}</b> de ${ehEu(x.p) ? "você" : esc(x.p)}`}</li>`).join("")}</ul>` : `<p class="sub">Está tudo zerado na viagem.</p>`}
+    ${cob ? `<p class="sub">Com você, somando a fatura de ${nomeMesAc} e o que ficou em aberto, o total pra cobrar é <b>${real(cob.total)}</b> (está em Quem me deve).</p>` : ""}`,
+    `<button type="button" class="btn" data-fechar>Fechar</button><button type="button" class="btn primario" id="vg-copiar-resumo">Copiar resumo</button>`);
+  $("#vg-copiar-resumo", d).onclick = async () => {
+    const pq = (x) => (ehEu(x) ? "eu paguei" : `${nomePessoa(x)} pagou`);
+    const txt = [`Oi, ${nomePessoa(n).split(" ")[0]}! Resumo da viagem ${v.nome}:`, ...gastos.filter((x) => x.parte > 0.004).map((x) => `${x.g.descricao}: sua parte ${real(x.parte)} (${pq(x.g.pagou)})`),
+      `Sua parte no total: ${real(parte)}.${pagou ? ` Você pagou ${real(pagou)}.` : ""}`,
+      ...(acertos.length ? ["Fica assim:", ...acertos.map((x) => (x.v > 0 ? `Você paga ${real(x.v)} pra ${ehEu(x.p) ? "mim" : nomePessoa(x.p)}.` : `${ehEu(x.p) ? "Eu te pago" : `${nomePessoa(x.p)} te paga`} ${real(-x.v)}.`))] : ["Está tudo zerado."])].join("\n");
+    try { await navigator.clipboard.writeText(txt); avisar("Resumo copiado. É só colar no WhatsApp."); } catch (_) { avisar("Não deu pra copiar. Tente de novo.", true); }
+  };
 }
 function formViagem(v) {
   const lista = [...viagens()];
