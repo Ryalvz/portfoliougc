@@ -85,6 +85,7 @@ const ESQUEMA = {
   metas: ["ano", "mes", "valor"],
   lembretes_adiados: ["chave", "ate"],
   ig_historico: ["data", "seguidores", "posts"],
+  ig_stories: ["id", "data", "tipo", "capa", "link", "alcance", "views", "respostas", "compartilhou", "interacoes", "seguiu", "perfil", "avancou", "voltou", "saiu", "pulou"],
   lembretes_rapidos: ["id", "texto", "quando", "feito", "avisado", "criado_em"],
   contatos_site: ["id", "criado_em", "tipo", "nome", "marca", "email", "whats", "mensagem", "visto"],
   contratos: ["id", "cliente", "tipo", "descricao", "valor", "mes", "ano", "data_nf", "prazo_dias", "status", "parcela1", "data_p1", "parcela2", "data_p2", "obs", "qtd", "prazo_entrega", "favorita", "criado_em"],
@@ -4628,6 +4629,7 @@ async function carregarInstagram() {
     ig.dados = ig.conectado ? r : null;
     if (r.erro) ig.erro = r.erro;
     if (ig.conectado) S.igHistorico = await ler("ig_historico", (q, c) => (c.includes("data") ? q.order("data") : q)).catch(() => []);
+    if (ig.conectado) S.igStories = await ler("ig_stories", (q, c) => (c.includes("data") ? q.order("data", { ascending: false }).limit(300) : q)).catch(() => []);
   } catch (e) { ig.erro = e.message; ig.conectado = ig.conectado ?? false; }
   ig.carregando = false;
   if (["instagram", "inicio"].includes(abaAtual)) desenhar();
@@ -4754,6 +4756,7 @@ function desenharMetricasInstagram(el) {
           <small class="lb-extra">${plural(x.n, "post", "posts")} · engajamento ${pct1(x.taxa)} · ${num(Math.round(x.salvos))} salvos em média</small>
         </div>`).join("")}</div>` : `<p class="vazio">Sem posts com métricas.</p>`}
       </div>
+${typeof pintarStories === "function" ? `<div class="cartao qp-cartao" id="st-caixa"></div>` : ""}
 ${typeof pintarQuandoPostar === "function" ? `<div class="cartao qp-cartao" id="qp-caixa"></div>` : `      <div class="cartao">
         <h2>Melhor dia para postar</h2>
         <div class="barras-mes barras-semana" role="img" aria-label="Alcance médio por dia da semana">${porDia.map((x, i) => `<div class="grupo-mes ${melhorDia && melhorDia.i === i ? "foco" : ""}" data-dica="<b>${DIAS_SEMANA[i]}</b><br>${plural(x.n, "post", "posts")}<br>Alcance médio: ${num(Math.round(x.alcance))}"><div class="par-barras"><i class="b-prev" style="height:${(x.alcance / maxDia) * 100}%"></i></div><span>${DIAS_CURTOS[i]}</span></div>`).join("")}</div>
@@ -4806,6 +4809,7 @@ ${typeof pintarQuandoPostar === "function" ? `<div class="cartao qp-cartao" id="
     try { await chamarInstagram({ acao: "desconectar" }); ig.conectado = false; ig.dados = null; desenhar(); avisar("Instagram desconectado."); } catch (e) { avisar(e.message, true); }
   };
   if (typeof pintarQuandoPostar === "function" && $("#qp-caixa", el)) pintarQuandoPostar($("#qp-caixa", el), posts);
+  if (typeof pintarStories === "function" && $("#st-caixa", el)) pintarStories($("#st-caixa", el));
   ligarDicas(el);
 }
 

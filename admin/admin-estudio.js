@@ -8,6 +8,7 @@
 const est = { i: 0 };
 const modoCarrossel = () => { try { return localStorage.getItem("car-modo") || "estudio"; } catch (_) { return "estudio"; } };
 const guardarModoCarrossel = (m) => { try { localStorage.setItem("car-modo", m); } catch (_) {} };
+const NOMES_CAMPO_EST = { titulo: "Título", texto: "Texto", nota: "Nota" };
 const PAGINAS_CAR = ["Gancho", "Contexto", "Construção", "Construção", "Tensão", "Recompensa", "CTA"];
 
 function estCampo(car, s, c) {
@@ -27,10 +28,11 @@ function estCampo(car, s, c) {
 
 function desenharEstudio(el) {
   const car = igx.car;
-  if (est.car !== car) { est.car = car; est.i = 0; } // carrossel novo aberto: começa do primeiro slide
+  if (est.car !== car) { est.car = car; est.i = 0; est.sel = null; } // carrossel novo aberto: começa do primeiro slide
   car.slides.forEach((s) => { if (!CAR_ESTILOS.TIPOS.some((t) => t[0] === s.tipo)) s.tipo = "construcao"; });
   if (est.i >= car.slides.length) est.i = car.slides.length - 1;
   if (est.i < 0) est.i = 0;
+  if (est.slideSel !== est.i) { est.slideSel = est.i; est.sel = null; }
   const E = CAR_ESTILOS.ESTILOS[car.estilo], s = car.slides[est.i], n = car.slides.length;
   const destaques = Object.entries(CAR_ESTILOS.DESTAQUES);
 
@@ -63,11 +65,12 @@ function desenharEstudio(el) {
         <button type="button" class="est-mini-mais" id="est-mais" ${n >= 10 ? "disabled" : ""}>${ic("mais")}Slide</button>
       </aside>
       <div class="est-palco">
-        <canvas class="est-grande" id="est-grande" width="1080" height="1350" aria-label="Slide ${est.i + 1} de ${n}"></canvas>
+        <div class="est-tela" id="est-tela"><canvas class="est-grande" id="est-grande" width="1080" height="1350" aria-label="Slide ${est.i + 1} de ${n}"></canvas>
+          <div class="est-sel" id="est-sel" hidden><span class="est-sel-nome"></span><button type="button" class="est-alca" id="est-alca" aria-label="Aumentar ou diminuir o texto"></button></div></div>
         <div class="est-nav"><button type="button" class="icone-btn" data-est-ir="-1" ${est.i === 0 ? "disabled" : ""} aria-label="Slide anterior">${ic("esq")}</button>
           <span>${est.i + 1} de ${n} · ${esc(PAGINAS_CAR[est.i] || "Extra")}</span>
           <button type="button" class="icone-btn" data-est-ir="1" ${est.i === n - 1 ? "disabled" : ""} aria-label="Próximo slide">${ic("dir")}</button></div>
-        <p class="sub est-ajuda">Escreva <b>*palavra*</b> pro destaque e <b>**palavra**</b> pro cinza. As setas do teclado trocam de slide.</p>
+        <p class="sub est-ajuda">Clique no título ou no texto do slide pra arrastar. A bolinha dourada no canto aumenta e diminui. Escreva <b>*palavra*</b> pro destaque e <b>**palavra**</b> pro cinza.</p>
       </div>
       <aside class="cartao est-painel" id="est-painel">
         <div class="est-painel-topo"><b>Prancheta ${est.i + 1} de ${n}</b><span class="espaco"></span>
@@ -80,6 +83,11 @@ function desenharEstudio(el) {
           <button type="button" data-est-fundo="" aria-pressed="${!s.fundo}">Como o estilo pede</button>
           <button type="button" data-est-fundo="trocar" aria-pressed="${s.fundo === "trocar"}">Trocar claro e escuro</button></div></div>
         <div class="est-bloco"><span class="est-rot">Cor de destaque</span><div class="est-cores">${destaques.map(([k, d]) => `<button type="button" data-est-cor="${k}" aria-pressed="${(s.destaque || "dourado") === k}" title="${esc(d.nome)}" aria-label="${esc(d.nome)}"><i style="background:linear-gradient(135deg, ${d.cores[0]} 50%, ${d.cores[1]} 50%)"></i></button>`).join("")}</div></div>
+        <div class="est-bloco"><span class="est-rot">Texto no slide</span>
+          <div class="est-opcoes">${["titulo", "texto", "nota"].filter((c) => CAR_ESTILOS.campos(car.estilo, s.tipo).includes(c) && s[c]).map((c) => `<button type="button" data-est-sel="${c}" aria-pressed="${est.sel === c}">${NOMES_CAMPO_EST[c]}</button>`).join("")}</div>
+          ${est.sel ? `<div class="est-opcoes"><button type="button" data-est-tam="-1" aria-label="Diminuir">A-</button><button type="button" data-est-tam="1" aria-label="Aumentar">A+</button><button type="button" data-est-voltar>Voltar ao lugar</button></div>
+          <small class="sub">Arraste no slide, ou use as setas do teclado (com Shift anda mais). Esc solta.</small>` : `<small class="sub">Escolha acima ou clique no texto do slide.</small>`}
+          ${s.pos && Object.keys(s.pos).length ? `<button type="button" class="link-btn" data-est-voltar-tudo>Voltar tudo pro lugar do estilo</button>` : ""}</div>
         <div class="est-textos"><span class="est-rot est-rot-sec">Textos</span>${CAR_ESTILOS.campos(car.estilo, s.tipo).map((c) => estCampo(car, s, c)).join("")}</div>
         ${palavrasDe(s) > 22 ? `<p class="sub car-dica"><b class="car-muito">${palavrasDe(s)} palavras: carrossel bom é curto.</b></p>` : ""}
         <button type="button" class="link-btn" data-est-todos>Usar este fundo e esta cor em todos os slides</button>
@@ -88,7 +96,21 @@ function desenharEstudio(el) {
 
   // Desenho
   const pintarMini = (i) => { const cv = $(`[data-est-mini="${i}"]`, el); if (cv && car.slides[i]) CAR_ESTILOS.pintar(cv, car.slides[i], i, car.slides.length, car.estilo, () => pintarMini(i), car.slides); };
-  const pintarGrande = () => { const cv = $("#est-grande", el); if (cv) CAR_ESTILOS.pintar(cv, car.slides[est.i], est.i, car.slides.length, car.estilo, pintarGrande, car.slides); };
+  const pintarGrande = () => { const cv = $("#est-grande", el); if (cv) { CAR_ESTILOS.pintar(cv, car.slides[est.i], est.i, car.slides.length, car.estilo, pintarGrande, car.slides); mostrarSel(); } };
+  // Moldura do texto escolhido, por cima do slide
+  const caixaDe = (cv, c) => {
+    const bs = (cv.__caixas || []).filter((b) => b.campo === c); if (!bs.length) return null;
+    return { x0: Math.min(...bs.map((b) => b.x0)), y0: Math.min(...bs.map((b) => b.y0)), x1: Math.max(...bs.map((b) => b.x1)), y1: Math.max(...bs.map((b) => b.y1)) };
+  };
+  const mostrarSel = () => {
+    const cv = $("#est-grande", el), caixa = $("#est-sel", el); if (!cv || !caixa) return;
+    const b = est.sel && caixaDe(cv, est.sel);
+    if (!b) { caixa.hidden = true; return; }
+    const f = cv.clientWidth / cv.width, m = 14;
+    Object.assign(caixa.style, { left: (b.x0 - m) * f + "px", top: (b.y0 - m) * f + "px", width: (b.x1 - b.x0 + 2 * m) * f + "px", height: (b.y1 - b.y0 + 2 * m) * f + "px" });
+    $(".est-sel-nome", caixa).textContent = NOMES_CAMPO_EST[est.sel] || "Texto";
+    caixa.hidden = false;
+  };
   const pintarTudo = () => { pintarGrande(); car.slides.forEach((_, i) => pintarMini(i)); };
   pintarTudo();
   carregarFontesCarrossel().then(pintarTudo);
@@ -132,13 +154,73 @@ function desenharEstudio(el) {
   document.__estTeclas = (e) => {
     if (!document.body.contains(el) || !$("#est-grande", el) || el.closest("[hidden]")) return;
     if (/INPUT|TEXTAREA|SELECT/.test((document.activeElement || {}).tagName || "") || $("#janela").open) return;
+    if (est.sel && est.moverTeclado && /^Arrow/.test(e.key)) {
+      e.preventDefault(); const d = e.shiftKey ? 40 : 8;
+      est.moverTeclado(e.key === "ArrowLeft" ? -d : e.key === "ArrowRight" ? d : 0, e.key === "ArrowUp" ? -d : e.key === "ArrowDown" ? d : 0); return;
+    }
+    if (e.key === "Escape" && est.sel) { est.sel = null; desenhar(); return; }
     if (e.key === "ArrowRight" && est.i < car.slides.length - 1) { e.preventDefault(); ir(est.i + 1); }
     if (e.key === "ArrowLeft" && est.i > 0) { e.preventDefault(); ir(est.i - 1); }
   };
   document.addEventListener("keydown", document.__estTeclas);
 
+  // Mini Canva: arrastar o texto no slide e aumentar pela bolinha do canto
+  const posDe = (c) => { s.pos = s.pos || {}; return (s.pos[c] = s.pos[c] || { x: 0, y: 0, k: 1 }); };
+  const limpaPos = (c) => { const p = s.pos && s.pos[c]; if (p && !p.x && !p.y && (p.k || 1) === 1) delete s.pos[c]; if (s.pos && !Object.keys(s.pos).length) delete s.pos; };
+  const tamanho = (k) => Math.min(3, Math.max(0.4, Math.round(k * 100) / 100));
+  let quadro = 0;
+  const repintarJa = () => { if (quadro) return; quadro = requestAnimationFrame(() => { quadro = 0; pintarGrande(); }); };
+  const miniDepois = () => { clearTimeout(espera); espera = setTimeout(() => pintarMini(est.i), 300); };
+  const tela = $("#est-tela", el), cvG = $("#est-grande", el);
+  const pontoNoSlide = (e) => { const r = cvG.getBoundingClientRect(); return [(e.clientX - r.left) * (cvG.width / r.width), (e.clientY - r.top) * (cvG.height / r.height)]; };
+  const campoNoPonto = ([x, y]) => { const bs = (cvG.__caixas || []).filter((b) => x >= b.x0 - 20 && x <= b.x1 + 20 && y >= b.y0 - 20 && y <= b.y1 + 20); return bs.length ? bs[bs.length - 1].campo : null; };
+  let arrasto = null;
+  tela.addEventListener("pointerdown", (e) => {
+    const pt = pontoNoSlide(e);
+    if (e.target.closest("#est-alca") && est.sel) {
+      const b = caixaDe(cvG, est.sel); if (!b) return;
+      const cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2;
+      arrasto = { tipo: "tamanho", c: est.sel, cx, cy, d0: Math.hypot(pt[0] - cx, pt[1] - cy) || 1, k0: posDe(est.sel).k || 1 };
+    } else {
+      const c = campoNoPonto(pt);
+      if (!c) { if (est.sel) { est.sel = null; desenhar(); } return; }
+      const mudou = est.sel !== c; est.sel = c;
+      const p = posDe(c); arrasto = { tipo: "mover", c, x0: pt[0], y0: pt[1], px: p.x || 0, py: p.y || 0, mudou };
+      mostrarSel();
+    }
+    e.preventDefault();
+    try { tela.setPointerCapture(e.pointerId); } catch (_) {}
+  });
+  tela.addEventListener("pointermove", (e) => {
+    const pt = pontoNoSlide(e);
+    if (!arrasto) { cvG.style.cursor = campoNoPonto(pt) ? "move" : ""; return; }
+    const p = posDe(arrasto.c);
+    if (arrasto.tipo === "mover") { p.x = Math.round(arrasto.px + pt[0] - arrasto.x0); p.y = Math.round(arrasto.py + pt[1] - arrasto.y0); }
+    else p.k = tamanho(arrasto.k0 * (Math.hypot(pt[0] - arrasto.cx, pt[1] - arrasto.cy) / arrasto.d0));
+    repintarJa();
+  });
+  const soltar = () => { if (!arrasto) return; const a = arrasto; arrasto = null; limpaPos(a.c); if (a.mudou) desenhar(); else { pintarGrande(); pintarMini(est.i); } };
+  tela.addEventListener("pointerup", soltar);
+  tela.addEventListener("pointercancel", soltar);
+  tela.addEventListener("dblclick", (e) => { const c = campoNoPonto(pontoNoSlide(e)); const f = c && $(`[data-est-k="${c}"]`, el); if (f) { f.focus(); if (f.select) f.select(); } });
+  tela.addEventListener("wheel", (e) => {
+    if (!est.sel) return;
+    e.preventDefault();
+    const p = posDe(est.sel); p.k = tamanho((p.k || 1) * (e.deltaY < 0 ? 1.04 : 1 / 1.04));
+    limpaPos(est.sel); repintarJa(); miniDepois();
+  }, { passive: false });
+  if (window.__estResize) window.removeEventListener("resize", window.__estResize);
+  window.__estResize = mostrarSel; window.addEventListener("resize", mostrarSel);
+  est.moverTeclado = (dx, dy) => { const p = posDe(est.sel); p.x = (p.x || 0) + dx; p.y = (p.y || 0) + dy; limpaPos(est.sel); pintarGrande(); miniDepois(); };
+
   // Painel do slide
   const painel = $("#est-painel", el);
+  $$("[data-est-sel]", painel).forEach((b) => b.onclick = () => { est.sel = est.sel === b.dataset.estSel ? null : b.dataset.estSel; desenhar(); });
+  $$("[data-est-tam]", painel).forEach((b) => b.onclick = () => { const p = posDe(est.sel); p.k = tamanho((p.k || 1) * (Number(b.dataset.estTam) > 0 ? 1.1 : 1 / 1.1)); limpaPos(est.sel); pintarGrande(); pintarMini(est.i); });
+  const voltar = $("[data-est-voltar]", painel);
+  if (voltar) voltar.onclick = () => { if (s.pos) delete s.pos[est.sel]; limpaPos(est.sel); desenhar(); };
+  const voltarTudo = $("[data-est-voltar-tudo]", painel);
+  if (voltarTudo) voltarTudo.onclick = () => { delete s.pos; desenhar(); };
   $$("[data-est-mover]", painel).forEach((b) => b.onclick = () => { const j = est.i + Number(b.dataset.estMover); [car.slides[est.i], car.slides[j]] = [car.slides[j], car.slides[est.i]]; est.i = j; desenhar(); });
   $("[data-est-duplicar]", painel).onclick = () => { if (car.slides.length >= 10) return; car.slides.splice(est.i + 1, 0, JSON.parse(JSON.stringify(s))); est.i++; desenhar(); };
   $("[data-est-apagar]", painel).onclick = async () => { if (car.slides.length <= 1) return; if (!(await confirmar(`Apagar o slide ${est.i + 1}?`, "Apagar slide"))) return; car.slides.splice(est.i, 1); desenhar(); };

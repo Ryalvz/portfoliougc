@@ -30,7 +30,7 @@ const iniDiaCurto = (iso) => `${Number(iso.slice(8, 10))}/${Number(iso.slice(5, 
 
 /* ---------- Gráficos (SVG, sem biblioteca) ---------- */
 // Barras do saldo de seguidores por dia: acima da linha ganhou, abaixo perdeu
-function iniBarras(dias) {
+function iniBarras(dias, novos = false) {
   if (dias.length < 2) return `<p class="ini-vazio-graf">O gráfico aparece depois de alguns dias de histórico.</p>`;
   const W = 320, H = 96, base = 64, maxPos = Math.max(1, ...dias.map((d) => d.v)), maxNeg = Math.max(1, ...dias.map((d) => -d.v));
   const passo = W / dias.length, larg = Math.max(3, Math.min(18, passo - 3));
@@ -41,7 +41,7 @@ function iniBarras(dias) {
       const x = i * passo + (passo - larg) / 2;
       const h = d.v >= 0 ? Math.max(d.v ? 2 : 0, (d.v / maxPos) * altPos) : Math.max(2, (-d.v / maxNeg) * altNeg);
       const y = d.v >= 0 ? base - h : base;
-      const dica = `${iniDiaCurto(d.dia)}: ${d.v > 0 ? "+" : ""}${num(d.v)} seguidores`;
+      const dica = novos ? `${iniDiaCurto(d.dia)}: ${num(d.v)} ${d.v === 1 ? "seguidor novo" : "seguidores novos"}` : `${iniDiaCurto(d.dia)}: ${d.v > 0 ? "+" : ""}${num(d.v)} seguidores`;
       return `<g data-dica="${esc(dica)}"><rect x="${i * passo}" y="0" width="${passo}" height="${H}" fill="transparent"/>
         ${h ? `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${larg.toFixed(1)}" height="${h.toFixed(1)}" rx="2" class="${d.v >= 0 ? "ini-barra" : "ini-barra neg"}"/>` : ""}</g>`;
     }).join("")}
@@ -89,6 +89,13 @@ function iniSaldoPorDia(dias) {
   }
   return r;
 }
+// O saldo depende dos dias em que o painel foi aberto. Se faltar muito dia, usa os seguidores novos de cada dia, que vêm da Meta.
+function iniSerieSeguidores(dias) {
+  const saldo = iniSaldoPorDia(dias), desde = somaDiasISO(-dias);
+  const novos = ((ig.dados && ig.dados.novosPorDia) || []).filter((x) => x.dia > desde).map((x) => ({ dia: x.dia, v: Number(x.valor) || 0 }));
+  if (novos.length >= 2 && saldo.length < Math.min(novos.length, dias) * 0.6) return { lista: novos, novos: true };
+  return { lista: saldo, novos: false };
+}
 function iniCartoesIG() {
   if (ig.carregando && !ig.dados) return `<section class="ini-card ini-seg"><p class="ini-carregando">Buscando o Instagram...</p></section><section class="ini-card ini-alc"><p class="ini-carregando">Buscando o alcance...</p></section>`;
   if (!ig.conectado || !ig.dados) return `<section class="ini-card ini-seg ini-sem-ig"><h2>Seguidores</h2><p>Conecte o @ryalvz para ver os seguidores, o alcance e o engajamento aqui.</p><button type="button" class="btn pequeno" data-ir="instagram">${ic("insta")}Conectar o Instagram</button></section>
@@ -104,8 +111,8 @@ function iniCartoesIG() {
         <div><strong class="ini-medio">+${num(novos)}</strong><span class="ini-rot">novos em ${n} dias</span>${iniSelo(novos, n2(b.seguiram))}</div>
       </div>
       <div class="ini-seg-perdeu"><strong class="ini-medio">−${num(perdeu)}</strong><span class="ini-rot">deixaram de seguir em ${n} dias</span></div>
-      <div class="ini-graf-caixa">${iniBarras(iniSaldoPorDia(n))}<div class="ini-dica" hidden></div></div>
-      <p class="ini-legenda">Saldo de seguidores por dia ${atualizando}</p>
+      ${(() => { const se = iniSerieSeguidores(n); return `<div class="ini-graf-caixa">${iniBarras(se.lista, se.novos)}<div class="ini-dica" hidden></div></div>
+      <p class="ini-legenda">${se.novos ? "Seguidores novos por dia" : "Saldo de seguidores por dia"} ${atualizando}</p>`; })()}
     </section>
     <section class="ini-card ini-alc">
       <div class="ini-card-topo"><h2>Alcance</h2>${iniPeriodoHTML()}</div>
@@ -297,6 +304,7 @@ function pintarQuandoPostar(caixa, posts) {
   const dias = DIAS_SEMANA.map((nome, i) => ({ nome: nome.charAt(0).toUpperCase() + nome.slice(1), curto: DIAS_CURTOS[i], ...grupo((x) => new Date(x.data).getDay() === i) }));
   const melhorDe = (l) => l.filter((g) => g.n >= 2).sort((a, b) => b.media - a.media)[0];
   const mh = melhorDe(horas), md = melhorDe(dias);
+  const on = onlinePorFaixa(), mo = on ? on.slice().sort((a, b) => b.media - a.media)[0] : null;
   const nomeMetrica = (METRICAS_QP.find((m) => m[0] === qp.metrica) || [0, ""])[1].toLowerCase();
   caixa.innerHTML = `<div class="qp-topo"><div><h2 style="margin:0">Quando postar</h2>
       <p class="sub" style="margin:4px 0 0">${mh || md ? `Seus posts ${mh ? `das <b>${mh.nome}</b>` : ""}${mh && md ? " e de " : ""}${md ? `<b>${md.nome.toLowerCase()}</b>` : ""} têm a maior média de ${nomeMetrica}.` : "Precisa de pelo menos 2 posts num horário pra comparar."}</p></div>
@@ -308,7 +316,70 @@ function pintarQuandoPostar(caixa, posts) {
       <div><h3 class="qp-tit">Por horário</h3>${barrasQP(horas, mh, "Média por faixa de horário")}</div>
       <div><h3 class="qp-tit">Por dia da semana</h3>${barrasQP(dias, md, "Média por dia da semana")}</div>
     </div>
+    ${on ? `<div class="qp-online"><h3 class="qp-tit">Quando seus seguidores estão online</h3>${barrasOnline(on, mo)}
+      <p class="sub" style="margin:8px 0 0">Média de seguidores online por hora em cada faixa, no horário de Brasília. Mais gente online às <b>${mo.nome}</b>.</p></div>` : ""}
     <p class="sub" style="margin:10px 0 0">Média de ${nomeMetrica} por post. O número de baixo é quantos posts entraram na conta (${plural(lista.length, "post", "posts")} dos últimos ${posts.length}). A barra dourada é a melhor entre as que têm pelo menos 2 posts.</p>`;
   $$("[data-qp-metrica]", caixa).forEach((b) => b.onclick = () => { qp.metrica = b.dataset.qpMetrica; pintarQuandoPostar(caixa, posts); });
   $("[data-qp-formato]", caixa).onchange = (e) => { qp.formato = e.target.value; pintarQuandoPostar(caixa, posts); };
+}
+
+/* =============================================================
+   Seguidores online e Stories (aba Métricas do Instagram)
+   A Meta manda os seguidores online por hora no horário do
+   Pacífico: aqui vira horário de Brasília. Os stories só ficam
+   na Meta por 24 horas, então cada um que aparece fica guardado
+   em ig_stories e a lista vai crescendo com o tempo.
+   ============================================================= */
+function horasAte(fuso) {
+  const agora = new Date(), h = (tz) => Number(new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", hourCycle: "h23" }).format(agora));
+  return (h("America/Sao_Paulo") - h(fuso) + 24) % 24;
+}
+function onlinePorFaixa() {
+  const on = ig.dados && ig.dados.online;
+  if (!on || !Array.isArray(on.horas) || on.horas.length !== 24) return null;
+  const desloca = horasAte("America/Los_Angeles"), br = Array(24).fill(0);
+  on.horas.forEach((v, h) => { br[(h + desloca) % 24] = Number(v) || 0; });
+  return FAIXAS_QP.map(([nome, de, ate]) => { const l = br.slice(de, ate); return { nome, n: l.length, media: l.reduce((s, x) => s + x, 0) / l.length }; });
+}
+function barrasOnline(grupos, melhor) {
+  const max = Math.max(...grupos.map((g) => g.media), 0) || 1;
+  return `<div class="qp-barras" role="img" aria-label="Seguidores online por faixa de horário">${grupos.map((g) => `<div class="qp-col ${g === melhor ? "melhor" : ""}" data-dica="${esc(`<b>${g.nome}</b><br>${num(Math.round(g.media))} seguidores online por hora`)}">
+      <span class="qp-valor">${compacto(Math.round(g.media))}</span>
+      <span class="qp-trilho"><i style="height:${Math.max(3, (g.media / max) * 100)}%"></i></span>
+      <span class="qp-nome">${esc(g.nome)}</span></div>`).join("")}</div>`;
+}
+
+function storiesJuntos() {
+  const porId = new Map();
+  (S.igStories || []).forEach((x) => porId.set(String(x.id), { ...x }));
+  ((ig.dados && ig.dados.stories) || []).forEach((x) => porId.set(String(x.id), { ...porId.get(String(x.id)), ...x, agora: true }));
+  return [...porId.values()].filter((x) => x.data).sort((a, b) => String(b.data).localeCompare(String(a.data)));
+}
+function pintarStories(caixa) {
+  const todos = storiesJuntos(), desde = somaDiasISO(-30);
+  const mes = todos.filter((x) => String(x.data).slice(0, 10) >= desde);
+  const comAlc = mes.filter((x) => x.alcance != null);
+  const m = (f) => media(comAlc, (x) => Number(f(x)) || 0);
+  const saida = comAlc.filter((x) => Number(x.views) > 0 && x.saiu != null);
+  const taxaSaida = saida.length ? media(saida, (x) => Number(x.saiu) / Number(x.views)) * 100 : null;
+  const hora = (iso) => new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
+  const dia = (iso) => new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" });
+  const faixas = FAIXAS_QP.map(([nome, de, ate]) => { const l = comAlc.filter((x) => { const h = Number(new Date(x.data).toLocaleString("en-US", { hour: "numeric", hourCycle: "h23", timeZone: "America/Sao_Paulo" })); return h >= de && h < ate; }); return { nome, n: l.length, media: media(l, (x) => Number(x.alcance) || 0) }; }).filter((g) => g.n);
+  const melhor = faixas.filter((g) => g.n >= 2).sort((a, b) => b.media - a.media)[0];
+  const salvoAgora = (S.igStories || []).length > 0 || !((ig.dados && ig.dados.stories) || []).length;
+  caixa.innerHTML = `<div class="qp-topo"><div><h2 style="margin:0">Stories</h2>
+      <p class="sub" style="margin:4px 0 0">${mes.length ? `${plural(mes.length, "story", "stories")} nos últimos 30 dias${melhor ? `. Os das <b>${melhor.nome}</b> alcançam mais.` : "."}` : "Nenhum story guardado ainda."}</p></div></div>
+    ${comAlc.length ? `<div class="st-kpis">
+      <div class="st-kpi"><b>${compacto(Math.round(m((x) => x.alcance)))}</b><small>alcance médio</small></div>
+      <div class="st-kpi"><b>${compacto(Math.round(m((x) => x.views)))}</b><small>visualizações em média</small></div>
+      <div class="st-kpi"><b>${num(Math.round(m((x) => x.respostas) * 10) / 10)}</b><small>respostas em média</small></div>
+      <div class="st-kpi"><b>${taxaSaida == null ? "-" : pct1(taxaSaida)}</b><small>saíram dos stories</small></div>
+    </div>` : ""}
+    ${todos.length ? `<div class="st-lista">${todos.slice(0, 30).map((x) => `<a class="st-item" ${x.link ? `href="${esc(x.link)}" target="_blank" rel="noopener"` : ""}>
+        <span class="st-capa">${x.capa ? `<img src="${esc(x.capa)}" alt="" loading="lazy" onerror="this.remove()">` : ""}${x.agora ? `<span class="st-agora">no ar</span>` : ""}</span>
+        <b>${dia(x.data)} às ${hora(x.data)}</b>
+        <small>${x.alcance != null ? `${num(x.alcance)} de alcance` : "sem métricas"}${x.respostas ? ` · ${plural(Number(x.respostas), "resposta", "respostas")}` : ""}${x.saiu ? `<br>${num(x.saiu)} saíram · ${num(x.avancou || 0)} avançaram` : ""}</small></a>`).join("")}</div>`
+      : `<p class="vazio">Quando tiver story no ar, ele aparece aqui. A Meta só mostra os stories das últimas 24 horas, então o painel guarda cada um que ver. Abra o painel ao menos uma vez por dia pra não perder nenhum.</p>`}
+    ${salvoAgora ? "" : `<p class="sub" style="margin:10px 0 0">Pra guardar o histórico dos stories, falta rodar a parte 43 do banco.</p>`}
+    <p class="sub" style="margin:10px 0 0">A foto da capa some depois de alguns dias (o link da Meta vence), mas os números ficam.</p>`;
 }

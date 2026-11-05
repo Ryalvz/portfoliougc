@@ -49,7 +49,14 @@ const CAR_ESTILOS = (() => {
     const c = R[tom], f = (t) => ({ n: mont(800, t), b: mont(800, t), a: play(t * 1.04) });
     let ls = linhasRicas(ctx, txt(texto), f(tam), largura, false);
     while ((ls.length * tam * entre > altura || ls.some((l) => larguraDaLinha(ctx, l, f(tam)) > largura + 1)) && tam > 30) { tam -= 4; ls = linhasRicas(ctx, txt(texto), f(tam), largura, false); }
-    ls.forEach((l, li) => {
+    const campo = carCampos && carCampos.get(txt(texto));
+    if (campo) {
+      const maxW = Math.max(0, ...ls.map((l) => larguraDaLinha(ctx, l, f(tam))));
+      const x0 = alinhar === "center" ? x - maxW / 2 : alinhar === "right" ? x - maxW : x;
+      posicionarCampo(ctx, campo, x0 - 12, y, maxW + 24, ls.length * tam * entre, () => desenharRico(ls, tam));
+    } else desenharRico(ls, tam);
+    return y + ls.length * tam * entre;
+    function desenharRico(ls, tam) { ls.forEach((l, li) => {
       const base = y + li * tam * entre + tam * 0.86;
       ctx.font = f(tam).n; const esp = ctx.measureText(" ").width;
       const total = l.itens.reduce((s, p, k) => s + p.w + (k > 0 && !p.cola ? esp : 0), 0);
@@ -60,8 +67,7 @@ const CAR_ESTILOS = (() => {
         ctx.font = f(tam)[p.e]; ctx.fillStyle = p.e === "a" ? c.naFaixa : p.e === "b" ? c.cinza : tom === "foto" ? "#fff" : c.tinta;
         ctx.textAlign = "left"; ctx.textBaseline = "alphabetic"; ctx.fillText(p.t, cx, base); cx += p.w;
       });
-    });
-    return y + ls.length * tam * entre;
+    }); }
   }
   // Playfair com *palavra* em itálico dourado
   function serif(ctx, texto, x, y, { tam = 96, min = 44, largura = 900, altura = 500, tom = "claro", alinhar = "left", entre = 1.08, cor } = {}) {
@@ -84,7 +90,9 @@ const CAR_ESTILOS = (() => {
   }
   function anotacao(ctx, texto, x, y, graus = -6, tam = 80, tom = "escuro") {
     if (!texto) return;
-    girar(ctx, x, y, graus, () => { ctx.font = `400 ${tam}px ${FONTE_MAO}`; ctx.fillStyle = R[tom].ouro; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic"; ctx.fillText(texto, 0, 0); });
+    ctx.font = `400 ${tam}px ${FONTE_MAO}`; const w = ctx.measureText(texto).width;
+    posicionarCampo(ctx, carCampos && carCampos.get(txt(texto)), x, y - tam * 0.85, w, tam * 1.1, () =>
+      girar(ctx, x, y, graus, () => { ctx.font = `400 ${tam}px ${FONTE_MAO}`; ctx.fillStyle = R[tom].ouro; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic"; ctx.fillText(texto, 0, 0); }));
   }
   function seta(ctx, pts, cor) {
     ctx.save(); ctx.strokeStyle = cor; ctx.lineWidth = 5; ctx.lineCap = "round"; ctx.lineJoin = "round";
@@ -386,8 +394,11 @@ const CAR_ESTILOS = (() => {
     if (s.fundo === "trocar") { Object.assign(R.claro, guarda.escuro); Object.assign(R.escuro, guarda.claro); }
     const d = DESTAQUES[s.destaque];
     if (d && s.destaque !== "dourado") [R.claro, R.escuro].forEach((c) => { const escuro = c.fundo === guarda.escuro.fundo; c.faixa = c.ouro = d.cores[escuro ? 1 : 0]; });
-    try { E.desenho(ctx, s, i, total, img, foco, todos); }
-    finally { Object.assign(R.claro, guarda.claro); Object.assign(R.escuro, guarda.escuro); }
+    // Estúdio: título e texto arrastados ou aumentados (s.pos = { titulo: { x, y, k } })
+    carCampos = new Map(); ["nota", "texto", "titulo"].forEach((c) => { if (s[c]) carCampos.set(txt(s[c]), c); });
+    carPos = s.pos || {}; carCaixas = [];
+    try { E.desenho(ctx, s, i, total, img, foco, todos); cv.__caixas = carCaixas; }
+    finally { Object.assign(R.claro, guarda.claro); Object.assign(R.escuro, guarda.escuro); carCampos = carPos = carCaixas = null; }
   }
 
   /* ---------- Texto <-> slides: o formato que o Claude escreve ----------

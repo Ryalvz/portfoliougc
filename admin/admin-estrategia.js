@@ -725,7 +725,15 @@ function larguraDaLinha(ctx, l, f) {
   ctx.font = f.n; const esp = ctx.measureText(" ").width;
   return l.itens.reduce((s, p, k) => s + p.w + (k > 0 && !p.cola ? esp : 0), 0);
 }
-function caberRico(ctx, texto, { fontes, max, min, largura, altura, entre = 1.15, maiusc = false, passo = 2 }) {
+// Estúdio de arte: o título e o texto do slide podem ser arrastados e aumentados.
+// O pintar() do carrossel preenche estas três variáveis só enquanto desenha um slide.
+let carCampos = null, carPos = null, carCaixas = null;
+function caberRico(ctx, texto, opcoes) {
+  const b = caberRico0(ctx, texto, opcoes), campo = carCampos && carCampos.get(String(texto));
+  if (campo) b.campo = campo;
+  return b;
+}
+function caberRico0(ctx, texto, { fontes, max, min, largura, altura, entre = 1.15, maiusc = false, passo = 2 }) {
   const cabeLargura = (linhas, f) => linhas.every((l) => larguraDaLinha(ctx, l, f) <= largura + 1);
   for (let tam = max; tam >= min; tam -= passo) {
     const f = fontes(tam), linhas = linhasRicas(ctx, texto, f, largura, maiusc);
@@ -741,6 +749,26 @@ function caberRico(ctx, texto, { fontes, max, min, largura, altura, entre = 1.15
 }
 // alinhar: "left" | "center" | "right" | "justify"
 function escreverRico(ctx, bloco, x, y, cores, alinhar = "left", largura = 0, extra = {}) {
+  if (!bloco.campo || !carCaixas) return escreverRico0(ctx, bloco, x, y, cores, alinhar, largura, extra);
+  // Caixa do bloco: o centro dela é o ponto de onde o texto cresce ou diminui
+  let maxW = 0;
+  bloco.linhas.forEach((l) => { maxW = Math.max(maxW, larguraDaLinha(ctx, l, bloco.f)); });
+  const x0 = alinhar === "center" ? x - maxW / 2 : alinhar === "right" ? x - maxW : x, w = alinhar === "justify" ? Math.max(largura, maxW) : maxW;
+  const h = bloco.linhas.length * bloco.tam * bloco.entre;
+  return posicionarCampo(ctx, bloco.campo, x0, y, w, h, () => escreverRico0(ctx, bloco, x, y, cores, alinhar, largura, extra));
+}
+// Desenha um campo do slide no lugar e no tamanho que o Ryan escolheu no estúdio, e guarda a caixa dele
+function posicionarCampo(ctx, campo, x0, y0, w, h, desenho) {
+  if (!campo || !carCaixas) return desenho();
+  const cx = x0 + w / 2, cy = y0 + h / 2;
+  const p = (carPos && carPos[campo]) || {}, k = Number(p.k) || 1;
+  ctx.save();
+  ctx.translate(cx + (Number(p.x) || 0), cy + (Number(p.y) || 0)); ctx.scale(k, k); ctx.translate(-cx, -cy);
+  const m = ctx.getTransform(), pts = [[x0, y0], [x0 + w, y0], [x0, y0 + h], [x0 + w, y0 + h]].map(([a, b]) => [m.a * a + m.c * b + m.e, m.b * a + m.d * b + m.f]);
+  carCaixas.push({ campo, x0: Math.min(...pts.map((q) => q[0])), y0: Math.min(...pts.map((q) => q[1])), x1: Math.max(...pts.map((q) => q[0])), y1: Math.max(...pts.map((q) => q[1])) });
+  try { return desenho(); } finally { ctx.restore(); }
+}
+function escreverRico0(ctx, bloco, x, y, cores, alinhar = "left", largura = 0, extra = {}) {
   ctx.textBaseline = "alphabetic"; ctx.textAlign = "left";
   bloco.linhas.forEach((l, i) => {
     const base = y + i * bloco.tam * bloco.entre + bloco.tam * 0.86;
