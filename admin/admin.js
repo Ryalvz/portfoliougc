@@ -4037,7 +4037,7 @@ function desenharInicio(el) {
     const abrirEmail = e.target.closest("[data-inicio-email]");
     if (abrirEmail) { const x = (gm.emails || []).find((m) => m.id === abrirEmail.dataset.inicioEmail); irPara("propostas"); if (x) abrirConversa(x); return; }
     const ir = e.target.closest("[data-ir]");
-    if (ir) { if (ir.dataset.pfSub) pf.sub = ir.dataset.pfSub; irPara(ir.dataset.ir); return; }
+    if (ir) { if (ir.dataset.igSub) { irParaSub(ir.dataset.ir, ir.dataset.igSub); return; } if (ir.dataset.pfSub) pf.sub = ir.dataset.pfSub; irPara(ir.dataset.ir); return; }
     const ev = e.target.closest("[data-evento]");
     if (ev) {
       const [origem, id] = ev.dataset.evento.split(":");
@@ -4868,7 +4868,7 @@ function quadrosEntrada() {
   let insta;
   if (ig.carregando && !ig.dados) insta = `<p class="vazio">Buscando o Instagram...</p>`;
   else if (!ig.conectado || !ig.dados) insta = `<p class="sub" style="margin:0 0 8px">Conecte o @ryalvz para ver alcance, seguidores e os posts que estão rendendo.</p>
-      <button type="button" class="btn pequeno" data-ir="instagram">${ic("insta")}Conectar o Instagram</button>`;
+      <button type="button" class="btn pequeno" data-ir="instagram" data-ig-sub="metricas">${ic("insta")}Conectar o Instagram</button>`;
   else {
     const d = ig.dados, a = d.atual || {}, b = d.anterior || {};
     const novos = n2(a.seguiram) - n2(a.deixaram);
@@ -4888,7 +4888,7 @@ function quadrosEntrada() {
       ${emails}
     </div>
     <div class="cartao">
-      <div class="barra" style="margin-bottom:6px"><h2 style="margin:0">${ic("insta")} Instagram</h2><span class="espaco"></span><button type="button" class="link-btn" data-ir="instagram">ver métricas</button></div>
+      <div class="barra" style="margin-bottom:6px"><h2 style="margin:0">${ic("insta")} Instagram</h2><span class="espaco"></span><button type="button" class="link-btn" data-ir="instagram" data-ig-sub="metricas">ver métricas</button></div>
       ${insta}
     </div>
   </div>`;

@@ -98,7 +98,7 @@ function iniSerieSeguidores(dias) {
 }
 function iniCartoesIG() {
   if (ig.carregando && !ig.dados) return `<section class="ini-card ini-seg"><p class="ini-carregando">Buscando o Instagram...</p></section><section class="ini-card ini-alc"><p class="ini-carregando">Buscando o alcance...</p></section>`;
-  if (!ig.conectado || !ig.dados) return `<section class="ini-card ini-seg ini-sem-ig"><h2>Seguidores</h2><p>Conecte o @ryalvz para ver os seguidores, o alcance e o engajamento aqui.</p><button type="button" class="btn pequeno" data-ir="instagram">${ic("insta")}Conectar o Instagram</button></section>
+  if (!ig.conectado || !ig.dados) return `<section class="ini-card ini-seg ini-sem-ig"><h2>Seguidores</h2><p>Conecte o @ryalvz para ver os seguidores, o alcance e o engajamento aqui.</p><button type="button" class="btn pequeno" data-ir="instagram" data-ig-sub="metricas">${ic("insta")}Conectar o Instagram</button></section>
     <section class="ini-card ini-alc ini-sem-ig"><h2>Alcance</h2><p class="sub">Os números aparecem depois de conectar.</p></section>`;
   const d = ig.dados, a = d.atual || {}, b = d.anterior || {}, n = d.dias;
   const novos = n2(a.seguiram), perdeu = n2(a.deixaram);
@@ -124,7 +124,7 @@ function iniCartoesIG() {
       <div class="ini-alc-views"><strong class="ini-medio">${compacto(a.views)}</strong><span class="ini-rot">visualizações</span>${iniSelo(n2(a.views), n2(b.views))}</div>
       <div class="ini-graf-caixa">${iniLinha(d.porDia || [])}<div class="ini-dica" hidden></div></div>
       <p class="ini-legenda">${(d.porDia || []).length ? `${iniDiaCurto(d.porDia[0].dia)} a ${iniDiaCurto(d.porDia[d.porDia.length - 1].dia)}, comparado com os ${n} dias antes` : ""} ${atualizando}</p>
-      <button type="button" class="link-btn" data-ir="instagram">Ver as métricas completas</button>
+      <button type="button" class="link-btn" data-ir="instagram" data-ig-sub="metricas">Ver as métricas completas</button>
     </section>`;
 }
 
@@ -261,7 +261,7 @@ function desenharInicioNovo(el) {
     const abrirEmail = e.target.closest("[data-inicio-email]");
     if (abrirEmail) { const x = (gm.emails || []).find((m) => m.id === abrirEmail.dataset.inicioEmail); irPara("propostas"); if (x) abrirConversa(x); return; }
     const ir = e.target.closest("[data-ir]");
-    if (ir) { if (ir.dataset.pfSub) pf.sub = ir.dataset.pfSub; if (ir.dataset.proSubIr) pro.sub = ir.dataset.proSubIr; irPara(ir.dataset.ir); return; }
+    if (ir) { if (ir.dataset.igSub) { irParaSub(ir.dataset.ir, ir.dataset.igSub); return; } if (ir.dataset.pfSub) pf.sub = ir.dataset.pfSub; if (ir.dataset.proSubIr) pro.sub = ir.dataset.proSubIr; irPara(ir.dataset.ir); return; }
     const ev = e.target.closest("[data-evento]");
     if (ev) { const [origem, id] = ev.dataset.evento.split(":"); if (origem === "campanha") formContrato(S.contratos.find((c) => String(c.id) === id)); else formCalendario(S.calendario.find((c) => String(c.id) === id)); return; }
     const ideia = e.target.closest("[data-ideia]");
