@@ -15,6 +15,27 @@ async function chamarAutomacao(corpo) {
   }
   return data;
 }
+// Seguidores que a automação trouxe: quem não seguia quando conversou e passou a seguir
+function seguidoresDaAuto(env) {
+  const pessoas = new Map();
+  env.forEach((x) => { const k = String(x.contato_id || x.usuario_id || x.usuario || x.id); const p = pessoas.get(k); if (!p || (x.segue != null && p.segue == null)) pessoas.set(k, x); });
+  const l = [...pessoas.values()];
+  return {
+    novos: l.filter((x) => x.virou_seguidor_em || (x.seguia_antes === false && x.segue === true)).length,
+    jaSeguiam: l.filter((x) => x.seguia_antes === true).length,
+    naoSeguem: l.filter((x) => x.segue === false).length,
+    semDado: l.filter((x) => x.segue == null).length,
+    pessoas: l.length
+  };
+}
+const textoSeguidores = (f) => f.pessoas ? `<b>${f.novos}</b> ${f.novos === 1 ? "começou" : "começaram"} a seguir${f.jaSeguiam ? ` · ${f.jaSeguiam} já ${f.jaSeguiam === 1 ? "seguia" : "seguiam"}` : ""}${f.naoSeguem ? ` · ${f.naoSeguem} não ${f.naoSeguem === 1 ? "segue" : "seguem"}` : ""}${f.semDado ? ` · ${f.semDado} sem resposta do Instagram` : ""}` : "";
+async function conferirSeguidoresAuto() {
+  if (au.conferindo || au.conferido) return;
+  au.conferindo = true;
+  try { const r = await chamarAutomacao({ acao: "conferir_seguidores" }); if (r && r.ok) { await carregarAutomacoes(); au.conferido = true; if (abaAtual === "instagram") desenhar(); } }
+  catch (_) { /* função antiga: só não confere */ }
+  au.conferindo = false;
+}
 async function carregarAutomacoes() {
   const [a, e] = await Promise.all([
     db.from("automacoes").select("*").order("id", { ascending: false }),
@@ -33,6 +54,9 @@ function desenharAutomacoes(el) {
   if (au.falta) { el.innerHTML = `<div class="aviso-falta">Falta rodar as partes 36 e 37 do banco.sql no Supabase.</div>`; return; }
   const st = au.status || {};
   const enviosDe = (id) => au.envios.filter((x) => x.automacao_id === id);
+  conferirSeguidoresAuto();
+  const temSeguir = au.envios.some((x) => "segue" in x);
+  const segTotal = temSeguir ? seguidoresDaAuto(au.envios) : null;
   const passos = [
     [!!st.endereco, "Instagram conectado", `${st.endereco ? "A chave do Instagram está no painel." : esc(st.erro || "Conecte em Métricas do Instagram.")}
       <span class="au-linha"><input class="campo" id="au-token" type="password" autocomplete="off" placeholder="Gerou uma chave nova na Meta? Cole aqui"><button class="btn" type="button" id="au-token-ok">Trocar chave</button></span>`],
@@ -55,7 +79,8 @@ function desenharAutomacoes(el) {
 
     <section class="cartao">
       <div class="au-topo"><div><h3 class="pro-titulo">🤖 Comentou, recebeu no direct</h3>
-        <p class="sub">Quando alguém comenta a palavra, a pessoa recebe a mensagem no direct e o comentário ganha uma resposta. Um direct por comentário, só em comentários de até 7 dias (regra da Meta).</p></div>
+        <p class="sub">Quando alguém comenta a palavra, a pessoa recebe a mensagem no direct e o comentário ganha uma resposta. Um direct por comentário, só em comentários de até 7 dias (regra da Meta).</p>
+        ${segTotal && segTotal.pessoas ? `<p class="au-seguidores"><span class="au-seg-num">+${segTotal.novos}</span><span><b>${segTotal.novos === 1 ? "seguidor novo" : "seguidores novos"} pelas automações</b><small class="sub">${textoSeguidores(segTotal)}. Conta quem não seguia quando conversou com a automação e passou a seguir.${au.conferindo ? " Conferindo agora..." : ""}</small></span></p>` : ""}</div>
         <button class="btn primario" type="button" id="au-nova">${ic("mais")}Nova automação</button></div>
       ${au.lista.length ? `<div class="au-lista">${au.lista.map((a) => {
         const env = enviosDe(a.id), ok = env.filter((x) => x.status === "enviado").length, erro = env.filter((x) => x.status === "erro").length, espera = env.filter((x) => x.status === "aguardando").length;
@@ -64,7 +89,8 @@ function desenharAutomacoes(el) {
           <div class="au-meio"><b>${esc(a.nome)}</b>
             <div class="au-palavras">${String(a.palavras).split(/[,\n]/).map((p) => p.trim()).filter(Boolean).map((p) => `<span class="pilula">${esc(p)}</span>`).join("")}${a.exige_seguir ? `<span class="pilula p-oliva">👤 só pra quem me segue</span>` : a.com_botao ? `<span class="pilula p-oliva">🔘 com botão</span>` : ""}</div>
             <p class="sub">${esc(String(a.mensagem).slice(0, 140))}${String(a.mensagem).length > 140 ? "…" : ""}</p>
-            <span class="sub"><b>${ok}</b> ${ok === 1 ? "pessoa recebeu" : "pessoas receberam"}${espera ? ` · ${espera} sem tocar no botão ainda` : ""}${erro ? ` · <span class="au-erro">${erro} com erro</span>` : ""}</span></div>
+            <span class="sub"><b>${ok}</b> ${ok === 1 ? "pessoa recebeu" : "pessoas receberam"}${espera ? ` · ${espera} sem tocar no botão ainda` : ""}${erro ? ` · <span class="au-erro">${erro} com erro</span>` : ""}</span>
+            ${temSeguir && env.length ? `<span class="sub au-seg-linha">${textoSeguidores(seguidoresDaAuto(env))}</span>` : ""}</div>
           <div class="au-acoes">
             <label class="au-chave"><input type="checkbox" data-au-ativa="${a.id}" ${a.ativa ? "checked" : ""}> ${a.ativa ? "Ligada" : "Pausada"}</label>
             <button class="btn pequeno" type="button" data-au-editar="${a.id}">${ic("editar")}Editar</button>

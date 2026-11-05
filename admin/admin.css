@@ -1827,3 +1827,9 @@ td .pc-follow { display: table; }
 .pro-follow-lista { margin-top: 10px; font-size: 13px; }
 .pro-follow-lista summary { cursor: pointer; font-weight: 700; }
 .pro-follow-lista ul { margin: 8px 0 0; padding-left: 18px; display: grid; gap: 4px; max-height: 260px; overflow-y: auto; }
+
+/* ---------- Automação: seguidores que ela trouxe ---------- */
+.au-seguidores { display: flex; align-items: center; gap: 14px; margin: 12px 0 0; padding: 12px 16px; border-radius: 14px; background: var(--tint); }
+.au-seg-num { font-family: 'Playfair Display', serif; font-size: 30px; font-weight: 700; color: var(--olive); line-height: 1; }
+.au-seguidores span:last-child { display: grid; gap: 2px; }
+.au-seg-linha { display: block; margin-top: 2px; }
