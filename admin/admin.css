@@ -1820,3 +1820,10 @@ td .pc-follow { display: table; }
 .st-item small { font-size: 11.5px; color: var(--muted); line-height: 1.35; }
 .st-item b { font-size: 13px; }
 @media (max-width: 760px) { .st-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* ---------- Follow-up por e-mail (Prospecção) ---------- */
+.pro-contagem .pro-dias { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0 4px; font-size: 13px; }
+.pro-contagem .pro-dias .campo { width: 72px; flex: 0 0 72px; padding-top: 6px; padding-bottom: 6px; }
+.pro-follow-lista { margin-top: 10px; font-size: 13px; }
+.pro-follow-lista summary { cursor: pointer; font-weight: 700; }
+.pro-follow-lista ul { margin: 8px 0 0; padding-left: 18px; display: grid; gap: 4px; max-height: 260px; overflow-y: auto; }

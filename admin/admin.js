@@ -4929,8 +4929,8 @@ Ryan Alves · @ryalvz
 P.S.: independente dessa collab, me conta como funciona o processo de vocês com criativos hoje? Se tiverem lista de creators, quero entrar nela.`
   },
   segundo: {
-    nome: "Segundo e-mail (reabre a conversa)",
-    assuntos: ["Sobre o vídeo pra {marca}", "Ainda sobre a ideia pra {marca}", "{marca}: posso te chamar no WhatsApp?"],
+    nome: "Follow-up (pra quem não respondeu)",
+    assuntos: ["Re: {assunto}", "Sobre o vídeo pra {marca}", "Ainda sobre a ideia pra {marca}", "{marca}: posso te chamar no WhatsApp?"],
     texto: `Oi, {pessoa}!
 
 Passando rapidinho pra saber se vocês conseguiram ver o meu último e-mail, com a ideia de vídeo pra {marca}.
@@ -5034,12 +5034,12 @@ const pro = {
   try {
     const r = JSON.parse(localStorage.getItem("prospeccao-rascunho") || "null");
     if (!r) return;
-    if (r.v === 4) ["envio", "escrita", "assunto", "texto", "html", "botaoTexto", "botaoLink", "modeloVoz"].forEach((k) => { if (r[k] != null) pro[k] = r[k]; });
+    if (r.v === 4) ["envio", "escrita", "assunto", "texto", "html", "botaoTexto", "botaoLink", "modeloVoz", "diasFollow"].forEach((k) => { if (r[k] != null) pro[k] = r[k]; });
     else if (r.envio) pro.envio = r.envio;
   } catch (_) {}
 })();
 function guardarRascunho() {
-  try { localStorage.setItem("prospeccao-rascunho", JSON.stringify({ v: 4, envio: pro.envio, escrita: pro.escrita, assunto: pro.assunto, texto: pro.texto, html: pro.html, botaoTexto: pro.botaoTexto, botaoLink: pro.botaoLink, modeloVoz: pro.modeloVoz })); } catch (_) {}
+  try { localStorage.setItem("prospeccao-rascunho", JSON.stringify({ v: 4, envio: pro.envio, escrita: pro.escrita, assunto: pro.assunto, texto: pro.texto, html: pro.html, botaoTexto: pro.botaoTexto, botaoLink: pro.botaoLink, modeloVoz: pro.modeloVoz, diasFollow: pro.diasFollow })); } catch (_) {}
 }
 
 // O primeiro e-mail válido do campo (tem marca com vários e-mails no mesmo campo)
@@ -5076,20 +5076,20 @@ const htmlAtual = () => pro.escrita === "html" ? pro.html : montarEmailHTML(pro)
 // Sem conexão ou sem ideia, o parágrafo inteiro sai (nada inventado). Sem pessoa, vira "time da Marca".
 const CHAVE_RE = (k) => new RegExp(`\\{\\{?\\s*${k}\\s*\\}?\\}`, "gi");
 function valoresDe(nome, marca, x = {}) {
-  return { nome, marca, pessoa: String(x.pessoa || "").trim() || `time da ${nome}`, conexao: String(x.conexao || "").trim(), ideia: String(x.ideia || "").trim() };
+  return { nome, marca, pessoa: String(x.pessoa || "").trim() || `time da ${nome}`, conexao: String(x.conexao || "").trim(), ideia: String(x.ideia || "").trim(), assunto: String(x.assunto || "").trim() || `Uma ideia de vídeo pra ${marca}` };
 }
 function preencherChaves(t, nome, marca, x) {
   const v = valoresDe(nome, marca, x);
   const vazio = (p) => ["conexao", "conexão", "ideia"].some((k) => CHAVE_RE(k).test(p) && !v[k === "conexão" ? "conexao" : k]);
   let s = String(t || "").replace(/<p\b[^>]*>[\s\S]*?<\/p>/gi, (p) => (vazio(p) ? "" : p));
-  ["nome", "marca", "pessoa", "conexao", "conexão", "ideia"].forEach((k) => { s = s.replace(CHAVE_RE(k), esc(v[k === "conexão" ? "conexao" : k])); });
+  ["nome", "marca", "pessoa", "conexao", "conexão", "ideia", "assunto"].forEach((k) => { s = s.replace(CHAVE_RE(k), esc(v[k === "conexão" ? "conexao" : k])); });
   return s;
 }
 // Mesma coisa em texto puro (Gmail e rascunho), parágrafo por parágrafo
 function preencherTexto(t, d) {
   const v = valoresDe(d.nome, d.marca, d);
   return String(t || "").split(/\n\s*\n/).filter((p) => !["conexao", "conexão", "ideia"].some((k) => CHAVE_RE(k).test(p) && !v[k === "conexão" ? "conexao" : k]))
-    .map((p) => { ["nome", "marca", "pessoa", "conexao", "conexão", "ideia"].forEach((k) => { p = p.replace(CHAVE_RE(k), v[k === "conexão" ? "conexao" : k]); }); return p; }).join("\n\n");
+    .map((p) => { ["nome", "marca", "pessoa", "conexao", "conexão", "ideia", "assunto"].forEach((k) => { p = p.replace(CHAVE_RE(k), v[k === "conexão" ? "conexao" : k]); }); return p; }).join("\n\n");
 }
 const assuntoPara = (d) => preencherChaves(pro.assunto, d.nome, d.marca, d).replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'");
 // Versão em texto puro (para copiar e para o Gmail)
@@ -5110,11 +5110,12 @@ function opcoesPublico() {
   const ordem = SITUACOES.map((x) => x[0]);
   sits.sort((a, b) => (ordem.indexOf(a) + 1 || 99) - (ordem.indexOf(b) + 1 || 99));
   const plurais = { lead: "Só os leads", conversando: "Só quem está conversando", cliente: "Só quem já é cliente", parada: "Só as paradas" };
-  return [["selecionadas", "Só as marcas que eu selecionei"], ["teste", "Só pra mim (teste)"], ["todas", "Todas as marcas com e-mail"]]
+  return [["selecionadas", "Só as marcas que eu selecionei"], ["followup", "Follow-up: quem recebeu e não respondeu"], ["teste", "Só pra mim (teste)"], ["todas", "Todas as marcas com e-mail"]]
     .concat(sits.map((s) => ["sit:" + s, plurais[s] || `Só: ${nomeSituacao(s)}`]));
 }
 // Devolve quem recebe e quantas ficaram de fora (sem e-mail, repetido, descadastro, já recebeu)
 function destinatariosDe(publico) {
+  if (publico === "followup") return destinatariosFollowup();
   if (publico === "teste") return { lista: [{ email: EMAIL_PROPOSTAS, nome: "Natura", marca: "Natura", marca_id: null }], semEmail: 0, repetidos: 0, descadastrados: 0, jaReceberam: 0, total: 1 };
   const marcas = S.marcas.filter((m) => !m.exemplo && (
     publico === "selecionadas" ? m.selecionada : publico === "todas" ? true : publico.startsWith("sit:") ? m.situacao === publico.slice(4) : false));
@@ -5134,6 +5135,67 @@ function destinatariosDe(publico) {
     lista.push({ email, nome: nomeCurto(m.nome), marca: m.nome, marca_id: m.id, pessoa: m.contato_nome || "", conexao: m.conexao || "", ideia: m.ideia || "" });
   });
   return { lista, semEmail, repetidos, descadastrados, jaReceberam, naoVerificados, total: marcas.length };
+}
+/* ---------- Follow-up: quem recebeu e-mail e não respondeu ----------
+   Entra quem recebeu pelo menos um e-mail, está há X dias sem e-mail novo,
+   não respondeu (etapa e Gmail) e recebeu no máximo 2 (o primeiro e um follow-up).
+   O assunto vira "Re: <assunto do primeiro e-mail>", como resposta. */
+const ETAPAS_COM_RESPOSTA = new Set(["respondeu", "negociando", "fechou", "descartada"]);
+const MAX_ENVIOS_FOLLOW = 3;
+function enviosPorEmail() {
+  const mapa = new Map();
+  (pro.envios || []).filter((x) => x.status === "ok" && x.email).forEach((x) => { const e = x.email.toLowerCase(); if (!mapa.has(e)) mapa.set(e, []); mapa.get(e).push(x); });
+  mapa.forEach((l) => l.sort((a, b) => String(b.criado_em).localeCompare(String(a.criado_em)))); // o mais novo primeiro
+  return mapa;
+}
+const assuntoOriginal = (envios, d) => {
+  const primeiro = envios.filter((x) => !CHAVE_RE("assunto").test(x.assunto || "")).pop() || envios[envios.length - 1];
+  return preencherTexto(String(primeiro.assunto || ""), d).replace(/^\s*(re|res|fwd?)\s*:\s*/i, "").trim();
+};
+function destinatariosFollowup() {
+  const dias = Math.max(1, Number(pro.diasFollow) || 4), limite = Date.now() - dias * 86400000;
+  const porEmail = enviosPorEmail(), fora = new Set((pro.optout || []).map((x) => x.email)), vistos = new Set();
+  let total = 0, repetidos = 0, descadastrados = 0, cedo = 0, noLimite = 0, responderam = 0, naoVerificados = 0;
+  const lista = [], respondidas = [];
+  S.marcas.filter((m) => !m.exemplo).forEach((m) => {
+    const email = primeiroEmail(m), env = email && porEmail.get(email);
+    if (!env) return;
+    total++;
+    if (vistos.has(email)) { repetidos++; return; }
+    vistos.add(email);
+    if (ETAPAS_COM_RESPOSTA.has(m.etapa) || ["conversando", "cliente", "parada"].includes(m.situacao)) { responderam++; return; }
+    if (fora.has(email)) { descadastrados++; return; }
+    if (typeof emailBarrado === "function" && emailBarrado(m)) { naoVerificados++; return; }
+    if (env.length >= MAX_ENVIOS_FOLLOW) { noLimite++; return; }
+    if (new Date(env[0].criado_em).getTime() > limite) { cedo++; return; }
+    if (pro.respondeuGmail && pro.respondeuGmail[email]) { responderam++; respondidas.push(m); return; }
+    const d = { email, nome: nomeCurto(m.nome), marca: m.nome, marca_id: m.id, pessoa: m.contato_nome || "", conexao: m.conexao || "", ideia: m.ideia || "" };
+    d.assunto = assuntoOriginal(env, d);
+    d.enviados = env.length; d.ultimoEnvio = env[0].criado_em; d.primeiroEnvio = env[env.length - 1].criado_em;
+    lista.push(d);
+  });
+  lista.sort((a, b) => String(a.ultimoEnvio).localeCompare(String(b.ultimoEnvio)));
+  return { lista, semEmail: 0, repetidos, descadastrados, jaReceberam: 0, naoVerificados, total, cedo, noLimite, responderam, respondidas, dias };
+}
+// Confere no Gmail se a marca respondeu depois do primeiro e-mail (a etapa nem sempre está em dia)
+async function conferirRespostasGmail(lista, depois) {
+  if (typeof gmailConectado !== "function" || !gmailConectado()) return;
+  pro.respondeuGmail = pro.respondeuGmail || {};
+  const falta = lista.filter((d) => pro.respondeuGmail[d.email] === undefined);
+  if (!falta.length || pro.conferindoGmail) return;
+  pro.conferindoGmail = true;
+  try {
+    for (let i = 0; i < falta.length; i += 5) {
+      await Promise.all(falta.slice(i, i + 5).map(async (d) => {
+        const desde = Math.floor(new Date(d.primeiroEnvio).getTime() / 1000);
+        try {
+          const r = await gmailApi("messages?maxResults=1&q=" + encodeURIComponent(`from:${d.email} after:${desde}`));
+          pro.respondeuGmail[d.email] = !!(r.messages && r.messages.length);
+        } catch (_) { pro.respondeuGmail[d.email] = false; }
+      }));
+    }
+  } finally { pro.conferindoGmail = false; }
+  if (depois) depois();
 }
 const nomePublico = (p) => (opcoesPublico().find((x) => x[0] === p) || [p, p])[1];
 
@@ -5212,7 +5274,7 @@ function desenharProspeccao(el) {
   const ligarSubabas = () => $$("[data-pro-sub]", el).forEach((b) => b.onclick = () => { pro.sub = b.dataset.proSub; try { localStorage.setItem("pro-sub", pro.sub); } catch (_) {} desenhar(); window.scrollTo(0, 0); });
   if (pro.sub !== "disparo") {
     el.innerHTML = capa + (pro.sub === "buscar" ? painelCaminhosHTML()
-      : (followupHTML() || `<div class="cartao pc-followups"><h2 style="margin:0 0 4px">${ic("relogio")} Follow-up pra fazer</h2><p class="sub" style="margin:0">Nenhuma marca com follow-up vencido ou pra hoje. Marque a data do próximo contato na ficha da marca.</p></div>`) + funilHTML());
+      : (followupHTML() || `<div class="cartao pc-followups"><h2 style="margin:0 0 4px">${ic("relogio")} Follow-up pra fazer</h2><p class="sub" style="margin:0">Nenhuma marca com follow-up vencido ou pra hoje. Marque a data do próximo contato na ficha da marca.</p></div>`) + (typeof semRespostaHTML === "function" ? semRespostaHTML() : "") + funilHTML());
     ligarSubabas();
     if (pro.sub === "buscar") ligarPainelCaminhos(el);
     ligarExtrasProspeccao(el);
@@ -5378,6 +5440,31 @@ function desenharProspeccao(el) {
     if (r.repetidos) fora.push(`${plural(r.repetidos, "e-mail repetido", "e-mails repetidos")} (vai uma vez só)`);
     if (r.descadastrados) fora.push(`${plural(r.descadastrados, "descadastrada", "descadastradas")}`);
     if (r.jaReceberam) fora.push(`${plural(r.jaReceberam, "já recebeu", "já receberam")} este assunto`);
+    const pular = $("#pro-pular"); if (pular && pular.closest("label")) pular.closest("label").hidden = pro.publico === "followup";
+    if (pro.publico === "followup") {
+      if (r.responderam) fora.push(`${plural(r.responderam, "já respondeu", "já responderam")}`);
+      if (r.cedo) fora.push(`${plural(r.cedo, "recebeu", "receberam")} e-mail há menos de ${r.dias} dias`);
+      if (r.noLimite) fora.push(`${plural(r.noLimite, "já recebeu", "já receberam")} o primeiro e-mail e 2 follow-ups`);
+      const caixaC = $("#pro-contagem");
+      const respondidas = (r.respondidas || []).filter((m) => (m.etapa || "nova") !== "respondeu");
+      caixaC.innerHTML = `<strong>${plural(r.lista.length, "marca vai receber o follow-up", "marcas vão receber o follow-up")}</strong>
+        <label class="pro-dias">Mandar pra quem está sem e-mail novo há <input class="campo" type="number" min="1" max="60" id="pro-dias" value="${r.dias}"> dias</label>
+        ${fora.length ? `<small>${fora.join(" · ")}</small>` : ""}
+        ${gmailConectado() ? (pro.conferindoGmail ? `<small class="sub">Conferindo no Gmail quem já respondeu...</small>` : "") : `<small class="sub">Conecte o Gmail pra eu conferir quem já respondeu antes de mandar.</small>`}
+        ${respondidas.length ? `<div class="pro-alerta">${plural(respondidas.length, "marca respondeu", "marcas responderam")} no Gmail: ${respondidas.slice(0, 6).map((m) => esc(m.nome)).join(", ")}${respondidas.length > 6 ? "..." : ""}.<button class="btn pequeno" type="button" id="pro-marcar-resp">Mover pra "Respondeu"</button></div>` : ""}
+        ${pro.modeloVoz !== "segundo" ? `<div class="pro-alerta">O texto de agora é o do primeiro e-mail.<button class="btn pequeno primario" type="button" id="pro-usar-follow">Usar o modelo de follow-up</button></div>` : ""}
+        ${pro.envio === "resend" ? `<div class="pro-alerta">O follow-up sai pelo Gmail ou pelo rascunho, pra ir como resposta do primeiro e-mail.</div>` : ""}
+        ${r.lista.length ? `<details class="pro-follow-lista"><summary>Ver quem vai receber</summary><ul>${r.lista.slice(0, 60).map((d) => `<li><b>${esc(d.marca)}</b> <small class="sub">${d.enviados === 1 ? "1º follow-up" : "2º follow-up"} · último e-mail ${dataBR(String(d.ultimoEnvio).slice(0, 10)).slice(0, 5)} · Re: ${esc(d.assunto)}</small></li>`).join("")}</ul></details>` : ""}`;
+      const di = $("#pro-dias", caixaC);
+      if (di) di.onchange = () => { pro.diasFollow = Math.max(1, Math.min(60, Number(di.value) || 4)); guardarRascunho(); pintarContagem(); };
+      const uf = $("#pro-usar-follow", caixaC);
+      if (uf) uf.onclick = () => { const m = MODELOS_VOZ.segundo; Object.assign(pro, { escrita: "texto", texto: m.texto, assunto: m.assuntos[0], botaoTexto: "", modeloVoz: "segundo" }); guardarRascunho(); desenhar(); };
+      const mr = $("#pro-marcar-resp", caixaC);
+      if (mr) mr.onclick = async () => { mr.disabled = true; for (const m of respondidas) { if (typeof moverMarca === "function") await moverMarca(m.id, "respondeu"); } pintarContagem(); };
+      conferirRespostasGmail(r.lista, () => { if (abaAtual === "prospeccao" && $("#pro-contagem")) pintarContagem(); });
+      pintarEnviar(pro.envio === "resend" ? { ...r, lista: [] } : r);
+      return;
+    }
     $("#pro-contagem").innerHTML = pro.publico === "selecionadas" && !r.total
       ? `<div class="pro-alerta">Nenhuma marca selecionada ainda. Marque as caixinhas na aba Marcas.<button class="btn pequeno primario" type="button" data-ir-aba="marcas">${ic("marcas")}Selecionar marcas</button></div>`
       : `<strong>${pro.publico === "teste" ? "1 e-mail, só pra você" : plural(r.lista.length, "marca vai receber", "marcas vão receber")}</strong>${fora.length ? `<small>${fora.join(" · ")}</small>` : ""}`;

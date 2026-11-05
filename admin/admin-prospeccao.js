@@ -534,7 +534,26 @@ function funilHTML() {
     </tbody></table></div>
   </div>`;
 }
+function semRespostaHTML() {
+  if (typeof destinatariosFollowup !== "function" || !pro.envios) return "";
+  const r = destinatariosFollowup();
+  if (!r.lista.length && !r.cedo) return "";
+  return `<div class="cartao pc-followups">
+    <div class="barra" style="margin-bottom:6px"><h2 style="margin:0">${ic("email")} Sem resposta</h2><span class="espaco"></span>
+      ${r.lista.length ? `<button class="btn pequeno primario" type="button" data-pc-follow-email>${ic("email")}Mandar follow-up</button>` : ""}</div>
+    <p class="sub" style="margin:0">${r.lista.length ? `<b>${plural(r.lista.length, "marca recebeu", "marcas receberam")} e-mail há ${r.dias} dias ou mais e não ${r.lista.length === 1 ? "respondeu" : "responderam"}.` : "Ninguém pronto pro follow-up hoje."}</b>${r.cedo ? ` ${plural(r.cedo, "outra recebeu", "outras receberam")} há menos tempo e ${r.cedo === 1 ? "entra" : "entram"} depois.` : ""} O follow-up vai como resposta do primeiro e-mail, no máximo 2 por marca.</p>
+    ${r.lista.length ? `<ul class="pc-follow-lista">${r.lista.slice(0, 8).map((d) => `<li><span class="pc-follow-item" style="cursor:default"><span><b>${esc(d.marca)}</b><small class="sub">último e-mail ${dataBR(String(d.ultimoEnvio).slice(0, 10)).slice(0, 5)} · ${d.enviados === 1 ? "1º follow-up" : "2º follow-up"}</small></span></span></li>`).join("")}</ul>` : ""}
+  </div>`;
+}
 function ligarExtrasProspeccao(el) {
+  $$("[data-pc-follow-email]", el).forEach((b) => b.onclick = () => {
+    pro.publico = "followup"; pro.sub = "disparo";
+    if (pro.modeloVoz !== "segundo") { const m = MODELOS_VOZ.segundo; Object.assign(pro, { escrita: "texto", texto: m.texto, assunto: m.assuntos[0], botaoTexto: "", modeloVoz: "segundo" }); }
+    if (pro.envio === "resend") pro.envio = "gmail";
+    try { localStorage.setItem("pro-sub", "disparo"); } catch (_) {}
+    if (typeof guardarRascunho === "function") guardarRascunho();
+    desenhar(); window.scrollTo(0, 0);
+  });
   $$("[data-follow]", el).forEach((b) => b.onclick = () => fichaMarca(S.marcas.find((m) => String(m.id) === b.dataset.follow), { depois: () => desenhar() }));
   $$("[data-pc-colar]", el).forEach((b) => b.onclick = () => colarPlanilha(b.dataset.pcColar));
 }
