@@ -24,11 +24,12 @@ function seguidoresDaAuto(env) {
     novos: l.filter((x) => x.virou_seguidor_em || (x.seguia_antes === false && x.segue === true)).length,
     jaSeguiam: l.filter((x) => x.seguia_antes === true).length,
     naoSeguem: l.filter((x) => x.segue === false).length,
+    seguemHoje: l.filter((x) => x.segue === true && x.seguia_antes == null && !x.virou_seguidor_em).length,
     semDado: l.filter((x) => x.segue == null).length,
     pessoas: l.length
   };
 }
-const textoSeguidores = (f) => f.pessoas ? `<b>${f.novos}</b> ${f.novos === 1 ? "começou" : "começaram"} a seguir${f.jaSeguiam ? ` · ${f.jaSeguiam} já ${f.jaSeguiam === 1 ? "seguia" : "seguiam"}` : ""}${f.naoSeguem ? ` · ${f.naoSeguem} não ${f.naoSeguem === 1 ? "segue" : "seguem"}` : ""}${f.semDado ? ` · ${f.semDado} sem resposta do Instagram` : ""}` : "";
+const textoSeguidores = (f) => f.pessoas ? `<b>${f.novos}</b> ${f.novos === 1 ? "começou" : "começaram"} a seguir${f.jaSeguiam ? ` · ${f.jaSeguiam} já ${f.jaSeguiam === 1 ? "seguia" : "seguiam"}` : ""}${f.seguemHoje ? ` · ${f.seguemHoje} ${f.seguemHoje === 1 ? "segue" : "seguem"} hoje (de antes de o painel contar)` : ""}${f.naoSeguem ? ` · ${f.naoSeguem} não ${f.naoSeguem === 1 ? "segue" : "seguem"}` : ""}${f.semDado ? ` · ${f.semDado} sem resposta do Instagram` : ""}` : "";
 async function conferirSeguidoresAuto() {
   if (au.conferindo || au.conferido) return;
   au.conferindo = true;
@@ -80,7 +81,7 @@ function desenharAutomacoes(el) {
     <section class="cartao">
       <div class="au-topo"><div><h3 class="pro-titulo">🤖 Comentou, recebeu no direct</h3>
         <p class="sub">Quando alguém comenta a palavra, a pessoa recebe a mensagem no direct e o comentário ganha uma resposta. Um direct por comentário, só em comentários de até 7 dias (regra da Meta).</p>
-        ${segTotal && segTotal.pessoas ? `<p class="au-seguidores"><span class="au-seg-num">+${segTotal.novos}</span><span><b>${segTotal.novos === 1 ? "seguidor novo" : "seguidores novos"} pelas automações</b><small class="sub">${textoSeguidores(segTotal)}. Conta quem não seguia quando conversou com a automação e passou a seguir.${au.conferindo ? " Conferindo agora..." : ""}</small></span></p>` : ""}</div>
+        ${segTotal && segTotal.pessoas && segTotal.semDado < segTotal.pessoas ? `<p class="au-seguidores"><span class="au-seg-num">+${segTotal.novos}</span><span><b>${segTotal.novos === 1 ? "seguidor novo" : "seguidores novos"} pelas automações</b><small class="sub">${textoSeguidores(segTotal)}. Conta quem não seguia quando conversou com a automação e passou a seguir.${au.conferindo ? " Conferindo agora..." : ""}</small></span></p>` : ""}</div>
         <button class="btn primario" type="button" id="au-nova">${ic("mais")}Nova automação</button></div>
       ${au.lista.length ? `<div class="au-lista">${au.lista.map((a) => {
         const env = enviosDe(a.id), ok = env.filter((x) => x.status === "enviado").length, erro = env.filter((x) => x.status === "erro").length, espera = env.filter((x) => x.status === "aguardando").length;
