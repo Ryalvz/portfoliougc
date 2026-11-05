@@ -1020,7 +1020,19 @@ function planoAcertoViagem(v, a) {
   return lista.filter((m) => m.c !== 0).map((m) => ({ k: m.k, valor: m.c / 100, parcelas: m.parcelas, avista: m.avista }));
 }
 // Par a par: quanto A deve a B (as partes de A nos gastos que B pagou)
-function devePara(v, a, b) { return (v.gastos || []).filter((g) => mesmaPessoa(g.pagou, b)).reduce((s, g) => s + partesGasto(g).filter((x) => mesmaPessoa(x.nome, a)).reduce((t, x) => t + x.v, 0), 0); }
+function devePara(v, a, b) { return (v.gastos || []).reduce((s, g) => s + deveNoGasto(g, a, b), 0); }
+// g.recebe: quem recebe as partes dos outros no lugar de quem pagou. Ex.: o bob pagou as compras,
+// mas os outros pagam a parte deles pra você, e você repassa ao bob a sua parte e a deles.
+const recebeDe = (g) => (g.recebe && !mesmaPessoa(g.recebe, g.pagou) ? g.recebe : null);
+function deveNoGasto(g, a, b) {
+  const partes = partesGasto(g), de = (n) => partes.filter((x) => mesmaPessoa(x.nome, n)).reduce((t, x) => t + x.v, 0);
+  const R = recebeDe(g);
+  if (!R) return mesmaPessoa(g.pagou, b) ? de(a) : 0;
+  const fora = (n) => !mesmaPessoa(n, R) && !mesmaPessoa(n, g.pagou);
+  if (mesmaPessoa(b, R)) return fora(a) ? de(a) : 0;
+  if (mesmaPessoa(a, R) && mesmaPessoa(b, g.pagou)) return de(R) + partes.filter((x) => fora(x.nome)).reduce((t, x) => t + x.v, 0);
+  return 0;
+}
 // O seu acerto com cada pessoa. "jaNoCartao" = parte dela em gasto do seu cartão (já cobrada pela fatura)
 function acertoComigo(v) {
   return (v.pessoas || []).filter((n) => !ehEu(n)).map((n) => {
@@ -1087,7 +1099,7 @@ function pfViagens(el) {
           <button class="btn" type="button" id="vg-cartao">Trazer do meu cartão</button>
           <button class="btn primario" type="button" id="vg-gasto">${ic("mais")}Gasto</button></div>
         ${(v.gastos || []).length ? `<ul class="pf-vg-gastos">${[...v.gastos].sort((a, b) => String(b.data || "").localeCompare(String(a.data || ""))).map((g) => `<li><button type="button" data-vg-gasto="${g.id}">
-          <span><b>${esc(g.descricao)}</b><small>${g.data ? dataBR(g.data).slice(0, 5) + " · " : ""}${quem(g.pagou)} pagou · divide entre ${(g.divide || []).map(quem).join(", ")}${textoCobertura(g, quem)}${g.compraId ? " · do seu cartão" : ""}${(() => { const pc = parcelasDoGasto(v, g); return pc ? `<br>${textoParcelas(v, pc)}` : ""; })()}</small></span>
+          <span><b>${esc(g.descricao)}</b><small>${g.data ? dataBR(g.data).slice(0, 5) + " · " : ""}${quem(g.pagou)} pagou · divide entre ${(g.divide || []).map(quem).join(", ")}${textoCobertura(g, quem)}${recebeDe(g) ? ` · as partes dos outros ${ehEu(recebeDe(g)) ? "você recebe e repassa" : `${quem(recebeDe(g))} recebe e repassa`} pra ${quem(g.pagou)}` : ""}${g.compraId ? " · do seu cartão" : ""}${(() => { const pc = parcelasDoGasto(v, g); return pc ? `<br>${textoParcelas(v, pc)}` : ""; })()}</small></span>
           <strong>${real(g.valor)}</strong></button></li>`).join("")}</ul>`
           : `<p class="vazio">Nenhum gasto ainda. Lance o que cada um pagou, ou traga as compras divididas do seu cartão.</p>`}
       </div>
@@ -1154,7 +1166,7 @@ function resumoPessoaViagemHTML(v, n) {
 async function copiarResumoViagem(v, n) {
   const { gastos, parte, pagou, acertos } = dadosResumoViagem(v, n);
   const pq = (x) => (ehEu(x) ? "eu paguei" : `${nomePessoa(x)} pagou`);
-  const txt = [`Oi, ${nomePessoa(n).split(" ")[0]}! Resumo da viagem ${v.nome}:`, ...gastos.filter((x) => x.parte > 0.004).map((x) => `${x.g.descricao}: sua parte ${real(x.parte)} (${pq(x.g.pagou)}${x.pc && x.pc.k ? `, no cartão em ${x.pc.n}x: nesta fatura vai a parcela ${x.pc.k}/${x.pc.n}, ${real(parteNaParcela(x.parte, x.pc))}` : ""})`),
+  const txt = [`Oi, ${nomePessoa(n).split(" ")[0]}! Resumo da viagem ${v.nome}:`, ...gastos.filter((x) => x.parte > 0.004).map((x) => `${x.g.descricao}: sua parte ${real(x.parte)} (${pq(x.g.pagou)}${recebeDe(x.g) && !mesmaPessoa(n, x.g.pagou) && !mesmaPessoa(n, recebeDe(x.g)) ? `, mas você paga pra ${ehEu(recebeDe(x.g)) ? "mim" : nomePessoa(recebeDe(x.g))}` : ""}${x.pc && x.pc.k ? `, no cartão em ${x.pc.n}x: nesta fatura vai a parcela ${x.pc.k}/${x.pc.n}, ${real(parteNaParcela(x.parte, x.pc))}` : ""})`),
     `Sua parte no total: ${real(parte)}.${pagou ? ` Você pagou ${real(pagou)}.` : ""}`,
     ...(acertos.length ? ["Fica assim:", ...acertos.map((x) => (x.v > 0 ? `Você paga ${real(x.v)} pra ${ehEu(x.p) ? "mim" : nomePessoa(x.p)}.` : `${ehEu(x.p) ? "Eu te pago" : `${nomePessoa(x.p)} te paga`} ${real(-x.v)}.`))] : ["Está tudo zerado."]),
     ...(() => { const ac = acertoComigo(v).find((x) => mesmaPessoa(x.nome, n)), l = ac ? linhaViagemNoMes(v, ac) : null; return l && l.parcelas.length && l.valor > 0 ? [`Na fatura de ${MESES_LONGOS[Number(mesAcViagem(v).slice(5)) - 1].toLowerCase()}, a viagem fica ${real(l.valor)} pra mim.`] : []; })()].join("\n");
