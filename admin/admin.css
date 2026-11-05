@@ -1762,3 +1762,20 @@ td .pc-follow { display: table; }
   .est-minis { position: static; max-height: none; grid-auto-flow: column; grid-auto-columns: 74px; overflow-x: auto; overflow-y: hidden; }
   .est-palco { padding: 10px; }
 }
+
+/* ---------- Quando postar (métricas do Instagram) ---------- */
+.qp-cartao { grid-column: 1 / -1; }
+.qp-topo { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 16px; }
+.qp-grade { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px; }
+.qp-tit { margin: 0 0 10px; font-size: 13px; color: var(--muted); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.qp-barras { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 10px; }
+.qp-col { display: grid; justify-items: center; gap: 6px; min-width: 0; cursor: default; }
+.qp-valor { font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.qp-trilho { position: relative; display: block; width: 100%; max-width: 46px; height: 120px; border-radius: 6px; background: var(--tint); overflow: hidden; }
+.qp-trilho i { position: absolute; left: 0; right: 0; bottom: 0; border-radius: 6px 6px 0 0; background: rgba(43, 36, 28, .55); }
+.qp-col.melhor .qp-trilho i { background: var(--olive); }
+.qp-col.melhor .qp-valor { color: var(--olive); }
+.qp-col:hover .qp-trilho { box-shadow: 0 0 0 2px var(--tint-2); }
+.qp-nome { font-size: 11.5px; color: var(--text); white-space: nowrap; }
+.qp-n { font-size: 11px; color: var(--muted); }
+@media (max-width: 760px) { .qp-grade { grid-template-columns: minmax(0, 1fr); } .qp-valor { font-size: 10.5px; } .qp-barras { gap: 4px; } }

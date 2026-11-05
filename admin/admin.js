@@ -4751,11 +4751,11 @@ function desenharMetricasInstagram(el) {
           <small class="lb-extra">${plural(x.n, "post", "posts")} · engajamento ${pct1(x.taxa)} · ${num(Math.round(x.salvos))} salvos em média</small>
         </div>`).join("")}</div>` : `<p class="vazio">Sem posts com métricas.</p>`}
       </div>
-      <div class="cartao">
+${typeof pintarQuandoPostar === "function" ? `<div class="cartao qp-cartao" id="qp-caixa"></div>` : `      <div class="cartao">
         <h2>Melhor dia para postar</h2>
         <div class="barras-mes barras-semana" role="img" aria-label="Alcance médio por dia da semana">${porDia.map((x, i) => `<div class="grupo-mes ${melhorDia && melhorDia.i === i ? "foco" : ""}" data-dica="<b>${DIAS_SEMANA[i]}</b><br>${plural(x.n, "post", "posts")}<br>Alcance médio: ${num(Math.round(x.alcance))}"><div class="par-barras"><i class="b-prev" style="height:${(x.alcance / maxDia) * 100}%"></i></div><span>${DIAS_CURTOS[i]}</span></div>`).join("")}</div>
         <p class="sub" style="margin:8px 0 0">${porHora.filter((x) => x.n).map((x) => `${x.nome}: ${compacto(x.alcance)}`).join(" · ")}</p>
-      </div>
+      </div>`}
       <div class="cartao">
         <h2>Quem te segue</h2>
         ${totalIdade ? `<div class="lista-barras">${(aud.age || []).slice(0, 5).map((x) => `<div class="linha-barra"><span class="lb-nome">${esc(x.nome)} anos</span><span class="lb-trilho"><i style="width:${(x.valor / totalIdade) * 100}%"></i></span><span class="lb-valor">${pct(x.valor, totalIdade)}%</span></div>`).join("")}</div>
@@ -4802,6 +4802,7 @@ function desenharMetricasInstagram(el) {
     if (!(await confirmar("Desconectar o Instagram do painel? Para voltar, vai precisar gerar uma chave nova na Meta.", "Sim, desconectar"))) return;
     try { await chamarInstagram({ acao: "desconectar" }); ig.conectado = false; ig.dados = null; desenhar(); avisar("Instagram desconectado."); } catch (e) { avisar(e.message, true); }
   };
+  if (typeof pintarQuandoPostar === "function" && $("#qp-caixa", el)) pintarQuandoPostar($("#qp-caixa", el), posts);
   ligarDicas(el);
 }
 

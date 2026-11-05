@@ -268,3 +268,47 @@ function desenharInicioNovo(el) {
 }
 // A página nova assume o Início; se der erro, a antiga aparece no lugar
 DESENHOS.inicio = (el) => { try { desenharInicioNovo(el); } catch (e) { console.error("início novo", e); desenharInicio(el); } };
+
+/* =============================================================
+   Quando postar (aba Métricas do Instagram)
+   Média de cada post por faixa de horário e por dia da semana,
+   com a métrica e o formato que você escolher. Usa os últimos 50
+   posts que o Instagram devolve, com as métricas de cada um.
+   ============================================================= */
+const qp = { metrica: "views", formato: "" };
+const FAIXAS_QP = [["00h–06h", 0, 6], ["06h–09h", 6, 9], ["09h–12h", 9, 12], ["12h–15h", 12, 15], ["15h–18h", 15, 18], ["18h–21h", 18, 21], ["21h–00h", 21, 24]];
+const METRICAS_QP = [["views", "Visualizações"], ["reach", "Alcance"], ["taxa", "Engajamento"]];
+const valorQP = (x) => (qp.metrica === "taxa" ? taxaDe(x) : n2(x[qp.metrica]));
+const textoQP = (v) => (qp.metrica === "taxa" ? pct1(v) : compacto(v));
+
+function barrasQP(grupos, melhor, rotulo) {
+  const max = Math.max(...grupos.map((g) => g.media), 0) || 1;
+  return `<div class="qp-barras" role="img" aria-label="${esc(rotulo)}">${grupos.map((g) => `<div class="qp-col ${g === melhor ? "melhor" : ""}" data-dica="${esc(`<b>${g.nome}</b><br>${plural(g.n, "post", "posts")}${g.n ? `<br>média de ${textoQP(g.media)} por post` : ""}`)}">
+      <span class="qp-valor">${g.n ? textoQP(g.media) : "-"}</span>
+      <span class="qp-trilho"><i style="height:${g.n ? Math.max(3, (g.media / max) * 100) : 0}%"></i></span>
+      <span class="qp-nome">${esc(g.curto || g.nome)}</span><small class="qp-n">${g.n}</small></div>`).join("")}</div>`;
+}
+function pintarQuandoPostar(caixa, posts) {
+  const formatos = [...new Set(posts.map((x) => x.tipo))].filter(Boolean);
+  if (qp.formato && !formatos.includes(qp.formato)) qp.formato = "";
+  const lista = posts.filter((x) => (!qp.formato || x.tipo === qp.formato) && x.data && (qp.metrica === "taxa" ? n2(x.reach) : x[qp.metrica] != null));
+  const grupo = (f) => { const l = lista.filter(f); return { n: l.length, media: media(l, valorQP) }; };
+  const horas = FAIXAS_QP.map(([nome, de, ate]) => ({ nome, ...grupo((x) => { const h = new Date(x.data).getHours(); return h >= de && h < ate; }) })).filter((g, i) => i > 0 || g.n);
+  const dias = DIAS_SEMANA.map((nome, i) => ({ nome: nome.charAt(0).toUpperCase() + nome.slice(1), curto: DIAS_CURTOS[i], ...grupo((x) => new Date(x.data).getDay() === i) }));
+  const melhorDe = (l) => l.filter((g) => g.n >= 2).sort((a, b) => b.media - a.media)[0];
+  const mh = melhorDe(horas), md = melhorDe(dias);
+  const nomeMetrica = (METRICAS_QP.find((m) => m[0] === qp.metrica) || [0, ""])[1].toLowerCase();
+  caixa.innerHTML = `<div class="qp-topo"><div><h2 style="margin:0">Quando postar</h2>
+      <p class="sub" style="margin:4px 0 0">${mh || md ? `Seus posts ${mh ? `das <b>${mh.nome}</b>` : ""}${mh && md ? " e de " : ""}${md ? `<b>${md.nome.toLowerCase()}</b>` : ""} têm a maior média de ${nomeMetrica}.` : "Precisa de pelo menos 2 posts num horário pra comparar."}</p></div>
+      <span class="espaco"></span>
+      <div class="ini-periodo" role="group" aria-label="Métrica">${METRICAS_QP.map(([k, r]) => `<button type="button" data-qp-metrica="${k}" aria-pressed="${qp.metrica === k}">${r}</button>`).join("")}</div>
+      <select class="campo" data-qp-formato aria-label="Formato"><option value="">Todos os formatos</option>${formatos.map((t) => `<option value="${t}" ${qp.formato === t ? "selected" : ""}>${esc(NOME_FORMATO[t] || t)}</option>`).join("")}</select>
+    </div>
+    <div class="qp-grade">
+      <div><h3 class="qp-tit">Por horário</h3>${barrasQP(horas, mh, "Média por faixa de horário")}</div>
+      <div><h3 class="qp-tit">Por dia da semana</h3>${barrasQP(dias, md, "Média por dia da semana")}</div>
+    </div>
+    <p class="sub" style="margin:10px 0 0">Média de ${nomeMetrica} por post. O número de baixo é quantos posts entraram na conta (${plural(lista.length, "post", "posts")} dos últimos ${posts.length}). A barra dourada é a melhor entre as que têm pelo menos 2 posts.</p>`;
+  $$("[data-qp-metrica]", caixa).forEach((b) => b.onclick = () => { qp.metrica = b.dataset.qpMetrica; pintarQuandoPostar(caixa, posts); });
+  $("[data-qp-formato]", caixa).onchange = (e) => { qp.formato = e.target.value; pintarQuandoPostar(caixa, posts); };
+}
