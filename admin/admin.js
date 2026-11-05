@@ -1899,6 +1899,7 @@ async function traduzir(texto, idioma, destino, aviso = () => {}) {
   return saida;
 }
 
+const NOMES_IDIOMA_MSG = { es: "espanhol", en: "inglês", fr: "francês", it: "italiano", de: "alemão", zh: "chinês", ja: "japonês", ko: "coreano" };
 function linkGoogleTradutor(texto, de = "auto", para = "pt") {
   return `https://translate.google.com/?sl=${de}&tl=${para}&op=translate&text=` + encodeURIComponent(texto.slice(0, 4500));
 }
@@ -4413,9 +4414,11 @@ function desenharConversa(el) {
     <div class="cartao conversa">
       <h2 class="conversa-assunto">${esc(x.assunto)}</h2>
       ${gm.carregandoConversa ? `<p class="vazio">Abrindo a conversa...</p>` : (gm.conversa || []).map((m) => `<div class="msg ${m.de.email === EMAIL_PROPOSTAS ? "minha" : ""}">
-        <div class="email-topo"><b>${m.de.email === EMAIL_PROPOSTAS ? "Você" : esc(m.de.nome)}</b><span class="sub">${esc(m.de.email)}</span><span class="espaco"></span><span class="sub">${m.data.toLocaleString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span></div>
+        <div class="email-topo"><b>${m.de.email === EMAIL_PROPOSTAS ? "Você" : esc(m.de.nome)}</b><span class="sub">${esc(m.de.email)}</span><span class="espaco"></span>
+          ${m.de.email !== EMAIL_PROPOSTAS && gm.idioma && gm.idioma !== "pt" ? `<button type="button" class="btn pequeno msg-traduzir" data-traduzir-msg="${esc(m.id)}">${ic("transcricao")}${m.traduzindo ? "Traduzindo..." : m.verTraducao ? "Ver o original" : "Traduzir pro português"}</button>` : ""}
+          <span class="sub">${m.data.toLocaleString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span></div>
+        ${m.verTraducao && m.traducao ? `<small class="sub msg-traduzido">Traduzido do ${esc(NOMES_IDIOMA_MSG[gm.idioma] || gm.idioma)} pelo tradutor do Chrome</small>` : ""}
         <div class="msg-texto">${esc(m.verTraducao && m.traducao ? m.traducao : m.texto)}</div>
-        ${m.de.email !== EMAIL_PROPOSTAS && gm.idioma && gm.idioma !== "pt" ? `<button type="button" class="link-btn pequeno-link" data-traduzir-msg="${esc(m.id)}">${m.verTraducao ? "ver o original" : "ver em português"}</button>` : ""}
       </div>`).join("")}
     </div>
     ${gm.carregandoConversa ? "" : `<div class="cartao responder">
@@ -4441,16 +4444,29 @@ function desenharConversa(el) {
   const caixa = $("#texto-resposta");
   if (caixa) caixa.addEventListener("input", () => { gm.rascunho = caixa.value; });
   $$("[data-modelo]", el).forEach((b) => b.onclick = () => { gm.rascunhoPt = ""; gm.rascunho = modelosResposta(x)[Number(b.dataset.modelo)][1]; desenhar(); $("#texto-resposta").focus(); });
-  $$("[data-traduzir-msg]", el).forEach((b) => b.onclick = async () => {
-    const m = gm.conversa.find((y) => y.id === b.dataset.traduzirMsg);
+  // Traduz um e-mail de fora. "auto": quando a conversa abre; aí, se o Chrome não traduzir, não abre outra aba
+  const traduzirMsg = async (m, auto) => {
+    if (!m || m.traduzindo) return;
     if (m.traducao) { m.verTraducao = !m.verTraducao; desenhar(); return; }
-    b.textContent = "traduzindo...";
+    m.traduzindo = true; m.tentouTraduzir = true; if (!auto) desenhar();
+    const b = () => $(`[data-traduzir-msg="${m.id}"]`, el);
     try {
-      const pt = await traduzir(m.texto, gm.idioma, "pt", (t) => { b.textContent = t; });
-      if (!pt) { window.open(linkGoogleTradutor(m.texto, gm.idioma, "pt"), "_blank", "noopener"); b.textContent = "ver em português"; return; }
-      m.traducao = pt.trim(); m.verTraducao = true; desenhar();
-    } catch (_) { window.open(linkGoogleTradutor(m.texto, gm.idioma, "pt"), "_blank", "noopener"); b.textContent = "ver em português"; }
-  });
+      const pt = await traduzir(m.texto, gm.idioma, "pt", (t) => { const x = b(); if (x) x.lastChild.textContent = t; });
+      m.traduzindo = false;
+      if (pt) { m.traducao = pt.trim(); m.verTraducao = true; }
+      else if (!auto) window.open(linkGoogleTradutor(m.texto, gm.idioma, "pt"), "_blank", "noopener");
+    } catch (_) {
+      m.traduzindo = false;
+      if (!auto) window.open(linkGoogleTradutor(m.texto, gm.idioma, "pt"), "_blank", "noopener");
+    }
+    if (gm.aberto && abaAtual === "propostas") desenhar();
+  };
+  $$("[data-traduzir-msg]", el).forEach((b) => b.onclick = () => traduzirMsg(gm.conversa.find((y) => y.id === b.dataset.traduzirMsg), false));
+  // E-mail em outro idioma já abre traduzido (um de cada vez, sem repetir)
+  if (gm.idioma && gm.idioma !== "pt" && !gm.carregandoConversa) {
+    const falta = (gm.conversa || []).filter((m) => m.de.email !== EMAIL_PROPOSTAS && !m.traducao && !m.tentouTraduzir);
+    (async () => { for (const m of falta) await traduzirMsg(m, true); })();
+  }
   const btnTraduzir = $("#traduzir-resposta");
   if (btnTraduzir) btnTraduzir.onclick = async () => {
     const texto = caixa.value.trim();
