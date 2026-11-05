@@ -1779,3 +1779,23 @@ td .pc-follow { display: table; }
 .qp-nome { font-size: 11.5px; color: var(--text); white-space: nowrap; }
 .qp-n { font-size: 11px; color: var(--muted); }
 @media (max-width: 760px) { .qp-grade { grid-template-columns: minmax(0, 1fr); } .qp-valor { font-size: 10.5px; } .qp-barras { gap: 4px; } }
+
+/* ---------- Datas comemorativas no Calendário ---------- */
+.cal-datas { display: grid; gap: 2px; margin: 2px 0 3px; }
+.cal-data { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 10.5px; line-height: 1.3; color: var(--muted); }
+.cal-data::before { content: ""; display: inline-block; width: 5px; height: 5px; margin-right: 4px; border-radius: 50%; background: var(--line); vertical-align: 1px; }
+.cal-data.d-feriado::before, .cal-dl-nome i.d-feriado { background: #b0533f; }
+.cal-data.d-comercio::before, .cal-dl-nome i.d-comercio { background: var(--olive); }
+.cal-data.d-tech::before, .cal-dl-nome i.d-tech { background: var(--cobalt); }
+.cal-data.d-lifestyle::before, .cal-dl-nome i.d-lifestyle { background: #7d8a55; }
+.cal-datas-mes { margin-top: 16px; }
+.cal-datas-lista { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 6px 18px; }
+.cal-datas-lista li { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.cal-dl-dia { display: grid; justify-items: center; padding: 4px 0; border-radius: 10px; background: var(--tint); line-height: 1.1; }
+.cal-dl-dia b { font-size: 16px; }
+.cal-dl-dia small { font-size: 10px; text-transform: uppercase; color: var(--muted); letter-spacing: .05em; }
+.cal-dl-nome { display: grid; min-width: 0; }
+.cal-dl-nome b { font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cal-dl-nome small { font-size: 11.5px; color: var(--muted); display: flex; align-items: center; gap: 5px; }
+.cal-dl-nome i { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+@media (max-width: 700px) { .cal-data { font-size: 8.5px; } .cal-datas-lista { grid-template-columns: minmax(0, 1fr); } }

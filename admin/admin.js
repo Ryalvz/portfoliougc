@@ -1206,6 +1206,7 @@ function desenharCalendario(el) {
     const extra = lista.length - 3;
     celulas += `<div class="dia ${d.getMonth() !== mes ? "fora" : ""} ${iso === hoje ? "hoje" : ""}" data-data="${iso}">
       <span class="dia-num">${d.getDate()}</span>
+      ${typeof datasDoDia === "function" ? datasDoDia(iso, d.getMonth() === mes) : ""}
       <button class="dia-mais" type="button" data-novo="${iso}" aria-label="Adicionar em ${dataBR(iso)}">${ic("mais")}</button>
       ${lista.slice(0, 3).map((e, k) => `<button type="button" class="item-cal t-${e.tipo} ${e.feito ? "feito" : ""}" data-ev="${iso}|${k}" title="${esc((e.hora ? horaCurta(e.hora) + " " : "") + e.titulo)}">${e.hora ? `<b class="hora-cal">${horaCurta(e.hora)}</b> ` : ""}${esc(e.titulo)}</button>`).join("")}
       ${extra > 0 ? `<button type="button" class="mais-itens" data-dia="${iso}">+${extra} mais</button>` : ""}
@@ -1231,6 +1232,7 @@ function desenharCalendario(el) {
       <div class="cal-semana">${["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"].map((d) => `<div>${d}</div>`).join("")}</div>
       <div class="cal-grade" id="cal-grade">${celulas}</div>
     </div>
+    ${typeof datasDoMesHTML === "function" ? datasDoMesHTML(ano, mes) : ""}
     <div class="cartao" style="margin-top:16px">
       <h2>Ficou pra trás</h2>
       ${atrasados.length === 0 ? `<p class="vazio">Nada atrasado. Tudo que passou do dia está feito.</p>` : `<ul class="atrasados">${atrasados.map((e, i) => {
@@ -1251,6 +1253,7 @@ function desenharCalendario(el) {
   // Ao abrir o Calendário, busca no Google o que você criou no iPhone
   if (!agendaG.abriu) { agendaG.abriu = true; sincronizarAgendaGoogle(true); }
 
+  if (typeof ligarDatas === "function") ligarDatas(el);
   $("#cal-grade").addEventListener("click", (e) => {
     const ev = e.target.closest("[data-ev]");
     if (ev) { const [iso, k] = ev.dataset.ev.split("|"); abrirEvento(porData[iso][Number(k)]); return; }
