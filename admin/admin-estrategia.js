@@ -342,11 +342,18 @@ O QUE EU PRECISO (pesquise na internet de verdade, nada de tendência inventada)
    SEG | Reels | Conectar | tema | gancho (a primeira frase do vídeo ou a capa) | o que a pessoa aprende ou sente + CTA
    Use só SEG, TER, QUA, QUI, SEX, SAB, DOM no começo. Formatos: Reels, Carrossel, Stories ou Foto. O terceiro campo é sempre Conhecer, Conectar ou Converter.
    Depois do plano, diga em 2 ou 3 linhas o que dá para gravar junto, no mesmo dia.
-6. PARA CADA POST DO PLANO:
+6. PARA CADA REELS DO PLANO (vídeo):
    GANCHOS (tema): 10 ganchos de 10 ângulos DIFERENTES (ex.: curiosidade, contra o senso comum, número, erro que eu cometi, bastidor, antes e depois, pergunta direta, mini história, comparação, prova). Nada de 10 versões da mesma frase. Cada um numa linha: 1. "frase" | ângulo | por que vai prender.
    PRIMEIROS 30 SEGUNDOS (tema): escritos com carinho, frase a frase, em linguagem de fala: 0 a 3 s o gancho, 3 a 10 s por que a pessoa tem que ficar, 10 a 30 s a primeira entrega de valor. É aqui que se ganha ou se perde a pessoa.
    ROTEIRO (tema): o resto em tópicos, em linguagem de fala (do jeito que eu falaria, não texto de blog), seguindo GANCHO, CONTEXTO, CONTEÚDO, FECHAMENTO.
    FECHAMENTO: o CTA, uma ação só.
+   PARA CADA CARROSSEL, nada de molde de vídeo (sem segundos, sem fala, sem gravação). Use estes títulos:
+   CAPAS (tema): 5 opções de texto pro slide 1, de ângulos diferentes, até 10 palavras cada. Uma por linha: 1. "frase" | ângulo | por que faz arrastar.
+   OS 3 PRIMEIROS SLIDES (tema): o que cada um mostra e por que a pessoa arrasta pro próximo (o loop de curiosidade).
+   SLIDE A SLIDE (tema): a função de cada uma das 7 páginas (gancho, contexto, construção, construção, tensão, recompensa, CTA), em texto de ler, até 15 palavras por slide.
+   CHAMADA FINAL: o CTA do último slide, uma ação só.
+   LEGENDA: gancho na primeira linha, o mesmo CTA, 3 a 5 hashtags.
+   DICAS DE ARTE: o estilo, que foto usar (ou se é sem foto) e onde a nota escrita à mão continua no próximo slide.
 7. CARROSSÉIS PRONTOS: para cada carrossel do plano, escreva os slides num dos meus 4 estilos (Bastidor, Revista, Conversa ou Fotos), escolhendo o que combina com o assunto${ultimoEstilo ? `. O último carrossel foi ${ultimoEstilo}: use outro estilo, e nunca dois carrosséis do mesmo estilo na mesma semana` : ", e nunca dois carrosséis do mesmo estilo na mesma semana"}.
    ${CAR_ESTILOS.formato("").split("\n").join("\n   ")}
 
@@ -1691,7 +1698,7 @@ ${legendas.map((x) => `- (${num(x.reach)} de alcance) ${String(x.legenda).replac
    citadas (#34 etc.: ganchos, roteiro, chamada, legenda, hashtags,
    dicas) e o trecho da pesquisa que fala do post. Cada parte tem
    o seu botão de copiar. */
-const SECOES_ROTEIRO = [["pesquisa", /^(O QUE J[ÁA] DEU RESULTADO|PESQUISA)\b/i], ["gap", /^(O )?GAP\b/i], ["primeiros", /^(OS )?PRIMEIROS 30\b/i], ["ganchos", /^(GANCHOS|OP[ÇC][ÕO]ES DE GANCHO)\b/i], ["duracao", /^DURA[ÇC][ÃA]O\b/i], ["angulo", /^(ÂNGULO|ANGULO)\b/i], ["filmar", /^O QUE FILMAR\b/i], ["roteiro", /^ROTEIRO\b/i], ["chamada", /^CHAMADA( FINAL)?\b/i], ["legenda", /^(LEGENDA|TEXTO DO POST)\b/i], ["dicas", /^DICAS( DE GRAVA[ÇC][ÃA]O)?\b/i], ["anotacao", /^ANOTA[ÇC][ÃA]O ORIGINAL\b/i], ["slides", /^SLIDES\b/i]];
+const SECOES_ROTEIRO = [["capas", /^(CAPAS|OP[ÇC][ÕO]ES DE CAPA)\b/i], ["primeirosSlides", /^(OS )?(3 )?PRIMEIROS SLIDES\b/i], ["slideaslide", /^SLIDE A SLIDE\b/i], ["arte", /^DICAS DE ARTE\b/i], ["pesquisa", /^(O QUE J[ÁA] DEU RESULTADO|PESQUISA)\b/i], ["gap", /^(O )?GAP\b/i], ["primeiros", /^(OS )?PRIMEIROS 30\b/i], ["ganchos", /^(GANCHOS|OP[ÇC][ÕO]ES DE GANCHO)\b/i], ["duracao", /^DURA[ÇC][ÃA]O\b/i], ["angulo", /^(ÂNGULO|ANGULO)\b/i], ["filmar", /^O QUE FILMAR\b/i], ["roteiro", /^ROTEIRO\b/i], ["chamada", /^CHAMADA( FINAL)?\b/i], ["legenda", /^(LEGENDA|TEXTO DO POST)\b/i], ["dicas", /^DICAS( DE GRAVA[ÇC][ÃA]O)?\b/i], ["anotacao", /^ANOTA[ÇC][ÃA]O ORIGINAL\b/i], ["slides", /^SLIDES\b/i]];
 function partesDoRoteiro(texto) {
   const partes = {}; let atual = "inicio";
   String(texto || "").split("\n").forEach((bruta) => {
@@ -1716,9 +1723,11 @@ const hashtagsDe = (txt) => [...new Set((String(txt || "").match(/#[\p{L}\d_]+/g
 function abrirPostDoPlano(plano, it, evento) {
   const numeros = [...String(it.tema || "").matchAll(/#(\d+)/g)].map((m) => m[1]);
   const ideias = numeros.map((n) => S.transcricoes.find((t) => String(t.id) === n)).filter(Boolean);
+  const ehCar = /carross/i.test(String(it.formato || ""));
   const dia = (DIAS_PLANO.find((x) => x[0] === it.dia) || [0, 0, it.dia]);
   const data = somaDiasISO(dia[1] || 0, plano.semana);
-  const car = ((plano.itens || {}).carrosseis || []).find((c) => semAcento(c.titulo).includes(semAcento(String(it.tema).replace(/#\d+\s*/g, "")).slice(0, 16)));
+  const car = ((plano.itens || {}).carrosseis || []).find((c) => semAcento(c.titulo).includes(semAcento(String(it.tema).replace(/#\d+\s*/g, "")).slice(0, 16)))
+    || (/carross/i.test(String(it.formato || "")) && ideias.map((t) => CAR_ESTILOS.lerTexto(t.minha_versao || "")[0]).find(Boolean)) || null;
   // Trecho da pesquisa que fala deste post (fora a própria linha do plano)
   const chaves = [...numeros.map((n) => "#" + n), semAcento(String(it.tema).replace(/#\d+\s*/g, "")).slice(0, 18)].filter((x) => x.length > 2);
   const trechos = String(plano.resposta || "").split("\n").map((l) => l.trim()).filter((l) => l && !/^(SEG|TER|QUA|QUI|SEX|S[AÁ]B|DOM)\s*\|/i.test(l.replace(/^[|*\s-]+/, "")) && chaves.some((c) => semAcento(l).includes(semAcento(c)))).slice(0, 6);
@@ -1728,10 +1737,10 @@ function abrirPostDoPlano(plano, it, evento) {
   const bloco = (titulo, texto, extra = "") => texto ? `<section class="pp-bloco"><div class="pp-bloco-topo"><h4>${titulo}</h4>${btnCopiar(texto, "📋 Copiar")}</div><div class="pp-texto">${esc(texto).replace(/\n/g, "<br>")}</div>${extra}</section>` : "";
 
   // Ganchos: o do plano + os do roteiro
-  const ganchos = [...new Set([it.gancho, ...ideias.flatMap((t) => ganchosDe(partesDoRoteiro(t.minha_versao).ganchos))].map((g) => String(g || "").replace(/^["“]|["”]$/g, "").trim()).filter(Boolean))];
+  const ganchos = [...new Set([it.gancho, ...ideias.flatMap((t) => { const pr = partesDoRoteiro(t.minha_versao); return ganchosDe(pr.ganchos || pr.capas); })].map((g) => String(g || "").replace(/^["“]|["”]$/g, "").trim()).filter(Boolean))];
   // O motivo de cada gancho (o que vem depois da frase: "| ângulo | por que vai prender")
   const motivos = {};
-  ideias.forEach((t) => String(partesDoRoteiro(t.minha_versao).ganchos || "").split("\n").forEach((l) => { const m = l.match(/["“]([^"”]{4,})["”]\s*[|:–-]?\s*(.+)$/); if (m) motivos[m[1].trim()] = m[2].replace(/^\|\s*/, "").replace(/\s*\|\s*/g, " · ").trim(); }));
+  ideias.forEach((t) => { const pr = partesDoRoteiro(t.minha_versao); return String(pr.ganchos || pr.capas || "").split("\n").forEach((l) => { const m = l.match(/["“]([^"”]{4,})["”]\s*[|:–-]?\s*(.+)$/); if (m) motivos[m[1].trim()] = m[2].replace(/^\|\s*/, "").replace(/\s*\|\s*/g, " · ").trim(); }); });
 
   const htmlIdeias = ideias.map((t) => {
     const p = partesDoRoteiro(t.minha_versao);
@@ -1740,11 +1749,17 @@ function abrirPostDoPlano(plano, it, evento) {
     const tags = hashtagsDe(p.legenda);
     return `<div class="pp-ideia">
       <div class="pp-ideia-topo"><b>#${t.id} ${esc(t.titulo || "")}</b><span class="espaco"></span>
-        ${pronto && lerRoteiroGravacao(t.minha_versao).blocos.length ? `<button type="button" class="btn pequeno primario" data-gravacao="${t.id}">Roteiro de gravação</button>` : ""}
+        ${!ehCar && pronto && lerRoteiroGravacao(t.minha_versao).blocos.length ? `<button type="button" class="btn pequeno primario" data-gravacao="${t.id}">Roteiro de gravação</button>` : ""}
         <button type="button" class="btn pequeno" data-ir-ideia="${t.id}">Abrir nos Roteiros</button></div>
       ${bloco("🔎 O que já deu resultado", p.pesquisa)}
       ${bloco("🕳️ O gap (onde você entra)", p.gap)}
-      ${pronto ? `
+      ${pronto && ehCar ? `
+        ${bloco("Os 3 primeiros slides", p.primeirosSlides || p.primeiros)}
+        ${bloco("Slide a slide", p.slideaslide)}
+        ${!car && p.roteiro && !/^\s*CARROSSEL\s*:/im.test(p.roteiro) ? bloco("Texto dos slides", p.roteiro) : ""}
+        ${bloco("Chamada final", p.chamada)}
+        ${bloco("Legenda", p.legenda, tags.length ? `<div class="pp-tags">${tags.map((h) => `<span class="pilula">${esc(h)}</span>`).join(" ")} ${btnCopiar(tags.join(" "), "Copiar hashtags")}</div>` : "")}
+        ${bloco("Dicas de arte", p.arte || p.dicas)}` : pronto ? `
         ${bloco("⏱️ Primeiros 30 segundos", p.primeiros)}
         ${bloco("🎬 Roteiro", p.roteiro)}
         ${bloco("📣 Chamada final", p.chamada)}
@@ -1763,11 +1778,11 @@ function abrirPostDoPlano(plano, it, evento) {
   const d = abrirJanelaSimples(`${esc(dia[2])} ${dataBR(data).slice(0, 5)} · ${esc(it.formato)}`, `
     <h3 class="pp-tema">${esc(it.tema)}</h3>
     ${it.porque ? `<p class="pp-porque">💡 ${esc(it.porque)}</p>` : ""}
-    ${ganchos.length ? `<section class="pp-bloco"><div class="pp-bloco-topo"><h4>🪝 Ganchos</h4></div>
+    ${ganchos.length ? `<section class="pp-bloco"><div class="pp-bloco-topo"><h4>${ehCar ? "Opções de capa (texto do slide 1)" : "🪝 Ganchos"}</h4></div>
       <ul class="pp-ganchos">${ganchos.map((g) => `<li><span>“${esc(g)}”${motivos[g] ? `<small class="pp-motivo">${esc(motivos[g])}</small>` : ""}</span>${btnCopiar(g)}</li>`).join("")}</ul></section>` : ""}
     ${htmlIdeias || `<section class="pp-bloco"><p class="sub" style="margin:0 0 8px">Esse post não está ligado a uma ideia dos Roteiros, então ainda não tem roteiro, legenda nem hashtags.</p>
       <button type="button" class="btn primario" data-voz-novo>✍️ Fazer o roteiro na minha voz</button></section>`}
-    ${car ? `<section class="pp-bloco"><div class="pp-bloco-topo"><h4>🎨 Slides do carrossel</h4><button type="button" class="btn pequeno primario" data-abrir-car>Abrir no gerador</button></div>
+    ${car ? `<section class="pp-bloco"><div class="pp-bloco-topo"><h4>🎨 Slides do carrossel</h4><button type="button" class="btn pequeno primario" data-abrir-car>Abrir no Estúdio de arte</button></div>
       <ol class="pp-slides">${car.slides.map((sl) => `<li><span class="pilula">${esc(sl.tipo ? CAR_ESTILOS.nomeTipo(sl.tipo) : (MODELOS_SLIDE.find((m) => m[0] === sl.modelo) || [0, sl.modelo])[1])}</span> ${esc([sl.titulo, sl.texto].filter(Boolean).join(" · ").replace(/\*/g, ""))}</li>`).join("")}</ol></section>` : ""}
     ${trechos.length ? `<details class="pp-bloco"><summary><b>🔎 O que a pesquisa falou desse post</b></summary><div class="pp-texto">${trechos.map((l) => esc(l.replace(/\*\*/g, ""))).join("<br>")}</div></details>` : ""}`,
     `${evento ? `<button type="button" class="btn" data-editar-evento>Editar data e hora</button>` : `<button type="button" class="btn" data-agenda>📅 Pôr na agenda</button>`}<button type="button" class="btn primario" data-fechar>Fechar</button>`);
