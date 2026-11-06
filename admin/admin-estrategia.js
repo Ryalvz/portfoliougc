@@ -1466,10 +1466,10 @@ function desenharEstilos(el) {
 function abrirCarrosselSalvo(id) {
   const c = igx.carrosseis.find((x) => String(x.id) === String(id)); if (!c) return;
   const d = Array.isArray(c.slides) ? { slides: c.slides } : c.slides || {};
-  igx.car = { id: c.id, titulo: c.titulo, tema: d.tema || "ryan", estilo: d.estilo || undefined, legenda: d.legenda || "", slides: JSON.parse(JSON.stringify(d.slides || [])) };
+  igx.car = { id: c.id, titulo: c.titulo, tema: d.tema || "ryan", estilo: d.estilo || undefined, formato: d.formato || "quadrado", legenda: d.legenda || "", slides: JSON.parse(JSON.stringify(d.slides || [])) };
 }
 async function salvarCarrossel(car) {
-  const dados = { titulo: (car.titulo || "Carrossel").slice(0, 200), slides: { tema: car.tema || "ryan", estilo: car.estilo, legenda: car.legenda || "", slides: car.slides }, atualizado_em: new Date().toISOString() };
+  const dados = { titulo: (car.titulo || "Carrossel").slice(0, 200), slides: { tema: car.tema || "ryan", estilo: car.estilo, formato: car.formato || "", legenda: car.legenda || "", slides: car.slides }, atualizado_em: new Date().toISOString() };
   const { data, error } = await (car.id ? db.from("carrosseis").update(dados).eq("id", car.id).select().single() : db.from("carrosseis").insert(dados).select().single());
   if (error) { avisar(traduzErro(error), true); return; }
   car.id = data.id; await carregarCarrosseis(); avisar("Carrossel salvo."); desenhar();
@@ -1479,9 +1479,9 @@ async function baixarCarrossel(b, car, pintar) {
   try {
     await carregarFontesCarrossel(); await esperarFotos(car.slides);
     const nome = (car.titulo || "carrossel").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^\w]+/g, "-").replace(/^-|-$/g, "").toLowerCase().slice(0, 40) || "carrossel";
-    const arquivos = [];
+    const arquivos = []; let medida = "";
     for (let i = 0; i < car.slides.length; i++) {
-      const cv = document.createElement("canvas"); pintar(cv, i);
+      const cv = document.createElement("canvas"); pintar(cv, i); medida = `${cv.width} x ${cv.height}`;
       const blob = await new Promise((ok) => cv.toBlob(ok, "image/jpeg", 0.93));
       arquivos.push(new File([blob], `${nome}-${String(i + 1).padStart(2, "0")}.jpg`, { type: "image/jpeg" }));
     }
@@ -1494,7 +1494,7 @@ async function baixarCarrossel(b, car, pintar) {
         setTimeout(() => URL.revokeObjectURL(a.href), 4000);
         await new Promise((ok) => setTimeout(ok, 350));
       }
-      avisar(`${plural(arquivos.length, "imagem", "imagens")} na pasta Downloads (1080 x 1350, o tamanho certo do Instagram).`);
+      avisar(`${plural(arquivos.length, "imagem", "imagens")} na pasta Downloads (${medida}, o tamanho certo do Instagram).`);
     }
   } catch (erro) { avisar("Não deu para gerar as imagens: " + (erro.message || erro), true); }
   b.disabled = false; b.textContent = "⬇️ Baixar imagens";

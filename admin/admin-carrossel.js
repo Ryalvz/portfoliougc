@@ -483,7 +483,7 @@ const CAR_ESTILOS = (() => {
   function formato(estilo) {
     const lista = estilo ? [estilo] : Object.keys(ESTILOS);
     return `Estrutura de 7 slides, nesta ordem: 1 gancho (provoca curiosidade com uma promessa forte), 2 contexto (o problema, direto), 3 e 4 construção (uma ideia só, explicada até não sobrar dúvida: é aqui que entra a autoridade), 5 tensão (desafia o que a pessoa acha), 6 recompensa (o "AHA", a solução clara) e 7 CTA (uma ação só; "comenta PALAVRA que eu te mando..." apenas se eu tiver algo pra mandar, senão portfólio no link da bio).
-Carrossel curto: título de até 10 palavras e texto de até 20 por slide, linguagem de conversa, nada de apostila. *palavra* fica em destaque dourado (1 por título) e **palavra** fica em cinza. Não use travessão. O que você não souber de mim vira campo entre parênteses.
+Carrossel curto e quadrado (1080 x 1080): título de até 10 palavras, texto de até 20 e no máximo 25 palavras somando tudo do slide (no estilo Conversa, no máximo 2 mensagens por slide). Linguagem de conversa, nada de apostila. *palavra* fica em destaque dourado (1 por título) e **palavra** fica em cinza. Não use travessão. O que você não souber de mim vira campo entre parênteses.
 Escreva assim, um slide por linha, com o nome de cada campo (o primeiro campo sem nome é o título):
 CARROSSEL: título do carrossel | estilo: ${lista.join(" ou ")}
 ${lista.map((e) => `Estilo ${ESTILOS[e].nome} (${ESTILOS[e].quando}), campos de cada página: ${TIPOS.map(([t, n]) => `${n}: ${ESTILOS[e].campos[t].filter((c) => c !== "foto").map((c) => ({ lead: "linha" }[c] || c)).join(", ")}`).join("; ")}. Exemplo:
