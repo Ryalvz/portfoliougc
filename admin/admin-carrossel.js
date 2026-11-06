@@ -90,9 +90,23 @@ const CAR_ESTILOS = (() => {
   }
   function anotacao(ctx, texto, x, y, graus = -6, tam = 80, tom = "escuro") {
     if (!texto) return;
-    ctx.font = `400 ${tam}px ${FONTE_MAO}`; const w = ctx.measureText(texto).width;
+    const MARGEM = 80;
+    ctx.font = `400 ${tam}px ${FONTE_MAO}`; let w = ctx.measureText(texto).width;
+    // A nota pode continuar no próximo slide (efeito de arrastar): undefined = só se já passar da borda; true = sempre; false = nunca
+    const passa = x + w > W - MARGEM;
+    const continua = notaPode && (notaModo === true || (notaModo !== false && passa));
+    if (continua) { if (x + w < W + 60) x = Math.max(MARGEM, W - w * 0.6); notaVazou = true; }
+    else {
+      // Nunca sai do slide: primeiro vai pra esquerda, depois diminui a letra
+      while (w > W - 2 * MARGEM && tam > 36) { tam -= 4; ctx.font = `400 ${tam}px ${FONTE_MAO}`; w = ctx.measureText(texto).width; }
+      if (x + w > W - MARGEM) x = Math.max(MARGEM, W - MARGEM - w);
+    }
     posicionarCampo(ctx, carCampos && carCampos.get(txt(texto)), x, y - tam * 0.85, w, tam * 1.1, () =>
-      girar(ctx, x, y, graus, () => { ctx.font = `400 ${tam}px ${FONTE_MAO}`; ctx.fillStyle = R[tom].ouro; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic"; ctx.fillText(texto, 0, 0); }));
+      girar(ctx, x, y, graus, () => {
+        ctx.font = `400 ${tam}px ${FONTE_MAO}`; ctx.fillStyle = R[tom].ouro; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+        if (continua) notaCapturada = { m: ctx.getTransform(), font: ctx.font, cor: ctx.fillStyle, texto };
+        ctx.fillText(texto, 0, 0);
+      }));
   }
   function seta(ctx, pts, cor) {
     ctx.save(); ctx.strokeStyle = cor; ctx.lineWidth = 5; ctx.lineCap = "round"; ctx.lineJoin = "round";
@@ -386,7 +400,7 @@ const CAR_ESTILOS = (() => {
       { tipo: "contexto", lead: "Marca", msgs: "marca: Quanto você cobra por um vídeo?\neu: Depende do que vocês precisam. Posso te fazer 3 perguntas?", texto: "Mandar o preço seco é o jeito mais rápido de perder a marca." },
       { tipo: "construcao", lead: "Marca", msgs: "eu: 1. O vídeo vai pra anúncio ou só pro orgânico?\neu: 2. Quantas versões de gancho vocês querem?", texto: "Cada resposta muda o trabalho. E o preço." },
       { tipo: "construcao", lead: "Marca", msgs: "eu: 3. Por quanto tempo vão usar o vídeo?\nmarca: Anúncio, 3 ganchos, 6 meses.", texto: "Agora eu sei **o que eu estou vendendo.**" },
-      { tipo: "tensao", lead: "Marca", msgs: "eu: Fica (seu valor), com os 3 ganchos inclusos.\nmarca: Hmm, ficou acima do que a gente pensou.", nota: "e agora?" },
+      { tipo: "tensao", lead: "Marca", msgs: "eu: Fica (seu valor), com os 3 ganchos inclusos.\nmarca: Hmm, ficou acima do que a gente pensou.", nota: "e agora, o que eu respondo?", notaContinua: true },
       { tipo: "recompensa", titulo: "Quem pergunta *antes* cobra pelo que entrega.", texto: "Anúncio, versões e tempo de uso mudam o preço. Pergunta sempre." },
       { tipo: "cta", lead: "Você", titulo: "Comenta *PREÇO*", msgs: "eu: PREÇO", texto: "que eu te mando as 3 perguntas prontas pra copiar." }] },
     fotos: { titulo: "Um dia gravando UGC em casa", slides: [
@@ -401,9 +415,21 @@ const CAR_ESTILOS = (() => {
 
   // Cor de destaque por slide: [no fundo claro, no fundo escuro]. Dourado é o padrão de cada estilo.
   const DESTAQUES = { dourado: { nome: "Dourado", cores: ["#7A6322", "#D9C48A"] }, terracota: { nome: "Terracota", cores: ["#A4532F", "#E7A47F"] }, oliva: { nome: "Oliva", cores: ["#5E6B3A", "#C2CB93"] }, vinho: { nome: "Vinho", cores: ["#7A2E3A", "#E2A3AC"] }, cafe: { nome: "Café", cores: ["#4A3B28", "#CDB99A"] } };
+  // Continuação da nota: o slide anterior desenha a nota passando da borda; o próximo desenha o resto
+  let notaModo, notaPode = false, notaVazou = false, notaCapturada = null, capturando = false;
+  function restoDaNotaAnterior(i, total, estilo, todos) {
+    const ant = todos[i - 1];
+    if (!ant || !ant.nota || ant.notaContinua === false || capturando) return null;
+    const cv = document.createElement("canvas");
+    capturando = true; notaCapturada = null;
+    try { pintar(cv, ant, i - 1, total, estilo, null, todos); } finally { capturando = false; }
+    return notaCapturada;
+  }
   function pintar(cv, s, i, total, estilo, aoCarregar, todos = []) {
     const E = ESTILOS[estilo] || ESTILOS.bastidor, ctx = cv.getContext("2d");
+    const resto = i > 0 ? restoDaNotaAnterior(i, total, estilo, todos) : null;
     cv.width = W; cv.height = H;
+    notaModo = s.notaContinua; notaPode = i < total - 1; notaVazou = false; if (!capturando) notaCapturada = null;
     const img = fotoCarrossel(s.foto, aoCarregar), foco = { topo: 0.15, meio: 0.45, baixo: 0.8 }[s.enquadrar] ?? 0.3;
     // Estúdio: "trocar" inverte o claro e o escuro deste slide; "destaque" troca a cor dourada
     const guarda = { claro: { ...R.claro }, escuro: { ...R.escuro } };
@@ -413,7 +439,11 @@ const CAR_ESTILOS = (() => {
     // Estúdio: título e texto arrastados ou aumentados (s.pos = { titulo: { x, y, k } })
     carCampos = new Map(); ["nota", "texto", "titulo"].forEach((c) => { if (s[c]) carCampos.set(txt(s[c]), c); });
     carPos = s.pos || {}; carCaixas = [];
-    try { E.desenho(ctx, s, i, total, img, foco, todos); cv.__caixas = carCaixas; }
+    try {
+      E.desenho(ctx, s, i, total, img, foco, todos); cv.__caixas = carCaixas; cv.__notaVaza = notaVazou;
+      // O resto da nota do slide anterior entra pela borda esquerda
+      if (resto) { ctx.save(); const m = resto.m; ctx.setTransform(m.a, m.b, m.c, m.d, m.e - W, m.f); ctx.font = resto.font; ctx.fillStyle = resto.cor; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic"; ctx.fillText(resto.texto, 0, 0); ctx.restore(); }
+    }
     finally { Object.assign(R.claro, guarda.claro); Object.assign(R.escuro, guarda.escuro); carCampos = carPos = carCaixas = null; }
   }
 

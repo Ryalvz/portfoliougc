@@ -87,6 +87,7 @@ function desenharEstudio(el) {
           <div class="est-opcoes">${["titulo", "texto", "nota"].filter((c) => CAR_ESTILOS.campos(car.estilo, s.tipo).includes(c) && s[c]).map((c) => `<button type="button" data-est-sel="${c}" aria-pressed="${est.sel === c}">${NOMES_CAMPO_EST[c]}</button>`).join("")}</div>
           ${est.sel ? `<div class="est-opcoes"><button type="button" data-est-tam="-1" aria-label="Diminuir">A-</button><button type="button" data-est-tam="1" aria-label="Aumentar">A+</button><button type="button" data-est-voltar>Voltar ao lugar</button></div>
           <small class="sub">Arraste no slide, ou use as setas do teclado (com Shift anda mais). Esc solta.</small>` : `<small class="sub">Escolha acima ou clique no texto do slide.</small>`}
+          ${s.nota && CAR_ESTILOS.campos(car.estilo, s.tipo).includes("nota") && est.i < n - 1 ? `<label class="check est-continua"><input type="checkbox" data-est-continua> A nota continua no próximo slide (o resto aparece quando arrasta)</label>` : ""}
           ${s.pos && Object.keys(s.pos).length ? `<button type="button" class="link-btn" data-est-voltar-tudo>Voltar tudo pro lugar do estilo</button>` : ""}</div>
         <div class="est-textos"><span class="est-rot est-rot-sec">Textos</span>${CAR_ESTILOS.campos(car.estilo, s.tipo).map((c) => estCampo(car, s, c)).join("")}</div>
         ${palavrasDe(s) > 22 ? `<p class="sub car-dica"><b class="car-muito">${palavrasDe(s)} palavras: carrossel bom é curto.</b></p>` : ""}
@@ -219,6 +220,12 @@ function desenharEstudio(el) {
   $$("[data-est-tam]", painel).forEach((b) => b.onclick = () => { const p = posDe(est.sel); p.k = tamanho((p.k || 1) * (Number(b.dataset.estTam) > 0 ? 1.1 : 1 / 1.1)); limpaPos(est.sel); pintarGrande(); pintarMini(est.i); });
   const voltar = $("[data-est-voltar]", painel);
   if (voltar) voltar.onclick = () => { if (s.pos) delete s.pos[est.sel]; limpaPos(est.sel); desenhar(); };
+  const cont = $("[data-est-continua]", painel);
+  if (cont) {
+    const cvG2 = $("#est-grande", el);
+    cont.checked = s.notaContinua === true || (s.notaContinua !== false && !!(cvG2 && cvG2.__notaVaza));
+    cont.onchange = () => { s.notaContinua = cont.checked; desenhar(); };
+  }
   const voltarTudo = $("[data-est-voltar-tudo]", painel);
   if (voltarTudo) voltarTudo.onclick = () => { delete s.pos; desenhar(); };
   $$("[data-est-mover]", painel).forEach((b) => b.onclick = () => { const j = est.i + Number(b.dataset.estMover); [car.slides[est.i], car.slides[j]] = [car.slides[j], car.slides[est.i]]; est.i = j; desenhar(); });
