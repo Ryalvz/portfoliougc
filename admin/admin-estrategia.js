@@ -1591,6 +1591,31 @@ GANCHOS: 3 opções de tipos diferentes.
 ROTEIRO: nos 4 blocos (GANCHO, CONTEXTO, CONTEÚDO, FECHAMENTO). Em cada bloco, a fala corrida entre aspas, do jeito que eu falaria, e embaixo a cena em [CENA: ...] em primeira pessoa.
 LEGENDA: para o Instagram, gancho na primeira linha, o mesmo CTA do vídeo, 1 a 3 emojis e 3 a 5 hashtags.`
   },
+  carrossel: {
+    nome: "Carrossel",
+    texto: `TIPO: CARROSSEL ORGÂNICO para o MEU perfil (Instagram), para o MEU público. NÃO é vídeo, NÃO é publicidade e NÃO é venda.
+Carrossel é texto de LER, arrastando de slide em slide: nada de fala, segundos, cena, gravação ou roteiro de vídeo.
+OBJETIVO: salvamento, compartilhamento, comentário e seguidores novos.
+Cada post tem um papel nos três Cs: CONHECER (quem eu sou, meu estilo de vida; CTA seguir ou compartilhar), CONECTAR (ensina com a minha experiência real, rotina e bastidores; CTA salvar ou comentar) ou CONVERTER (mostra o meu trabalho para as marcas; CTA portfólio na bio ou direct).
+ESTRUTURA: 7 slides, até 15 palavras por slide, com um loop de curiosidade que faz a pessoa arrastar.
+1. GANCHO: a capa, que abre uma pergunta ou promessa.
+2. CONTEXTO: a minha história real em uma ou duas frases.
+3 e 4. CONSTRUÇÃO: a entrega de verdade (passo, número, antes e depois ou exemplo concreto).
+5. TENSÃO: o ponto que segura a resposta.
+6. RECOMPENSA: a resposta do gancho.
+7. CTA: uma ação só, coerente com o C.
+O post nasce de uma história, experiência ou prova REAL minha. Dica que qualquer creator daria não serve: se faltar a minha história, me pergunte.`,
+    // getter: CAR_ESTILOS vem do admin-carrossel.js, que carrega depois
+    get entrega() { return `C: qual dos três Cs esse post cumpre e por quê, em uma linha.
+CAPAS: 5 opções de texto pro slide 1, de ângulos diferentes, até 10 palavras cada. Uma por linha: 1. "frase" | ângulo | por que faz arrastar.
+OS 3 PRIMEIROS SLIDES: o que cada um mostra e por que a pessoa arrasta pro próximo.
+SLIDE A SLIDE: a função e o texto de cada uma das 7 páginas.
+SLIDES: o carrossel pronto, num dos meus 4 estilos (Bastidor, Revista, Conversa ou Fotos), neste formato (é o que o Estúdio de arte do painel abre):
+${CAR_ESTILOS.formato("")}
+CHAMADA FINAL: o CTA do último slide, uma ação só.
+LEGENDA: para o Instagram, gancho na primeira linha, o mesmo CTA e 3 a 5 hashtags.
+DICAS DE ARTE: o estilo, que foto usar (ou se é sem foto) e onde a nota escrita à mão continua no próximo slide.`; }
+  },
   publi: {
     nome: "Publi / UGC",
     texto: `TIPO: vídeo UGC para uma MARCA (publi), pago pela marca, para ela usar no perfil e em anúncio.
@@ -1609,37 +1634,50 @@ LEGENDA: sugestão para a marca, respeitando o briefing.`
   }
 };
 
+// A ideia é um carrossel? (formato do plano, bloco CARROSSEL, plano que cita o #número, ou o título)
+function ideiaEhCarrossel(t) {
+  if (/carross/i.test(String(t.formato || ""))) return true;
+  if (typeof CAR_ESTILOS !== "undefined" && CAR_ESTILOS.lerTexto(t.minha_versao || "")[0]) return true;
+  if (t.id != null) {
+    const marca = new RegExp(`#${t.id}(?!\\d)`);
+    const noPlano = (igx.planos || []).some((p) => (((p.itens || {}).itens) || []).some((it) => marca.test(String(it.tema || "")) && /carross/i.test(String(it.formato || ""))));
+    if (noPlano) return true;
+  }
+  return /carross/i.test(String(t.titulo || ""));
+}
+
 function roteiroNaMinhaVoz(t) {
-  Promise.all([carregarVoz(), carregarDna()]).then(([voz, dna]) => {
-    let cat = FORMATO_ROTEIRO[t.categoria] ? t.categoria : "organico";
-    const montar = () => { const f = FORMATO_ROTEIRO[cat]; return `Você vai escrever um roteiro pronto para eu gravar, do MEU jeito de falar.
+  Promise.all([carregarVoz(), carregarDna(), igx.planos ? Promise.resolve() : carregarPlanos().catch(() => {})]).then(([voz, dna]) => {
+    const ehCar = t.categoria !== "tiktok" && t.categoria !== "publi" && ideiaEhCarrossel(t);
+    let cat = ehCar ? "carrossel" : FORMATO_ROTEIRO[t.categoria] ? t.categoria : "organico";
+    const montar = () => { const f = FORMATO_ROTEIRO[cat]; const car = cat === "carrossel"; const org = cat === "organico" || car; return `${car ? "Você vai escrever um carrossel pronto para eu montar no Estúdio de arte, do MEU jeito de escrever." : "Você vai escrever um roteiro pronto para eu gravar, do MEU jeito de falar."}
 
 ${f.texto}
 
-IMPORTANTE: o TIPO acima manda no objetivo e na estrutura. Do meu guia de voz abaixo, use só o TOM, o jeito de falar, a DURAÇÃO no meu ritmo e a lista de PROIBIDOS.${cat === "organico" ? " As partes do guia sobre vender, objeção, prova de produto e estrutura para marca NÃO valem aqui." : ""}
+IMPORTANTE: o TIPO acima manda no objetivo e na estrutura. Do meu guia de voz abaixo, use só ${car ? "o TOM, o jeito de escrever e a lista de PROIBIDOS. O ritmo de fala, a duração, a estrutura de vídeo e as dicas de gravação do guia NÃO valem aqui, porque carrossel é para ler." : "o TOM, o jeito de falar, a DURAÇÃO no meu ritmo e a lista de PROIBIDOS."}${org ? " As partes do guia sobre vender, objeção, prova de produto e estrutura para marca NÃO valem aqui." : ""}
 
 MEU GUIA DE VOZ
 ${voz}
-${cat === "organico" ? `
+${org ? `
 O QUE JÁ FUNCIONOU NO MEU PERFIL (encaixe a ideia na fórmula que mais combina e diga qual no ÂNGULO)
 ${dna}
 ` : ""}
 A IDEIA
 Título: ${t.titulo || "sem título"}
 ${t.minha_versao ? `O que eu já anotei:\n${t.minha_versao}\n` : ""}${t.observacoes ? `Observações:\n${t.observacoes}\n` : ""}${t.transcricao ? `Referência (vídeo de ${t.perfil || "outra pessoa"}): use só a ESTRUTURA, nunca copie as frases.\n${String(t.transcricao).slice(0, 2500)}\n` : ""}
-Se você tiver a skill "roteiro-ugc", use as regras de voz dela, mas a estrutura é a do TIPO acima (${f.nome}).
+${car ? `Se você tiver a skill "roteiro-ugc", use só as regras de voz e a lista de proibidos dela. Nada de molde de vídeo.` : `Se você tiver a skill "roteiro-ugc", use as regras de voz dela, mas a estrutura é a do TIPO acima (${f.nome}).`}
 
 ME ENTREGUE ASSIM (use exatamente estes títulos em maiúsculas)
 ${f.entrega}
-DURAÇÃO: quantas palavras faladas, dividido por 3,25, mais o respiro de tela. Se passar do formato, diga qual frase cortar.
+${car ? "" : `DURAÇÃO: quantas palavras faladas, dividido por 3,25, mais o respiro de tela. Se passar do formato, diga qual frase cortar.
 DICAS DE GRAVAÇÃO: enquadramento e cenas de apoio${cat === "organico" ? "" : ", e qual cena é a prova do vídeo"}.
-ÂNGULO: em uma linha, por que escolheu esse ângulo.
+`}ÂNGULO: em uma linha, por que escolheu esse ângulo.
 
-Nada de picotar a fala linha por linha. Antes de entregar, confira contra a lista de proibidos do guia. Nada de número ou resultado inventado: o que eu precisar preencher vai entre parênteses.`; };
+${car ? "Nada de frase picotada para falso impacto." : "Nada de picotar a fala linha por linha."} Antes de entregar, confira contra a lista de proibidos do guia. Nada de número ou resultado inventado: o que eu precisar preencher vai entre parênteses.`; };
     const d = abrirJanelaSimples("✍️ Roteiro na minha voz", `
       <p class="sub" style="margin-top:0">Cada tipo tem objetivo e estrutura próprios. Confira o tipo antes de copiar:</p>
       <div class="pro-abas" role="tablist" aria-label="Tipo de roteiro">${Object.entries(FORMATO_ROTEIRO).map(([k, f]) => `<button type="button" role="tab" data-rv-tipo="${k}" aria-selected="${k === cat}">${esc(f.nome)}</button>`).join("")}</div>
-      ${t.categoria && FORMATO_ROTEIRO[t.categoria] ? "" : `<p class="sub">Essa ideia está sem divisão, então comecei como ideia orgânica. Troque acima se for TikTok Shop ou publi.</p>`}
+      ${ehCar ? `<p class="sub">Essa ideia é um carrossel, então o pedido já vem com o molde de carrossel (slides, capa e arte), sem nada de vídeo.</p>` : t.categoria && FORMATO_ROTEIRO[t.categoria] ? "" : `<p class="sub">Essa ideia está sem divisão, então comecei como ideia orgânica. Troque acima se for TikTok Shop ou publi.</p>`}
       <ol class="passos"><li>Toque em <b>Copiar o pedido</b> e cole no Claude.</li><li>Ajuste o que quiser conversando com ele.</li><li>Cole o roteiro final em <b>Minha versão</b> e salve. Pronto pra gravar.</li></ol>
       ${vozGuia === VOZ_PADRAO ? `<p class="sub">Dica: em <b>🗣️ Minha voz</b> (embaixo da lista de roteiros) dá para deixar o guia ainda mais com a sua cara.</p>` : ""}
       <textarea class="campo" id="rv-prompt" rows="10" style="width:100%;font-size:12px" readonly>${esc(montar())}</textarea>`,
@@ -1797,8 +1835,8 @@ function abrirPostDoPlano(plano, it, evento) {
     const ir = e.target.closest("[data-ir-ideia]");
     if (ir) { d.close(); trans.sel = ir.dataset.irIdeia; irPara("transcricoes"); return; }
     const voz = e.target.closest("[data-voz]");
-    if (voz) { const t = S.transcricoes.find((x) => String(x.id) === voz.dataset.voz); d.close(); if (t) roteiroNaMinhaVoz(t); return; }
-    if (e.target.closest("[data-voz-novo]")) { d.close(); roteiroNaMinhaVoz({ titulo: String(it.tema).replace(/#\d+\s*/g, ""), categoria: "organico", minha_versao: [it.gancho && `Gancho sugerido: ${it.gancho}`, it.porque && `Por que vai funcionar: ${it.porque}`].filter(Boolean).join("\n") }); return; }
+    if (voz) { const t = S.transcricoes.find((x) => String(x.id) === voz.dataset.voz); d.close(); if (t) roteiroNaMinhaVoz({ ...t, formato: it.formato }); return; }
+    if (e.target.closest("[data-voz-novo]")) { d.close(); roteiroNaMinhaVoz({ titulo: String(it.tema).replace(/#\d+\s*/g, ""), categoria: "organico", formato: it.formato, minha_versao: [it.gancho && `Gancho sugerido: ${it.gancho}`, it.porque && `Por que vai funcionar: ${it.porque}`].filter(Boolean).join("\n") }); return; }
     if (e.target.closest("[data-abrir-car]")) { d.close(); igx.car = { titulo: car.titulo, estilo: car.estilo || undefined, slides: car.slides.map((x) => ({ ...x })) }; igx.sub = "carrossel"; try { localStorage.setItem("ig-sub", "carrossel"); } catch (_) {} irPara("instagram"); return; }
     if (e.target.closest("[data-editar-evento]")) { d.close(); formCalendarioBase(evento); return; }
     if (e.target.closest("[data-agenda]")) {
