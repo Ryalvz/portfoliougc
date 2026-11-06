@@ -157,10 +157,26 @@ const CAR_ESTILOS = (() => {
       }
       case "tensao": {
         fundoLuz(ctx, "escuro"); moldura(ctx, "escuro", i, total);
-        let y = rico(ctx, s.titulo, W / 2, 340, { tam: 104, largura: 900, tom: "escuro", alinhar: "center", altura: 360 });
-        ctx.font = mont(600, 42); ctx.fillStyle = R.escuro.cinza; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic"; ctx.fillText(txt(s.lead), W / 2, y + 60);
-        y += 130;
-        linhas(s.itens).slice(0, 5).forEach((t) => { y = pilula(ctx, t, W / 2, y, 760, "escuro") + 34; });
+        // Mede o bloco inteiro antes, pra centralizar na altura do slide (sem buraco embaixo)
+        const itens = linhas(s.itens).slice(0, 5), optTit = { tam: 120, largura: 900, tom: "escuro", alinhar: "center", altura: 380 };
+        const guardaCampos = carCampos; carCampos = null;
+        const med = document.createElement("canvas"); med.width = W; med.height = H;
+        const hTit = rico(med.getContext("2d"), s.titulo, W / 2, 0, optTit);
+        carCampos = guardaCampos;
+        const PIL = 76, VAO = 44;
+        const hLead = s.lead ? 90 : 0, hItens = itens.length ? 80 + itens.length * PIL + (itens.length - 1) * VAO : 0, hTexto = s.texto ? 150 : 0;
+        const topo = 230, util = H - 150 - topo, soma = hTit + hLead + hItens + hTexto;
+        let y = topo + Math.max(0, (util - soma) / 2);
+        y = rico(ctx, s.titulo, W / 2, y, optTit);
+        if (s.lead) { ctx.font = mont(600, 44); ctx.fillStyle = R.escuro.cinza; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic"; ctx.fillText(txt(s.lead), W / 2, y + 66); y += hLead; }
+        if (itens.length) {
+          y += 80;
+          // Linha que liga os botões, como uma linha do tempo
+          if (itens.length > 1) { ctx.save(); ctx.strokeStyle = R.escuro.faixa; ctx.globalAlpha = 0.45; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(W / 2, y + PIL / 2); ctx.lineTo(W / 2, y + (itens.length - 1) * (PIL + VAO) + PIL / 2); ctx.stroke(); ctx.restore(); }
+          itens.forEach((t, k) => { pilula(ctx, t, W / 2, y + k * (PIL + VAO), 820, "escuro"); });
+          y += itens.length * PIL + (itens.length - 1) * VAO;
+        }
+        if (s.texto) paragrafo(ctx, s.texto, W / 2, y + 70, { tam: 40, largura: 820, tom: "escuro", alinhar: "center", altura: 120 });
         return;
       }
       case "recompensa": {
@@ -333,8 +349,8 @@ const CAR_ESTILOS = (() => {
   const TIPOS = [["gancho", "Gancho"], ["contexto", "Contexto"], ["construcao", "Construção"], ["tensao", "Tensão"], ["recompensa", "Recompensa"], ["cta", "CTA"]];
   const ESTILOS = {
     bastidor: { nome: "Bastidor", quando: "Método e bastidor de UGC: a marca vê como você pensa.", desenho: bastidor,
-      campos: { gancho: ["foto", "titulo", "texto", "nota"], contexto: ["lead", "titulo", "texto"], construcao: ["titulo", "itens", "texto", "foto", "nota"], tensao: ["titulo", "lead", "itens"], recompensa: ["titulo", "texto", "nota", "lead"], cta: ["palavra", "texto", "foto"] },
-      rotulos: { contexto: { lead: "Linha pequena em cima (ex.: Exemplo real:)" }, construcao: { itens: "Lista, um por linha: item / explicação (vazio = slide de print com foto)" }, tensao: { lead: "Frase embaixo do título", itens: "Botões, um por linha" }, recompensa: { lead: "Palavra fantasma ao fundo", texto: "Frase com seta (opcional)" } } },
+      campos: { gancho: ["foto", "titulo", "texto", "nota"], contexto: ["lead", "titulo", "texto"], construcao: ["titulo", "itens", "texto", "foto", "nota"], tensao: ["titulo", "lead", "itens", "texto"], recompensa: ["titulo", "texto", "nota", "lead"], cta: ["palavra", "texto", "foto"] },
+      rotulos: { contexto: { lead: "Linha pequena em cima (ex.: Exemplo real:)" }, construcao: { itens: "Lista, um por linha: item / explicação (vazio = slide de print com foto)" }, tensao: { lead: "Frase embaixo do título", itens: "Botões, um por linha", texto: "Frase final embaixo dos botões (opcional)" }, recompensa: { lead: "Palavra fantasma ao fundo", texto: "Frase com seta (opcional)" } } },
     revista: { nome: "Revista", quando: "Dicas e listas, como a série De Creator pra Creator: elegante e pra salvar.", desenho: revista,
       campos: { gancho: ["foto", "titulo", "texto", "nota"], contexto: ["titulo", "texto"], construcao: ["lead", "titulo", "texto"], tensao: ["titulo", "itens"], recompensa: ["titulo", "texto"], cta: ["palavra", "texto", "foto"] },
       rotulos: { construcao: { lead: "Linha pequena (ex.: pra cortar e legendar)" }, tensao: { itens: "Duas colunas: 1ª linha 'todo mundo / eu', depois 'isso / aquilo'" } } },
