@@ -88,7 +88,7 @@ const ESQUEMA = {
   ig_stories: ["id", "data", "tipo", "capa", "link", "alcance", "views", "respostas", "compartilhou", "interacoes", "seguiu", "perfil", "avancou", "voltou", "saiu", "pulou"],
   lembretes_rapidos: ["id", "texto", "quando", "feito", "avisado", "criado_em"],
   contatos_site: ["id", "criado_em", "tipo", "nome", "marca", "email", "whats", "mensagem", "visto"],
-  contratos: ["id", "cliente", "tipo", "descricao", "valor", "mes", "ano", "data_nf", "prazo_dias", "status", "parcela1", "data_p1", "parcela2", "data_p2", "obs", "qtd", "prazo_entrega", "favorita", "criado_em"],
+  contratos: ["id", "cliente", "tipo", "descricao", "valor", "mes", "ano", "data_nf", "prazo_dias", "status", "parcela1", "data_p1", "parcela2", "data_p2", "obs", "qtd", "prazo_entrega", "favorita", "roteiro_link", "roteiro_texto", "criado_em"],
   transcricoes: ["id", "criado_em", "link", "plataforma", "categoria", "status", "titulo", "transcricao", "transcricao_original", "idioma_original", "minha_versao", "observacoes", "de_quem", "perfil", "tags", "legenda", "postado_em", "andamento", "erro"],
   marcados: ["chave", "marcado"],
   visitas: ["id", "data", "pagina", "origem"]
@@ -3170,6 +3170,8 @@ function formContrato(c, extra = {}) {
       { n: "descricao", r: "Descrição", inteiro: true, ph: "ex: 2 vídeos + 3 stories" },
       { n: "qtd", r: "Quantidade de vídeos", t: "number" },
       { n: "prazo_entrega", r: "Prazo de entrega para a marca", t: "date" },
+      { n: "roteiro_link", r: "Link do roteiro aprovado", t: "url", inteiro: true, ph: "https://docs.google.com/...", ajuda: "Google Docs, Drive, Notion ou o link que a marca aprovou. No cartão da campanha aparece o botão Ver roteiro aprovado." },
+      { n: "roteiro_texto", r: "Texto do roteiro aprovado (opcional)", t: "textarea", ph: "Cole o roteiro aqui pra ver no formato de gravação: fala de um lado, cena do outro, com letra grande.", ajuda: "Com os blocos (GANCHO, DESENVOLVIMENTO, CTA...) e a cena em [CENA: ...], ele abre igual aos seus roteiros. Sem blocos, abre o texto em letra grande." },
       { n: "valor", r: "Valor total (R$)", t: "number" },
       { n: "mes", r: "Mês de fechamento", t: "select", op: MESES_LONGOS.map((m, i) => [i + 1, m]) },
       { n: "ano", r: "Ano", t: "number" },
@@ -3193,6 +3195,8 @@ function formContrato(c, extra = {}) {
       if (["Nota fiscal enviada", "Aguardando pagamento"].includes(d.status) && !d.data_nf) d.data_nf = hojeISO();
       const quitado = n2(d.valor) > 0 && n2(d.parcela1) + n2(d.parcela2) >= n2(d.valor);
       if (quitado && grupoDe(d.status) === "dinheiro" && d.status !== "Pago") { d.status = "Pago"; setTimeout(() => avisar("Marquei como Pago: o valor todo já foi recebido."), 400); }
+      ["roteiro_link", "roteiro_texto"].forEach((k) => { if (k in d) d[k] = String(d[k] || "").trim() || null; });
+      if (d.roteiro_link && !/^https?:\/\//i.test(d.roteiro_link)) d.roteiro_link = "https://" + d.roteiro_link;
       const ok = await gravar("contratos", d, c ? c.id : null);
       if (ok) { recarregar("contratos"); if (extra.depois) extra.depois(); }
       return ok;
@@ -3311,6 +3315,7 @@ function desenharProducao(el) {
     const c = S.contratos.find((x) => String(x.id) === cartao.dataset.id);
     if (estrela) { if (await gravar("contratos", { favorita: !c.favorita }, c.id)) { c.favorita = !c.favorita; pintar(); } return; }
     if (e.target.closest("[data-depoimento]")) { pedirDepoimento(c); return; }
+    if (e.target.closest("[data-roteiro-camp]")) { abrirRoteiroDaCampanha(c); return; }
     formContrato(c);
   });
 }
@@ -3394,11 +3399,25 @@ function cartaoCampanha(c) {
     ${fechado(c) && !entregue(c) ? `<small>${c.prazo_entrega ? `Entrega ${dataBR(c.prazo_entrega)}` : "Sem prazo de entrega"}${avisoEntrega(c)}</small>` : ""}
     <small><b>${real(c.valor)}</b>${saldoDe(c) > 0 && entregue(c) ? ` · falta receber ${real(saldoDe(c))}` : ""}</small>
     ${c.status !== "Pago" ? `<span class="pilula ${classeStatus(s)}" style="align-self:flex-start">${esc(s)}</span>` : ""}
+    ${c.roteiro_link || c.roteiro_texto ? `<button class="btn pequeno" type="button" data-roteiro-camp style="align-self:flex-start">Ver roteiro aprovado</button>` : ""}
     ${entregue(c) ? `<button class="link-btn" type="button" data-depoimento style="align-self:flex-start">💬 Pedir depoimento</button>` : ""}
     <select class="campo etapa-cartao" data-etapa-prod="${esc(c.id)}" aria-label="Mudar a etapa de ${esc(c.cliente)}">
       ${STATUS_CONTRATO.map((v) => `<option value="${esc(v)}" ${v === c.status ? "selected" : ""}>${esc(v)}</option>`).join("")}
     </select>
   </article>`;
+}
+
+// O roteiro que a marca aprovou: no formato de gravação (como os meus), em letra grande ou no link
+function abrirRoteiroDaCampanha(c) {
+  const titulo = [c.cliente, c.descricao].filter(Boolean).join(" · ");
+  const texto = String(c.roteiro_texto || "").trim(), link = c.roteiro_link || "";
+  if (!texto) { if (link) window.open(link, "_blank", "noopener"); return; }
+  const base = { titulo, categoria: "publi", marca: c.cliente || "", link, nota: "Dá pra tocar no título e no cabeçalho pra mudar antes de baixar. O roteiro em si você muda na campanha, em Texto do roteiro aprovado." };
+  if (lerRoteiroGravacao(texto).blocos.length) { abrirRoteiroGravacao(base, texto); return; }
+  const d = abrirJanelaSimples(`Roteiro aprovado: ${esc(titulo)}`, `
+    <div class="rc-texto">${esc(texto).replace(/\n/g, "<br>")}</div>`,
+    `${link ? `<a class="btn" href="${esc(link)}" target="_blank" rel="noopener">Abrir o link original</a>` : ""}<button type="button" class="btn" id="rc-grande" aria-pressed="false">Letra grande</button><button type="button" class="btn primario" data-fechar>Fechar</button>`);
+  $("#rc-grande", d).onclick = (e) => { const on = $(".rc-texto", d).classList.toggle("grande"); e.target.setAttribute("aria-pressed", String(on)); };
 }
 
 async function mudarEtapa(c, novo) {

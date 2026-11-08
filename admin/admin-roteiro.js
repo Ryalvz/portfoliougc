@@ -116,7 +116,7 @@ const META_ROTEIRO = {
 function abrirRoteiroGravacao(t, texto) {
   const r = lerRoteiroGravacao(texto != null ? texto : t.minha_versao);
   if (!r.blocos.length) { avisar("Ainda não achei o roteiro: escreva em Minha versão com os blocos (GANCHO, CONTEXTO...) e a cena em [CENA: ...].", true); return; }
-  const meta = { ...(META_ROTEIRO[t.categoria] || META_ROTEIRO.organico), titulo: t.titulo || "Roteiro", data: dataBR(hojeISO()) };
+  const meta = { ...(META_ROTEIRO[t.categoria] || META_ROTEIRO.organico), ...(t.marca ? { marca: t.marca } : {}), titulo: t.titulo || "Roteiro", data: dataBR(hojeISO()) };
   const etapas = etapasDoRoteiro(r.blocos);
   let n = 0;
   const campo = (k, rot) => `<div class="rg-meta-item"><span>${rot}</span><b contenteditable="true" spellcheck="false" data-meta="${k}">${esc(meta[k])}</b></div>`;
@@ -132,6 +132,7 @@ function abrirRoteiroGravacao(t, texto) {
   d.innerHTML = `
     <div class="rg-barra">
       <b class="rg-barra-titulo">Roteiro de gravação</b><span class="espaco"></span>
+      ${t.link ? `<a class="btn" href="${esc(t.link)}" target="_blank" rel="noopener">Abrir o link original</a>` : ""}
       <button type="button" class="btn" data-rg="grande" aria-pressed="false">Letra grande</button>
       <button type="button" class="btn" data-rg="pdf">PDF</button>
       <button type="button" class="btn" data-rg="word">Word</button>
@@ -152,7 +153,7 @@ function abrirRoteiroGravacao(t, texto) {
       </section>`).join("")}
       ${r.chamada ? `<div class="rg-extra rg-chamada"><b>Chamada final</b><p>${esc(r.chamada).replace(/\n/g, "<br>")}</p></div>` : ""}
       ${r.dicas ? `<details class="rg-extra rg-dicas"><summary><b>Dicas de gravação</b></summary><p>${esc(r.dicas).replace(/\n/g, "<br>")}</p></details>` : ""}
-      <p class="rg-nota">Dá pra tocar no título e no cabeçalho pra mudar antes de baixar. O roteiro em si você muda em Minha versão.</p>
+      <p class="rg-nota">${esc(t.nota || "Dá pra tocar no título e no cabeçalho pra mudar antes de baixar. O roteiro em si você muda em Minha versão.")}</p>
     </div>`;
   document.body.appendChild(d);
   const lerMeta = () => { $$("[data-meta]", d).forEach((x) => { meta[x.dataset.meta] = x.textContent.trim(); }); return meta; };
