@@ -3390,7 +3390,7 @@ function cartaoCampanha(c) {
   const s = situacaoDe(c);
   return `<article class="cartao-ideia cartao-campanha ${c.favorita ? "favorita" : ""}" draggable="true" data-id="${esc(c.id)}" tabindex="0">
     <div class="item-trans-topo">
-      <span class="pilula ${c.tipo === "Influencer" ? "p-publicidade" : "p-conteudo"}">${esc(c.tipo || "")}</span>
+      <span class="pilula ${c.tipo === "Influencer" ? "p-publicidade" : "p-conteudo"}">${esc(c.tipo || "").replace(/\//g, "/<wbr>")}</span>
       ${c.qtd ? `<span class="pilula p-status">${plural(Number(c.qtd), "vídeo", "vídeos")}</span>` : ""}
       <button class="icone-btn estrela ${c.favorita ? "on" : ""}" type="button" data-estrela aria-pressed="${!!c.favorita}" aria-label="${c.favorita ? "Tirar destaque" : "Destacar"}" style="margin-left:auto;width:24px;height:24px">${ic("estrela")}</button>
     </div>

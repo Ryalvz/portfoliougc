@@ -539,6 +539,7 @@ details.tokscript > summary .emo { font-size: 16px; color: var(--cobalt); }
 .cartao-campanha { min-width: 0; grid-template-columns: minmax(0, 1fr); }
 .cartao-campanha .etapa-cartao { width: 100%; min-width: 0; }
 .cartao-campanha > .pilula { white-space: normal; }
+.cartao-campanha .item-trans-topo .pilula { white-space: normal; max-width: 100%; min-width: 0; overflow-wrap: break-word; }
 .cartao-campanha [data-roteiro-camp] { align-self: stretch !important; max-width: 100%; white-space: normal; justify-content: center; text-align: center; }
 .col-prod > header small { white-space: nowrap; }
 
