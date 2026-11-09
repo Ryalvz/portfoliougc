@@ -219,7 +219,7 @@ function lerPlano(texto) {
   String(texto || "").split("\n").forEach((bruta) => {
     const l = bruta.replace(/^[\s>*•-]+/, "").replace(/\*\*/g, "").replace(/^\|/, "").replace(/\|\s*$/, "").trim();
     const mc = l.match(/^CARROSSEL\s*:\s*(.+)$/i);
-    if (mc) { const [tit, ...resto] = mc[1].split("|").map((x) => x.trim()); const me = resto.join(" ").match(/estilo\s*:?\s*(bastidor|revista|conversa|fotos)/i); car = { titulo: tit, estilo: me ? me[1].toLowerCase() : "", slides: [] }; carrosseis.push(car); return; }
+    if (mc) { const [tit, ...resto] = mc[1].split("|").map((x) => x.trim()); const me = resto.join(" ").match(/estilo\s*:?\s*(direto|bastidor|revista|conversa|fotos)/i); car = { titulo: tit, estilo: me ? me[1].toLowerCase() : "", slides: [] }; carrosseis.push(car); return; }
     const md = l.match(/^(SEG|TER|QUA|QUI|SEX|S[AÁ]B|DOM)[A-Za-zçÇáÁ-]*\s*\|\s*(.+)$/i);
     if (md) {
       const p = md[2].split("|").map((x) => x.trim());
@@ -294,7 +294,6 @@ Regras da série: é sempre um Conectar, em Reels. O título do post começa com
 ${ideias.map((t) => `#${t.id} [${(CATEGORIAS.find((c) => c[0] === t.categoria) || [0, t.categoria || ""])[1]}${t.status === "agora" ? ", fazer agora" : ""}] ${t.titulo || "sem título"}${(t.minha_versao || t.transcricao) ? `: ${String(t.minha_versao || t.transcricao).replace(/\s+/g, " ").slice(0, 160)}` : ""}`).join("\n")}
 ` : "";
   const contexto = String((igx.contextos || {})[seg] || "").trim();
-  const ultimoEstilo = ((CAR_ESTILOS.ESTILOS[((igx.carrosseis || []).map((c) => (c.slides || {}).estilo).find(Boolean))] || {}).nome) || "";
   return `Você é o meu estrategista de conteúdo para Instagram. O seu trabalho é montar uma semana que siga a MINHA ESTRATÉGIA abaixo, com ideias específicas e coerentes, nada vago.
 
 QUEM SOU EU
@@ -354,7 +353,7 @@ O QUE EU PRECISO (pesquise na internet de verdade, nada de tendência inventada)
    CHAMADA FINAL: o CTA do último slide, uma ação só.
    LEGENDA: gancho na primeira linha, o mesmo CTA, 3 a 5 hashtags.
    DICAS DE ARTE: o estilo, que foto usar (ou se é sem foto) e onde a nota escrita à mão continua no próximo slide.
-7. CARROSSÉIS PRONTOS: para cada carrossel do plano, escreva os slides num dos meus 4 estilos (Bastidor, Revista, Conversa ou Fotos), escolhendo o que combina com o assunto${ultimoEstilo ? `. O último carrossel foi ${ultimoEstilo}: use outro estilo, e nunca dois carrosséis do mesmo estilo na mesma semana` : ", e nunca dois carrosséis do mesmo estilo na mesma semana"}.
+7. CARROSSÉIS PRONTOS: para cada carrossel do plano, escreva os slides num dos meus estilos (de preferência o Direto; Bastidor, Revista, Conversa ou Fotos só se o assunto pedir). O Direto pode repetir toda semana: o que muda é a capa, a foto e o tom de fundo.
    ${CAR_ESTILOS.formato("").split("\n").join("\n   ")}
 
 Fale como gente de verdade, em português do Brasil, tom de conversa de café, sem cara de anúncio. Não use travessão em nenhum texto. Proibido: "não é X, é Y" e variações, "aí eu descobri", "foi aí que", "foi quando", "até que", "você sabia que" como gancho, "isso muda tudo", "isso muda o jogo". Não invente número ou resultado meu: o que você não sabe vira campo entre parênteses.`;
@@ -579,6 +578,8 @@ function desenharPlanoSemana(el) {
    No texto: *palavra* = itálico colorido, **palavra** = negrito.
    ----------------------------------------------------------------- */
 const FONTE_SERIFA = "'Playfair Display'", FONTE_BASTAO = "Montserrat", FONTE_MAO = "Allura", FONTE_PINCEL = "Yellowtail";
+// Estilo Direto: grotesca grossa e apertada + letra de marcador
+const FONTE_GROT = "'Inter Tight'", FONTE_MARCADOR = "'Caveat Brush'";
 const TEMAS_CARROSSEL = {
   ryan: { nome: "Ryan (creme e dourado)", acento: "#1F3FC3", mao: "#E8B33C",
     claro: { fundo: "#F5F1EA", titulo: "#2B241C", texto: "#3A3128", destaque: "#7A6322" },
@@ -1122,7 +1123,7 @@ const novoSlide = (modelo) => ({ modelo, titulo: "", texto: "" });
 function desenharCarrossel(el) {
   if (igx.carrosseis === null) { el.innerHTML = `<p class="vazio">Abrindo o gerador...</p>`; Promise.all([carregarCarrosseis(), carregarFontesCarrossel()]).then(desenhar); return; }
   if (igx.faltaCarrosseis) { el.innerHTML = `<div class="aviso-falta">Falta rodar a parte 27 do banco.sql no Supabase.</div>`; return; }
-  if (!igx.car) igx.car = CAR_ESTILOS.exemplo("bastidor");
+  if (!igx.car) igx.car = CAR_ESTILOS.exemplo("direto");
   if (igx.car.estilo && CAR_ESTILOS.ESTILOS[igx.car.estilo]) return desenharEstilos(el);
   const car = igx.car;
   car.slides.forEach((s) => { if (!MODELOS_SLIDE.some((m) => m[0] === s.modelo)) s.modelo = s.modelo === "comparacao" ? "cartao" : "texto"; });
@@ -1288,7 +1289,6 @@ function trocarEstilo(car, novo) {
   car.estilo = novo; // entre os 4 estilos os slides são os mesmos, só muda o desenho
 }
 function pedidoCarrossel(ideia, estilo) {
-  const ultimo = (igx.carrosseis || []).map((c) => (c.slides || {}).estilo).find(Boolean);
   return `Você é o meu roteirista e designer de carrossel para Instagram. Eu tenho a ideia, você monta o carrossel.
 
 QUEM SOU EU
@@ -1297,7 +1297,7 @@ ${NICHO_PADRAO}
 A MINHA IDEIA
 ${ideia}
 
-${estilo === "auto" ? `ESTILO: escolha o que combina mais com a ideia${ultimo ? ` (o último carrossel foi ${CAR_ESTILOS.ESTILOS[ultimo].nome}: prefira outro, pro feed não ficar repetido)` : ""}.` : `ESTILO: ${CAR_ESTILOS.ESTILOS[estilo].nome}.`}
+${estilo === "auto" ? `ESTILO: de preferência o Direto; outro só se a ideia pedir (Conversa para negociação com marca, Fotos para rotina com foto).` : `ESTILO: ${CAR_ESTILOS.ESTILOS[estilo].nome}.`}
 
 ${CAR_ESTILOS.formato(estilo === "auto" ? "" : estilo)}
 
@@ -1610,7 +1610,7 @@ O post nasce de uma história, experiência ou prova REAL minha. Dica que qualqu
 CAPAS: 5 opções de texto pro slide 1, de ângulos diferentes, até 10 palavras cada. Uma por linha: 1. "frase" | ângulo | por que faz arrastar.
 OS 3 PRIMEIROS SLIDES: o que cada um mostra e por que a pessoa arrasta pro próximo.
 SLIDE A SLIDE: a função e o texto de cada uma das 7 páginas.
-SLIDES: o carrossel pronto, num dos meus 4 estilos (Bastidor, Revista, Conversa ou Fotos), neste formato (é o que o Estúdio de arte do painel abre):
+SLIDES: o carrossel pronto, de preferência no estilo Direto (Bastidor, Revista, Conversa ou Fotos só se o assunto pedir), neste formato (é o que o Estúdio de arte do painel abre):
 ${CAR_ESTILOS.formato("")}
 CHAMADA FINAL: o CTA do último slide, uma ação só.
 LEGENDA: para o Instagram, gancho na primeira linha, o mesmo CTA e 3 a 5 hashtags.

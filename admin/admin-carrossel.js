@@ -1,6 +1,7 @@
 /* =============================================================
-   ADMIN, PARTE 4: os 4 estilos de carrossel do Ryan
-   Bastidor, Revista, Conversa e Fotos. Todos em creme, café e
+   ADMIN, PARTE 4: os estilos de carrossel do Ryan
+   Direto (o padrão, desde 09/11/2026: letra gigante, frase por slide,
+   bilhete e marca-texto), Bastidor, Revista, Conversa e Fotos. Todos em creme, café e
    dourado, com Playfair, Montserrat e Allura, e a mesma estrutura
    de 7 páginas: gancho, contexto, construção (2), tensão,
    recompensa e CTA. Usa as funções de desenho da parte 2
@@ -362,6 +363,9 @@ const CAR_ESTILOS = (() => {
   /* ---------- O que cada estilo pede em cada página ---------- */
   const TIPOS = [["gancho", "Gancho"], ["contexto", "Contexto"], ["construcao", "Construção"], ["tensao", "Tensão"], ["recompensa", "Recompensa"], ["cta", "CTA"]];
   const ESTILOS = {
+    direto: { nome: "Direto", quando: "O padrão: letra gigante, uma frase por slide, bilhete e marca-texto. Criativo e direto ao ponto.", desenho: null,
+      campos: { gancho: ["foto", "lead", "titulo", "nota"], contexto: ["lead", "titulo", "texto", "nota"], construcao: ["lead", "titulo", "itens", "texto", "nota"], tensao: ["lead", "msgs", "titulo", "texto"], recompensa: ["lead", "titulo", "texto", "nota"], cta: ["lead", "titulo", "texto", "palavra"] },
+      rotulos: { _: { lead: "Etiqueta pequena no topo (ex.: bastidor de ugc)", titulo: "A frase grande (*palavra* = marca-texto, **palavra** = negrito)", texto: "Frase de apoio (opcional)" }, construcao: { itens: "Bilhete colado: um item por linha (opcional)" }, tensao: { msgs: "Balão de mensagem em cima (opcional): marca: ..." }, cta: { texto: "Botão (ex.: portfólio no link da bio)", palavra: "Palavra do comentário (só se tiver algo pra mandar)" } } },
     bastidor: { nome: "Bastidor", quando: "Método e bastidor de UGC: a marca vê como você pensa.", desenho: bastidor,
       campos: { gancho: ["foto", "titulo", "texto", "nota"], contexto: ["lead", "titulo", "texto"], construcao: ["titulo", "itens", "texto", "foto", "nota"], tensao: ["titulo", "lead", "itens", "texto"], recompensa: ["titulo", "texto", "nota", "lead"], cta: ["palavra", "texto", "foto"] },
       rotulos: { contexto: { lead: "Linha pequena em cima (ex.: Exemplo real:)" }, construcao: { itens: "Lista, um por linha: item / explicação (vazio = slide de print com foto)" }, tensao: { lead: "Frase embaixo do título", itens: "Botões, um por linha", texto: "Frase final embaixo dos botões (opcional)" }, recompensa: { lead: "Palavra fantasma ao fundo", texto: "Frase com seta (opcional)" } } },
@@ -379,6 +383,14 @@ const CAR_ESTILOS = (() => {
   const ESTRUTURA = ["gancho", "contexto", "construcao", "construcao", "tensao", "recompensa", "cta"];
 
   const EXEMPLOS = {
+    direto: { titulo: "A marca pediu 1 vídeo pra black", slides: [
+      { tipo: "gancho", lead: "bastidor de ugc", titulo: "a marca pediu 1 vídeo pra black.", nota: "eu mandei 3." },
+      { tipo: "contexto", lead: "@ryalvz", titulo: "faltam *18 dias* pra black.", texto: "e quase todo mundo vai postar a mesma coisa: **produto e preço.**" },
+      { tipo: "construcao", lead: "o que o estudo mostrou", titulo: "produto e preço engaja 0,8%. o que testa e ensina, *3,8%.*", nota: "56 mil posts de black" },
+      { tipo: "construcao", lead: "como eu proponho", titulo: "3 ganchos do mesmo produto, testados *agora.*", itens: "unboxing\ndepoimento\ndemonstração", nota: "o que segura mais gente vence" },
+      { tipo: "tensao", lead: "a pergunta da marca", msgs: "marca: e se nenhum funcionar?", titulo: "você descobre agora. *e não no dia 27.*" },
+      { tipo: "recompensa", lead: "@ryalvz", titulo: "quem testa agora chega na black com o *vencedor.*" },
+      { tipo: "cta", lead: "bastidor de ugc", titulo: "quer testar 3 ganchos no seu *produto?*", texto: "portfólio no link da bio" }] },
     bastidor: { titulo: "O briefing pedia uma coisa", slides: [
       { tipo: "gancho", titulo: "O briefing pedia uma coisa.", texto: "O cliente queria *outra.*", nota: "bastidor de UGC" },
       { tipo: "contexto", lead: "Exemplo real:", titulo: "o briefing pede **pra mostrar a** *bateria de 30h.*", texto: "Um fone bluetooth. Parece simples: mostra a bateria e pronto. Só que não." },
@@ -426,6 +438,10 @@ const CAR_ESTILOS = (() => {
     return notaCapturada;
   }
   function pintar(cv, s, i, total, estilo, aoCarregar, todos = []) {
+    if (estilo === "direto" && typeof CAMADAS !== "undefined") {
+      const lista = todos && todos.length ? todos : [s];
+      return CAMADAS.pintar(cv, { estilo: "direto", slides: lista }, Math.max(0, lista.indexOf(s)), { aoCarregar });
+    }
     const E = ESTILOS[estilo] || ESTILOS.bastidor, ctx = cv.getContext("2d");
     const resto = i > 0 ? restoDaNotaAnterior(i, total, estilo, todos) : null;
     cv.width = W; cv.height = H;
@@ -473,7 +489,7 @@ const CAR_ESTILOS = (() => {
     String(texto || "").split("\n").forEach((bruta) => {
       const l = bruta.replace(/^[\s>*•-]+/, "").replace(/^\|/, "").replace(/\|\s*$/, "").trim();
       const mc = l.replace(/\*\*/g, "").match(/^CARROSSEL\s*:\s*(.+)$/i);
-      if (mc) { const [tit, ...resto] = mc[1].split("|").map((x) => x.trim()); const me = resto.join(" ").match(/estilo\s*:?\s*(bastidor|revista|conversa|fotos)/i); car = { titulo: tit, estilo: me ? me[1].toLowerCase() : "", slides: [] }; cars.push(car); return; }
+      if (mc) { const [tit, ...resto] = mc[1].split("|").map((x) => x.trim()); const me = resto.join(" ").match(/estilo\s*:?\s*(direto|bastidor|revista|conversa|fotos)/i); car = { titulo: tit, estilo: me ? me[1].toLowerCase() : "", slides: [] }; cars.push(car); return; }
       const s = lerSlide(l);
       if (s) { if (!car) { car = { titulo: "Carrossel", estilo: "", slides: [] }; cars.push(car); } car.slides.push(s); }
     });
@@ -483,7 +499,13 @@ const CAR_ESTILOS = (() => {
   function formato(estilo) {
     const lista = estilo ? [estilo] : Object.keys(ESTILOS);
     return `Estrutura de 7 slides, nesta ordem: 1 gancho (provoca curiosidade com uma promessa forte), 2 contexto (o problema, direto), 3 e 4 construção (uma ideia só, explicada até não sobrar dúvida: é aqui que entra a autoridade), 5 tensão (desafia o que a pessoa acha), 6 recompensa (o "AHA", a solução clara) e 7 CTA (uma ação só; "comenta PALAVRA que eu te mando..." apenas se eu tiver algo pra mandar, senão portfólio no link da bio).
-Carrossel curto e quadrado (1080 x 1080): título de até 10 palavras, texto de até 20 e no máximo 25 palavras somando tudo do slide (no estilo Conversa, no máximo 2 mensagens por slide). Linguagem de conversa, nada de apostila. *palavra* fica em destaque dourado (1 por título) e **palavra** fica em cinza. Não use travessão. O que você não souber de mim vira campo entre parênteses.
+COMO ESCREVER (vale para todo carrossel): prático, criativo, direto ao ponto e que converte. Fala de creator, não de empresa.
+- Uma ideia por slide, numa frase curta que parece pensamento em voz alta, em minúscula, e que deixa a pessoa querendo o próximo slide.
+- Comece no meio da situação real ("a marca pediu 1 vídeo pra black."), nunca com apresentação ou "neste carrossel".
+- Número concreto e exemplo real valem mais que adjetivo. Nada de frase de apostila, lista genérica ou palavra de LinkedIn (estratégia, potencializar, alavancar, jornada).
+- O CTA pede uma ação só e diz o que a pessoa ganha.
+Carrossel curto e quadrado (1080 x 1080): título de até 12 palavras e no máximo 22 palavras somando tudo do slide (no máximo 2 mensagens por slide). *palavra* é o destaque do slide (1 por título: no estilo Direto vira marca-texto) e **palavra** fica em negrito (no Direto) ou cinza (nos outros). Não use travessão. O que você não souber de mim vira campo entre parênteses.
+Use o estilo Direto na maioria dos carrosséis. Os outros só quando o assunto pedir (Conversa para negociação com marca, Fotos para rotina com foto).
 Escreva assim, um slide por linha, com o nome de cada campo (o primeiro campo sem nome é o título):
 CARROSSEL: título do carrossel | estilo: ${lista.join(" ou ")}
 ${lista.map((e) => `Estilo ${ESTILOS[e].nome} (${ESTILOS[e].quando}), campos de cada página: ${TIPOS.map(([t, n]) => `${n}: ${ESTILOS[e].campos[t].filter((c) => c !== "foto").map((c) => ({ lead: "linha" }[c] || c)).join(", ")}`).join("; ")}. Exemplo:

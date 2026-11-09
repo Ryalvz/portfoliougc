@@ -13,10 +13,14 @@ const CAMADAS = (() => {
   const FORMATOS = { quadrado: { nome: "Quadrado 1:1", w: 1080, h: 1080 }, retrato: { nome: "Retrato 4:5", w: 1080, h: 1350 } };
   const dims = (car) => FORMATOS[car && car.formato] || FORMATOS.quadrado;
   const TEMAS = {
-    claro: { fundo: "#F5F1EA", tinta: "#2B241C", texto: "#3A3128", cinza: "#8F8676", ouro: "#7A6322", naOuro: "#FFF8EA", vidro: "rgba(43,36,28,.06)", balao: "#E6DDCD" },
-    escuro: { fundo: "#2B241C", tinta: "#F5F1EA", texto: "#E9E1D3", cinza: "#A89E8E", ouro: "#D9C48A", naOuro: "#2B241C", vidro: "rgba(255,255,255,.06)", balao: "#3A3128" },
-    foto: { fundo: "#1A1511", tinta: "#FFF8EA", texto: "#F2EBDD", cinza: "rgba(255,248,234,.75)", ouro: "#D9C48A", naOuro: "#2B241C", vidro: "rgba(0,0,0,.28)", balao: "rgba(43,36,28,.85)" }
+    claro: { fundo: "#F5F1EA", tinta: "#2B241C", texto: "#3A3128", cinza: "#8F8676", ouro: "#7A6322", naOuro: "#FFF8EA", vidro: "rgba(43,36,28,.06)", balao: "#E6DDCD", marca: "#D9C48A", naMarca: "#2B241C", marcaTipo: "meia" },
+    escuro: { fundo: "#2B241C", tinta: "#F5F1EA", texto: "#E9E1D3", cinza: "#A89E8E", ouro: "#D9C48A", naOuro: "#2B241C", vidro: "rgba(255,255,255,.06)", balao: "#3A3128", marca: "", naMarca: "#D9C48A", marcaTipo: "" },
+    foto: { fundo: "#1A1511", tinta: "#FFF8EA", texto: "#F2EBDD", cinza: "rgba(255,248,234,.75)", ouro: "#D9C48A", naOuro: "#2B241C", vidro: "rgba(0,0,0,.28)", balao: "rgba(43,36,28,.85)", marca: "", naMarca: "#D9C48A", marcaTipo: "" },
+    // Só no Direto: o slide de fundo dourado chapado
+    ouro: { fundo: "#D9C48A", tinta: "#2B241C", texto: "#2B241C", cinza: "#5C5038", ouro: "#2B241C", naOuro: "#F5F1EA", vidro: "rgba(43,36,28,.08)", balao: "#F5F1EA", marca: "#2B241C", naMarca: "#D9C48A", marcaTipo: "bloco" }
   };
+  // Direto: o fundo muda a cada slide (café, creme, dourado...), como nas referências
+  const SEQ_DIRETO = ["escuro", "claro", "ouro", "claro", "escuro", "claro", "ouro"];
   const TOM = {
     bastidor: { gancho: "foto", contexto: "claro", construcao: "claro", tensao: "escuro", recompensa: "claro", cta: "escuro" },
     revista: { gancho: "claro", contexto: "claro", construcao: "claro", tensao: "escuro", recompensa: "claro", cta: "claro" },
@@ -24,14 +28,18 @@ const CAMADAS = (() => {
     fotos: { gancho: "foto", contexto: "foto", construcao: "foto", tensao: "foto", recompensa: "foto", cta: "claro" }
   };
   function tomDe(car, s) {
-    const t = ((TOM[car.estilo] || TOM.bastidor)[s.tipo]) || "claro";
+    let t = ((TOM[car.estilo] || TOM.bastidor)[s.tipo]) || "claro";
+    if (car.estilo === "direto") { const k = Math.max(0, (car.slides || []).indexOf(s)), n = (car.slides || []).length; t = k === n - 1 && n > 1 ? "ouro" : SEQ_DIRETO[k % SEQ_DIRETO.length]; }
     if (s.fundo === "trocar") return t === "escuro" ? "claro" : "escuro";
     return t;
   }
   function temaDe(car, s) {
     const tom = tomDe(car, s), c = { ...TEMAS[tom], tom };
     const d = CAR_ESTILOS.DESTAQUES[s.destaque];
-    if (d && s.destaque !== "dourado") c.ouro = d.cores[tom === "claro" ? 0 : 1];
+    if (d && s.destaque !== "dourado") {
+      if (tom === "ouro") { c.fundo = d.cores[1]; c.naMarca = d.cores[1]; }
+      else { c.ouro = d.cores[tom === "claro" ? 0 : 1]; if (tom === "claro") c.marca = d.cores[1]; else c.naMarca = d.cores[1]; }
+    }
     return c;
   }
   const cor = (tema, k) => tema[k] || k;
@@ -54,6 +62,8 @@ const CAMADAS = (() => {
   }
   function fonte(l, e, tam) {
     if (l.fonte === "mao") return `400 ${tam}px ${FONTE_MAO}`;
+    if (l.fonte === "marcador") return `400 ${tam}px ${FONTE_MARCADOR}`;
+    if (l.fonte === "grot") return `${e === "a" || e === "b" ? Math.max(800, l.peso || 500) : l.peso || 500} ${tam}px ${FONTE_GROT}`;
     if (l.fonte === "serif") return `${e === "a" ? "italic " : ""}700 ${tam}px ${FONTE_SERIFA}`;
     if (e === "a") return `italic 700 ${Math.round(tam * 1.04)}px ${FONTE_SERIFA}`;
     return `${l.peso || 500} ${tam}px ${FONTE_BASTAO}`;
@@ -81,12 +91,21 @@ const CAMADAS = (() => {
     m.linhas.forEach((ln, k) => {
       const base = y0 + k * lh + (lh - m.tam) / 2 + m.tam * 0.8;
       let cx = alinhar === "center" ? x0 + (largura - ln.w) / 2 : alinhar === "right" ? x0 + largura - ln.w : x0;
-      ln.itens.forEach((it) => { cx += it.sep; ctx.font = fonte(l, it.e, m.tam); ctx.fillStyle = it.e === "a" ? cores.a : it.e === "b" ? cores.b : cores.n; ctx.fillText(it.t, cx, base); cx += it.w; });
+      ln.itens.forEach((it, j) => {
+        cx += it.sep;
+        if (it.e === "a" && cores.marca) { // marca-texto: meia altura (creme) ou bloco cheio (dourado)
+          const prox = ln.itens[j + 1], junta = prox && prox.e === "a" ? prox.sep : 0, pad = m.tam * 0.08;
+          ctx.fillStyle = cores.marca;
+          if (cores.marcaTipo === "bloco") ctx.fillRect(cx - pad, base - m.tam * 0.8, it.w + junta + pad * 2, m.tam * 0.98);
+          else ctx.fillRect(cx - pad, base - m.tam * 0.36, it.w + junta + pad * 2, m.tam * 0.44);
+        }
+        ctx.font = fonte(l, it.e, m.tam); ctx.fillStyle = it.e === "a" ? cores.a : it.e === "b" ? cores.b : cores.n; ctx.fillText(it.t, cx, base); cx += it.w;
+      });
     });
   }
 
   /* ---------- Desenho de cada camada; devolve a caixa (pra selecionar) ---------- */
-  const TEXTOS = ["texto", "bolha", "pilula"];
+  const TEXTOS = ["texto", "bolha", "pilula", "bilhete"];
   function textoDe(l, i, n) {
     if (l.auto === "num") return l.numDois ? `${String(i + 1).padStart(2, "0")}/${String(n).padStart(2, "0")}` : `${i + 1}/${n}`;
     return l.texto;
@@ -110,7 +129,9 @@ const CAMADAS = (() => {
     } else if (l.t === "foto") {
       caixa = { x0: l.x, y0: l.y, x1: l.x + l.w, y1: l.y + l.h };
       const img = fotoCarrossel(s.foto, aoCarregar), foco = { topo: 0.15, meio: 0.45, baixo: 0.8 }[s.enquadrar] ?? 0.3;
-      if (l.forma === "arco") { ctx.beginPath(); ctx.moveTo(l.x, l.y + l.h); ctx.lineTo(l.x, l.y + l.w / 2); ctx.arc(l.x + l.w / 2, l.y + l.w / 2, l.w / 2, Math.PI, 0); ctx.lineTo(l.x + l.w, l.y + l.h); ctx.closePath(); ctx.clip(); }
+      const arco = (b) => { ctx.beginPath(); ctx.moveTo(l.x - b, l.y + l.h + b); ctx.lineTo(l.x - b, l.y + l.w / 2); ctx.arc(l.x + l.w / 2, l.y + l.w / 2, l.w / 2 + b, Math.PI, 0); ctx.lineTo(l.x + l.w + b, l.y + l.h + b); ctx.closePath(); };
+      if (l.forma === "arco" && l.borda) { arco(14); ctx.fillStyle = cor(tema, l.borda); ctx.fill(); }
+      if (l.forma === "arco") { arco(0); ctx.clip(); }
       if (l.pb) ctx.filter = "grayscale(1) contrast(1.05)";
       fotoCobre(ctx, img, l.x, l.y, l.w, l.h, foco);
     } else {
@@ -118,7 +139,8 @@ const CAMADAS = (() => {
       const m = montar(ctx, lt);
       if (l.t === "texto") {
         caixa = { x0: l.x, y0: l.y, x1: l.x + l.w, y1: l.y + m.alt };
-        girarEm(caixa, () => escrever(ctx, lt, m, l.x, l.y, l.w, { n: cor(tema, l.cor || "texto"), a: cor(tema, l.corDestaque || "ouro"), b: cor(tema, "cinza") }, l.alinhar));
+        const marca = l.marca ? { marca: tema.marca, marcaTipo: tema.marcaTipo } : {};
+        girarEm(caixa, () => escrever(ctx, lt, m, l.x, l.y, l.w, { n: cor(tema, l.cor || "texto"), a: l.marca ? tema.naMarca : cor(tema, l.corDestaque || "ouro"), b: cor(tema, l.corNegrito || "cinza"), ...marca }, l.alinhar));
       } else if (l.t === "bolha") {
         const px = 34, py = 24, bw = Math.min(m.larg, l.w) + px * 2, bh = m.alt + py * 2;
         const x0 = l.eu ? l.x + l.w + px * 2 - bw : l.x;
@@ -131,6 +153,14 @@ const CAMADAS = (() => {
         ctx.fill();
         const tc = l.eu ? cor(tema, "naOuro") : cor(tema, "tinta");
         escrever(ctx, lt, m, x0 + px, l.y + py, bw - px * 2, { n: tc, a: l.eu ? tc : cor(tema, "ouro"), b: tc }, "left");
+      } else if (l.t === "bilhete") { // papel colado com fita, sempre claro
+        const pad = Math.round(m.tam * 0.9), bw = Math.min(l.w, m.larg + pad * 2), bh = m.alt + pad * 2;
+        caixa = { x0: l.x, y0: l.y, x1: l.x + bw, y1: l.y + bh };
+        girarEm(caixa, () => {
+          caixaPapel(ctx, l.x, l.y, bw, bh, 6, "#FFFDF8", true);
+          ctx.save(); ctx.translate(l.x + bw * 0.32, l.y + 4); ctx.rotate(-0.14); ctx.fillStyle = "rgba(217,196,138,.88)"; ctx.fillRect(-70, -20, 140, 40); ctx.restore();
+          escrever(ctx, lt, m, l.x + pad, l.y + pad, bw - pad * 2, { n: "#2B241C", a: "#7A6322", b: "#2B241C" }, "left");
+        });
       } else if (l.t === "pilula") {
         const bw = m.larg + m.tam * 1.4, bh = m.alt + m.tam * 0.5, x0 = l.x + (l.w - bw) / 2;
         caixa = { x0, y0: l.y, x1: x0 + bw, y1: l.y + bh };
@@ -146,7 +176,8 @@ const CAMADAS = (() => {
   /* ---------- Fundo do slide ---------- */
   function fundo(ctx, car, s, tema, W, H, aoCarregar) {
     ctx.save(); ctx.fillStyle = tema.fundo; ctx.fillRect(0, 0, W, H);
-    if (tema.tom === "foto") {
+    if (car.estilo === "direto") texturaPapel(ctx, tema.tom === "escuro" ? 0.1 : 0.07);
+    else if (tema.tom === "foto") {
       const img = fotoCarrossel(s.foto, aoCarregar), foco = { topo: 0.15, meio: 0.45, baixo: 0.8 }[s.enquadrar] ?? 0.3;
       ctx.save(); if (car.estilo === "bastidor") ctx.filter = "grayscale(1) contrast(1.08)"; fotoCobre(ctx, img, 0, 0, W, H, foco); ctx.restore();
       const g = ctx.createLinearGradient(0, H * 0.25, 0, H); g.addColorStop(0, "rgba(10,8,6,0)"); g.addColorStop(0.55, "rgba(10,8,6,.72)"); g.addColorStop(1, "rgba(10,8,6,.94)");
@@ -176,6 +207,7 @@ const CAMADAS = (() => {
     const tema = temaDe(car, s), L = [], mold = { moldura: true };
     // Capa no quadrado: o perfil mostra só o meio (3:4), então o texto fica longe das laterais
     const capa = i === 0 && W === H, xC = capa ? 160 : M, wC = W - 2 * xC;
+    if (e === "direto") return gerarDireto(car, i, s, n, W, H, tema, ctx);
     let topo = M + 100;
     if (e === "conversa") {
       const nome = String(s.tipo === "recompensa" ? "Notas do Ryan" : s.lead || "Marca");
@@ -253,8 +285,85 @@ const CAMADAS = (() => {
     return L;
   }
 
+  /* ---------- Direto: letra gigante e apertada, uma frase por slide, bilhete e marca-texto ---------- */
+  function gerarDireto(car, i, s, n, W, H, tema, ctx) {
+    const L = [], mold = { moldura: true }, capa = i === 0 && W === H, xC = capa ? 160 : M, wC = W - 2 * xC;
+    const G = (nome, texto, o) => T(nome, texto, { fonte: "grot", ...o });
+    L.push(G("Etiqueta do topo", s.lead || "bastidor de ugc", { x: xC, y: M, w: 640, tam: 24, peso: 500, cor: "cinza", entre: 1.2, ...mold }));
+    L.push(G("Número do slide", "", { auto: "num", numDois: true, x: W - M - 200, y: M, w: 200, tam: 24, peso: 800, cor: "tinta", alinhar: "right", entre: 1.2, ...mold }));
+    L.push(G("Arroba", "@ryalvz", { y: H - M - 28, w: 300, tam: 22, cor: "cinza", entre: 1.2, ...mold }));
+    L.push(G("Arrasta pro lado", "arrasta pro lado  →", { auto: "arrasta", x: W - M - 360, y: H - M - 28, w: 360, tam: 22, cor: "cinza", alinhar: "right", entre: 1.2, ...mold }));
+    const topo = M + 80, fim = H - M - 60;
+    const titulo = (tam, w) => G("Título", s.titulo, { x: xC, w, tam, peso: 900, cor: "tinta", corNegrito: "tinta", marca: true, entre: 0.94, letra: -Math.round(tam * 0.045) });
+    const caber = (l, alt, min = 48) => { const t0 = l.tam; while (montar(ctx, l).alt > alt && l.tam > min) { l.tam -= 4; l.letra = -Math.round(l.tam * 0.045); } return l.tam !== t0 ? l : l; };
+    const nota = (txt, o) => T("Nota à mão", txt, { fonte: "marcador", tam: 76, cor: "ouro", rot: -5, entre: 1.05, ...o });
+
+    if (s.tipo === "gancho") {
+      // Capa: a frase grande em cima e a sua foto num arco com borda, embaixo à direita
+      const fw = W === H ? 330 : 400, fh = W === H ? 420 : 560;
+      const fx = W - xC - fw, fy = fim - fh;
+      if (s.titulo) { const t = caber(titulo(W === H ? 120 : 132, wC), fy - topo - 30, 64); t.y = topo; L.push(t); }
+      L.push({ id: novoId(), nome: "Foto", t: "foto", forma: "arco", borda: "tinta", x: fx, y: fy, w: fw, h: fh });
+      if (s.nota) { const nl = nota(s.nota, { tam: 76, x: xC, w: Math.max(200, fx - xC - 30) }); const m = montar(ctx, nl); nl.y = Math.round(fim - m.alt - 20); L.push(nl); }
+      return L;
+    }
+    // Os outros slides: frase grande no topo, apoio embaixo
+    const C = [];
+    const msgs = String(s.msgs || "").split("\n").map((x) => x.trim()).filter(Boolean).slice(0, 2);
+    msgs.forEach((l) => {
+      const m = l.match(/^\s*(eu|ryan|eu mesmo)\s*:\s*(.*)$/i), o = l.match(/^\s*[^:]{1,20}:\s*(.*)$/);
+      C.push({ id: novoId(), nome: m ? "Mensagem sua" : "Mensagem da marca", t: "bolha", eu: !!m, texto: m ? m[2] : o ? o[1] : l, x: xC, w: Math.min(640, wC - 80), tam: 42, fonte: "grot", peso: 500, cor: "tinta", entre: 1.3, letra: 0, alinhar: "left", gap: 28 });
+    });
+    // A frase começa enorme e diminui até caber: com apoio embaixo ela fica com uns 60% da altura, sozinha com quase tudo
+    if (s.titulo) {
+      const t = titulo(156, wC), sozinha = !s.texto && !s.itens && !s.msgs && !s.nota && s.tipo !== "cta";
+      caber(t, (fim - topo) * (sozinha ? 0.8 : 0.58), 52); C.push({ ...t, gap: 44 });
+    }
+    const itens = String(s.itens || "").split("\n").map((x) => x.trim()).filter(Boolean).slice(0, 4);
+    if (itens.length) C.push({ ...G("Bilhete", itens.map((x, k) => `${k + 1}. ${x.replace(/\s+\/\s+/, ": ")}`).join("\n"), { t: "bilhete", x: xC + 10, w: Math.min(640, wC - 20), tam: 46, peso: 500, cor: "tinta", entre: 1.45, rot: -3 }), gap: 34 });
+    let botao = null;
+    if (s.tipo === "cta") {
+      if (s.palavra) {
+        C.push({ ...G("Chamada", "comenta", { tam: 44, peso: 800, cor: "tinta", entre: 1.1 }), gap: 18 });
+        botao = { id: novoId(), nome: "Palavra", t: "pilula", texto: String(s.palavra).replace(/\*/g, "").toUpperCase(), x: xC, w: 0, tam: 60, fonte: "grot", peso: 900, cor: "naOuro", entre: 1.1, letra: 1, alinhar: "center", gap: 26 };
+        C.push(botao);
+        if (s.texto) C.push(G("Texto", s.texto, { tam: 40, peso: 500, cor: "texto", corNegrito: "tinta", entre: 1.3 }));
+      } else if (s.texto) {
+        botao = { id: novoId(), nome: "Botão", t: "pilula", texto: String(s.texto).replace(/\*/g, ""), x: xC, w: 0, tam: 44, fonte: "grot", peso: 800, cor: "naOuro", entre: 1.1, letra: 0, alinhar: "center" };
+        C.push(botao);
+      }
+    } else if (s.texto) C.push(G("Texto", s.texto, { tam: 46, peso: 500, cor: "texto", corNegrito: "tinta", entre: 1.28, w: Math.min(wC, 820) }));
+    // Tamanho: diminui o título até tudo caber entre o topo e o rodapé
+    const alturaDe = (l) => { const m = montar(ctx, l); return l.t === "bolha" ? m.alt + 48 : l.t === "pilula" ? m.alt + m.tam * 0.5 : l.t === "bilhete" ? m.alt + Math.round(m.tam * 1.8) : m.alt; };
+    const soma = () => C.reduce((a, l, k) => a + alturaDe(l) + (k < C.length - 1 ? l.gap ?? 34 : 0), 0);
+    C.forEach((l) => { if (l.t === "pilula") l.w = wC; });
+    const tit = C.find((l) => l.nome === "Título");
+    while (soma() > fim - topo && tit && tit.tam > 52) { tit.tam -= 4; tit.letra = -Math.round(tit.tam * 0.045); }
+    while (soma() > fim - topo && C.some((l) => l.tam > 26 && l !== tit)) C.forEach((l) => { if (l !== tit) l.tam = Math.max(24, l.tam - 2); });
+    const larguraPilula = (l) => { l.w = wC; const m = montar(ctx, l); l.w = Math.ceil(m.larg + m.tam * 1.4); };
+    C.forEach((l) => { if (l.t === "pilula") larguraPilula(l); });
+    // Onde fica: tensão e CTA embaixo; o resto começa no topo, e o texto de apoio desce pro rodapé
+    const total = soma();
+    let y = s.tipo === "tensao" || s.tipo === "cta" ? fim - total : topo;
+    C.forEach((l, k) => { l.y = Math.round(y); y += alturaDe(l) + (l.gap ?? 34); delete l.gap; });
+    const ultimo = C[C.length - 1];
+    if (ultimo && ultimo.nome === "Texto" && s.tipo !== "cta" && s.tipo !== "tensao") ultimo.y = Math.max(ultimo.y, Math.round(fim - alturaDe(ultimo)));
+    L.push(...C);
+    if (s.nota) {
+      const nl = nota(s.nota, { w: 3000 });
+      let m = montar(ctx, nl);
+      while (m.larg > wC * 0.75 && nl.tam > 40) { nl.tam -= 4; m = montar(ctx, nl); }
+      nl.w = Math.ceil(m.larg) + 12; nl.x = W - xC - nl.w;
+      const ocupado = C.filter((l) => l.nome !== "Texto").reduce((a, l) => Math.max(a, l.y + alturaDe(l)), topo);
+      const temTexto = ultimo && ultimo.nome === "Texto";
+      nl.y = Math.round(Math.min(fim - m.alt - (temTexto ? alturaDe(ultimo) + 40 : 10), Math.max(ocupado + 30, fim - m.alt - 140)));
+      L.push(nl);
+    }
+    return L;
+  }
+
   // As camadas do slide: nascem dos campos e só refazem sozinhas enquanto ninguém mexeu à mão
-  const fontesProntas = () => { try { return document.fonts.check(`700 60px ${FONTE_SERIFA}`) && document.fonts.check(`500 40px ${FONTE_BASTAO}`) && document.fonts.check(`400 60px ${FONTE_MAO}`); } catch (_) { return true; } };
+  const fontesProntas = () => { try { return document.fonts.check(`700 60px ${FONTE_SERIFA}`) && document.fonts.check(`500 40px ${FONTE_BASTAO}`) && document.fonts.check(`400 60px ${FONTE_MAO}`) && document.fonts.check(`900 60px ${FONTE_GROT}`) && document.fonts.check(`400 60px ${FONTE_MARCADOR}`); } catch (_) { return true; } };
   const baseDe = (car, s, i) => JSON.stringify([car.estilo, car.formato || "quadrado", i === 0, s.tipo, s.fundo || "", s.titulo, s.texto, s.lead, s.itens, s.msgs, s.palavra, s.nota, s.notaContinua]);
   function garantir(car, i) {
     const s = car.slides[i]; if (!s) return [];
