@@ -219,7 +219,7 @@ function lerPlano(texto) {
   String(texto || "").split("\n").forEach((bruta) => {
     const l = bruta.replace(/^[\s>*•-]+/, "").replace(/\*\*/g, "").replace(/^\|/, "").replace(/\|\s*$/, "").trim();
     const mc = l.match(/^CARROSSEL\s*:\s*(.+)$/i);
-    if (mc) { const [tit, ...resto] = mc[1].split("|").map((x) => x.trim()); const me = resto.join(" ").match(/estilo\s*:?\s*(direto|bastidor|revista|conversa|fotos)/i); car = { titulo: tit, estilo: me ? me[1].toLowerCase() : "", slides: [] }; carrosseis.push(car); return; }
+    if (mc) { const [tit, ...resto] = mc[1].split("|").map((x) => x.trim()); const me = resto.join(" ").match(/estilo\s*:?\s*(papel|colagem|direto|bastidor|revista|conversa|fotos)/i); car = { titulo: tit, estilo: me ? me[1].toLowerCase() : "", slides: [] }; carrosseis.push(car); return; }
     const md = l.match(/^(SEG|TER|QUA|QUI|SEX|S[AÁ]B|DOM)[A-Za-zçÇáÁ-]*\s*\|\s*(.+)$/i);
     if (md) {
       const p = md[2].split("|").map((x) => x.trim());
@@ -662,7 +662,8 @@ let fontesCarrossel = null;
 function carregarFontesCarrossel() {
   if (!fontesCarrossel) fontesCarrossel = Promise.all([
     `400 60px ${FONTE_SERIFA}`, `700 60px ${FONTE_SERIFA}`, `italic 400 60px ${FONTE_SERIFA}`, `italic 700 60px ${FONTE_SERIFA}`,
-    `500 40px ${FONTE_BASTAO}`, `600 40px ${FONTE_BASTAO}`, `700 40px ${FONTE_BASTAO}`, `800 40px ${FONTE_BASTAO}`, `400 60px ${FONTE_MAO}`, `400 60px ${FONTE_PINCEL}`
+    `500 40px ${FONTE_BASTAO}`, `600 40px ${FONTE_BASTAO}`, `700 40px ${FONTE_BASTAO}`, `800 40px ${FONTE_BASTAO}`, `400 60px ${FONTE_MAO}`, `400 60px ${FONTE_PINCEL}`,
+    `500 60px ${FONTE_GROT}`, `800 60px ${FONTE_GROT}`, `900 60px ${FONTE_GROT}`, `400 60px ${FONTE_MARCADOR}`, `400 40px ${FONTE_BASTAO}`
   ].map((f) => document.fonts.load(f).catch(() => null))).then(() => document.fonts.ready);
   return fontesCarrossel;
 }

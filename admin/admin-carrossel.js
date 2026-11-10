@@ -363,6 +363,13 @@ const CAR_ESTILOS = (() => {
   /* ---------- O que cada estilo pede em cada página ---------- */
   const TIPOS = [["gancho", "Gancho"], ["contexto", "Contexto"], ["construcao", "Construção"], ["tensao", "Tensão"], ["recompensa", "Recompensa"], ["cta", "CTA"]];
   const ESTILOS = {
+    papel: { nome: "Papel", quando: "Papel creme, título enorme em duas cores, caixa caramelo, print e notificação de verdade. Pra mostrar bastidor e ensinar.", desenho: null,
+      campos: { gancho: ["foto", "titulo", "lead", "msgs", "nota"], contexto: ["lead", "titulo", "texto", "foto", "nota"], construcao: ["lead", "titulo", "itens", "texto", "foto"], tensao: ["lead", "titulo", "msgs", "texto"], recompensa: ["lead", "titulo", "texto", "foto"], cta: ["lead", "titulo", "palavra", "texto"] },
+      rotulos: { _: { lead: "Linha embaixo do seu nome (ex.: UGC criativo e bastidor)", titulo: "Título enorme (*palavra* fica caramelo)", texto: "Caixa caramelo (*palavra* fica amarela)", msgs: "Notificação: marca: texto (uma por linha)", foto: "Print (aparece numa janelinha)" },
+        gancho: { foto: "Sua foto (tela cheia)", lead: "Cartão de número (ex.: campanhas / +50)", titulo: "Frase da capa (em faixas)", nota: "Letra à mão (opcional)" }, construcao: { itens: "Opções numeradas: texto / explicação (uma por linha)" }, cta: { texto: "Complemento da caixa (ex.: que eu te mando o modelo)" } } },
+    colagem: { nome: "Colagem", quando: "Fundo chapado, letra gigante em minúscula, polaroid com fita, adesivo e seta à mão. Pra parar o dedo.", desenho: null,
+      campos: { gancho: ["foto", "titulo", "lead", "nota"], contexto: ["lead", "titulo", "texto", "foto", "nota"], construcao: ["lead", "titulo", "itens", "texto", "foto", "nota"], tensao: ["lead", "msgs", "titulo", "texto"], recompensa: ["lead", "titulo", "texto", "foto", "nota"], cta: ["titulo", "palavra", "texto"] },
+      rotulos: { _: { lead: "Adesivo redondo (ex.: bastidor)", titulo: "A frase gigante (*palavra* = marca-texto)", foto: "Foto polaroid (opcional)" }, construcao: { itens: "Bilhete colado: um item por linha" }, tensao: { msgs: "Balão de mensagem: marca: ..." } } },
     direto: { nome: "Direto", quando: "O padrão: letra gigante, uma frase por slide, bilhete e marca-texto. Criativo e direto ao ponto.", desenho: null,
       campos: { gancho: ["foto", "lead", "titulo", "nota"], contexto: ["lead", "titulo", "texto", "nota"], construcao: ["lead", "titulo", "itens", "texto", "nota"], tensao: ["lead", "msgs", "titulo", "texto"], recompensa: ["lead", "titulo", "texto", "nota"], cta: ["lead", "titulo", "texto", "palavra"] },
       rotulos: { _: { lead: "Etiqueta pequena no topo (ex.: bastidor de ugc)", titulo: "A frase grande (*palavra* = marca-texto, **palavra** = negrito)", texto: "Frase de apoio (opcional)" }, construcao: { itens: "Bilhete colado: um item por linha (opcional)" }, tensao: { msgs: "Balão de mensagem em cima (opcional): marca: ..." }, cta: { texto: "Botão (ex.: portfólio no link da bio)", palavra: "Palavra do comentário (só se tiver algo pra mandar)" } } },
@@ -383,6 +390,22 @@ const CAR_ESTILOS = (() => {
   const ESTRUTURA = ["gancho", "contexto", "construcao", "construcao", "tensao", "recompensa", "cta"];
 
   const EXEMPLOS = {
+    papel: { titulo: "Como eu entrego um roteiro pra marca", slides: [
+      { tipo: "gancho", titulo: "como eu entrego roteiro pra marca", lead: "vídeos entregues / (seu número)", msgs: "marca: aprovou o roteiro. pode gravar!" },
+      { tipo: "contexto", titulo: "Nada de PDF ou *textão*", texto: "É um link, com o *logo da marca* e tudo organizado.", foto: "" },
+      { tipo: "construcao", titulo: "A marca escolhe *o gancho*", texto: "Sempre mando 2, e o roteiro *funciona com qualquer um.*", itens: "Seu fone cai na academia? / eu correndo na esteira\nEsse aqui não sai nem pulando corda / close no fone" },
+      { tipo: "construcao", titulo: "Ela comenta *direto na fala*", texto: "Sem aquela *troca enorme de mensagens.*" },
+      { tipo: "tensao", titulo: "Aprovou, *chega na hora*", msgs: "marca: aprovou o roteiro. pode gravar!", texto: "*Pode gravar!*" },
+      { tipo: "recompensa", titulo: "Eu fiz isso com o Claude, *sem saber programar*", texto: "Mas dá pra começar hoje, *no Google Docs.*" },
+      { tipo: "cta", titulo: "Quer entregar *assim?*", palavra: "ROTEIRO", texto: "que eu te mando o modelo que eu uso" }] },
+    colagem: { titulo: "A marca pediu 1 vídeo pra black", slides: [
+      { tipo: "gancho", lead: "bastidor", titulo: "a marca pediu *1 vídeo* pra black.", nota: "eu mandei 3." },
+      { tipo: "contexto", titulo: "faltam *18 dias.*", texto: "e quase todo mundo vai postar a mesma coisa: **produto e preço.**" },
+      { tipo: "construcao", lead: "o método", titulo: "3 ganchos do mesmo produto, *testados agora.*", itens: "unboxing\ndepoimento\ndemonstração" },
+      { tipo: "construcao", titulo: "o que segurar mais gente *vence.*", nota: "simples assim" },
+      { tipo: "tensao", msgs: "marca: e se nenhum funcionar?", titulo: "você descobre agora. *não no dia 27.*" },
+      { tipo: "recompensa", lead: "aha", titulo: "quem testa antes chega na black com o *vencedor.*" },
+      { tipo: "cta", titulo: "quer testar 3 ganchos no *seu produto?*", palavra: "BLACK", texto: "que eu te mostro como eu faria" }] },
     direto: { titulo: "A marca pediu 1 vídeo pra black", slides: [
       { tipo: "gancho", lead: "bastidor de ugc", titulo: "a marca pediu 1 vídeo pra black.", nota: "eu mandei 3." },
       { tipo: "contexto", lead: "@ryalvz", titulo: "faltam *18 dias* pra black.", texto: "e quase todo mundo vai postar a mesma coisa: **produto e preço.**" },
@@ -438,9 +461,9 @@ const CAR_ESTILOS = (() => {
     return notaCapturada;
   }
   function pintar(cv, s, i, total, estilo, aoCarregar, todos = []) {
-    if (estilo === "direto" && typeof CAMADAS !== "undefined") {
+    if (["direto", "papel", "colagem"].includes(estilo) && typeof CAMADAS !== "undefined") {
       const lista = todos && todos.length ? todos : [s];
-      return CAMADAS.pintar(cv, { estilo: "direto", slides: lista }, Math.max(0, lista.indexOf(s)), { aoCarregar });
+      return CAMADAS.pintar(cv, { estilo, slides: lista }, Math.max(0, lista.indexOf(s)), { aoCarregar });
     }
     const E = ESTILOS[estilo] || ESTILOS.bastidor, ctx = cv.getContext("2d");
     const resto = i > 0 ? restoDaNotaAnterior(i, total, estilo, todos) : null;
@@ -489,7 +512,7 @@ const CAR_ESTILOS = (() => {
     String(texto || "").split("\n").forEach((bruta) => {
       const l = bruta.replace(/^[\s>*•-]+/, "").replace(/^\|/, "").replace(/\|\s*$/, "").trim();
       const mc = l.replace(/\*\*/g, "").match(/^CARROSSEL\s*:\s*(.+)$/i);
-      if (mc) { const [tit, ...resto] = mc[1].split("|").map((x) => x.trim()); const me = resto.join(" ").match(/estilo\s*:?\s*(direto|bastidor|revista|conversa|fotos)/i); car = { titulo: tit, estilo: me ? me[1].toLowerCase() : "", slides: [] }; cars.push(car); return; }
+      if (mc) { const [tit, ...resto] = mc[1].split("|").map((x) => x.trim()); const me = resto.join(" ").match(/estilo\s*:?\s*(papel|colagem|direto|bastidor|revista|conversa|fotos)/i); car = { titulo: tit, estilo: me ? me[1].toLowerCase() : "", slides: [] }; cars.push(car); return; }
       const s = lerSlide(l);
       if (s) { if (!car) { car = { titulo: "Carrossel", estilo: "", slides: [] }; cars.push(car); } car.slides.push(s); }
     });
