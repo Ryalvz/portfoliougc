@@ -100,7 +100,7 @@ const TTK_SUG_RADAR = [
   ["Adaptador CarPlay sem fio", "apareceu entre os eletrônicos em alta"]
 ];
 const TTK_SUG_STATUS = [["nova", "Nova"], ["vou_testar", "Vou testar"], ["pedi_amostra", "Pedi amostra"], ["testando", "Testando"], ["entrou", "Entrou na rotina"], ["descartei", "Descartei"]];
-const ttkSug = { status: null, filtro: "todas", sub: "" };
+const ttkSug = { status: null, filtro: "todas", sub: "", aberto: null, lista: TTK_SUGESTOES, radar: TTK_SUG_RADAR, coletado: TTK_SUG_COLETA, termos: [] };
 
 async function ttkSugCarregar() {
   if (ttkSug.status) return;
@@ -109,6 +109,12 @@ async function ttkSugCarregar() {
     const { data } = await db.from("preferencias").select("valor").eq("chave", "ttk_sugestoes").maybeSingle();
     if (data && data.valor) ttkSug.status = typeof data.valor === "string" ? JSON.parse(data.valor) : data.valor;
   } catch (_) {}
+  // A pesquisa de toda segunda (tarefa automática) grava aqui. Sem ela, vale a lista fixa deste arquivo.
+  try {
+    const { data } = await db.from("preferencias").select("valor").eq("chave", "ttk_sugestoes_dados").maybeSingle();
+    const d = data && data.valor ? (typeof data.valor === "string" ? JSON.parse(data.valor) : data.valor) : null;
+    if (d && Array.isArray(d.produtos) && d.produtos.length) { ttkSug.lista = d.produtos; ttkSug.radar = d.radar || []; ttkSug.coletado = d.coletado || ttkSug.coletado; ttkSug.termos = d.termos || []; }
+  } catch (_) {}
 }
 async function ttkSugSalvar() {
   const { error } = await db.from("preferencias").upsert({ chave: "ttk_sugestoes", valor: JSON.stringify(ttkSug.status), atualizado_em: new Date().toISOString() });
@@ -116,6 +122,14 @@ async function ttkSugSalvar() {
 }
 
 const ttkSugLink = (c) => "https://www.tiktok.com/" + c;
+const ttkSugVid = (c) => (String(c).match(/video\/(\d+)/) || [])[1] || "";
+const ttkSugFoto = (c) => `https://db.creatorsbase.com.br/storage/v1/object/public/thumbs/mercado/${ttkSugVid(c)}.jpg`;
+const ttkSugLoja = (s) => "https://www.tiktok.com/search/product?q=" + encodeURIComponent(String(s.busca || s.nome).slice(0, 60));
+// Foto: tenta a capa de cada vídeo de referência; se nenhuma existir, mostra a inicial do produto
+function ttkSugFotoHTML(s, classe) {
+  const ids = s.refs.map((r) => r[0]);
+  return `<span class="${classe}" data-sug-foto="${esc(ids.join("|"))}" data-sug-i="0"><img src="${esc(ttkSugFoto(ids[0]))}" alt="" loading="lazy"><b>${esc(String(s.nome).trim().charAt(0).toUpperCase())}</b></span>`;
+}
 const ttkSugTexto = (t) => String(t || "").replace(/\p{Extended_Pictographic}|️/gu, "").replace(/\s+/g, " ").trim();
 const ttkSugMil = (n) => !n ? "–" : n >= 1e6 ? `${String(Math.round(n / 1e5) / 10).replace(".", ",")} mi` : n >= 1e3 ? `${Math.round(n / 1e3)} mil` : String(n);
 const ttkSugReal = (n) => !n ? "sem estimativa" : n >= 1e6 ? `R$ ${String(Math.round(n / 1e5) / 10).replace(".", ",")} mi` : `R$ ${Math.round(n / 1e3)} mil`;
@@ -150,9 +164,20 @@ function ttkSugCartao(s) {
       <span class="ttk-sug-acao">${tr ? (tr.rodando ? `<span class="sub">Transcrevendo...</span>` : `<button class="btn pequeno" type="button" data-sug-abrir="${esc(tr.t.id)}">Abrir no Modelar copy</button>`)
         : `<button class="btn pequeno" type="button" data-sug-rot="${esc(r[0])}" data-sug-nome="${esc(s.nome)}" data-sug-leg="${esc(leg)}" title="Transcreve pelo seu painel (1 crédito da Supadata)">Modelar este vídeo</button>`}</span></li>`;
   }).join("");
-  return `<div class="ini-card ttk-bloco ttk-sug${st === "descartei" ? " ttk-sug-fora" : ""}">
-    <div class="ini-card-topo"><div><h2>${s.fila ? `<span class="ttk-sug-fila">${s.fila}</span>` : ""}${esc(s.nome)}</h2>
-      <span class="sub">${esc((TTK_CATS[s.sub] || [0, ""])[1])}${s.tipo === "escalar" ? " · já está na sua vitrine" : ""}</span></div><span class="espaco"></span>
+  const aberto = ttkSug.aberto === s.id;
+  const v0 = ttkSugVid(s.refs[0][0]);
+  const detalhe = aberto ? `<div class="ttk-sug-detalhe">
+      <div class="ttk-sug-player"><iframe src="https://www.tiktok.com/embed/v2/${v0}" title="Vídeo de referência" loading="lazy" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>
+      <div class="ttk-sug-info">
+        <b>${esc(s.nome)}</b>
+        <p class="sub">${esc((TTK_CATS[s.sub] || [0, ""])[1])}${s.termo ? ` · achado buscando "${esc(s.termo)}"` : ""}</p>
+        <div class="ttk-sug-capas">${s.refs.map((r) => `<a href="${esc(ttkSugLink(r[0]))}" target="_blank" rel="noopener" title="${esc(ttkSugTexto(r[1]) || "Abrir o vídeo")}"><img src="${esc(ttkSugFoto(r[0]))}" alt="" loading="lazy" onerror="this.parentNode.classList.add('sem-foto')"><span>${ttkSugMil(r[3])} views</span></a>`).join("")}</div>
+        <div class="barra" style="flex-wrap:wrap;gap:8px"><a class="btn primario pequeno" href="${esc(ttkSugLoja(s))}" target="_blank" rel="noopener">Ver o produto no TikTok Shop</a><a class="btn pequeno" href="${esc(ttkSugLink(s.refs[0][0]))}" target="_blank" rel="noopener">Abrir o vídeo no TikTok</a></div>
+        <p class="sub" style="margin:8px 0 0">O vídeo ao lado é a referência mais forte. No TikTok Shop dá pra ver preço, avaliações e se o produto aceita afiliado.</p>
+      </div></div>` : "";
+  return `<div class="ini-card ttk-bloco ttk-sug${st === "descartei" ? " ttk-sug-fora" : ""}${aberto ? " ttk-sug-aberto" : ""}">
+    <div class="ini-card-topo"><button type="button" class="ttk-sug-cabeca" data-sug-abre="${esc(s.id)}" aria-expanded="${aberto}" title="Ver o produto">${ttkSugFotoHTML(s, "ttk-sug-foto")}<span><h2>${s.fila ? `<span class="ttk-sug-fila">${s.fila}</span>` : ""}${esc(s.nome)}</h2>
+      <span class="sub">${esc((TTK_CATS[s.sub] || [0, ""])[1])}${s.tipo === "escalar" ? " · já está na sua vitrine" : ""}${s.novo ? ` · <span class="ini-selo ttk-novo">novo esta semana</span>` : ""} · <u>${aberto ? "fechar" : "ver o produto"}</u></span></span></button><span class="espaco"></span>
       <select class="campo ttk-sug-status" data-sug-status="${s.id}" aria-label="Status">${TTK_SUG_STATUS.map(([k, n]) => `<option value="${k}" ${k === st ? "selected" : ""}>${n}</option>`).join("")}</select></div>
     <div class="ttk-sug-nums">
       <div><span>Vídeos vendendo</span><b>${s.vids}</b></div>
@@ -161,6 +186,7 @@ function ttkSugCartao(s) {
       <div><span>Unidades estimadas</span><b>${s.un ? `até ${num(s.un)}` : "–"}</b></div>
       ${minhas ? `<div><span>Suas vendas em 30 dias</span><b>${real(minhas.g)}</b><small class="sub">${num(minhas.i)} un. em ${minhas.dias} dias</small></div>` : ""}
     </div>
+    ${detalhe}
     <p class="ttk-sug-nota">${esc(s.nota)}</p>
     <ul class="ttk-cv">${refs}</ul></div>`;
 }
@@ -169,14 +195,14 @@ function ttkTelaSugestoes(el) {
   if (!ttkSug.status) { el.innerHTML = `<p class="vazio">Abrindo as sugestões...</p>`; ttkSugCarregar().then(() => desenharTikTok(el)); return; }
   const per = ttkPeriodo();
   const passa = (s) => (ttkSug.filtro === "todas" || s.tipo === ttkSug.filtro) && (!ttkSug.sub || s.sub === ttkSug.sub);
-  const lista = TTK_SUGESTOES.filter(passa);
-  const subs = [...new Set(TTK_SUGESTOES.map((s) => s.sub))];
+  const lista = ttkSug.lista.filter(passa);
+  const subs = [...new Set(ttkSug.lista.map((s) => s.sub))];
   const escalar = lista.filter((s) => s.tipo === "escalar"), testar = lista.filter((s) => s.tipo === "testar").sort((a, b) => a.fila - b.fila);
   el.innerHTML = ttkCabecalho(per, { titulo: "Sugestões", comMes: false }) + `
-    <div class="ini-card ttk-bloco"><div class="ini-card-topo"><h2>Como encaixar nos seus 15 vídeos por dia</h2><span class="sub">pesquisa do CreatorsBase de ${TTK_SUG_COLETA}</span></div>
+    <div class="ini-card ttk-bloco"><div class="ini-card-topo"><h2>Como encaixar nos seus 15 vídeos por dia</h2><span class="sub">pesquisa do CreatorsBase de ${esc(ttkSug.coletado)}</span></div>
       <div class="ttk-sug-plano">
         <div><b>Principais (6)</b><p>Continuam iguais: Top Antonella e os 2 campeões do mês.</p></div>
-        <div><b>Com vendas (6)</b><p>Os ${TTK_SUGESTOES.filter((s) => s.tipo === "escalar").length} produtos de "Escalar" entram aqui primeiro: o mercado está comprando e você já tem o link.</p></div>
+        <div><b>Com vendas (6)</b><p>Os ${ttkSug.lista.filter((s) => s.tipo === "escalar").length} produtos de "Escalar" entram aqui primeiro: o mercado está comprando e você já tem o link.</p></div>
         <div><b>Testes (3)</b><p>Um produto novo de cada vez, com 3 ganchos diferentes em 3 dias. Vendeu em 2 dos 3 dias: sobe pra Com vendas. Não vendeu: troca pelo próximo da fila.</p></div>
       </div>
       ${ttkFrase("A fila começa por iluminação e gravação, que é o que a sua conta já vende. Postar mais Tech, e menos roupa, tende a mudar a categoria em que o TikTok te encaixa. Os números de faturamento e unidades são estimativas do CreatorsBase, do vídeo mais forte de cada produto. Pra ver gancho e CTA de um vídeo, toque em Modelar este vídeo: ele é transcrito pelo seu painel (1 crédito da Supadata), a primeira e a última frase aparecem aqui e ele já fica pronto em Modelar copy.")}</div>
@@ -188,12 +214,17 @@ function ttkTelaSugestoes(el) {
     ${testar.length ? `<h3 class="ttk-sug-titulo">Testar: fila de produtos novos</h3>${testar.map(ttkSugCartao).join("")}` : ""}
     ${!lista.length ? `<p class="vazio">Nenhuma sugestão com esse filtro.</p>` : ""}
     <div class="ini-card ttk-bloco"><div class="ini-card-topo"><h2>Também subindo no Radar</h2><span class="sub">sem vídeo de referência coletado</span></div>
-      <ul class="ttk-sug-radar">${TTK_SUG_RADAR.map(([n, d]) => `<li><b>${esc(n)}</b> ${esc(d)}</li>`).join("")}</ul></div>`;
+      <ul class="ttk-sug-radar">${ttkSug.radar.map(([n, d]) => `<li><b>${esc(n)}</b> ${esc(d)}</li>`).join("")}</ul></div>`;
   ttkSugLigar(el);
 }
 
 function ttkSugLigar(el) {
   const redesenhar = () => { const y = window.scrollY; desenharTikTok(el); window.scrollTo(0, y); };
+  el.querySelectorAll("[data-sug-abre]").forEach((b) => b.onclick = () => { ttkSug.aberto = ttkSug.aberto === b.dataset.sugAbre ? null : b.dataset.sugAbre; redesenhar(); });
+  el.querySelectorAll("[data-sug-foto]").forEach((f) => {
+    const img = f.querySelector("img"), ids = f.dataset.sugFoto.split("|");
+    img.onerror = () => { const i = Number(f.dataset.sugI) + 1; if (i < ids.length) { f.dataset.sugI = i; img.src = ttkSugFoto(ids[i]); } else f.classList.add("sem-foto"); };
+  });
   el.querySelectorAll("[data-sug-filtro]").forEach((b) => b.onclick = () => { ttkSug.filtro = b.dataset.sugFiltro; redesenhar(); });
   el.querySelectorAll("[data-sug-sub]").forEach((b) => b.onclick = () => { ttkSug.sub = b.dataset.sugSub; redesenhar(); });
   el.querySelectorAll("[data-sug-status]").forEach((s) => s.onchange = async () => { ttkSug.status[s.dataset.sugStatus] = s.value; await ttkSugSalvar(); redesenhar(); });
@@ -227,7 +258,23 @@ function ttkSugLigar(el) {
     .ttk-sug-rot { color: var(--ink, inherit) !important; }
     .ttk-sug-acao { text-align: right; }
     .ttk-sug-fora { opacity: .55; }
+    .ttk-sug-cabeca { display: flex; gap: 12px; align-items: center; background: none; border: 0; padding: 0; text-align: left; font: inherit; color: inherit; cursor: pointer; min-width: 0; }
+    .ttk-sug-cabeca u { color: var(--muted); }
+    .ttk-sug-cabeca:hover h2 { text-decoration: underline; }
+    .ttk-sug-foto { position: relative; flex: 0 0 56px; width: 56px; height: 72px; border-radius: 10px; overflow: hidden; background: var(--tint); display: grid; place-items: center; }
+    .ttk-sug-foto img { width: 100%; height: 100%; object-fit: cover; position: absolute; inset: 0; }
+    .ttk-sug-foto b { font-size: 22px; color: var(--muted); }
+    .ttk-sug-foto.sem-foto img { display: none; }
+    .ttk-sug-detalhe { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 16px; margin: 4px 0 12px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; }
+    .ttk-sug-player { aspect-ratio: 9 / 16; max-height: 560px; border-radius: 10px; overflow: hidden; background: #000; }
+    .ttk-sug-player iframe { width: 100%; height: 100%; border: 0; }
+    .ttk-sug-info p { margin: 2px 0 10px; }
+    .ttk-sug-capas { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+    .ttk-sug-capas a { position: relative; width: 96px; height: 128px; border-radius: 10px; overflow: hidden; background: var(--tint); display: block; }
+    .ttk-sug-capas img { width: 100%; height: 100%; object-fit: cover; }
+    .ttk-sug-capas a.sem-foto img { display: none; }
+    .ttk-sug-capas span { position: absolute; left: 0; right: 0; bottom: 0; padding: 4px 6px; font-size: 11px; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,.7)); }
     .ttk-sug-radar { margin: 0; padding-left: 18px; font-size: 13.5px; display: grid; gap: 4px; }
-    @media (max-width: 760px) { .ttk-sug-plano { grid-template-columns: 1fr; } .ttk-sug .ttk-cv li { grid-template-columns: 1fr; } .ttk-sug-acao { text-align: left; } }`;
+    @media (max-width: 760px) { .ttk-sug-detalhe { grid-template-columns: 1fr; } .ttk-sug-player { max-width: 300px; } .ttk-sug-plano { grid-template-columns: 1fr; } .ttk-sug .ttk-cv li { grid-template-columns: 1fr; } .ttk-sug-acao { text-align: left; } }`;
   document.head.appendChild(st);
 })();
