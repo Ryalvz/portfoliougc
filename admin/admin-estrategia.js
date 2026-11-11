@@ -219,7 +219,7 @@ function lerPlano(texto) {
   String(texto || "").split("\n").forEach((bruta) => {
     const l = bruta.replace(/^[\s>*•-]+/, "").replace(/\*\*/g, "").replace(/^\|/, "").replace(/\|\s*$/, "").trim();
     const mc = l.match(/^CARROSSEL\s*:\s*(.+)$/i);
-    if (mc) { const [tit, ...resto] = mc[1].split("|").map((x) => x.trim()); const me = resto.join(" ").match(/estilo\s*:?\s*(papel|colagem|direto|bastidor|revista|conversa|fotos)/i); car = { titulo: tit, estilo: me ? me[1].toLowerCase() : "", slides: [] }; carrosseis.push(car); return; }
+    if (mc) { const [tit, ...resto] = mc[1].split("|").map((x) => x.trim()); const me = resto.join(" ").match(/estilo\s*:?\s*(set de grava[cç][aã]o|set|papel|colagem|direto|bastidor|revista|conversa|fotos)/i); car = { titulo: tit, estilo: me ? me[1].toLowerCase().replace(/^set.*$/, "set").replace(/^papel$/, "set") : "", slides: [] }; carrosseis.push(car); return; }
     const md = l.match(/^(SEG|TER|QUA|QUI|SEX|S[AÁ]B|DOM)[A-Za-zçÇáÁ-]*\s*\|\s*(.+)$/i);
     if (md) {
       const p = md[2].split("|").map((x) => x.trim());

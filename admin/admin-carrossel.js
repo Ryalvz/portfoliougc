@@ -363,10 +363,10 @@ const CAR_ESTILOS = (() => {
   /* ---------- O que cada estilo pede em cada página ---------- */
   const TIPOS = [["gancho", "Gancho"], ["contexto", "Contexto"], ["construcao", "Construção"], ["tensao", "Tensão"], ["recompensa", "Recompensa"], ["cta", "CTA"]];
   const ESTILOS = {
-    papel: { nome: "Papel", quando: "Papel creme, título enorme em duas cores, caixa caramelo, print e notificação de verdade. Pra mostrar bastidor e ensinar.", desenho: null,
-      campos: { gancho: ["foto", "titulo", "lead", "msgs", "nota"], contexto: ["lead", "titulo", "texto", "foto", "nota"], construcao: ["lead", "titulo", "itens", "texto", "foto"], tensao: ["lead", "titulo", "msgs", "texto"], recompensa: ["lead", "titulo", "texto", "foto"], cta: ["lead", "titulo", "palavra", "texto"] },
-      rotulos: { _: { lead: "Linha embaixo do seu nome (ex.: UGC criativo e bastidor)", titulo: "Título enorme (*palavra* fica caramelo)", texto: "Caixa caramelo (*palavra* fica amarela)", msgs: "Notificação: marca: texto (uma por linha)", foto: "Print (aparece numa janelinha)" },
-        gancho: { foto: "Sua foto (tela cheia)", lead: "Cartão de número (ex.: campanhas / +50)", titulo: "Frase da capa (em faixas)", nota: "Letra à mão (opcional)" }, construcao: { itens: "Opções numeradas: texto / explicação (uma por linha)" }, cta: { texto: "Complemento da caixa (ex.: que eu te mando o modelo)" } } },
+    set: { nome: "Set de gravação", quando: "A sua marca: visor de câmera com REC, letra gigante, legenda de Reels, print no celular, takes em fita crepe e claquete no CTA.", desenho: null,
+      campos: { gancho: ["foto", "titulo", "texto", "nota"], contexto: ["titulo", "msgs", "texto", "foto", "nota"], construcao: ["titulo", "itens", "texto", "foto", "nota"], tensao: ["msgs", "titulo", "texto"], recompensa: ["titulo", "texto", "foto", "nota"], cta: ["titulo", "palavra", "texto"] },
+      rotulos: { _: { titulo: "A frase gigante (*palavra* = marca-texto)", texto: "Legenda de vídeo embaixo (*palavra* fica amarela)", msgs: "Comentário do Instagram: nome: texto (um por linha)", foto: "Print (aparece dentro de um celular)", itens: "Takes em fita crepe, um por linha", nota: "Letra à mão (opcional)" },
+        gancho: { foto: "Sua foto (tela cheia, com o visor da câmera)", texto: "Legenda embaixo da frase (opcional)" }, cta: { palavra: "Palavra escrita na claquete (ex.: ROTEIRO)", texto: "Legenda embaixo (ex.: que eu te mando o modelo)" } } },
     colagem: { nome: "Colagem", quando: "Fundo chapado, letra gigante em minúscula, polaroid com fita, adesivo e seta à mão. Pra parar o dedo.", desenho: null,
       campos: { gancho: ["foto", "titulo", "lead", "nota"], contexto: ["lead", "titulo", "texto", "foto", "nota"], construcao: ["lead", "titulo", "itens", "texto", "foto", "nota"], tensao: ["lead", "msgs", "titulo", "texto"], recompensa: ["lead", "titulo", "texto", "foto", "nota"], cta: ["titulo", "palavra", "texto"] },
       rotulos: { _: { lead: "Adesivo redondo (ex.: bastidor)", titulo: "A frase gigante (*palavra* = marca-texto)", foto: "Foto polaroid (opcional)" }, construcao: { itens: "Bilhete colado: um item por linha" }, tensao: { msgs: "Balão de mensagem: marca: ..." } } },
@@ -390,14 +390,14 @@ const CAR_ESTILOS = (() => {
   const ESTRUTURA = ["gancho", "contexto", "construcao", "construcao", "tensao", "recompensa", "cta"];
 
   const EXEMPLOS = {
-    papel: { titulo: "Como eu entrego um roteiro pra marca", slides: [
-      { tipo: "gancho", titulo: "como eu entrego roteiro pra marca", lead: "vídeos entregues / (seu número)", msgs: "marca: aprovou o roteiro. pode gravar!" },
-      { tipo: "contexto", titulo: "Nada de PDF ou *textão*", texto: "É um link, com o *logo da marca* e tudo organizado.", foto: "" },
-      { tipo: "construcao", titulo: "A marca escolhe *o gancho*", texto: "Sempre mando 2, e o roteiro *funciona com qualquer um.*", itens: "Seu fone cai na academia? / eu correndo na esteira\nEsse aqui não sai nem pulando corda / close no fone" },
-      { tipo: "construcao", titulo: "Ela comenta *direto na fala*", texto: "Sem aquela *troca enorme de mensagens.*" },
-      { tipo: "tensao", titulo: "Aprovou, *chega na hora*", msgs: "marca: aprovou o roteiro. pode gravar!", texto: "*Pode gravar!*" },
-      { tipo: "recompensa", titulo: "Eu fiz isso com o Claude, *sem saber programar*", texto: "Mas dá pra começar hoje, *no Google Docs.*" },
-      { tipo: "cta", titulo: "Quer entregar *assim?*", palavra: "ROTEIRO", texto: "que eu te mando o modelo que eu uso" }] },
+    set: { titulo: "A marca pediu 1 vídeo pra black", slides: [
+      { tipo: "gancho", titulo: "a marca pediu *1 vídeo* pra black.", nota: "eu mandei 3.", texto: "bastidor de um job de verdade" },
+      { tipo: "contexto", titulo: "faltam *18 dias.*", texto: "e quase todo mundo vai postar *produto e preço.*" },
+      { tipo: "construcao", titulo: "3 ganchos do mesmo produto.", itens: "unboxing\ndepoimento\ndemonstração" },
+      { tipo: "construcao", titulo: "subo os 3 e vejo qual *segura mais gente.*", celular: true, texto: "o print do resultado entra aqui" },
+      { tipo: "tensao", msgs: "marca: e se nenhum dos 3 funcionar?", titulo: "você descobre agora. *não no dia 27.*" },
+      { tipo: "recompensa", titulo: "quem testa antes chega na black com o *vencedor.*", nota: "simples assim" },
+      { tipo: "cta", titulo: "quer testar 3 ganchos no seu produto?", palavra: "BLACK", texto: "que eu te mostro como eu faria o seu" }] },
     colagem: { titulo: "A marca pediu 1 vídeo pra black", slides: [
       { tipo: "gancho", lead: "bastidor", titulo: "a marca pediu *1 vídeo* pra black.", nota: "eu mandei 3." },
       { tipo: "contexto", titulo: "faltam *18 dias.*", texto: "e quase todo mundo vai postar a mesma coisa: **produto e preço.**" },
@@ -461,7 +461,7 @@ const CAR_ESTILOS = (() => {
     return notaCapturada;
   }
   function pintar(cv, s, i, total, estilo, aoCarregar, todos = []) {
-    if (["direto", "papel", "colagem"].includes(estilo) && typeof CAMADAS !== "undefined") {
+    if (["direto", "set", "papel", "colagem"].includes(estilo) && typeof CAMADAS !== "undefined") {
       const lista = todos && todos.length ? todos : [s];
       return CAMADAS.pintar(cv, { estilo, slides: lista }, Math.max(0, lista.indexOf(s)), { aoCarregar });
     }
@@ -512,7 +512,7 @@ const CAR_ESTILOS = (() => {
     String(texto || "").split("\n").forEach((bruta) => {
       const l = bruta.replace(/^[\s>*•-]+/, "").replace(/^\|/, "").replace(/\|\s*$/, "").trim();
       const mc = l.replace(/\*\*/g, "").match(/^CARROSSEL\s*:\s*(.+)$/i);
-      if (mc) { const [tit, ...resto] = mc[1].split("|").map((x) => x.trim()); const me = resto.join(" ").match(/estilo\s*:?\s*(papel|colagem|direto|bastidor|revista|conversa|fotos)/i); car = { titulo: tit, estilo: me ? me[1].toLowerCase() : "", slides: [] }; cars.push(car); return; }
+      if (mc) { const [tit, ...resto] = mc[1].split("|").map((x) => x.trim()); const me = resto.join(" ").match(/estilo\s*:?\s*(set de grava[cç][aã]o|set|papel|colagem|direto|bastidor|revista|conversa|fotos)/i); car = { titulo: tit, estilo: me ? me[1].toLowerCase().replace(/^set.*$/, "set").replace(/^papel$/, "set") : "", slides: [] }; cars.push(car); return; }
       const s = lerSlide(l);
       if (s) { if (!car) { car = { titulo: "Carrossel", estilo: "", slides: [] }; cars.push(car); } car.slides.push(s); }
     });
