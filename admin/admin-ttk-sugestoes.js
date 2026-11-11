@@ -147,8 +147,8 @@ function ttkSugCartao(s) {
         <small>${esc(ttkSugTexto(r[2]))} · ${ttkSugMil(r[3])} views · +${ttkSugMil(r[4])} views/dia${r[5] ? ` · até ${ttkSugReal(r[5])} estimado` : ""}</small>
         ${tr && tr.gancho ? `<small class="ttk-sug-rot"><b>Gancho:</b> "${esc(tr.gancho.slice(0, 180))}"</small>` : ""}
         ${tr && tr.cta ? `<small class="ttk-sug-rot"><b>CTA:</b> "${esc(tr.cta.slice(0, 180))}"</small>` : ""}</span>
-      <span class="ttk-sug-acao">${tr ? (tr.rodando ? `<span class="sub">Transcrevendo...</span>` : `<button class="btn pequeno" type="button" data-sug-abrir="${esc(tr.t.id)}">Ver nos Roteiros</button>`)
-        : `<button class="btn pequeno" type="button" data-sug-rot="${esc(r[0])}" data-sug-nome="${esc(s.nome)}" data-sug-leg="${esc(leg)}" title="Transcreve pelo seu painel (1 crédito da Supadata)">Mandar pros Roteiros</button>`}</span></li>`;
+      <span class="ttk-sug-acao">${tr ? (tr.rodando ? `<span class="sub">Transcrevendo...</span>` : `<button class="btn pequeno" type="button" data-sug-abrir="${esc(tr.t.id)}">Abrir no Modelar copy</button>`)
+        : `<button class="btn pequeno" type="button" data-sug-rot="${esc(r[0])}" data-sug-nome="${esc(s.nome)}" data-sug-leg="${esc(leg)}" title="Transcreve pelo seu painel (1 crédito da Supadata)">Modelar este vídeo</button>`}</span></li>`;
   }).join("");
   return `<div class="ini-card ttk-bloco ttk-sug${st === "descartei" ? " ttk-sug-fora" : ""}">
     <div class="ini-card-topo"><div><h2>${s.fila ? `<span class="ttk-sug-fila">${s.fila}</span>` : ""}${esc(s.nome)}</h2>
@@ -179,7 +179,7 @@ function ttkTelaSugestoes(el) {
         <div><b>Com vendas (6)</b><p>Os ${TTK_SUGESTOES.filter((s) => s.tipo === "escalar").length} produtos de "Escalar" entram aqui primeiro: o mercado está comprando e você já tem o link.</p></div>
         <div><b>Testes (3)</b><p>Um produto novo de cada vez, com 3 ganchos diferentes em 3 dias. Vendeu em 2 dos 3 dias: sobe pra Com vendas. Não vendeu: troca pelo próximo da fila.</p></div>
       </div>
-      ${ttkFrase("A fila começa por iluminação e gravação, que é o que a sua conta já vende. Postar mais Tech, e menos roupa, tende a mudar a categoria em que o TikTok te encaixa. Os números de faturamento e unidades são estimativas do CreatorsBase, do vídeo mais forte de cada produto. Pra ver gancho e CTA de um vídeo, toque em Mandar pros Roteiros: ele é transcrito pelo seu painel (1 crédito da Supadata) e a primeira e a última frase aparecem aqui.")}</div>
+      ${ttkFrase("A fila começa por iluminação e gravação, que é o que a sua conta já vende. Postar mais Tech, e menos roupa, tende a mudar a categoria em que o TikTok te encaixa. Os números de faturamento e unidades são estimativas do CreatorsBase, do vídeo mais forte de cada produto. Pra ver gancho e CTA de um vídeo, toque em Modelar este vídeo: ele é transcrito pelo seu painel (1 crédito da Supadata), a primeira e a última frase aparecem aqui e ele já fica pronto em Modelar copy.")}</div>
     <div class="ttk-sug-filtros">
       <div class="ini-periodo" role="group" aria-label="Tipo">${[["todas", "Todas"], ["escalar", "Escalar"], ["testar", "Testar"]].map(([k, n]) => `<button type="button" data-sug-filtro="${k}" aria-pressed="${ttkSug.filtro === k}">${n}</button>`).join("")}</div>
       <div class="ini-periodo" role="group" aria-label="Categoria"><button type="button" data-sug-sub="" aria-pressed="${!ttkSug.sub}">Toda Tech</button>${subs.map((k) => `<button type="button" data-sug-sub="${k}" aria-pressed="${ttkSug.sub === k}">${esc((TTK_CATS[k] || [0, k])[1])}</button>`).join("")}</div>
@@ -197,19 +197,11 @@ function ttkSugLigar(el) {
   el.querySelectorAll("[data-sug-filtro]").forEach((b) => b.onclick = () => { ttkSug.filtro = b.dataset.sugFiltro; redesenhar(); });
   el.querySelectorAll("[data-sug-sub]").forEach((b) => b.onclick = () => { ttkSug.sub = b.dataset.sugSub; redesenhar(); });
   el.querySelectorAll("[data-sug-status]").forEach((s) => s.onchange = async () => { ttkSug.status[s.dataset.sugStatus] = s.value; await ttkSugSalvar(); redesenhar(); });
-  el.querySelectorAll("[data-sug-abrir]").forEach((b) => b.onclick = () => { trans.sel = b.dataset.sugAbrir; irPara("transcricoes"); });
+  el.querySelectorAll("[data-sug-abrir]").forEach((b) => b.onclick = () => { if (typeof ttkMod !== "undefined") ttkMod.sel = b.dataset.sugAbrir; irParaSub("tiktok", "modelar"); });
   el.querySelectorAll("[data-sug-rot]").forEach((b) => b.onclick = async () => {
     b.disabled = true; b.textContent = "Salvando...";
-    const link = ttkSugLink(b.dataset.sugRot), perfil = (b.dataset.sugRot.match(/^@([^/]+)/) || [])[1] || null;
-    const dados = { link, plataforma: "tiktok", categoria: "tiktok_shop", status: "ideia", titulo: `Referência: ${b.dataset.sugNome}`.slice(0, 90), de_quem: "outra", perfil,
-      legenda: b.dataset.sugLeg || null, tags: ["sugestao-ttk"], andamento: "processando" };
-    const limpo = {}; Object.keys(dados).forEach((k) => { if (temCampo("transcricoes", k)) limpo[k] = dados[k]; });
-    const { data, error } = await db.from("transcricoes").insert(limpo).select("id").single();
-    if (error) { avisar(traduzErro(error), true); b.disabled = false; b.textContent = "Mandar pros Roteiros"; return; }
-    await recarregar("transcricoes");
-    const novo = S.transcricoes.find((x) => String(x.id) === String(data.id));
-    if (novo) transcreverVideo(novo).then(() => { if (ttkX.sub === "sugestoes" && document.body.contains(el)) redesenhar(); });
-    avisar("Salvo nos Roteiros. A transcrição chega em alguns minutos (1 crédito da Supadata).");
+    const novo = await modSalvarReferencia(ttkSugLink(b.dataset.sugRot), { titulo: `Referência: ${b.dataset.sugNome}`.slice(0, 90), legenda: b.dataset.sugLeg || null, tags: ["sugestao-ttk"] }, null);
+    if (!novo) { b.disabled = false; b.textContent = "Modelar este vídeo"; return; }
     redesenhar();
   });
 }

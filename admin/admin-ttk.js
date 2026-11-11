@@ -29,7 +29,7 @@ const ttkX = {
   grupos: {}, prodGrupo: {}, prodInfo: {}, importacoes: [], historico: [], amostras: []
 };
 const TTK_SUBS = [["geral", "Visão Geral"], ["tech", "Shop Tech"], ["outras", "Outras categorias"], ["produtos", "Produtos e SKUs"], ["conteudos", "Conteúdos e vídeos"],
-  ["oportunidades", "Oportunidades"], ["sugestoes", "Sugestões"], ["amostras", "Testes e amostras"], ["live", "LIVE"], ["historico", "Histórico"]];
+  ["oportunidades", "Oportunidades"], ["sugestoes", "Sugestões"], ["modelar", "Modelar copy"], ["amostras", "Testes e amostras"], ["live", "LIVE"], ["historico", "Histórico"]];
 // Subcategorias: [área, nome]. A área "tech" é a operação principal.
 const TTK_CATS = {
   iluminacao: ["tech", "Iluminação"], audio: ["tech", "Áudio"], mobile: ["tech", "Acessórios mobile"], gravacao: ["tech", "Equipamentos de gravação"],
@@ -392,7 +392,7 @@ async function desenharTikTok(el) {
   if (!TTK_SUBS.some(([k]) => k === ttkX.sub)) ttkX.sub = "geral";
   ttkMeses();
   const telas = { geral: ttkTelaGeral, tech: (e) => ttkTelaAnalise(e, "tech"), outras: (e) => ttkTelaAnalise(e, "outras"), produtos: ttkTelaProdutos,
-    conteudos: ttkTelaConteudos, oportunidades: ttkTelaOportunidades, sugestoes: (e) => (typeof ttkTelaSugestoes === "function" ? ttkTelaSugestoes(e) : (e.innerHTML = `<p class="vazio">Recarregue a página pra abrir as sugestões.</p>`)), amostras: ttkTelaAmostras, live: ttkTelaLive, historico: ttkTelaHistorico };
+    conteudos: ttkTelaConteudos, oportunidades: ttkTelaOportunidades, modelar: (e) => (typeof ttkTelaModelar === "function" ? ttkTelaModelar(e) : (e.innerHTML = `<p class="vazio">Recarregue a página pra abrir o Modelar copy.</p>`)), sugestoes: (e) => (typeof ttkTelaSugestoes === "function" ? ttkTelaSugestoes(e) : (e.innerHTML = `<p class="vazio">Recarregue a página pra abrir as sugestões.</p>`)), amostras: ttkTelaAmostras, live: ttkTelaLive, historico: ttkTelaHistorico };
   telas[ttkX.sub](el);
   ttkLigar(el, { per: ttkPeriodo(), hoje: hojeISO() });
   if (typeof iniLigarDicas === "function") iniLigarDicas(el);
