@@ -24,12 +24,19 @@ const ttkX = {
   pedidos: null, conteudos: null, videos: null, metas: null, erro: "",
   mes: null, modo: "mes", dia: null,
   prodSel: "", pareto: "com", busca: "", pagina: 0, janela: 14, conteudoPor: "gancho",
-  todos: null, sub: "geral", subcat: "", escopoGeral: "tech", escopoConteudo: "tech", ordemVideos: "liq",
+  todos: null, sub: "hoje", subcat: "", escopoGeral: "tech", escopoConteudo: "tech", ordemVideos: "liq",
   filtroProd: "tech", buscaProd: "", fichaGrupo: null,
   grupos: {}, prodGrupo: {}, prodInfo: {}, importacoes: [], historico: [], amostras: []
 };
-const TTK_SUBS = [["geral", "Visão Geral"], ["tech", "Shop Tech"], ["outras", "Outras categorias"], ["produtos", "Produtos e SKUs"], ["conteudos", "Conteúdos e vídeos"],
+const TTK_SUBS = [["hoje", "Hoje"], ["gravar", "Gravação"], ["geral", "Visão Geral"], ["tech", "Shop Tech"], ["outras", "Outras categorias"], ["produtos", "Produtos e SKUs"], ["conteudos", "Conteúdos e vídeos"],
   ["oportunidades", "Oportunidades"], ["sugestoes", "Sugestões"], ["modelar", "Modelar copy"], ["amostras", "Testes e amostras"], ["live", "LIVE"], ["historico", "Histórico"]];
+// O menu tem 6 itens; cada um junta telas que viram abas dentro dele
+const TTK_MENU = [["hoje", "Hoje", ["hoje"]], ["resultados", "Resultados", ["geral", "tech", "outras", "live", "historico"]],
+  ["produtos", "Produtos", ["produtos", "oportunidades"]], ["videos", "Vídeos", ["conteudos"]],
+  ["criar", "Criar", ["sugestoes", "modelar", "gravar"]], ["amostras", "Amostras", ["amostras"]]];
+const TTK_NOME_ABA = { geral: "Visão geral", tech: "Shop Tech", outras: "Outras categorias", live: "LIVE", historico: "Histórico", produtos: "Produtos e SKUs", oportunidades: "Oportunidades", sugestoes: "Sugestões", modelar: "Modelar copy", gravar: "Gravação" };
+const ttkGrupoDe = (sub) => (TTK_MENU.find(([, , l]) => l.includes(sub)) || TTK_MENU[0]);
+const ttkUltima = {};
 // Subcategorias: [área, nome]. A área "tech" é a operação principal.
 const TTK_CATS = {
   iluminacao: ["tech", "Iluminação"], audio: ["tech", "Áudio"], mobile: ["tech", "Acessórios mobile"], gravacao: ["tech", "Equipamentos de gravação"],
@@ -389,11 +396,15 @@ function ttkChipsSub(area) {
 async function desenharTikTok(el) {
   if (!ttkX.todos) { el.innerHTML = `<p class="vazio">Abrindo o TikTok...</p>`; await ttkCarregar(); }
   if (ttkX.erro) { el.innerHTML = `<div class="aviso-falta">Não consegui ler os pedidos do TikTok Shop (${esc(ttkX.erro)}). Falta rodar as partes 46, 47 e 48 do banco.sql no Supabase.</div>`; return; }
-  if (!TTK_SUBS.some(([k]) => k === ttkX.sub)) ttkX.sub = "geral";
+  if (!TTK_SUBS.some(([k]) => k === ttkX.sub)) ttkX.sub = "hoje";
   ttkMeses();
   const telas = { geral: ttkTelaGeral, tech: (e) => ttkTelaAnalise(e, "tech"), outras: (e) => ttkTelaAnalise(e, "outras"), produtos: ttkTelaProdutos,
-    conteudos: ttkTelaConteudos, oportunidades: ttkTelaOportunidades, modelar: (e) => (typeof ttkTelaModelar === "function" ? ttkTelaModelar(e) : (e.innerHTML = `<p class="vazio">Recarregue a página pra abrir o Modelar copy.</p>`)), sugestoes: (e) => (typeof ttkTelaSugestoes === "function" ? ttkTelaSugestoes(e) : (e.innerHTML = `<p class="vazio">Recarregue a página pra abrir as sugestões.</p>`)), amostras: ttkTelaAmostras, live: ttkTelaLive, historico: ttkTelaHistorico };
+    conteudos: ttkTelaConteudos, oportunidades: ttkTelaOportunidades, hoje: (e) => (typeof ttkTelaHoje === "function" ? ttkTelaHoje(e) : ttkTelaGeral(e)), gravar: (e) => (typeof ttkTelaGravar === "function" ? ttkTelaGravar(e) : (e.innerHTML = `<p class="vazio">Recarregue a página.</p>`)), modelar: (e) => (typeof ttkTelaModelar === "function" ? ttkTelaModelar(e) : (e.innerHTML = `<p class="vazio">Recarregue a página pra abrir o Modelar copy.</p>`)), sugestoes: (e) => (typeof ttkTelaSugestoes === "function" ? ttkTelaSugestoes(e) : (e.innerHTML = `<p class="vazio">Recarregue a página pra abrir as sugestões.</p>`)), amostras: ttkTelaAmostras, live: ttkTelaLive, historico: ttkTelaHistorico };
   telas[ttkX.sub](el);
+  // Abas dentro do item do menu (Resultados, Produtos, Criar)
+  const grupo = ttkGrupoDe(ttkX.sub); ttkUltima[grupo[0]] = ttkX.sub;
+  if (grupo[2].length > 1) el.insertAdjacentHTML("afterbegin", `<nav class="ttk-abas" aria-label="${esc(grupo[1])}">${grupo[2].map((k) => `<button type="button" data-ttk-aba="${k}" aria-current="${k === ttkX.sub ? "page" : "false"}">${esc(TTK_NOME_ABA[k] || k)}</button>`).join("")}</nav>`);
+  el.querySelectorAll("[data-ttk-aba]").forEach((b) => b.onclick = () => irParaSub("tiktok", b.dataset.ttkAba));
   ttkLigar(el, { per: ttkPeriodo(), hoje: hojeISO() });
   if (typeof iniLigarDicas === "function") iniLigarDicas(el);
 }
@@ -1176,10 +1187,12 @@ function ttkFormVideo(el, v, dia) {
       { n: "produto", r: "Produto", req: true, inteiro: true, lista: nomes, ph: "Comece a digitar ou escolha um que já vende" },
       { n: "data", r: "Dia", t: "date", req: true },
       { n: "hora", r: "Horário", t: "time" },
-      { n: "status", r: "Status", t: "select", op: TTK_STATUS_VIDEO }
+      { n: "status", r: "Status", t: "select", op: TTK_STATUS_VIDEO },
+      { n: "bloco", r: "Bloco", t: "select", op: [["", "Sem bloco"], ["principal", "Principal"], ["com_vendas", "Com vendas"], ["teste", "Teste"]] },
+      { n: "legenda", r: "Legenda", t: "textarea", inteiro: true }
     ],
     aoSalvar: async (d) => {
-      const dados = { produto: d.produto, data: d.data, hora: d.hora || null, status: d.status || "rascunho" };
+      const dados = { produto: d.produto, data: d.data, hora: d.hora || null, status: d.status || "rascunho", bloco: d.bloco || null, legenda: d.legenda || null };
       const r = v ? await db.from("ttk_videos").update(dados).eq("id", v.id).select().single() : await db.from("ttk_videos").insert(dados).select().single();
       if (r.error) { avisar(traduzErro(r.error), true); return false; }
       ttkX.videos = ttkX.videos.filter((x) => x.id !== r.data.id).concat(r.data).sort((a, b) => String(a.hora || "99").localeCompare(String(b.hora || "99")));
@@ -1348,6 +1361,9 @@ async function ttkImportar(arq, el) {
     .ttk-vendas-linha { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 16px; }
     .ttk-vendas-linha .ini-medio { font-size: 22px; }
     .ttk-clicavel { cursor: pointer; }
+    .ttk-abas { display: flex; gap: 4px; flex-wrap: wrap; margin: 0 0 14px; padding: 4px; background: var(--tint); border-radius: 12px; width: fit-content; max-width: 100%; }
+    .ttk-abas button { border: 0; background: none; font: inherit; font-size: 13.5px; padding: 7px 14px; border-radius: 9px; cursor: pointer; color: var(--muted); }
+    .ttk-abas button[aria-current="page"] { background: var(--card); color: inherit; font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
     .ttk-clicavel:hover td { background: var(--tint); }
     .ttk-seta { display: inline-grid; place-items: center; width: 18px; height: 18px; margin-right: 8px; border-radius: 50%; border: 1px solid var(--line); font-size: 12px; font-weight: 700; color: var(--muted); vertical-align: 1px; }
     .ttk-cv-linha td { background: var(--card); padding: 4px 12px 12px; }
@@ -1389,12 +1405,14 @@ const confirmar_ = (t, r) => confirmar(t, r);
 // O menu tem um item por seção (data-aba="tiktok" data-sub="..."). Ensina o roteador do painel a lembrar a seção.
 {
   const subOriginal = subDaAba, irSubOriginal = irParaSub, enderecoOriginal = irParaEndereco;
-  subDaAba = (aba) => (aba === "tiktok" ? ttkX.sub : subOriginal(aba));
-  irParaSub = (aba, sub) => { if (aba === "tiktok") { ttkX.sub = sub; ttkX.subcat = ""; try { localStorage.setItem("ttk-sub", sub); } catch (_) {} irPara("tiktok"); return; } irSubOriginal(aba, sub); };
+  // O menu marca o item do grupo (ex.: "resultados"), a tela fica em ttkX.sub (ex.: "tech")
+  const resolver = (x) => { if (TTK_SUBS.some(([k]) => k === x)) return x; const g = TTK_MENU.find(([k]) => k === x); return g ? (ttkUltima[g[0]] || g[2][0]) : "hoje"; };
+  subDaAba = (aba) => (aba === "tiktok" ? ttkGrupoDe(ttkX.sub)[0] : subOriginal(aba));
+  irParaSub = (aba, sub) => { if (aba === "tiktok") { ttkX.sub = resolver(sub); ttkX.subcat = ""; try { localStorage.setItem("ttk-sub", ttkX.sub); } catch (_) {} irPara("tiktok"); return; } irSubOriginal(aba, sub); };
   irParaEndereco = () => {
     const alvo = (location.hash || "").slice(1);
     const m = alvo.match(/^tiktok(?:-(\w+))?$/);
-    if (m) { ttkX.sub = TTK_SUBS.some(([k]) => k === m[1]) ? m[1] : "geral"; irPara("tiktok"); return; }
+    if (m) { ttkX.sub = m[1] ? resolver(m[1]) : "hoje"; irPara("tiktok"); return; }
     enderecoOriginal();
   };
   try { const s = localStorage.getItem("ttk-sub"); if (s && TTK_SUBS.some(([k]) => k === s)) ttkX.sub = s; } catch (_) {}

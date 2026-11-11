@@ -101,7 +101,7 @@ function ttkTelaModelar(el) {
       <div class="ini-card ttk-bloco"><h3 class="mod-h" style="margin-top:0">Copy pronta</h3>
         <p class="sub" style="margin:0 0 6px">Cole aqui o que o Claude devolveu e salve. Fica guardado junto com a referência.</p>
         <textarea class="campo" id="mod-final" rows="10" style="width:100%" placeholder="A copy final, pronta pra gravar">${esc(t.minha_versao || "")}</textarea>
-        <div class="barra" style="margin-top:8px"><span class="sub" id="mod-salvo"></span><span class="espaco"></span>${typeof abrirRoteiroGravacao === "function" ? `<button class="btn" type="button" id="mod-roteiro">Ver roteiro de gravação</button>` : ""}<button class="btn primario" type="button" id="mod-salvar">Salvar copy</button></div>
+        <div class="barra" style="margin-top:8px"><span class="sub" id="mod-salvo"></span><span class="espaco"></span>${typeof abrirRoteiroGravacao === "function" ? `<button class="btn" type="button" id="mod-roteiro">Ver roteiro de gravação</button>` : ""}${typeof ttkGravarAdicionar === "function" ? `<button class="btn" type="button" id="mod-gravar">Mandar pra gravação</button>` : ""}<button class="btn primario" type="button" id="mod-salvar">Salvar copy</button></div>
       </div>` : ""}`;
   }
 
@@ -155,6 +155,14 @@ function modLigar(el, t) {
     const grupos = Object.values(ttkX.grupos || {});
     const produto = est.modo === "meu" ? (grupos.find((g) => String(g.id) === est.grupo) || {}).nome : est.modo === "outro" ? est.outro : "";
     abrirRoteiroGravacao({ ...t, categoria: "tiktok_shop", ...(produto ? { marca: String(produto).slice(0, 60) } : {}), nota: "Dá pra tocar no título e no cabeçalho pra mudar antes de baixar. O texto você muda em Copy pronta." }, modParaRoteiro(v));
+  };
+  if (q("#mod-gravar")) q("#mod-gravar").onclick = async () => {
+    const v = q("#mod-final").value.trim();
+    if (!v) { avisar("Cole e salve a copy pronta primeiro.", true); return; }
+    if (v !== (t.minha_versao || "")) { if (!(await gravar("transcricoes", { minha_versao: v }, t.id))) return; t.minha_versao = v; }
+    const grupos = Object.values(ttkX.grupos || {});
+    const produto = est.modo === "meu" ? (grupos.find((g) => String(g.id) === est.grupo) || {}).nome : est.modo === "outro" ? est.outro : (t.titulo || "Referência");
+    if (await ttkGravarAdicionar({ produto: String(produto || "Referência").slice(0, 120), obs: "copy do Modelar copy", ref: String(t.id) })) avisar("Foi pro quadro de Gravação, na coluna Gravar.");
   };
   if (q("#mod-salvar")) q("#mod-salvar").onclick = async () => {
     const v = q("#mod-final").value.trim();
