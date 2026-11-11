@@ -12,7 +12,7 @@ const MOD_MUDAR = [
   ["dor", "Dor de abertura", "o problema que abre o vídeo"],
   ["oferta", "Oferta", "preço, condição e motivo pra comprar agora"]
 ];
-const ttkMod = { sel: null, busca: "", est: {}, voz: null };
+const ttkMod = { sel: null, busca: "", est: {}, voz: null, filtro: "todas" };
 
 const modRefs = () => (S.transcricoes || []).filter((t) => t.categoria === "tiktok_shop" && t.link && t.de_quem !== "minha");
 const modEst = (id) => (ttkMod.est[id] = ttkMod.est[id] || { modo: "mesmo", grupo: "", outro: "", info: "", mudar: new Set(["gancho", "fala"]) });
@@ -59,7 +59,9 @@ function ttkTelaModelar(el) {
   if (ttkMod.voz === null) { ttkMod.voz = ""; if (typeof carregarVoz === "function") carregarVoz().then((v) => { ttkMod.voz = v || ""; }).catch(() => {}); }
   const per = ttkPeriodo();
   const q = ttkMod.busca.toLowerCase();
-  const refs = modRefs().filter((t) => !q || [t.titulo, t.perfil, t.transcricao].some((x) => String(x || "").toLowerCase().includes(q)));
+  const comCopy = modRefs().filter((t) => t.minha_versao).length;
+  const refs = modRefs().filter((t) => (ttkMod.filtro !== "copy" || t.minha_versao) && (!q || [t.titulo, t.perfil, t.transcricao, t.minha_versao].some((x) => String(x || "").toLowerCase().includes(q))))
+    .sort((a, b) => (b.minha_versao ? 1 : 0) - (a.minha_versao ? 1 : 0));
   if (ttkMod.sel && !modRefs().some((t) => String(t.id) === String(ttkMod.sel))) ttkMod.sel = null;
   const t = ttkMod.sel ? modRefs().find((x) => String(x.id) === String(ttkMod.sel)) : null;
   const grupos = Object.values(ttkX.grupos || {}).sort((a, b) => String(a.nome).localeCompare(String(b.nome)));
@@ -68,9 +70,10 @@ function ttkTelaModelar(el) {
   const lista = `<div class="ini-card ttk-bloco mod-lista"><div class="ini-card-topo"><h2>Referências do TikTok Shop</h2><span class="sub">${refs.length}</span></div>
       <form class="mod-novo" id="mod-novo"><input class="campo" id="mod-link" type="url" placeholder="Cole o link de um vídeo do TikTok"><button class="btn primario pequeno" type="submit">Transcrever</button></form>
       <p class="sub" style="margin:4px 0 8px">Transcrever usa 1 crédito da Supadata e leva uns 3 minutos.</p>
+      <div class="ini-periodo" role="group" aria-label="Mostrar" style="margin-bottom:6px">${[["todas", "Todas"], ["copy", `Com copy pronta (${comCopy})`]].map(([k, n]) => `<button type="button" data-mod-filtro="${k}" aria-pressed="${ttkMod.filtro === k}">${n}</button>`).join("")}</div>
       <input class="campo" id="mod-busca" type="search" placeholder="Buscar" value="${esc(ttkMod.busca)}" style="width:100%;margin-bottom:6px">
       <ul class="mod-itens">${refs.map((r) => { const rod = r.andamento === "processando"; return `<li><button type="button" data-mod-sel="${r.id}" aria-pressed="${String(r.id) === String(ttkMod.sel)}">
-        <b>${esc(String(r.titulo || "Sem título").slice(0, 70))}</b><small>${esc(r.perfil ? "@" + String(r.perfil).replace(/^@/, "") : "")}${rod ? " · transcrevendo..." : !r.transcricao ? " · sem transcrição" : r.minha_versao ? " · já modelado" : ""}</small></button></li>`; }).join("") || `<li><p class="vazio">Nenhuma referência ainda. Cole um link aqui em cima ou mande um vídeo pela aba Sugestões.</p></li>`}</ul></div>`;
+        ${r.minha_versao ? `<span class="ini-selo sobe mod-pronta">Copy pronta</span>` : ""}<b>${esc(String(r.titulo || "Sem título").slice(0, 70))}</b><small>${esc(r.perfil ? "@" + String(r.perfil).replace(/^@/, "") : "")}${rod ? " · transcrevendo..." : !r.transcricao ? " · sem transcrição" : ""}</small></button></li>`; }).join("") || `<li><p class="vazio">Nenhuma referência ainda. Cole um link aqui em cima ou mande um vídeo pela aba Sugestões.</p></li>`}</ul></div>`;
 
   let painel;
   if (!t) painel = `<div class="ini-card ttk-bloco"><p class="vazio">Escolha uma referência ao lado pra modelar a copy.</p></div>`;
@@ -111,6 +114,7 @@ function ttkTelaModelar(el) {
 function modLigar(el, t) {
   const redesenhar = () => { const y = window.scrollY; desenharTikTok(el); window.scrollTo(0, y); };
   const q = (s) => el.querySelector(s);
+  el.querySelectorAll("[data-mod-filtro]").forEach((b) => b.onclick = () => { ttkMod.filtro = b.dataset.modFiltro; redesenhar(); });
   el.querySelectorAll("[data-mod-sel]").forEach((b) => b.onclick = () => { ttkMod.sel = b.dataset.modSel; redesenhar(); });
   const busca = q("#mod-busca");
   if (busca) busca.oninput = (e) => { ttkMod.busca = e.target.value; clearTimeout(modLigar.tm); modLigar.tm = setTimeout(() => { desenharTikTok(el); const b = el.querySelector("#mod-busca"); if (b) { b.focus(); b.setSelectionRange(b.value.length, b.value.length); } }, 300); };
@@ -154,7 +158,7 @@ function modLigar(el, t) {
   };
   if (q("#mod-salvar")) q("#mod-salvar").onclick = async () => {
     const v = q("#mod-final").value.trim();
-    if (await gravar("transcricoes", { minha_versao: v || null }, t.id)) { t.minha_versao = v; q("#mod-salvo").textContent = "Salvo"; }
+    if (await gravar("transcricoes", { minha_versao: v || null }, t.id)) { t.minha_versao = v; q("#mod-salvo").textContent = "Salvo. Fica nesta referência, em Com copy pronta."; setTimeout(redesenhar, 1200); }
   };
   atualizar();
 }
@@ -228,6 +232,7 @@ async function modSalvarReferencia(link, extra, el) {
     .mod-itens button[aria-pressed="true"] { background: var(--tint); border-color: var(--line); }
     .mod-itens b { display: block; font-size: 13px; font-weight: 600; }
     .mod-itens small { color: var(--muted); font-size: 12px; }
+    .mod-pronta { display: inline-block; margin-bottom: 3px; font-size: 11px; }
     .mod-h { font-size: 14px; margin: 14px 0 6px; }
     .mod-transcricao { white-space: pre-wrap; font-size: 13.5px; line-height: 1.55; max-height: 260px; overflow: auto; background: var(--tint); border-radius: 10px; padding: 10px 12px; }
     .mod-checks { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 6px; }
