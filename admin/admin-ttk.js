@@ -813,8 +813,8 @@ async function ttkImportar(arq, el) {
     .ttk-meta-linhas b { display: flex; align-items: center; gap: 6px; }
     .ttk-meta-linhas .ini-selo { margin-top: 0; }
     .ttk-com .ini-alc-nums .ini-medio, .ttk-ontem .ini-medio { font-size: clamp(18px, 1.55vw, 24px); white-space: nowrap; }
-    .ttk-com .ini-alc-nums { gap: 14px; }
-    .ttk-ontem-nums { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .ttk-com .ini-alc-nums { gap: 14px; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr) minmax(0, 1fr); }
+    .ttk-ontem-nums { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 12px; }
     .ttk-mini-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 16px; }
     .ttk-mini-cards .ini-card { padding: 16px 18px; }
     .ttk-mini-cards .ini-rot { margin: 0 0 6px; }
