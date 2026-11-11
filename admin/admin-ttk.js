@@ -336,7 +336,7 @@ function ttkHeroArea(dias) {
     <path d="M0,${fundo} L${pts.join(" L")} L${W},${fundo} Z" class="ini-area"/>
     <polyline points="${pts.join(" ")}" class="ini-linha" vector-effect="non-scaling-stroke"/>
     <line class="ini-mira" x1="0" x2="0" y1="${topo}" y2="${fundo}" vector-effect="non-scaling-stroke" style="display:none"/>
-    ${dias.map((d, i) => `<rect data-dica="${esc(`${d.rot}: ${real(d.v)} de comissão`)}" data-x="${px(i).toFixed(1)}" x="${Math.max(0, px(i) - W / dias.length / 2).toFixed(1)}" y="0" width="${(W / dias.length).toFixed(1)}" height="${H}" fill="transparent"/>`).join("")}
+    ${dias.map((d, i) => `<rect data-dica="${esc(`${d.rot}: ${real(d.v)}`)}" data-x="${px(i).toFixed(1)}" x="${Math.max(0, px(i) - W / dias.length / 2).toFixed(1)}" y="0" width="${(W / dias.length).toFixed(1)}" height="${H}" fill="transparent"/>`).join("")}
   </svg><span class="ini-ponto" style="left:${((px(ult) / W) * 100).toFixed(2)}%;top:${((py(dias[ult].v) / H) * 100).toFixed(2)}%"></span>`;
 }
 
@@ -425,7 +425,7 @@ function ttkTelaGeral(el) {
     serie = Array.from({ length: per.atual ? Number(hoje.slice(8, 10)) : per.D }, (_, i) => ({ rot: `${i + 1}/${Number(per.mes.slice(5, 7))}`, v: v[i + 1] }));
   }
   const vendas = ttkX.todos.filter((p) => filtro(p) && ttkNoPeriodo(p, per.ini, per.fim));
-  const gDia = per.acum ? [] : Array.from({ length: per.N }, (_, i) => ({ rot: `${i + 1}/${Number(per.mes.slice(5, 7))}`, v: vendas.filter((p) => ttkValido(p) && Number(p.dia.slice(8, 10)) === i + 1).reduce((s, p) => s + p.g, 0) }));
+  const gDia = per.acum ? [...new Set(ttkX.todos.map((p) => p.mes))].sort().map((m) => ({ rot: ttkNomeMes(m), v: ttkX.todos.filter((p) => filtro(p) && ttkValido(p) && p.mes === m).reduce((s, p) => s + p.g, 0) })) : Array.from({ length: per.N }, (_, i) => ({ rot: `${i + 1}/${Number(per.mes.slice(5, 7))}`, v: vendas.filter((p) => ttkValido(p) && Number(p.dia.slice(8, 10)) === i + 1).reduce((s, p) => s + p.g, 0) }));
   const oo = ttkSomar(ttkX.todos.filter((p) => filtro(p) && p.dia === ontem));
   const sete = [1, 2, 3, 4, 5, 6, 7].map((n) => ttkSomar(ttkX.todos.filter((p) => filtro(p) && p.dia === ttkSomaDias(ontem, -n))));
   const m7 = { g: sete.reduce((s, x) => s + x.g, 0) / 7, p: sete.reduce((s, x) => s + x.pedidos, 0) / 7 };
@@ -455,8 +455,8 @@ function ttkTelaGeral(el) {
           <div><strong class="ini-medio">${num(A.pedidos)}</strong><span class="ini-rot">pedidos</span>${ttkSelo(A.pedidos, B && B.pedidos)}</div>
           <div><strong class="ini-medio">${num(A.i)}</strong><span class="ini-rot">unidades</span>${ttkSelo(A.i, B && B.i)}</div>
         </div>
-        ${per.acum ? "" : `<div class="ini-graf-caixa">${ttkHeroArea(gDia)}<div class="ini-dica" hidden></div></div>
-        <p class="ini-legenda">GMV por dia do pedido</p>`}
+        <div class="ini-graf-caixa">${ttkHeroArea(gDia)}<div class="ini-dica" hidden></div></div>
+        <p class="ini-legenda">GMV por ${per.acum ? "mês" : "dia do pedido"}</p>
       </section>
       <div class="ini-lado">
         <section class="ini-card ttk-meta-card">
