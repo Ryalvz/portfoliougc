@@ -452,10 +452,10 @@ function ttkTelaGeral(el) {
         <div class="ini-graf-caixa">${ttkHeroBarras(serie)}<div class="ini-dica" hidden></div></div>
         <p class="ini-legenda">Comissão que caiu por ${per.acum ? "mês" : "dia de liquidação"}</p>
       </section>
-      <section class="ini-card ini-alc ttk-com">
+      <section class="ini-card ini-alc ttk-vendas">
         <div class="ini-card-topo"><h2>Vendas${tech ? " Tech" : ""}</h2><span class="ttk-etiqueta ttk-etiqueta-clara">${per.acum ? "acumulado" : esc(ttkNomeMes(per.mes))}</span></div>
-        <div class="ini-alc-nums">
-          <div><strong class="ini-medio">${real(A.g)}</strong><span class="ini-rot">GMV</span>${ttkSelo(A.g, B && B.g)}</div>
+        <div><strong class="ini-medio ttk-vendas-gmv">${real(A.g)}</strong><span class="ini-rot">GMV</span>${ttkSelo(A.g, B && B.g)}</div>
+        <div class="ttk-vendas-linha">
           <div><strong class="ini-medio">${num(A.pedidos)}</strong><span class="ini-rot">pedidos</span>${ttkSelo(A.pedidos, B && B.pedidos)}</div>
           <div><strong class="ini-medio">${num(A.i)}</strong><span class="ini-rot">unidades</span>${ttkSelo(A.i, B && B.i)}</div>
         </div>
@@ -1344,6 +1344,9 @@ async function ttkImportar(arq, el) {
     .ttk-ficha { border: 1.5px solid var(--olive); }
     .ttk-ficha .ini-card-topo h2 { font-size: 20px; }
     #ttk-fin .grade-2 { grid-template-columns: 2fr 1fr; }
+    .ttk-vendas-gmv { font-size: clamp(26px, 2.4vw, 34px); white-space: nowrap; }
+    .ttk-vendas-linha { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 16px; }
+    .ttk-vendas-linha .ini-medio { font-size: 22px; }
     .ttk-clicavel { cursor: pointer; }
     .ttk-clicavel:hover td { background: var(--tint); }
     .ttk-seta { display: inline-grid; place-items: center; width: 18px; height: 18px; margin-right: 8px; border-radius: 50%; border: 1px solid var(--line); font-size: 12px; font-weight: 700; color: var(--muted); vertical-align: 1px; }
