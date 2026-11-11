@@ -354,7 +354,7 @@ async function desenharTikTok(el) {
         <p class="ini-legenda">GMV por ${un}</p>
       </section>
 
-      <section class="ini-card ini-alc">
+      <section class="ini-card ini-alc ttk-com">
         <div class="ini-card-topo"><h2>Comissão</h2><span class="ttk-etiqueta ttk-etiqueta-clara">${per.acum ? "acumulado" : esc(ttkNomeMes(per.mes))}</span></div>
         <div class="ini-alc-nums">
           <div><strong class="ini-medio">${real(A.c)}</strong><span class="ini-rot">comissão estimada</span>${ttkSelo(A.c, B && B.c)}</div>
@@ -812,6 +812,8 @@ async function ttkImportar(arq, el) {
     .ttk-meta-linhas span:first-child { color: var(--muted); font-weight: 600; }
     .ttk-meta-linhas b { display: flex; align-items: center; gap: 6px; }
     .ttk-meta-linhas .ini-selo { margin-top: 0; }
+    .ttk-com .ini-alc-nums .ini-medio, .ttk-ontem .ini-medio { font-size: clamp(18px, 1.55vw, 24px); white-space: nowrap; }
+    .ttk-com .ini-alc-nums { gap: 14px; }
     .ttk-ontem-nums { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
     .ttk-mini-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 16px; }
     .ttk-mini-cards .ini-card { padding: 16px 18px; }
