@@ -407,9 +407,13 @@ function ttkTelaGeral(el) {
   const doAnt = per.acum ? [] : ttkX.todos.filter((p) => filtro(p) && ttkNoPeriodo(p, per.iniAnt, per.fimAnt));
   const A = ttkSomar(doPer), B = per.acum ? null : ttkSomar(doAnt);
   const prev = per.acum ? null : ttkComEscopo(filtro, () => ttkPrevisao(per));
-  const meta = per.acum || !tech ? 0 : n2((ttkX.metas.mes || {})[per.mes] ?? (per.atual ? ttkX.metas.ultimaMeta : 0));
+  // A meta do mês é de GMV total (todas as categorias), por isso usa o total e a previsão total
+  const meta = per.acum ? 0 : n2((ttkX.metas.mes || {})[per.mes] ?? (per.atual ? ttkX.metas.ultimaMeta : 0));
+  const todosPer = ttkX.todos.filter((p) => ttkNoPeriodo(p, per.ini, per.fim)), T = ttkSomar(todosPer);
+  const prevTotal = per.acum ? null : ttkComEscopo(() => true, () => ttkPrevisao(per));
+  const gTech = ttkSomar(todosPer.filter(ttkEhTech)).g;
   const diasRest = per.acum || !per.atual ? 0 : per.D - per.fechados;
-  const feitoAteOntem = prev ? prev.dias.reduce((s, x) => s + (x.real || 0), 0) : 0;
+  const feitoAteOntem = prevTotal ? prevTotal.dias.reduce((s, x) => s + (x.real || 0), 0) : 0;
   const falta = Math.max(0, meta - feitoAteOntem);
   const taxaLiq = A.pedLiq + A.pedPen ? A.pedLiq / (A.pedLiq + A.pedPen) * 100 : 0;
   const fimCaiu = per.acum ? hoje : per.atual ? hoje : per.fim;
@@ -460,17 +464,19 @@ function ttkTelaGeral(el) {
       </section>
       <div class="ini-lado">
         <section class="ini-card ttk-meta-card">
-          ${per.acum || !tech ? `<div class="ini-card-topo"><h2>${tech ? "Média por mês" : "Divisão"}</h2></div>
-            ${tech ? `<strong class="ini-grande">${real(A.liq / Math.max(1, new Set(doPer.filter((p) => p.cat === "liq").map((p) => p.mes)).size))}</strong><span class="ini-rot">de comissão liquidada por mês</span>`
-              : `<div class="ttk-meta-linhas"><div><span>Tech</span><b>${real(ttkSomar(doPer.filter(ttkEhTech)).liq)}</b></div><div><span>Outras categorias</span><b>${real(ttkSomar(doPer.filter(ttkEhOutras)).liq)}</b></div><div><span>Total liquidado</span><b>${real(A.liq)}</b></div></div>`}`
-          : `<div class="ini-card-topo"><h2>Meta Tech</h2><button class="link-btn" type="button" id="ttk-meta">${meta ? "mudar" : "definir"}</button></div>
-            ${meta ? `<div class="ttk-meta-nums"><strong class="ini-grande">${Math.round(ttkPct(A.g, meta))}%</strong><span class="ini-rot">de ${real(meta)} de GMV</span></div>
-              <div class="ttk-meta-barra"><i style="width:${Math.min(100, ttkPct(A.g, meta))}%"></i>${prev ? `<b style="left:${Math.min(100, ttkPct(prev.total, meta))}%" title="previsão"></b>` : ""}</div>
+          ${per.acum ? `<div class="ini-card-topo"><h2>Média por mês</h2></div>
+            <strong class="ini-grande">${real(T.g / Math.max(1, new Set(todosPer.filter(ttkValido).map((p) => p.mes)).size))}</strong><span class="ini-rot">de GMV total por mês</span>
+            <div class="ttk-meta-linhas" style="margin-top:12px"><div><span>Tech</span><b>${real(gTech)}</b></div><div><span>Outras categorias</span><b>${real(T.g - gTech)}</b></div></div>`
+          : `<div class="ini-card-topo"><h2>Meta do mês</h2><button class="link-btn" type="button" id="ttk-meta">${meta ? "mudar" : "definir"}</button></div>
+            ${meta ? `<div class="ttk-meta-nums"><strong class="ini-grande">${Math.round(ttkPct(T.g, meta))}%</strong><span class="ini-rot">de ${real(meta)} de GMV total</span></div>
+              <div class="ttk-meta-barra"><i style="width:${Math.min(100, ttkPct(T.g, meta))}%"></i>${prevTotal ? `<b style="left:${Math.min(100, ttkPct(prevTotal.total, meta))}%" title="previsão"></b>` : ""}</div>
               <div class="ttk-meta-linhas">
+                <div><span>GMV até agora</span><b>${real(T.g)}</b></div>
+                <div><span>Tech · outras</span><b>${real(gTech)} · ${real(T.g - gTech)}</b></div>
                 ${per.atual ? `<div><span>${falta ? "Falta por dia" : "Meta batida"}</span><b>${falta ? real(falta / Math.max(1, diasRest)) : ""}</b></div>` : ""}
-                <div><span>${per.atual ? "Previsão" : "Fechou em"}</span><b>${real(prev.total)} <span class="ini-selo ${prev.total >= meta ? "sobe" : "desce"}">${prev.total >= meta ? "▲" : "▼"} ${real(Math.abs(prev.total - meta))}</span></b></div>
+                <div><span>${per.atual ? "Previsão" : "Fechou em"}</span><b>${real(prevTotal.total)} <span class="ini-selo ${prevTotal.total >= meta ? "sobe" : "desce"}">${prevTotal.total >= meta ? "▲" : "▼"} ${real(Math.abs(prevTotal.total - meta))}</span></b></div>
               </div>`
-            : `<p class="sub" style="margin:0">Defina a meta de GMV Tech do mês. A previsão hoje é de ${real(prev.total)}.</p>`}`}
+            : `<p class="sub" style="margin:0">Defina a meta de GMV do mês (todas as categorias). A previsão hoje é de ${real(prevTotal.total)}.</p>`}`}
         </section>
         <section class="ini-card ttk-ontem">
           <div class="ini-card-topo"><h2>Hoje</h2><span class="ttk-etiqueta ttk-etiqueta-clara">${dataBR(hoje).slice(0, 5)}</span></div>
@@ -532,7 +538,7 @@ function ttkTelaAnalise(el, area) {
     const doAnt = per.acum ? [] : ttkX.pedidos.filter((p) => ttkNoPeriodo(p, per.iniAnt, per.fimAnt));
     const A = ttkSomar(doPer), B = per.acum ? null : ttkSomar(doAnt);
     const prev = per.acum ? null : ttkPrevisao(per);
-    const meta = area === "tech" && !ttkX.subcat && !per.acum ? n2((ttkX.metas.mes || {})[per.mes] ?? (per.atual ? ttkX.metas.ultimaMeta : 0)) : 0;
+    const meta = 0; // a meta do mês é de GMV total: fica na Visão Geral
     const prods = ttkProdutos(doPer), os80 = ttkOs80(prods);
     const diasCorridos = per.acum ? Math.max(1, Math.round((new Date(hojeISO()) - new Date(per.ini)) / 864e5) + 1) : per.N;
     const titulo = ttkX.subcat ? ttkNomeCat(ttkX.subcat) : area === "tech" ? "Shop Tech" : "Outras categorias";
@@ -1111,9 +1117,9 @@ function ttkLigar(el, { per, hoje }) {
   });
   const btnMeta = $("#ttk-meta", el);
   if (btnMeta) btnMeta.onclick = () => abrirForm({
-    titulo: `Meta de GMV Tech de ${ttkNomeMes(per.mes, true)}`,
+    titulo: `Meta de GMV de ${ttkNomeMes(per.mes, true)}`,
     valores: { valor: n2((ttkX.metas.mes || {})[per.mes]) || "" },
-    campos: [{ n: "valor", r: "Meta de GMV Tech do mês (R$)", t: "number", req: true }],
+    campos: [{ n: "valor", r: "Meta de GMV do mês, todas as categorias (R$)", t: "number", req: true }],
     aoSalvar: async (d) => {
       ttkX.metas.mes = ttkX.metas.mes || {};
       ttkX.metas.mes[per.mes] = n2(d.valor); if (per.atual) ttkX.metas.ultimaMeta = n2(d.valor);
