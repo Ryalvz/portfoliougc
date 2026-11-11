@@ -109,15 +109,23 @@ const temCampo = (tabela, campo) => (CAMPOS[tabela] || []).includes(campo);
 async function ler(tabela, ajuste) {
   let campos = ESQUEMA[tabela].slice();
   const faltando = [];
+  let semRede = 0;
   for (let tentativa = 0; tentativa < 15; tentativa++) {
     let q = db.from(tabela).select(campos.join(","));
     if (ajuste) q = ajuste(q, campos);
     let resp;
     try { resp = await q; } catch (e) { resp = { error: e }; }
     const { data, error } = resp;
+    // Falha de conexão (computador dormiu, internet oscilou) não é falta no banco:
+    // tenta mais 2 vezes e, se não der, fica com o que já tinha, sem aviso
+    if (error && /failed to fetch|networkerror|load failed|network request failed/i.test(error.message || String(error))) {
+      if (++semRede <= 2) { await new Promise((ok) => setTimeout(ok, 3000)); continue; }
+      return Array.isArray(S[tabela]) ? S[tabela] : [];
+    }
     if (!error) {
       CAMPOS[tabela] = campos;
       if (faltando.length) registrarFalta(tabela, "faltam os campos " + faltando.join(", "));
+      else if (FALTAS.has(tabela)) { FALTAS.delete(tabela); if (!FALTAS.size) $("#avisos").innerHTML = ""; else registrarFalta(...[...FALTAS].pop()); }
       return data || [];
     }
     const msg = error.message || "";
