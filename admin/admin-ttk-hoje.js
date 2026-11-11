@@ -2,7 +2,7 @@
    TikTok > Hoje (tela de abertura) e Criar > Gravação (quadro)
    Hoje: fechamento de ontem, meta do mês, os vídeos do dia (com legenda pra copiar),
    o plano dos 15 (Principais, Com vendas, Testes), amostras com prazo e o produto da vez.
-   Gravação: quadro Ideia > Gravar > Gravado > Agendado, salvo em preferencias "ttk_gravar".
+   Gravação: quadro Ideia > Gravar > Gravado > Agendado, salvo em preferencias "ttk_gravar" (v1).
    ========================================================= */
 const TTK_BLOCOS = [["principal", "Principal"], ["com_vendas", "Com vendas"], ["teste", "Teste"]];
 const TTK_TOP_ANTONELLA = 2;
