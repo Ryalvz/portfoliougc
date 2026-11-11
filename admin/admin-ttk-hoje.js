@@ -2,7 +2,7 @@
    TikTok > Hoje (tela de abertura) e Criar > Gravação (quadro)
    Hoje: fechamento de ontem, meta do mês, os vídeos do dia (com legenda pra copiar),
    o plano dos 15 (Principais, Com vendas, Testes), amostras com prazo e o produto da vez.
-   Gravação: quadro Ideia > Gravar > Gravado > Agendado, salvo em preferencias "ttk_gravar" (v1).
+   Gravação: quadro Ideia > Gravar > Gravado > Agendado, salvo em preferencias "ttk_gravar" (v2).
    ========================================================= */
 const TTK_BLOCOS = [["principal", "Principal"], ["com_vendas", "Com vendas"], ["teste", "Teste"]];
 const TTK_TOP_ANTONELLA = 2;
@@ -206,7 +206,8 @@ function ttkTelaGravar(el) {
   st.textContent = `
     .ttk-hoje-topo { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 14px; margin-bottom: 14px; }
     .ttk-hoje-topo .ini-card { margin: 0; }
-    .ttk-hoje-nums { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 14px; align-items: end; margin: 6px 0 10px; }
+    .ttk-hoje-nums { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 14px; align-items: end; margin: 6px 0 10px; }
+    .ttk-hoje-nums > div:first-child { grid-column: 1 / -1; }
     .ttk-hoje-nums > div { min-width: 0; }
     .ttk-hoje-sub { display: block; opacity: .75; font-size: 12px; margin-top: 2px; }
     .ttk-plano { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
@@ -217,6 +218,7 @@ function ttkTelaGravar(el) {
     .ttk-hoje-vids { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
     .ttk-hoje-vids li { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto auto auto; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px dashed var(--line); font-size: 13.5px; }
     .ttk-hoje-vids li:last-child { border-bottom: 0; }
+    .ttk-hoje-vids li.sub { display: block; padding: 10px 0; }
     .ttk-hoje-vtexto small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
     .ttk-sem-leg { font-style: italic; }
     .ttk-bloco-chip { font-size: 11px; padding: 2px 8px; border-radius: 99px; background: var(--tint); font-weight: 600; }
