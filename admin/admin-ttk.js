@@ -146,21 +146,21 @@ function ttkPorDiaDoMes(mes, campo = "g", filtro = () => true) {
 /* Previsão do mês: mistura o ritmo deste mês com o dos últimos 7 dias do mês anterior.
    Peso deste mês = dias fechados ÷ (dias fechados + 7): no começo o mês anterior pesa
    mais, e a cada dia fechado este mês ganha peso. O caminho até o fim do mês segue o
-   formato das vendas nos últimos 3 meses fechados (dia a dia, suavizado em 7 dias). */
+   formato das vendas nos últimos 3 meses fechados (mediana dia a dia, suavizada em 7 dias). */
 function ttkPrevisao(per, filtro = () => true) {
   const real = ttkPorDiaDoMes(per.mes, "g", filtro), D = per.D, k = per.fechados;
   const totalReal = real.reduce((s, x) => s + x, 0);
   if (!per.atual) return { total: totalReal, dias: real.map((r, d) => ({ d, real: r })), k: D };
-  // Formato do mês: média dos 3 meses fechados anteriores
-  const fator = new Array(D + 1).fill(0), conta = new Array(D + 1).fill(0);
+  // Formato do mês: mediana dos 3 meses fechados anteriores (um dia que viralizou não distorce)
+  const fatores = Array.from({ length: D + 1 }, () => []);
   let m = per.mes;
   for (let n = 0; n < 3; n++) {
     m = ttkMesAnterior(m);
     const v = ttkPorDiaDoMes(m, "g", filtro), Dm = ttkDiasNoMes(m), tot = v.reduce((s, x) => s + x, 0);
     if (!tot) continue;
-    for (let d = 1; d <= Math.min(D, Dm); d++) { fator[d] += v[d] / tot * Dm; conta[d]++; }
+    for (let d = 1; d <= Math.min(D, Dm); d++) fatores[d].push(v[d] / tot * Dm);
   }
-  let f = fator.map((x, d) => (conta[d] ? x / conta[d] : 1));
+  let f = fatores.map((l) => (l.length ? ttkMediana(l) : 1));
   f = f.map((_, d) => { if (!d) return 0; let s = 0, q = 0; for (let j = d - 3; j <= d + 3; j++) if (j >= 1 && j <= D) { s += f[j]; q++; } return s / q; });
   const somaK = real.slice(1, k + 1).reduce((s, x) => s + x, 0);
   const rAtual = k ? somaK / k : 0;
@@ -352,7 +352,7 @@ function ttkBlocoRitmo(per, prev, meta) {
       <span class="ttk-leg"><i class="ttk-l-cafe"></i>Real ${per.atual ? `(até o dia ${prev.k}, ${real(ac)})` : real(ac)}</span>${per.atual ? `<span class="ttk-leg"><i class="ttk-l-tracejada"></i>Previsão ${real(prev.total)}</span>` : ""}<span class="ttk-leg"><i class="ttk-l-cinza"></i>${ttkNomeMes(per.ant, true)}</span>${meta ? `<span class="ttk-leg"><i class="ttk-l-meta"></i>Meta</span>` : ""}</div>
     ${ttkGrafLinhas(rot, series, meta ? [{ v: meta, nome: "meta " + ttkCurto(meta) }] : [])}
     ${ttkFrase(per.atual
-      ? `Cada ponto é quanto o mês somou até aquele dia. A previsão mistura o ritmo deste mês com o da última semana de ${ttkNomeMes(per.ant, true)}: no começo do mês o anterior pesa mais e, a cada dia fechado, este mês ganha peso. O caminho até o fim segue como as vendas se espalharam nos últimos 3 meses fechados.`
+      ? `Cada ponto é quanto o mês somou até aquele dia. A previsão mistura o ritmo deste mês com o da última semana de ${ttkNomeMes(per.ant, true)}: no começo do mês o anterior pesa mais e, a cada dia fechado, este mês ganha peso. O caminho até o fim segue como as vendas costumam se espalhar ao longo do mês (mediana dos últimos 3 meses fechados, pra um dia que viralizou não distorcer).`
       : `Cada ponto é quanto o mês somou até aquele dia. A linha cinza é ${ttkNomeMes(per.ant, true)} no mesmo dia.`)}</div>`;
 }
 
@@ -537,15 +537,16 @@ function ttkBlocoConteudo() {
   });
   const linhas = [...grupos.entries()].map(([nome, l]) => {
     const tot = l.reduce((s, x) => s + x, 0), maior = Math.max(...l);
-    return { nome, n: l.length, pctVendeu: ttkPct(l.filter((x) => x > 0).length, l.length), mediana: ttkMediana(l), media: tot / l.length, acaso: tot > 0 && maior / tot > .5 && l.length > 1 ? Math.round(maior / tot * 100) : 0 };
-  }).filter((x) => x.n >= 3).sort((a, b) => b.mediana - a.mediana || b.media - a.media);
+    const venderam = l.filter((x) => x > 0);
+    return { nome, n: l.length, pctVendeu: ttkPct(venderam.length, l.length), mediana: ttkMediana(venderam), media: tot / l.length, acaso: tot > 0 && maior / tot > .5 && l.length > 1 ? Math.round(maior / tot * 100) : 0 };
+  }).filter((x) => x.n >= 3).sort((a, b) => b.media - a.media);
   ttkX.tabConteudo = linhas;
   const analisados = ttkX.conteudos.filter((c) => c[campo]).length;
   return `<div class="cartao"><div class="barra"><h2 style="margin:0">O que está vendendo no seu conteúdo</h2><span class="espaco"></span>
       <div class="chips" role="group" aria-label="Agrupar por">${[["gancho", "Por gancho"], ["formato", "Por formato"]].map(([k, n]) => `<button class="chip" type="button" data-ttk-conteudo="${k}" aria-pressed="${ttkX.conteudoPor === k}">${n}</button>`).join("")}</div>${ttkExportar("conteudo")}</div>
-    <div class="tabela-caixa"><table><thead><tr><th>${ttkX.conteudoPor === "formato" ? "Formato" : "Tipo de gancho"}</th><th class="num">Vídeos</th><th class="num">% que venderam</th><th class="num">Mediana por vídeo</th><th class="num">Média por vídeo</th></tr></thead>
+    <div class="tabela-caixa"><table><thead><tr><th>${ttkX.conteudoPor === "formato" ? "Formato" : "Tipo de gancho"}</th><th class="num">Vídeos</th><th class="num">% que venderam</th><th class="num">Mediana dos que venderam</th><th class="num">Média por vídeo</th></tr></thead>
     <tbody>${linhas.map((x) => `<tr><td>${esc(x.nome)}${x.acaso ? `<small class="ttk-aviso-acaso">1 vídeo fez ${x.acaso}% do GMV daqui: é um acaso que viralizou, não um padrão.</small>` : ""}</td><td class="num">${num(x.n)}</td><td class="num">${ttkFmtPct(x.pctVendeu)}</td><td class="num">${real(x.mediana)}</td><td class="num">${real(x.media)}</td></tr>`).join("")}</tbody></table></div>
-    ${ttkFrase(`Usa os ${num(analisados)} vídeos que têm análise, com o GMV de todos os pedidos de cada um. A mediana é o vídeo do meio: mostra o que costuma acontecer, sem ser puxada por um vídeo que estourou. Grupos com menos de 3 vídeos ficam de fora.`)}</div>`;
+    ${ttkFrase(`Usa os ${num(analisados)} vídeos que têm análise, com o GMV de todos os pedidos de cada um. A média divide o GMV por todos os vídeos do grupo, inclusive os que não venderam. A mediana olha só os que venderam e pega o do meio: mostra quanto um vídeo desse tipo costuma fazer quando vende, sem ser puxada por um que estourou. Grupos com menos de 3 vídeos ficam de fora.`)}</div>`;
 }
 
 /* Ontem e vídeos do dia */
@@ -606,7 +607,7 @@ function ttkLigar(el, { per, hoje }) {
     if (t === "videos") baixarCSV(`tiktok-videos-${sufixo}`, ["Posição", "Vídeo", "Quando", "Link", "Produto", "GMV", "Itens", "% do GMV de vídeo", "GMV no período anterior"], ttkX.tabVideos.map((v) => [v.pos, v.titulo, v.quando, v.link, v.produto, br(v.g), v.i, br(v.pct), br(v.ant)]));
     if (t === "produtos") baixarCSV(`tiktok-produtos-${sufixo}`, ["Produto", "Qtde", "GMV", "Comissão", "% inelegível", "% acumulado"], ttkX.tabProdutos.map((x) => [x.nome, x.i, br(x.g), br(x.c), br(x.pctIne), br(x.acum)]));
     if (t === "apostas") baixarCSV(`tiktok-apostas-${ttkX.janela}-dias`, ["Produto", "Sinal", "GMV na janela", "GMV na janela anterior", "Dias com venda"], ttkX.tabApostas.map((x) => [x.nome, x.tipo, br(x.a), br(x.b), x.dias.size]));
-    if (t === "conteudo") baixarCSV(`tiktok-conteudo-${ttkX.conteudoPor}`, ["Categoria", "Vídeos", "% que venderam", "Mediana por vídeo", "Média por vídeo", "Um vídeo fez % do GMV"], ttkX.tabConteudo.map((x) => [x.nome, x.n, br(x.pctVendeu), br(x.mediana), br(x.media), x.acaso || ""]));
+    if (t === "conteudo") baixarCSV(`tiktok-conteudo-${ttkX.conteudoPor}`, ["Categoria", "Vídeos", "% que venderam", "Mediana dos que venderam", "Média por vídeo", "Um vídeo fez % do GMV"], ttkX.tabConteudo.map((x) => [x.nome, x.n, br(x.pctVendeu), br(x.mediana), br(x.media), x.acaso || ""]));
   });
   const btnMeta = $("#ttk-meta", el);
   if (btnMeta) btnMeta.onclick = () => abrirForm({
@@ -760,9 +761,10 @@ async function ttkImportar(arq, el) {
     .ttk-dupla { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
     @media (max-width: 900px) { .ttk-dupla { grid-template-columns: 1fr; } }
     .ttk-mes4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 10px; }
-    .ttk-mes4 span { display: block; font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .6px; }
+    .ttk-mes4 > div > span { display: block; font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .6px; }
     .ttk-mes4 b { display: block; font-size: 18px; color: var(--cobalt); }
     .ttk-mes4 small { display: block; font-size: 11.5px; color: var(--muted); }
+    .ttk-mes4 b .ttk-pill, .ttk-mes4 small .ttk-pill { margin-left: 4px; vertical-align: middle; }
     .ttk-fora td { color: var(--muted); }
     .ttk-nome { max-width: 380px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .ttk-nome-curto { max-width: 220px; }
