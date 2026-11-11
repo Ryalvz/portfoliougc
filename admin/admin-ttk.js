@@ -483,7 +483,42 @@ function ttkTelaGeral(el) {
         </section>
       </div>
     </div>
+    ${ttkBlocoCategorias(per)}
     ${ttkFrase(`Liquidada no mês é a comissão que o TikTok pagou nesses dias (valor final recebido), comparada com o que caiu nos mesmos dias do mês anterior. Pendente é a estimativa dos pedidos do mês que ainda vão liquidar, em média 7 dias depois do pedido. As análises completas ficam nas outras seções do menu.`)}`;
+}
+
+/* Todo o GMV do período por categoria (como o gráfico do TikTok) e a virada mês a mês pra Tech.
+   Usa todas as categorias, sempre: é a foto da conta inteira. */
+const TTK_FAIXAS = [["tech", "Tech", "ttk-f-tech"], ["vestuario", "Vestuário e calçados", "ttk-f-vest"], ["resto", "Outras categorias", "ttk-f-outras"]];
+const ttkFaixa = (p) => (p.area === "tech" ? "tech" : p.subcat === "vestuario" ? "vestuario" : "resto");
+function ttkBlocoCategorias(per) {
+  const doPer = ttkX.todos.filter((p) => ttkValido(p) && ttkNoPeriodo(p, per.ini, per.fim));
+  const tot = doPer.reduce((s, p) => s + p.g, 0);
+  const cats = {};
+  doPer.forEach((p) => { const k = TTK_CATS[p.subcat] ? p.subcat : "a_classificar"; const x = cats[k] || (cats[k] = { g: 0, liq: 0 }); x.g += p.g; x.liq += p.liq; });
+  const linhas = Object.entries(cats).sort((a, b) => b[1].g - a[1].g);
+  const maior = linhas.length ? linhas[0][1].g : 0;
+  // Últimos 6 meses: quanto do GMV foi Tech, vestuário e o resto
+  const meses = []; { let m = per.acum ? hojeISO().slice(0, 7) : per.mes; for (let n = 0; n < 6; n++) { meses.unshift(m); m = ttkMesAnterior(m); } }
+  const porMes = meses.map((m) => { const l = ttkX.todos.filter((p) => ttkValido(p) && p.mes === m), t = l.reduce((s, p) => s + p.g, 0); const f = {}; TTK_FAIXAS.forEach(([k]) => { f[k] = t ? l.filter((p) => ttkFaixa(p) === k).reduce((s, p) => s + p.g, 0) / t * 100 : 0; }); return { m, t, f }; });
+  const techAgora = porMes[porMes.length - 1].f.tech, techAntes = porMes.find((x) => x.t) ? porMes.find((x) => x.t).f.tech : 0;
+  return `<div class="ini-card ttk-bloco ttk-cats">
+    <div class="ini-card-topo"><h2>Todo o seu GMV por categoria</h2><span class="sub">${per.acum ? "todo o período" : esc(ttkNomeMes(per.mes, true))} · ${real(tot)}</span></div>
+    <div class="ttk-cats-grade">
+      <div>${linhas.map(([k, x]) => `<div class="ttk-cat-linha">
+          <span class="ttk-cat-nome"><i class="${(TTK_CATS[k] || [])[0] === "tech" ? "ttk-f-tech" : k === "vestuario" ? "ttk-f-vest" : "ttk-f-outras"}"></i>${esc(ttkNomeCat(k))}</span>
+          <span class="ttk-cat-barra"><b style="width:${maior ? (x.g / maior * 100).toFixed(1) : 0}%" class="${(TTK_CATS[k] || [])[0] === "tech" ? "ttk-f-tech" : k === "vestuario" ? "ttk-f-vest" : "ttk-f-outras"}"></b></span>
+          <span class="ttk-cat-num">${ttkFmtPct(ttkPct(x.g, tot))}</span><span class="ttk-cat-valor">${real(x.g)}</span></div>`).join("") || `<p class="vazio">Sem vendas nesse período.</p>`}</div>
+      <div>
+        <h3 class="ttk-sub">Quanto do GMV foi Tech, mês a mês</h3>
+        <div class="ttk-pilhas">${porMes.map((x) => `<div class="ttk-pilha" title="${esc(`${ttkNomeMes(x.m)}: Tech ${ttkFmtPct(x.f.tech)} · Vestuário ${ttkFmtPct(x.f.vestuario)} · Outras ${ttkFmtPct(x.f.resto)}`)}">
+            <div class="ttk-pilha-col">${x.t ? TTK_FAIXAS.map(([k, , c]) => `<i class="${c}" style="height:${x.f[k].toFixed(1)}%"></i>`).join("") : ""}</div>
+            <b>${x.t ? Math.round(x.f.tech) + "%" : "–"}</b><span>${ttkNomeMes(x.m)}</span></div>`).join("")}</div>
+        <div class="ttk-pilha-leg">${TTK_FAIXAS.map(([, n, c]) => `<span><i class="${c}"></i>${n}</span>`).join("")}</div>
+      </div>
+    </div>
+    ${ttkFrase(`À esquerda, cada categoria com o quanto pesou no GMV, de todas as áreas (Liquidado e Pendente). À direita, cada coluna é um mês: a parte escura é Tech, e o número embaixo é quanto do GMV daquele mês foi Tech. ${porMes.some((x) => x.t) ? `Em ${ttkNomeMes(porMes[porMes.length - 1].m)}, ${ttkFmtPct(techAgora)} do GMV foi Tech${techAntes !== techAgora ? `, contra ${ttkFmtPct(techAntes)} em ${ttkNomeMes(porMes.find((x) => x.t).m)}` : ""}.` : ""} É essa proporção que faz o TikTok te enxergar como uma categoria ou outra.`)}
+  </div>`;
 }
 
 /* ---------- 2 e 3. Shop Tech e Outras categorias: os blocos de análise ---------- */
@@ -1281,7 +1316,26 @@ async function ttkImportar(arq, el) {
     .ttk-linha-aberta td { background: var(--olive-tint); }
     .ttk-ficha { border: 1.5px solid var(--olive); }
     .ttk-ficha .ini-card-topo h2 { font-size: 20px; }
-    #ttk-fin .grade-2 { grid-template-columns: 2fr 1fr; }`;
+    #ttk-fin .grade-2 { grid-template-columns: 2fr 1fr; }
+    .ttk-cats-grade { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+    @media (max-width: 900px) { .ttk-cats-grade { grid-template-columns: 1fr; } }
+    .ttk-cat-linha { display: grid; grid-template-columns: minmax(120px, 1.1fr) minmax(60px, 1.4fr) 54px 96px; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+    .ttk-cat-linha:last-child { border-bottom: 0; }
+    .ttk-cat-nome { display: flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ttk-cat-nome i { flex: none; width: 9px; height: 9px; border-radius: 50%; }
+    .ttk-cat-barra { height: 8px; border-radius: 999px; background: var(--tint); overflow: hidden; }
+    .ttk-cat-barra b { display: block; height: 100%; border-radius: 999px; }
+    .ttk-cat-num { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .ttk-cat-valor { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+    .ttk-f-tech { background: var(--cobalt); } .ttk-f-vest { background: var(--olive); } .ttk-f-outras { background: rgba(122, 110, 96, .35); }
+    .ttk-pilhas { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; align-items: end; margin-top: 6px; }
+    .ttk-pilha { display: grid; justify-items: center; gap: 4px; font-size: 11.5px; color: var(--muted); }
+    .ttk-pilha-col { width: 100%; max-width: 38px; height: 120px; border-radius: 8px; overflow: hidden; display: flex; flex-direction: column-reverse; background: var(--tint); gap: 2px; }
+    .ttk-pilha-col i { display: block; width: 100%; }
+    .ttk-pilha b { color: var(--cobalt); font-size: 13px; }
+    .ttk-pilha-leg { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 10px; font-size: 12px; color: var(--muted); }
+    .ttk-pilha-leg span { display: inline-flex; align-items: center; gap: 6px; }
+    .ttk-pilha-leg i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }`;
   document.head.appendChild(s);
 })();
 
