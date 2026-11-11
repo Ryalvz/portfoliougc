@@ -349,6 +349,8 @@ function ttkComEscopo(filtro, fn) {
   try { return fn(); } finally { ttkX.pedidos = antes; }
 }
 const ttkEhTech = (p) => p.area === "tech";
+// Comissão que caiu entre duas datas, pela data de liquidação (comparação justa: não sofre com a demora de ~7 dias pra liquidar)
+const ttkCaiu = (filtro, ini, fim) => ttkX.todos.reduce((s, p) => s + (p.cat === "liq" && p.liqEm && p.liqEm >= ini && p.liqEm <= fim && filtro(p) ? p.liq : 0), 0);
 const ttkEhOutras = (p) => p.area !== "tech";
 const ttkNomeCat = (k) => (TTK_CATS[k] || [0, k === "a_classificar" ? "A classificar" : "Outros"])[1];
 
@@ -410,6 +412,9 @@ function ttkTelaGeral(el) {
   const feitoAteOntem = prev ? prev.dias.reduce((s, x) => s + (x.real || 0), 0) : 0;
   const falta = Math.max(0, meta - feitoAteOntem);
   const taxaLiq = A.pedLiq + A.pedPen ? A.pedLiq / (A.pedLiq + A.pedPen) * 100 : 0;
+  const fimCaiu = per.acum ? hoje : per.atual ? hoje : per.fim;
+  const caiu = per.acum ? A.liq : ttkCaiu(filtro, per.ini, fimCaiu);
+  const caiuAnt = per.acum ? null : ttkCaiu(filtro, per.iniAnt, per.atual ? `${per.ant}-${pad(Math.min(Number(hoje.slice(8, 10)), ttkDiasNoMes(per.ant)))}` : per.fimAnt);
   // Comissão que caiu por dia (data de liquidação), no mês escolhido
   let serie;
   if (per.acum) {
@@ -434,12 +439,12 @@ function ttkTelaGeral(el) {
     <div class="ini-grade">
       <section class="ini-card ini-seg">
         <div class="ini-card-topo"><h2>Comissão${tech ? " Tech" : ""}</h2><span class="ttk-etiqueta">${per.acum ? "acumulado" : esc(ttkNomeMes(per.mes))}</span></div>
-        <div class="ini-seg-nums"><div><strong class="ini-grande">${real(A.liq)}</strong><span class="ini-rot">liquidada (já caiu)</span>${ttkSelo(A.liq, B && B.liq)}</div></div>
+        <div class="ini-seg-nums"><div><strong class="ini-grande">${real(caiu)}</strong><span class="ini-rot">${per.acum ? "liquidada em todo o período" : "liquidada no mês (já caiu)"}</span>${ttkSelo(caiu, caiuAnt)}</div></div>
         <div class="ttk-seg-linha">
-          <div><strong class="ini-medio">${real(A.pend)}</strong><span class="ini-rot">pendente</span></div>
-          <div><strong class="ini-medio">${ttkFmtPct(taxaLiq)}</strong><span class="ini-rot">pedidos já liquidados</span></div>
+          <div><strong class="ini-medio">${real(A.pend)}</strong><span class="ini-rot">pendente dos pedidos ${per.acum ? "" : "do mês"}</span></div>
+          <div><strong class="ini-medio">${ttkFmtPct(taxaLiq)}</strong><span class="ini-rot">desses pedidos já liquidados</span></div>
         </div>
-        <p class="ttk-status-linha">Dos pedidos ${per.acum ? "de todo o período" : "do mês"}. Estimada no total: ${real(A.c)}. Nunca é somada como recebida.</p>
+        <p class="ttk-status-linha">${per.acum ? "" : `Dos pedidos do mês já caíram ${real(A.liq)}. `}Estimada desses pedidos: ${real(A.c)}. Estimada nunca é somada como recebida.</p>
         <div class="ini-graf-caixa">${ttkHeroBarras(serie)}<div class="ini-dica" hidden></div></div>
         <p class="ini-legenda">Comissão que caiu por ${per.acum ? "mês" : "dia de liquidação"}</p>
       </section>
@@ -478,7 +483,7 @@ function ttkTelaGeral(el) {
         </section>
       </div>
     </div>
-    ${ttkFrase(`Comissão liquidada é o que o TikTok já pagou (valor final recebido). Pendente é a estimativa dos pedidos que ainda vão liquidar, em média 7 dias depois do pedido. As análises completas ficam nas outras seções do menu.`)}`;
+    ${ttkFrase(`Liquidada no mês é a comissão que o TikTok pagou nesses dias (valor final recebido), comparada com o que caiu nos mesmos dias do mês anterior. Pendente é a estimativa dos pedidos do mês que ainda vão liquidar, em média 7 dias depois do pedido. As análises completas ficam nas outras seções do menu.`)}`;
 }
 
 /* ---------- 2 e 3. Shop Tech e Outras categorias: os blocos de análise ---------- */
@@ -499,7 +504,7 @@ function ttkTelaAnalise(el, area) {
     return ttkCabecalho(per, { titulo }) + ttkChipsSub(area) + `
       ${area === "outras" ? `<p class="sub ttk-aviso-outras">Estas vendas continuam no financeiro consolidado, mas não entram em metas, previsões, rankings nem oportunidades da operação Tech.</p>` : ""}
       <div class="ttk-mini-cards">
-        <div class="ini-card"><span class="ini-rot">Comissão liquidada</span><strong class="ini-medio">${real(A.liq)}</strong>${ttkSelo(A.liq, B && B.liq)}<small>pendente ${real(A.pend)}</small></div>
+        <div class="ini-card"><span class="ini-rot">Liquidada ${per.acum ? "no período" : "no mês"}</span><strong class="ini-medio">${real(per.acum ? A.liq : ttkCaiu(filtro, per.ini, per.atual ? hojeISO() : per.fim))}</strong>${per.acum ? "" : ttkSelo(ttkCaiu(filtro, per.ini, per.atual ? hojeISO() : per.fim), ttkCaiu(filtro, per.iniAnt, per.atual ? `${per.ant}-${pad(Math.min(Number(hojeISO().slice(8, 10)), ttkDiasNoMes(per.ant)))}` : per.fimAnt))}<small>pendente dos pedidos ${real(A.pend)}</small></div>
         <div class="ini-card"><span class="ini-rot">GMV</span><strong class="ini-medio">${real(A.g)}</strong>${ttkSelo(A.g, B && B.g)}<small>${real(A.g / diasCorridos)} por dia</small></div>
         <div class="ini-card"><span class="ini-rot">Pedidos e unidades</span><strong class="ini-medio">${num(A.pedidos)} · ${num(A.i)}</strong><small>comissão por unidade ${real(A.iLiqNet ? A.liq / A.iLiqNet : 0)}</small></div>
         <div class="ini-card"><span class="ini-rot">Itens inelegíveis</span><strong class="ini-medio">${ttkFmtPct(ttkPct(A.iIne, A.itensTodos))}</strong>${ttkSelo(ttkPct(A.iIne, A.itensTodos), B ? ttkPct(B.iIne, B.itensTodos) : null, { pp: true, inverso: true })}<small>${num(A.iIne)} de ${num(A.itensTodos)} itens</small></div>
