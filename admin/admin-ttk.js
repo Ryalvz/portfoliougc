@@ -121,7 +121,7 @@ async function ttkCarregar() {
   } catch (e) { ttkX.erro = traduzErro(e); ttkX.todos = ttkX.pedidos = []; ttkX.conteudos = []; ttkX.videos = []; ttkX.metas = {}; return; }
   await ttkCarregarApoio();
   ttkX.todos = ttkX.pedidos = ped.map(ttkEnriquecer);
-  try { ttkX.conteudos = await ttkLerTudo("ttk_conteudos", "tiktok_video_id,postado_em,titulo,link,gancho_categoria,formato_categoria", "tiktok_video_id"); }
+  try { ttkX.conteudos = await ttkLerTudo("ttk_conteudos", "tiktok_video_id,postado_em,titulo,link,gancho,gancho_categoria,formato_categoria", "tiktok_video_id"); }
   catch (_) { ttkX.conteudos = []; }
   const { data: vids } = await db.from("ttk_videos").select("*").gte("data", ttkSomaDias(hojeISO(), -30)).order("hora", { ascending: true, nullsFirst: false });
   ttkX.videos = vids || [];
@@ -995,27 +995,45 @@ function ttkBlocoApostas(per, os80) {
 /* 10. O que está vendendo no seu conteúdo (gancho e formato) */
 function ttkBlocoConteudo() {
   if (!ttkX.conteudos.length) return "";
-  const gmvVid = new Map();
-  ttkX.pedidos.forEach((p) => { if (p.conteudo_id && ttkValido(p)) gmvVid.set(p.conteudo_id, (gmvVid.get(p.conteudo_id) || 0) + p.g); });
+  const gmvVid = new Map(), liqVid = new Map();
+  ttkX.pedidos.forEach((p) => { if (p.conteudo_id && ttkValido(p)) { gmvVid.set(p.conteudo_id, (gmvVid.get(p.conteudo_id) || 0) + p.g); liqVid.set(p.conteudo_id, (liqVid.get(p.conteudo_id) || 0) + p.liq); } });
   const campo = ttkX.conteudoPor === "formato" ? "formato_categoria" : "gancho_categoria";
   const grupos = new Map();
   ttkX.conteudos.forEach((c) => {
     const cat = c[campo]; if (!cat) return;
     const nome = cat === "indeterminado" ? "Sem categoria clara" : cat;
-    const l = grupos.get(nome) || []; l.push(gmvVid.get(c.tiktok_video_id) || 0); grupos.set(nome, l);
+    const l = grupos.get(nome) || []; l.push({ c, g: gmvVid.get(c.tiktok_video_id) || 0, liq: liqVid.get(c.tiktok_video_id) || 0 }); grupos.set(nome, l);
   });
-  const linhas = [...grupos.entries()].map(([nome, l]) => {
-    const tot = l.reduce((s, x) => s + x, 0), maior = Math.max(...l);
+  const linhas = [...grupos.entries()].map(([nome, vids]) => {
+    const l = vids.map((v) => v.g), tot = l.reduce((s, x) => s + x, 0), maior = Math.max(...l);
     const venderam = l.filter((x) => x > 0);
-    return { nome, n: l.length, pctVendeu: ttkPct(venderam.length, l.length), mediana: ttkMediana(venderam), media: tot / l.length, acaso: tot > 0 && maior / tot > .5 && l.length > 1 ? Math.round(maior / tot * 100) : 0 };
+    return { nome, vids, n: l.length, pctVendeu: ttkPct(venderam.length, l.length), mediana: ttkMediana(venderam), media: tot / l.length, tot, acaso: tot > 0 && maior / tot > .5 && l.length > 1 ? Math.round(maior / tot * 100) : 0 };
   }).filter((x) => x.n >= 3).sort((a, b) => b.media - a.media);
   ttkX.tabConteudo = linhas;
   const analisados = ttkX.conteudos.filter((c) => c[campo]).length;
-  return `<div class="ini-card ttk-bloco"><div class="ini-card-topo"><h2>O que está vendendo no seu conteúdo</h2><span class="espaco"></span>
+  // Os vídeos do grupo aberto: os que venderam primeiro (do maior pro menor), depois os que não venderam
+  const videosDe = (x) => {
+    const vendeu = x.vids.filter((v) => v.g > 0).sort((a, b) => b.g - a.g), nada = x.vids.filter((v) => !v.g).sort((a, b) => String(b.c.postado_em).localeCompare(String(a.c.postado_em)));
+    const linha = (v, i) => {
+      const t = String(v.c.titulo || "").replace(/#\S+/g, "").trim() || "Vídeo sem legenda";
+      const acaso = i === 0 && x.acaso && v.g > 0;
+      return `<li class="${v.g ? "" : "ttk-cv-zero"}">
+        <span class="ttk-cv-texto">${v.c.link ? `<a href="${esc(v.c.link)}" target="_blank" rel="noopener">${esc(t)}</a>` : esc(t)}${acaso ? ` <span class="ini-selo ttk-novo">viralizou</span>` : ""}
+          ${v.c.gancho ? `<small>Gancho: "${esc(String(v.c.gancho).slice(0, 160))}"</small>` : ""}</span>
+        <span class="ttk-cv-data">${dataBR(String(v.c.postado_em || "").slice(0, 10))}</span>
+        <span class="ttk-cv-num">${v.g ? real(v.g) : "não vendeu"}${v.liq ? `<small>${real(v.liq)} liquidada</small>` : ""}</span></li>`;
+    };
+    const mostrar = ttkX.conteudoTodos ? vendeu.concat(nada) : vendeu.concat(nada).slice(0, 12);
+    return `<ul class="ttk-cv">${mostrar.map(linha).join("")}</ul>
+      ${x.vids.length > 12 ? `<button class="link-btn" type="button" data-ttk-conttodos>${ttkX.conteudoTodos ? "Mostrar só os 12 primeiros" : `Ver os ${x.vids.length} vídeos`}</button>` : ""}`;
+  };
+  return `<div class="ini-card ttk-bloco" id="ttk-conteudo"><div class="ini-card-topo"><h2>O que está vendendo no seu conteúdo</h2><span class="espaco"></span>
       <div class="ini-periodo" role="group" aria-label="Agrupar por">${[["gancho", "Por gancho"], ["formato", "Por formato"]].map(([k, n]) => `<button type="button" data-ttk-conteudo="${k}" aria-pressed="${ttkX.conteudoPor === k}">${n}</button>`).join("")}</div>${ttkExportar("conteudo")}</div>
     <div class="tabela-caixa"><table><thead><tr><th>${ttkX.conteudoPor === "formato" ? "Formato" : "Tipo de gancho"}</th><th class="num">Vídeos</th><th class="num">% que venderam</th><th class="num">Mediana dos que venderam</th><th class="num">Média por vídeo</th></tr></thead>
-    <tbody>${linhas.map((x) => `<tr><td>${esc(x.nome)}${x.acaso ? `<small class="ttk-aviso-acaso">1 vídeo fez ${x.acaso}% do GMV daqui: é um acaso que viralizou, não um padrão.</small>` : ""}</td><td class="num">${num(x.n)}</td><td class="num">${ttkFmtPct(x.pctVendeu)}</td><td class="num">${real(x.mediana)}</td><td class="num">${real(x.media)}</td></tr>`).join("")}</tbody></table></div>
-    ${ttkFrase(`Usa os ${num(analisados)} vídeos que têm análise, com o GMV de todos os pedidos de cada um. A média divide o GMV por todos os vídeos do grupo, inclusive os que não venderam. A mediana olha só os que venderam e pega o do meio: mostra quanto um vídeo desse tipo costuma fazer quando vende, sem ser puxada por um que estourou. Grupos com menos de 3 vídeos ficam de fora.`)}</div>`;
+    <tbody>${linhas.map((x) => { const aberto = ttkX.conteudoAberto === x.nome; return `<tr class="ttk-clicavel${aberto ? " ttk-linha-aberta" : ""}" data-ttk-contcat="${esc(x.nome)}" tabindex="0" title="Ver os vídeos">
+      <td><span class="ttk-seta">${aberto ? "−" : "+"}</span>${esc(x.nome)}${x.acaso ? `<small class="ttk-aviso-acaso">1 vídeo fez ${x.acaso}% do GMV daqui: é um acaso que viralizou, não um padrão.</small>` : ""}</td><td class="num">${num(x.n)}</td><td class="num">${ttkFmtPct(x.pctVendeu)}</td><td class="num">${real(x.mediana)}</td><td class="num">${real(x.media)}</td></tr>
+      ${aberto ? `<tr class="ttk-cv-linha"><td colspan="5">${videosDe(x)}</td></tr>` : ""}`; }).join("")}</tbody></table></div>
+    ${ttkFrase(`Toque numa linha pra ver os vídeos daquele tipo, do que mais vendeu pro que menos vendeu, com o link pra assistir. Usa os ${num(analisados)} vídeos que têm análise, com o GMV de todos os pedidos de cada um. A média divide o GMV por todos os vídeos do grupo, inclusive os que não venderam. A mediana olha só os que venderam e pega o do meio. Grupos com menos de 3 vídeos ficam de fora.`)}</div>`;
 }
 
 /* Ontem e vídeos do dia */
@@ -1094,7 +1112,10 @@ function ttkLigar(el, { per, hoje }) {
   const prod = $("#ttk-prod", el); if (prod) prod.onchange = (e) => { ttkX.prodSel = e.target.value; redesenhar(); };
   $$("[data-ttk-pareto]", el).forEach((b) => b.onclick = () => { ttkX.pareto = b.dataset.ttkPareto; redesenhar(); });
   $$("[data-ttk-janela]", el).forEach((b) => b.onclick = () => { ttkX.janela = Number(b.dataset.ttkJanela); redesenhar(); });
-  $$("[data-ttk-conteudo]", el).forEach((b) => b.onclick = () => { ttkX.conteudoPor = b.dataset.ttkConteudo; redesenhar(); });
+  $$("[data-ttk-conteudo]", el).forEach((b) => b.onclick = () => { ttkX.conteudoPor = b.dataset.ttkConteudo; ttkX.conteudoAberto = null; redesenhar(); });
+  const abrirCont = (tr) => { const n = tr.dataset.ttkContcat; ttkX.conteudoAberto = ttkX.conteudoAberto === n ? null : n; ttkX.conteudoTodos = false; const y = window.scrollY; redesenhar(); window.scrollTo(0, y); };
+  $$("[data-ttk-contcat]", el).forEach((tr) => { tr.onclick = () => abrirCont(tr); tr.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); abrirCont(tr); } }; });
+  $$("[data-ttk-conttodos]", el).forEach((b) => b.onclick = () => { ttkX.conteudoTodos = !ttkX.conteudoTodos; const y = window.scrollY; redesenhar(); window.scrollTo(0, y); });
   $$("[data-ttk-pag]", el).forEach((b) => b.onclick = () => { ttkX.pagina += Number(b.dataset.ttkPag); redesenhar(); $("#ttk-todos", el).scrollIntoView({ block: "nearest" }); });
   const busca = $("#ttk-busca", el);
   if (busca) busca.oninput = () => {
@@ -1323,6 +1344,20 @@ async function ttkImportar(arq, el) {
     .ttk-ficha { border: 1.5px solid var(--olive); }
     .ttk-ficha .ini-card-topo h2 { font-size: 20px; }
     #ttk-fin .grade-2 { grid-template-columns: 2fr 1fr; }
+    .ttk-clicavel { cursor: pointer; }
+    .ttk-clicavel:hover td { background: var(--tint); }
+    .ttk-seta { display: inline-grid; place-items: center; width: 18px; height: 18px; margin-right: 8px; border-radius: 50%; border: 1px solid var(--line); font-size: 12px; font-weight: 700; color: var(--muted); vertical-align: 1px; }
+    .ttk-cv-linha td { background: var(--card); padding: 4px 12px 12px; }
+    .ttk-cv { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+    .ttk-cv li { display: grid; grid-template-columns: minmax(0, 1fr) 84px 120px; gap: 12px; align-items: start; padding: 8px 0; border-bottom: 1px dashed var(--line); font-size: 13px; }
+    .ttk-cv li:last-child { border-bottom: 0; }
+    .ttk-cv-texto small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+    .ttk-cv-texto a { font-weight: 600; }
+    .ttk-cv-data { color: var(--muted); font-size: 12px; }
+    .ttk-cv-num { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .ttk-cv-num small { display: block; font-weight: 500; color: var(--muted); font-size: 11.5px; }
+    .ttk-cv-zero { opacity: .65; }
+    .ttk-cv-zero .ttk-cv-num { font-weight: 500; color: var(--muted); }
     .ttk-cats-grade { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 28px; align-items: start; }
     @media (max-width: 900px) { .ttk-cats-grade { grid-template-columns: 1fr; } }
     .ttk-cat-linha { display: grid; grid-template-columns: minmax(120px, 1.1fr) minmax(60px, 1.4fr) 54px 96px; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
