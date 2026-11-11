@@ -48,7 +48,7 @@ ${ttkMod.voz ? `MEU GUIA DE VOZ (use o tom, o ritmo e a lista de proibidos)\n${t
 
 ME ENTREGUE ASSIM (use exatamente estes títulos)
 MAPA DA REFERÊNCIA: cada bloco da referência em uma linha (nome do bloco, a função dele, segundos).
-COPY PRONTA PRA GRAVAR: o texto corrido, do jeito que eu falo, dividido pelos mesmos blocos.
+COPY PRONTA PRA GRAVAR: dividida pelos mesmos blocos. Cada bloco começa numa linha com o nome entre colchetes, ex. [1. Gancho], depois a fala do jeito que eu falo, e embaixo a cena em [CENA: o que aparece na imagem].
 LADO A LADO: uma tabela com as colunas Bloco | Referência | Minha versão | Mantido ou mudado (e o porquê em poucas palavras).
 DURAÇÃO: palavras faladas ÷ 3,25 = segundos. Se passar, diga qual frase cortar.
 2 GANCHOS ALTERNATIVOS: pra eu gravar junto e testar.
@@ -98,7 +98,7 @@ function ttkTelaModelar(el) {
       <div class="ini-card ttk-bloco"><h3 class="mod-h" style="margin-top:0">Copy pronta</h3>
         <p class="sub" style="margin:0 0 6px">Cole aqui o que o Claude devolveu e salve. Fica guardado junto com a referência.</p>
         <textarea class="campo" id="mod-final" rows="10" style="width:100%" placeholder="A copy final, pronta pra gravar">${esc(t.minha_versao || "")}</textarea>
-        <div class="barra" style="margin-top:8px"><span class="sub" id="mod-salvo"></span><span class="espaco"></span><button class="btn primario" type="button" id="mod-salvar">Salvar copy</button></div>
+        <div class="barra" style="margin-top:8px"><span class="sub" id="mod-salvo"></span><span class="espaco"></span>${typeof abrirRoteiroGravacao === "function" ? `<button class="btn" type="button" id="mod-roteiro">Ver roteiro de gravação</button>` : ""}<button class="btn primario" type="button" id="mod-salvar">Salvar copy</button></div>
       </div>` : ""}`;
   }
 
@@ -145,11 +145,57 @@ function modLigar(el, t) {
     try { await navigator.clipboard.writeText(txt); q("#mod-copiar").textContent = "Copiado"; avisar("Pedido copiado. Cole no Claude."); }
     catch (_) { const p = q("#mod-prompt"); p.closest("details").open = true; p.select(); avisar("Selecionei o texto: aperte Cmd + C para copiar.", true); }
   };
+  if (q("#mod-roteiro")) q("#mod-roteiro").onclick = () => {
+    const v = q("#mod-final").value.trim();
+    if (!v) { avisar("Cole a copy pronta aqui primeiro.", true); return; }
+    const grupos = Object.values(ttkX.grupos || {});
+    const produto = est.modo === "meu" ? (grupos.find((g) => String(g.id) === est.grupo) || {}).nome : est.modo === "outro" ? est.outro : "";
+    abrirRoteiroGravacao({ ...t, categoria: "tiktok_shop", ...(produto ? { marca: String(produto).slice(0, 60) } : {}), nota: "Dá pra tocar no título e no cabeçalho pra mudar antes de baixar. O texto você muda em Copy pronta." }, modParaRoteiro(v));
+  };
   if (q("#mod-salvar")) q("#mod-salvar").onclick = async () => {
     const v = q("#mod-final").value.trim();
     if (await gravar("transcricoes", { minha_versao: v || null }, t.id)) { t.minha_versao = v; q("#mod-salvo").textContent = "Salvo"; }
   };
   atualizar();
+}
+
+// Converte a resposta do Modelar copy pro formato do "Roteiro de gravação" (GANCHO ... CTA, GANCHOS, DICAS)
+const MOD_SECOES = [["mapa", /^MAPA\b/i], ["copy", /^COPY PRONTA\b/i], ["lado", /^LADO A LADO\b/i], ["duracao", /^DURA[ÇC][ÃA]O\b/i], ["ganchos", /^(\d+\s+)?GANCHOS?\s+ALTERNATIVOS?\b/i], ["prova", /^CENA DE PROVA\b/i]];
+function modParaRoteiro(texto) {
+  const partes = { antes: [] }; let atual = "antes";
+  String(texto || "").split("\n").forEach((bruta) => {
+    const l = bruta.replace(/^[#>\s*]+/, "").replace(/\*\*/g, "").trim();
+    const achou = l.length < 80 && MOD_SECOES.find(([, re]) => re.test(l.replace(/^\d+[.)]\s*/, "")));
+    if (achou) { atual = achou[0]; partes[atual] = []; const resto = l.replace(/^[^:]*:\s*/, ""); if (resto && resto !== l) partes[atual].push(resto); return; }
+    (partes[atual] = partes[atual] || []).push(bruta);
+  });
+  if (!partes.copy) return texto; // não veio no formato do modelador: usa como está
+  // Cabeçalhos de bloco: "[1. Gancho]", "1. GANCHO", "**Gancho**"
+  const cab = /^\s*(?:\[\s*)?(?:\*\*)?\s*(?:\d+[.)-]?\s*)?([A-Za-zÀ-ú][^\]\n:*]{1,50}?)(?:\*\*)?\s*(?:\]|:)?\s*$/;
+  const linhas = partes.copy.filter((l) => l.trim());
+  const ehCab = (l) => /^\s*\[(?!\s*(CENA|TELA|TEXTO|IMAGEM|TAKE)\s*:)/i.test(l) || (/^\s*(\*\*|\d+[.)])/.test(l) && cab.test(l) && l.trim().length < 60);
+  const nomes = linhas.filter(ehCab);
+  const mapear = (nome, i) => {
+    if (i === 0) return "GANCHO";
+    if (i === nomes.length - 1) return "CTA";
+    const n = nome.toLowerCase();
+    if (/dor|obje|problema/.test(n)) return "PROBLEMA";
+    if (/hist[óo]ria|contexto|identifica/.test(n)) return "IDENTIFICAÇÃO";
+    if (/uso|demonstr|mostra/.test(n)) return "DEMONSTRAÇÃO";
+    if (/prova|resultado/.test(n)) return "PROVA";
+    if (/vale|oferta|benef|atribut/.test(n)) return "POR QUE VALE A PENA";
+    if (/solu/.test(n)) return "SOLUÇÃO";
+    return "DESENVOLVIMENTO";
+  };
+  let i = -1;
+  const copy = linhas.map((l) => {
+    if (!ehCab(l)) return l;
+    i++; const nome = (l.match(cab) || [])[1] || l.replace(/[[\]*]/g, "").trim();
+    return `${mapear(nome.trim(), i)} (${nome.trim()})`;
+  }).join("\n");
+  const juntar = (k) => (partes[k] || []).join("\n").trim();
+  const dicas = [juntar("prova") && `Cena de prova: ${juntar("prova")}`].filter(Boolean).join("\n\n");
+  return `ROTEIRO\n${copy}\n\nGANCHOS\n${juntar("ganchos")}\n\nDICAS DE GRAVAÇÃO\n${dicas}`;
 }
 
 // Salva um vídeo como referência de TikTok Shop e começa a transcrição (usado aqui e na aba Sugestões)
