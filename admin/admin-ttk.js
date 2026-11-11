@@ -124,11 +124,15 @@ function ttkPeriodo() {
     return { acum: true, ini, fim: hoje, atual: true, titulo: `Desde ${dataBR(ini)}` };
   }
   const mes = ttkX.mes, D = ttkDiasNoMes(mes), atual = mes === mesHoje;
-  const N = atual ? Number(hoje.slice(8, 10)) : D;
+  // No mês atual, o período vai até o último dia que tem pedido importado (hoje sem importar não conta)
+  const ultimoDia = ttkX.pedidos.length ? ttkX.pedidos[ttkX.pedidos.length - 1].dia : hoje;
+  const fimDados = atual ? (ultimoDia.slice(0, 7) === mes && ultimoDia < hoje ? ultimoDia : hoje) : null;
+  const N = atual ? Number(fimDados.slice(8, 10)) : D;
+  const fechados = atual ? (fimDados < hoje ? N : N - 1) : D;
   const ant = ttkMesAnterior(mes), Nant = Math.min(N, ttkDiasNoMes(ant));
   return {
     mes, D, N, atual, ini: `${mes}-01`, fim: `${mes}-${pad(N)}`, ant, iniAnt: `${ant}-01`, fimAnt: `${ant}-${pad(Nant)}`,
-    fechados: atual ? N - 1 : D, titulo: ttkNomeMes(mes, true)
+    fechados, titulo: ttkNomeMes(mes, true)
   };
 }
 const ttkNoPeriodo = (p, ini, fim) => p.dia >= ini && p.dia <= fim;
@@ -187,7 +191,9 @@ function ttkProdutos(lista) {
 const ttkOs80 = (prods) => { const s = new Set(); for (const x of prods) { s.add(x.chave); if (x.acum >= 80) break; } return s; };
 
 /* ---------- Gráficos (SVG simples, um eixo só) ---------- */
-const TTK_W = 640, TTK_H = 220, TTK_M = { e: 56, d: 12, t: 12, b: 26 };
+let TTK_W = 960; const TTK_H = 240, TTK_M = { e: 68, d: 12, t: 14, b: 26 };
+// Gráfico pela metade da largura usa um desenho mais estreito, pra o texto não ficar miúdo
+const ttkLargura = (w, f) => { const antes = TTK_W; TTK_W = w; try { return f(); } finally { TTK_W = antes; } };
 function ttkEixos(yMax, rotulosX) {
   const h = TTK_H - TTK_M.t - TTK_M.b, w = TTK_W - TTK_M.e - TTK_M.d;
   const linhas = [0, .25, .5, .75, 1].map((f) => {
@@ -343,7 +349,7 @@ function ttkBlocoRitmo(per, prev, meta) {
   const series = [{ v: antAc, classe: "ttk-linha-cinza", nome: ttkNomeMes(per.ant, true) }, { v: realAc, classe: "ttk-linha-cafe", nome: "Acumulado real" }];
   if (prevAc) series.push({ v: prevAc, classe: "ttk-linha-tracejada", nome: "Previsão" });
   return `<div class="cartao"><div class="barra"><h2 style="margin:0">GMV acumulado, ritmo do mês</h2><span class="espaco"></span>
-      <span class="ttk-leg"><i class="ttk-l-cafe"></i>Real ${per.atual ? `(até ontem, ${real(ac)})` : real(ac)}</span>${per.atual ? `<span class="ttk-leg"><i class="ttk-l-tracejada"></i>Previsão ${real(prev.total)}</span>` : ""}<span class="ttk-leg"><i class="ttk-l-cinza"></i>${ttkNomeMes(per.ant, true)}</span>${meta ? `<span class="ttk-leg"><i class="ttk-l-meta"></i>Meta</span>` : ""}</div>
+      <span class="ttk-leg"><i class="ttk-l-cafe"></i>Real ${per.atual ? `(até o dia ${prev.k}, ${real(ac)})` : real(ac)}</span>${per.atual ? `<span class="ttk-leg"><i class="ttk-l-tracejada"></i>Previsão ${real(prev.total)}</span>` : ""}<span class="ttk-leg"><i class="ttk-l-cinza"></i>${ttkNomeMes(per.ant, true)}</span>${meta ? `<span class="ttk-leg"><i class="ttk-l-meta"></i>Meta</span>` : ""}</div>
     ${ttkGrafLinhas(rot, series, meta ? [{ v: meta, nome: "meta " + ttkCurto(meta) }] : [])}
     ${ttkFrase(per.atual
       ? `Cada ponto é quanto o mês somou até aquele dia. A previsão mistura o ritmo deste mês com o da última semana de ${ttkNomeMes(per.ant, true)}: no começo do mês o anterior pesa mais e, a cada dia fechado, este mês ganha peso. O caminho até o fim segue como as vendas se espalharam nos últimos 3 meses fechados.`
@@ -366,10 +372,10 @@ function ttkBlocoDiario(per, doPer) {
   const un = per.acum ? "mês" : "dia";
   return `<div class="cartao"><h2>Ritmo ${per.acum ? "mensal" : "diário do mês"}</h2>
     <div class="ttk-dupla">
-      <div><h3 class="ttk-sub">GMV por ${un}</h3>${ttkGrafBarras(rot, g, { nome: "GMV por " + un })}</div>
-      <div><h3 class="ttk-sub">Comissão por ${un}</h3>${ttkGrafBarras(rot, c, { classe: "ttk-barra-dourada", nome: "Comissão por " + un })}</div>
+      <div><h3 class="ttk-sub">GMV por ${un}</h3>${ttkLargura(520, () => ttkGrafBarras(rot, g, { nome: "GMV por " + un }))}</div>
+      <div><h3 class="ttk-sub">Comissão por ${un}</h3>${ttkLargura(520, () => ttkGrafBarras(rot, c, { classe: "ttk-barra-dourada", nome: "Comissão por " + un }))}</div>
     </div>
-    ${ttkFrase(`Cada barra é um ${un}${per.acum ? "" : " do mês"}. As linhas tracejadas marcam a média por ${un}. ${per.atual && !per.acum ? "O último dia é hoje e ainda está em andamento." : ""}`)}</div>`;
+    ${ttkFrase(`Cada barra é um ${un}${per.acum ? "" : " do mês"}. As linhas tracejadas marcam a média por ${un}. ${per.atual && !per.acum && per.fechados < per.N ? "O último dia é hoje e ainda está em andamento." : ""}`)}</div>`;
 }
 
 /* 4. Ritmo diário por produto (só os que fazem 80% do GMV) */
@@ -391,7 +397,7 @@ function ttkBlocoProduto(per, prods, os80, prev, A) {
   } else {
     const dia = ttkPorDiaDoMes(per.mes, "g", f).slice(1, per.N + 1);
     // Tendência: últimos 7 dias fechados contra os 7 anteriores
-    const fimT = per.atual ? ttkSomaDias(hojeISO(), -1) : per.fim;
+    const fimT = per.fechados ? `${per.mes}-${pad(per.fechados)}` : ttkSomaDias(per.ini, -1);
     const soma = (ini, fim) => ttkX.pedidos.filter((p) => f(p) && ttkValido(p) && p.dia >= ini && p.dia <= fim).reduce((s, p) => s + p.g, 0);
     const t1 = soma(ttkSomaDias(fimT, -6), fimT), t0 = soma(ttkSomaDias(fimT, -13), ttkSomaDias(fimT, -7));
     const antFechado = ttkX.pedidos.filter((p) => f(p) && ttkValido(p) && p.mes === per.ant).reduce((s, p) => s + p.g, 0);
@@ -498,7 +504,7 @@ function ttkBlocoTodos(prods) {
 
 /* 9. Apostas: fora do 80%, novos ou acelerando, vendendo em pelo menos 3 dias */
 function ttkBlocoApostas(per, os80) {
-  const w = ttkX.janela, fim = per.atual ? ttkSomaDias(hojeISO(), -1) : per.fim;
+  const w = ttkX.janela, fim = per.acum ? ttkSomaDias(hojeISO(), -1) : per.fechados ? `${per.mes}-${pad(per.fechados)}` : ttkSomaDias(per.ini, -1);
   const iniA = ttkSomaDias(fim, -(w - 1)), fimB = ttkSomaDias(iniA, -1), iniB = ttkSomaDias(fimB, -(w - 1));
   const m = new Map();
   ttkX.pedidos.filter((p) => ttkValido(p) && p.dia >= iniB && p.dia <= fim && !os80.has(p.chave)).forEach((p) => {
@@ -734,7 +740,7 @@ async function ttkImportar(arq, el) {
     .ttk-frase { font-size: 12.5px; color: var(--muted); margin: 8px 0 0; line-height: 1.45; }
     .ttk-destaque { margin: 0 0 10px; font-size: 14px; }
     .ttk-sub { font-size: 12px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); margin: 0 0 4px; }
-    .ttk-graf { width: 100%; height: auto; display: block; }
+    .ttk-graf { width: 100%; height: auto; display: block; max-height: 300px; }
     .ttk-grade { stroke: var(--line); stroke-width: 1; }
     .ttk-eixo { font-size: 10.5px; fill: var(--muted); font-family: inherit; }
     .ttk-linha-cafe { fill: none; stroke: var(--cobalt); stroke-width: 2.2; }
