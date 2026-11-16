@@ -27,6 +27,25 @@ loja_online: site, marketplace ou só DM.
 observacao: o gancho, ou seja, o detalhe específico dessa marca que eu posso citar no e-mail.
 Deixe em branco o que não se aplica.`;
 
+// O que conta como marca boa pra UGC (o olhar de quem passou 12 anos no atacado separando marca de revenda)
+const REGRAS_MARCA = (nicho) => `O QUE CONTA COMO MARCA BOA (a marca precisa passar em todas, sem exceção):
+1. Marca própria: cria ou fabrica o produto e tem identidade (nome, coleção, foto e vídeo próprios). Fora: revenda, multimarcas, loja de atacado (Brás, Bom Retiro, 25 de Março, Rua 44 de Goiânia), dropshipping, catálogo de fornecedor, franquia e marca gigante que todo mundo conhece.
+2. Ativa: postou no feed ou em Reels nos últimos 14 dias. Abra o perfil e anote a data do último post. Parada há mais tempo, descarte.
+3. Vende online sozinha: site próprio (Shopify, Nuvemshop, VTEX, Tray, Loja Integrada, Wix) ou loja oficial em marketplace. Fora quem vende só por DM, WhatsApp ou catálogo.
+4. Tamanho certo: de 5 mil a 150 mil seguidores, com comentário de cliente de verdade (pergunta de tamanho, preço, entrega), não só emoji de perfil falso.
+5. Tem verba: procure a marca na Biblioteca de Anúncios do Meta (facebook.com/ads/library, país Brasil). Anote quantos anúncios ativos ela tem. Anúncio ativo pesa muito a favor.
+
+COMO PROCURAR${nicho ? ` (${nicho})` : ""}:
+- Google: site:instagram.com com o nicho e termos como "loja oficial", "nova coleção", "frete grátis", "site oficial".
+- Biblioteca de Anúncios do Meta: busque palavras do nicho e veja quem está anunciando agora. Essas marcas já gastam com vídeo.
+- Lojas Nuvemshop e Shopify do nicho (busque "nicho + nuvemshop", "nicho + myshopify").
+- Perfis que as marcas boas seguem e marcam, e marcas que aparecem em publi de creators do nicho.
+
+NA OBSERVAÇÃO DE CADA MARCA, ESCREVA ASSIM:
+último post (data) · anúncios ativos (quantos, ou "nenhum") · o que o conteúdo dela tem de fraco hoje (ex.: só foto de produto parado, vídeo sem gancho, nenhum vídeo de gente usando, anúncio que só mostra preço) · uma ideia de vídeo UGC que resolve isso.
+
+Qualidade antes de quantidade: se só encontrar poucas marcas que passam em tudo, entregue menos. Não invente número, data nem contato: o que você não conseguiu confirmar, escreva "não confirmado".`;
+
 const CAMINHOS = [
   {
     id: "chrome", nome: "Pesquisa no Chrome", icone: "busca", meta: 8, rotuloMeta: "marcas boas depois da limpeza",
@@ -41,22 +60,21 @@ nome da empresa · link do produto · link do Instagram · quantidade de seguido
 
 Se você não encontrar o e-mail, escreva "não encontrado". Não invente contato.
 
+${REGRAS_MARCA(c.produto)}
+
 Me mande a planilha pronta para baixar.`,
     checagens: ["O Instagram existe e postou nos últimos 30 dias", "O e-mail é de uma pessoa ou do marketing, não do suporte técnico", "A marca vende no Brasil e entrega na região", "O link do produto abre e é o produto certo"]
   },
   {
     id: "instagram", nome: "Instagram (via Google)", icone: "insta", meta: 20, rotuloMeta: "marcas checadas",
-    objetivo: "Achar marcas pequenas e em crescimento que o algoritmo não mostra.",
-    campos: [{ k: "nicho", r: "Nicho e produtos", ph: "Ex.: skincare masculino e barbear" }, { k: "qtd", r: "Quantidade", op: ["10", "20", "30"], padrao: "20" }],
-    prompt: (c) => `Quero fechar parceria com marcas que vendam ${c.nicho || "[NICHO E PRODUTOS]"}.
+    objetivo: "Marcas próprias, ativas e com anúncio rodando, que o algoritmo não mostra.",
+    campos: [{ k: "nicho", r: "Nicho e produtos (quanto mais específico, melhor)", ph: "Ex.: camisaria masculina, alfaiataria casual, básicos premium" }, { k: "qtd", r: "Quantidade", op: ["10", "15", "20"], padrao: "10" }],
+    prompt: (c) => `Sou creator de UGC: faço vídeo pra anúncio e pra página de produto. Trabalhei 12 anos no atacado de moda e sei a diferença entre marca e revenda. Quero marcas pra prospectar no nicho de ${c.nicho || "[NICHO E PRODUTOS]"}.
 
-Encontre marcas brasileiras com até 50 mil seguidores no Instagram. Prefiro marcas novas, que estão começando a aparecer.
+Me traga até ${c.qtd || "10"} marcas que passem em todas as regras abaixo.
 
-Me traga ${c.qtd || "20"} marcas, em lista, com:
-@ do perfil · link do Instagram · quantos seguidores · o que ela vende · se ela já postou vídeo feito por creator · e-mail ou forma de contato que estiver no perfil ou no site.
-
-Não repita marca grande e conhecida. O foco é quem está crescendo agora.`,
-    checagens: ["Posta com frequência? (parada há 3 meses significa sem verba)", "Tem loja online ou vende só por DM? (muda o tipo de vídeo oferecido)", "Os vídeos são caseiros? (a dor está visível no feed)", "Já marcou creator? (entende o formato e tem verba)", "Tem e-mail no perfil? (anotar junto com o @)"],
+${REGRAS_MARCA(c.nicho)}`,
+    checagens: ["É marca própria, não revenda, multimarcas ou loja de atacado (Brás, Bom Retiro, 25 de Março)", "Postou nos últimos 14 dias (a data está na observação)", "Tem anúncio ativo na Biblioteca de Anúncios do Meta (tem verba pra vídeo)", "Vende em site próprio ou loja oficial, não só por DM", "O conteúdo dela tem uma falha que o seu vídeo resolve (é o gancho do e-mail)"],
     nota: "Marca que nunca usou creator precisa de mais explicação. No e-mail, mostre o antes e depois: o vídeo caseiro dela ao lado do que você entrega."
   },
   {
@@ -84,9 +102,11 @@ Prefiro analista, coordenador ou gerente de marketing, não o dono da empresa.`,
 Separe as marcas do nicho de ${c.nicho || "[NICHO]"} e, para cada uma, procure:
 Instagram · quantos seguidores · site próprio · e-mail de contato ou de marketing · se ela já usa vídeo de creator na página do produto.
 
-Me devolva ${c.qtd || "20"} marcas em planilha, da menor para a maior em seguidores.
+Me devolva até ${c.qtd || "20"} marcas em planilha, da menor para a maior em seguidores.
 
-Se não achar o contato, escreva "não encontrado".`,
+Se não achar o contato, escreva "não encontrado".
+
+${REGRAS_MARCA(c.nicho)}`,
     checagens: [],
     nota: "Clip de marketplace puxa o preço para baixo. Use como fonte de recorrência, sem deixar que vire o principal."
   },
