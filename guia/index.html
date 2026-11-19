@@ -1,0 +1,599 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Guia Claude pra TikTok Shop · Ryan Alves</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Allura&family=Montserrat:wght@400;500;600;700;800&display=swap">
+<style>
+/* Guia no estilo vidro: fundo areia com luz de janela, painéis de vidro fosco,
+   etapas como pílulas que abrem e fecham, botão preto arredondado. Identidade: assinatura Ryan Alves em Allura. */
+:root{
+  --tinta:#1E1813; --tinta2:#5B4D42; --tinta3:#8C7C6E; --preto:#151110; --ouro:#A8864A;
+  --vidro:rgba(255,251,246,.58); --vidro2:rgba(255,253,250,.78); --borda:rgba(255,255,255,.75); --linha:rgba(60,42,28,.12);
+  --laranja:#B9542A; --verde:#4E6A39; --verde-bg:rgba(94,128,66,.16); --cinza-bg:rgba(60,42,28,.07);
+  --sans:Montserrat,ui-sans-serif,system-ui,-apple-system,sans-serif; --assina:Allura,cursive;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+[hidden]{display:none!important}
+body{min-height:100vh;color:var(--tinta);font-family:var(--sans);font-size:15px;line-height:1.6;background:#D9C9B6}
+body::before{content:"";position:fixed;inset:0;z-index:-2;background:radial-gradient(90% 70% at 88% 6%,#FBF5EC 0%,rgba(251,245,236,0) 60%),linear-gradient(118deg,#F1E8DC 0%,#E5D6C4 38%,#BFA78F 72%,#6F5B4A 100%)}
+body::after{content:"";position:fixed;inset:-25%;z-index:-1;pointer-events:none;filter:blur(34px);opacity:.75;
+  background:repeating-linear-gradient(118deg,rgba(255,247,234,0) 0 140px,rgba(255,247,234,.55) 190px 300px,rgba(255,247,234,0) 350px 520px)}
+a{color:inherit}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--preto);outline-offset:3px}
+.assina{font-family:var(--assina);font-size:34px;line-height:1;color:var(--tinta)}
+.vidro{background:var(--vidro);-webkit-backdrop-filter:blur(22px) saturate(1.15);backdrop-filter:blur(22px) saturate(1.15);border:1px solid var(--borda);border-radius:30px;box-shadow:0 40px 70px -30px rgba(70,45,25,.45),inset 0 1px 0 rgba(255,255,255,.85)}
+.marca{display:flex;align-items:center;gap:10px}
+.marca .ponto{width:22px;height:22px;border-radius:50%;border:5px solid var(--ouro);background:var(--preto);flex:none}
+
+/* ---------- botões, campos ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;border:0;border-radius:999px;padding:15px 26px;background:var(--preto);color:#fff;font-weight:600;font-size:15px;cursor:pointer;text-decoration:none;box-shadow:0 12px 24px -12px rgba(20,15,10,.6)}
+.btn.sec{background:rgba(255,255,255,.6);color:var(--tinta);border:1px solid var(--borda);box-shadow:inset 0 1px 0 #fff}
+.btn:disabled{opacity:.6;cursor:wait}
+.lbl{display:block;font-size:13px;font-weight:700;color:var(--tinta);margin-bottom:6px}
+.inp{width:100%;font:15px var(--sans);color:var(--tinta);background:rgba(255,255,255,.72);border:1px solid var(--borda);border-radius:18px;padding:13px 16px;outline:none;box-shadow:inset 0 1px 2px rgba(60,42,28,.06)}
+.inp:focus{border-color:var(--tinta3);background:#fff}
+textarea.inp{min-height:90px;resize:vertical}
+.consent{display:flex;gap:10px;align-items:flex-start;font-size:13px;color:var(--tinta2);cursor:pointer}
+.consent input{margin-top:3px;width:18px;height:18px;accent-color:var(--preto);flex:none}
+.erro{color:var(--laranja);font-size:13px;margin:0;min-height:1.2em}
+.mini{font-size:12px;color:var(--tinta3);text-align:center;margin:0}
+
+/* ---------- cadastro ---------- */
+.gate{min-height:100vh;min-height:100dvh;display:grid;place-items:center;padding-block:32px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.gate-card{width:100%;max-width:470px;padding:34px 30px 28px;display:flex;flex-direction:column;gap:16px}
+.gate h1{font-size:clamp(28px,6vw,36px);font-weight:700;letter-spacing:-.02em;line-height:1.1;margin:0;text-wrap:balance}
+.gate p.sub{margin:0;color:var(--tinta2)}
+.gate form{display:flex;flex-direction:column;gap:12px}
+.gate .btn{width:100%;padding:17px}
+
+/* ---------- estrutura ---------- */
+.app{display:grid;grid-template-columns:330px minmax(0,1fr);gap:28px;max-width:1240px;margin:0 auto;padding-block:28px;padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px));min-height:100vh}
+.side{position:sticky;top:28px;align-self:start;max-height:calc(100vh - 56px);overflow-y:auto;padding:26px 22px;display:flex;flex-direction:column;gap:18px}
+.side .titulo{font-size:15px;font-weight:700;margin-top:4px}
+.side .titulo b{font-weight:700;color:var(--ouro)}
+.prog{display:flex;gap:14px;align-items:center;padding:12px 16px;border-radius:22px;background:rgba(255,255,255,.55);border:1px solid var(--borda)}
+.ring{width:46px;height:46px;flex:none}
+.ring circle{fill:none;stroke-width:5}
+.ring .bg{stroke:rgba(60,42,28,.12)} .ring .fg{stroke:var(--preto);stroke-linecap:round;transition:stroke-dashoffset .4s}
+.prog strong{display:block;font-size:18px;font-variant-numeric:tabular-nums}
+.prog span{font-size:12px;color:var(--tinta3);font-variant-numeric:tabular-nums}
+.grupo{font-size:17px;font-weight:700;margin:10px 0 2px}
+.nav{display:flex;flex-direction:column;gap:6px}
+.nav a{display:flex;align-items:center;gap:12px;text-decoration:none;font-size:14px;padding:11px 16px 11px 12px;border-radius:999px;color:var(--tinta2);transition:background .2s}
+.nav a .n{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;flex:none;font-size:11px;font-weight:700;background:rgba(60,42,28,.08);color:var(--tinta2)}
+.nav a::after{content:"→";margin-left:auto;color:var(--tinta3);font-size:15px}
+.nav a:hover{background:rgba(255,255,255,.5)}
+.nav a.on{background:rgba(255,255,255,.85);color:var(--tinta);font-weight:600;box-shadow:0 10px 22px -12px rgba(70,45,25,.4),inset 0 1px 0 #fff}
+.nav a.feito .n{background:var(--verde);color:#fff}
+.nav a.feito::after{content:"✓";color:var(--verde);font-weight:800}
+.continuar{margin-top:8px}
+.continuar .btn{width:100%}
+.side .sair{font-size:12px;color:var(--tinta3);background:none;border:0;cursor:pointer;text-decoration:underline;padding:0;align-self:center}
+.topbar{display:none}
+
+.col{min-width:0;display:flex;flex-direction:column;gap:24px}
+.hero{padding:34px 34px 30px;display:flex;flex-direction:column;gap:12px}
+.hero h1{font-size:clamp(30px,4.2vw,48px);font-weight:700;letter-spacing:-.025em;line-height:1.06;margin:0;text-wrap:balance;max-width:20ch}
+.hero p{margin:0;color:var(--tinta2);max-width:60ch;font-size:16px}
+.hero .acoes{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+.painel-etapas{padding:18px;display:flex;flex-direction:column;gap:10px}
+.painel-etapas > .tit-painel{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:10px 10px 6px}
+.painel-etapas > .tit-painel h2{font-size:20px;margin:0;font-weight:700}
+.painel-etapas > .tit-painel span{font-size:13px;color:var(--tinta3)}
+
+/* ---------- etapa = pílula que abre ---------- */
+section.etapa{scroll-margin-top:24px;border-radius:28px;transition:background .25s}
+section.etapa.aberta{background:rgba(255,255,255,.42);border:1px solid var(--borda);box-shadow:inset 0 1px 0 rgba(255,255,255,.9)}
+.cab-etapa{width:100%;display:flex;align-items:center;gap:14px;text-align:left;cursor:pointer;padding:14px 16px 14px 14px;border-radius:999px;border:1px solid var(--borda);background:rgba(255,255,255,.62);box-shadow:0 10px 24px -16px rgba(70,45,25,.45),inset 0 1px 0 #fff}
+.etapa.aberta .cab-etapa{background:rgba(255,255,255,.9)}
+.cab-etapa .num{width:36px;height:36px;border-radius:50%;flex:none;display:grid;place-items:center;font-weight:700;font-size:13px;background:rgba(60,42,28,.08)}
+.cab-etapa .tit{flex:1;min-width:0;font-weight:600;font-size:15.5px;line-height:1.3}
+.cab-etapa .tit small{display:block;font-size:11.5px;font-weight:600;color:var(--tinta3);letter-spacing:.04em}
+.cab-etapa .tit em{font-style:normal}
+.cab-etapa .st{flex:none;font-size:12px;font-weight:700;padding:6px 14px;border-radius:999px;background:var(--cinza-bg);color:var(--tinta3)}
+.cab-etapa .st.agora{background:var(--laranja);color:#fff}
+.cab-etapa .st.feito{background:var(--verde-bg);color:var(--verde)}
+.etapa.feita .num{background:var(--verde);color:#fff}
+.cab-etapa .seta{flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:18px;transition:transform .25s}
+.etapa.aberta .cab-etapa .seta{transform:rotate(90deg)}
+.corpo{display:none;padding:20px 20px 24px;flex-direction:column;gap:16px}
+.etapa.aberta .corpo{display:flex}
+.corpo > p{margin:0;color:var(--tinta2);max-width:68ch}
+h3{font-size:13px;font-weight:700;margin:6px 0 0}
+
+.bloco{background:rgba(255,255,255,.6);border:1px solid var(--borda);border-radius:24px;padding:20px}
+ol.passos{margin:0;padding:0;list-style:none;counter-reset:p;display:flex;flex-direction:column;gap:12px}
+ol.passos li{counter-increment:p;display:grid;grid-template-columns:30px 1fr;gap:12px;align-items:start}
+ol.passos li::before{content:counter(p);width:28px;height:28px;border-radius:50%;background:var(--preto);color:#fff;font-weight:700;font-size:12px;display:grid;place-items:center}
+.links{display:flex;flex-wrap:wrap;gap:10px}
+
+.prompt{border:1px solid var(--borda);border-radius:24px;overflow:hidden;background:rgba(255,255,255,.75)}
+.prompt .hd{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px 10px 18px;border-bottom:1px solid var(--linha)}
+.prompt .hd span{font-size:12.5px;font-weight:700;color:var(--tinta2)}
+.prompt .hd button{font-size:13px;font-weight:600;padding:9px 18px;border-radius:999px;border:0;background:var(--preto);color:#fff;cursor:pointer}
+.prompt .hd button.ok{background:var(--verde)}
+.prompt pre{margin:0;padding:18px;font-family:var(--sans);font-size:13.5px;line-height:1.6;white-space:pre-wrap;word-break:break-word;max-height:300px;overflow:auto}
+.pers{font-size:12px;color:var(--verde);font-weight:600}
+.pers.nao{color:var(--laranja)}
+
+.checks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.checks label{display:flex;gap:12px;align-items:center;cursor:pointer;font-size:14px;padding:10px 14px;border-radius:999px;background:rgba(255,255,255,.45);border:1px solid var(--borda)}
+.checks input{appearance:none;-webkit-appearance:none;width:22px;height:22px;border-radius:50%;border:1.5px solid var(--tinta3);background:#fff;flex:none;margin:0;display:grid;place-items:center;cursor:pointer}
+.checks input:checked{background:var(--verde);border-color:var(--verde)}
+.checks input:checked::after{content:"✓";color:#fff;font-size:12px;font-weight:800}
+.checks input:checked + span{color:var(--tinta3);text-decoration:line-through}
+
+.passos-aula{display:flex;flex-direction:column;gap:16px}
+.passo{display:grid;grid-template-columns:34px minmax(0,1fr);gap:14px;align-items:start}
+.passo .pn{width:32px;height:32px;border-radius:50%;background:var(--preto);color:#fff;font-weight:700;font-size:13px;display:grid;place-items:center}
+.passo .pc{min-width:0;display:flex;flex-direction:column;gap:10px}
+.passo .pc > p{margin:5px 0 0}
+.prompt pre .mais{display:block;margin-top:10px;color:var(--tinta3);font-style:italic}
+.nota{font-size:13.5px;padding:14px 18px;border-radius:20px;background:rgba(60,42,28,.07);color:var(--tinta)}
+
+.q{display:flex;flex-direction:column;gap:22px}
+.q .item > .lbl{margin-bottom:10px}
+.q .item small{display:block;font-weight:500;color:var(--tinta3);font-size:12px;margin-top:2px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1px solid var(--borda);background:rgba(255,255,255,.65);border-radius:999px;padding:9px 16px;font-size:13.5px;cursor:pointer;box-shadow:inset 0 1px 0 #fff}
+.chip:hover{background:#fff}
+.chip[aria-pressed="true"]{background:var(--preto);color:#fff;border-color:var(--preto)}
+.preset{display:flex;gap:14px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:18px 20px;border-radius:24px;background:rgba(255,255,255,.55);border:1px solid var(--borda)}
+.preset p{margin:0;font-size:14px;max-width:52ch}
+.preset p b{font-size:16px}
+.resumo{font-size:13.5px;color:var(--tinta2);padding:14px 18px;border-radius:20px;background:rgba(255,255,255,.45)}
+.resumo b{color:var(--tinta)}
+
+footer.fim{text-align:center;color:var(--tinta2);font-size:13px;display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 0 20px}
+.toast{position:fixed;bottom:calc(24px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%) translateY(20px);background:var(--preto);color:#fff;padding:12px 20px;border-radius:999px;font-size:13px;opacity:0;transition:.25s;pointer-events:none;z-index:50}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+
+@media (max-width:900px){
+  .app{grid-template-columns:1fr;padding-block:0 28px;gap:18px}
+  .side{position:fixed;inset:10px auto 10px 10px;width:min(86vw,330px);max-height:none;z-index:40;transform:translateX(-110%);transition:transform .25s;padding-top:calc(26px + env(safe-area-inset-top,0px))}
+  .side.aberto{transform:none}
+  .veu{position:fixed;inset:0;background:rgba(40,28,18,.3);z-index:30}
+  .topbar{display:flex;position:sticky;top:0;z-index:20;justify-content:space-between;align-items:center;gap:12px;margin:0 calc(-1 * max(20px, env(safe-area-inset-left,0px))) 0;padding-block:calc(10px + env(safe-area-inset-top,0px)) 10px;padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px));background:rgba(245,236,224,.7);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border-bottom:1px solid var(--borda)}
+  .topbar .assina{font-size:28px}
+  .topbar button{border:1px solid var(--borda);background:rgba(255,255,255,.7);border-radius:999px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer}
+  .hero{padding:26px 22px}
+  .painel-etapas{padding:10px;border-radius:26px}
+  .corpo{padding:16px 10px 20px}
+  .cab-etapa .st{display:none}
+  .bloco{padding:16px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<!-- =============== CADASTRO =============== -->
+<main class="gate" id="gate">
+  <div class="gate-card vidro">
+    <div class="assina">Ryan Alves</div>
+    <h1>Seu guia de Claude pra TikTok Shop</h1>
+    <p class="sub">Todo o passo a passo das aulas, com os pedidos prontos e personalizados pro seu jeito de gravar. Coloque seus dados para liberar. É por aqui que eu aviso quando sair aula nova.</p>
+    <form id="cadastro" novalidate>
+      <div><label class="lbl" for="nome">Seu nome</label><input class="inp" id="nome" type="text" autocomplete="name" placeholder="Como você quer ser chamado"></div>
+      <div><label class="lbl" for="email">E-mail</label><input class="inp" id="email" type="email" autocomplete="email" placeholder="voce@email.com"></div>
+      <div><label class="lbl" for="whats">WhatsApp com DDD</label><input class="inp" id="whats" type="tel" autocomplete="tel" inputmode="tel" placeholder="(27) 91234-5678"></div>
+      <div><label class="lbl" for="tiktok">Seu @ no TikTok</label><input class="inp" id="tiktok" type="text" autocomplete="off" placeholder="@seuuser"></div>
+      <label class="consent"><input id="aceite" type="checkbox"><span>Aceito receber avisos de aulas, atualizações e novos cursos por e-mail e WhatsApp. Posso pedir para sair quando quiser.</span></label>
+      <p class="erro" id="erro" role="alert"></p>
+      <button class="btn" id="enviar" type="submit">Liberar meu guia</button>
+    </form>
+    <p class="mini">Seus dados ficam só comigo e não são compartilhados.</p>
+  </div>
+</main>
+
+<!-- =============== GUIA =============== -->
+<div class="app" id="guia" hidden>
+  <aside class="side vidro" id="side">
+    <div>
+      <div class="marca"><span class="ponto" aria-hidden="true"></span><span class="assina">Ryan Alves</span></div>
+      <div class="titulo">Claude pra <b>TikTok Shop</b></div>
+    </div>
+    <div class="prog">
+      <svg class="ring" viewBox="0 0 48 48" aria-hidden="true"><circle class="bg" cx="24" cy="24" r="20"/><circle class="fg" id="ringfg" cx="24" cy="24" r="20" transform="rotate(-90 24 24)" stroke-dasharray="125.66" stroke-dashoffset="125.66"/></svg>
+      <div><strong id="pct">0%</strong><span id="cnt">0 de 0 marcados</span></div>
+    </div>
+    <nav class="nav" id="nav">
+      <div class="grupo">Preparar</div>
+      <a href="#e1"><span class="n">01</span>Como usar este guia</a>
+      <a href="#e2"><span class="n">02</span>Instalar o Claude</a>
+      <a href="#e3"><span class="n">03</span>O seu jeito de vender</a>
+      <div class="grupo">Painel</div>
+      <a href="#e4"><span class="n">04</span>Criar seu painel</a>
+      <a href="#e5"><span class="n">05</span>Subir suas vendas</a>
+      <div class="grupo">Gravar</div>
+      <a href="#e6"><span class="n">06</span>Treinar roteiros</a>
+      <a href="#e7"><span class="n">07</span>Copiar estrutura de vídeo</a>
+      <div class="grupo">Editar e postar</div>
+      <a href="#e8"><span class="n">08</span>Edição</a>
+      <a href="#e9"><span class="n">09</span>Agendar</a>
+    </nav>
+    <div class="continuar"><button class="btn" type="button" data-continuar>Continuar de onde parei</button></div>
+    <button class="sair" id="sair" type="button">Sair deste aparelho</button>
+  </aside>
+
+  <div>
+    <div class="topbar"><span class="assina">Ryan Alves</span><button type="button" id="abrirMenu">Etapas · <span id="pctTop">0%</span></button></div>
+    <main class="main">
+      <div class="col">
+
+        <header class="hero vidro">
+          <div class="marca"><span class="ponto" aria-hidden="true"></span><span class="assina">Ryan Alves</span></div>
+          <h1>O Claude faz o trabalho pesado. Você grava e vende.</h1>
+          <p>Instale o Claude, entre no seu painel de TikTok Shop e ensine o Claude a escrever, cortar e agendar seus vídeos do seu jeito. São 9 etapas, na ordem das aulas. Abra uma por vez.</p>
+          <div class="acoes"><button class="btn" type="button" data-continuar>Continuar de onde parei</button><a class="btn sec" href="#e3">Responder meu perfil</a></div>
+        </header>
+
+        <div class="painel-etapas vidro">
+          <div class="tit-painel"><h2>Etapas</h2><span id="cntPainel"></span></div>
+        <!-- 01 -->
+        <section class="etapa" id="e1" data-etapa>
+          <div class="tag"><span class="e">ETAPA 01</span><span class="g">Preparar</span></div>
+          <h2>Como usar <em>este guia</em></h2>
+          <p>Cada etapa usa o que a anterior produziu. Siga na ordem e marque o que terminou: o progresso fica salvo neste aparelho.</p>
+          <div class="bloco">
+            <ol class="passos">
+              <li><span><b>Responda a etapa 03 antes de copiar qualquer pedido.</b> Suas respostas entram nos textos das etapas seguintes, então cada pedido já sai com o seu número de vídeos, seu estilo e sua edição.</span></li>
+              <li><span><b>Copie, cole no Claude e mande.</b> Os blocos com o botão Copiar são para colar na aba Code do Claude, do jeito que estão.</span></li>
+              <li><span><b>Corrija conversando.</b> Se algo não ficou do seu jeito, fale em português normal: "mais curto", "sem esse gancho", "corta mais seco".</span></li>
+            </ol>
+          </div>
+          <ul class="checks"><li><label><input type="checkbox" data-c="e1a"><span>Entendi como o guia funciona</span></label></li></ul>
+        </section>
+
+        <!-- 02 -->
+        <section class="etapa" id="e2" data-etapa>
+          <div class="tag"><span class="e">ETAPA 02</span><span class="g">Preparar</span></div>
+          <h2>Instale o Claude e <em>assine o Pro</em></h2>
+          <p>O Claude Code vem dentro do app do Claude, no computador, e precisa do plano Pro, o plano pago básico. O plano gratuito não tem.</p>
+          <div class="links">
+            <a class="btn" href="https://claude.ai/download" target="_blank" rel="noopener">Baixar o Claude</a>
+            <a class="btn sec" href="https://claude.ai/pricing" target="_blank" rel="noopener">Ver o plano Pro</a>
+          </div>
+          <div class="bloco">
+            <ol class="passos">
+              <li><span>Baixe o app para Mac ou Windows, instale e entre com seu e-mail ou Google.</span></li>
+              <li><span>Assine o <b>Pro</b> em Configurações, Plano.</span></li>
+              <li><span>Abra a aba <b>Code</b>. É onde o Claude cria e mexe em arquivos no seu computador.</span></li>
+              <li><span>Crie uma pasta chamada <b>TikTok Shop</b> em Documentos e escolha ela como pasta do projeto.</span></li>
+            </ol>
+          </div>
+          <p class="nota"><b>Normal:</b> o Claude pede permissão antes de mexer em arquivos ou abrir sites. É a segurança da sua conta. Leia e aprove.</p>
+          <ul class="checks">
+            <li><label><input type="checkbox" data-c="e2a"><span>Instalei o app e fiz login</span></label></li>
+            <li><label><input type="checkbox" data-c="e2b"><span>Assinei o Pro</span></label></li>
+            <li><label><input type="checkbox" data-c="e2c"><span>Abri a aba Code na pasta TikTok Shop</span></label></li>
+          </ul>
+        </section>
+
+        <!-- 03 -->
+        <section class="etapa" id="e3" data-etapa>
+          <div class="tag"><span class="e">ETAPA 03</span><span class="g">Preparar</span></div>
+          <h2>O seu jeito <em>de vender</em></h2>
+          <p>Responda uma vez. Tudo que você escolher aqui entra automaticamente nos pedidos das próximas etapas.</p>
+          <div class="preset">
+            <p><b>Não sabe por onde começar?</b><br>Use o meu método: 15 vídeos por dia, direto ao ponto, 3 benefícios e só cortes secos. Depois você ajusta.</p>
+            <button class="btn" type="button" id="usarRyan">Usar o estilo do Ryan</button>
+          </div>
+          <div class="bloco q" id="quiz"></div>
+          <div class="resumo" id="resumo"></div>
+          <ul class="checks"><li><label><input type="checkbox" data-c="e3a"><span>Respondi e conferi o resumo</span></label></li></ul>
+        </section>
+
+        <!-- 04 -->
+        <section class="etapa" id="e4" data-etapa>
+          <div class="tag"><span class="e">ETAPA 04</span><span class="g">Painel</span></div>
+          <h2>Crie seu painel</h2>
+          <p>Seu painel fica dentro da sua conta do Claude. Só você abre. Um copiar e colar e pronto.</p>
+          <div class="passos-aula"><div class="passo"><span class="pn">1</span><div class="pc"><p><b>Aperte Copiar</b>, vá na aba <b>Code</b> do Claude, clique na caixa de mensagem, cole (<b>Cmd + V</b> no Mac, <b>Ctrl + V</b> no Windows) e aperte <b>Enter</b>.</p><div class="prompt"><div class="hd"><span>Skill do painel + pedido</span><button type="button" data-copiar="pInstPainel">Copiar</button></div><pre id="pInstPainel"></pre></div></div></div><div class="passo"><span class="pn">2</span><div class="pc"><p><b>Clique em Permitir</b> quando o Claude pedir. Ele pergunta antes de criar arquivo e antes de criar a página.</p></div></div><div class="passo"><span class="pn">3</span><div class="pc"><p>O painel abre sozinho. Entre em <b>Meu perfil</b> e coloque seu nome, seu @, quanto quer vender no mês (ou use a sugestão) e quantos vídeos posta por dia. Escolha o estilo e a cor.</p></div></div><div class="passo"><span class="pn">4</span><div class="pc"><p><b>Salve o link</b> do painel nos favoritos do navegador.</p></div></div></div>
+          <p class="nota"><b>Quer abrir o painel outro dia?</b> Use o favorito, ou peça ao Claude: <i>"Abra meu painel"</i>.</p>
+          <ul class="checks"><li><label><input type="checkbox" data-c="e4a"><span>Meu painel abriu</span></label></li><li><label><input type="checkbox" data-c="e4b"><span>Preenchi Meu perfil</span></label></li><li><label><input type="checkbox" data-c="e4c"><span>Salvei o link nos favoritos</span></label></li></ul>
+        </section>
+
+        <!-- 05 -->
+        <section class="etapa" id="e5" data-etapa>
+          <div class="tag"><span class="e">ETAPA 05</span><span class="g">Painel</span></div>
+          <h2>Suba suas vendas</h2>
+          <p>O painel não puxa nada sozinho do TikTok. Uma vez por semana você baixa o arquivo de pedidos e solta no painel.</p>
+          <div class="passos-aula"><div class="passo"><span class="pn">1</span><div class="pc"><p>No computador, abra o <b>TikTok Shop</b>, entre na <b>Central de afiliados</b> e vá em <b>Pedidos</b>.</p></div></div><div class="passo"><span class="pn">2</span><div class="pc"><p>Escolha o período (até 90 dias) e clique em <b>Exportar</b>. O arquivo vai para a pasta Downloads.</p></div></div><div class="passo"><span class="pn">3</span><div class="pc"><p>No painel, abra <b>Importar</b> e solte o arquivo. Pode subir de novo quando quiser: pedido repetido não duplica.</p></div></div><div class="passo"><span class="pn">4</span><div class="pc"><p>Abra <b>Hoje</b>. Ali estão os <b>Principais</b> (o que mais te paga), o <b>Dê atenção</b> (produtos começando a vender: grave mais deles) e o <b>Esfriando</b>.</p></div></div><div class="passo"><span class="pn">5</span><div class="pc"><p>Clique em <b>Lançar no dia</b> para montar a lista de vídeos de hoje com horários.</p></div></div></div>
+          <p class="nota"><b>Recebeu amostra?</b> Tire um print (a tela da amostra no TikTok, a conversa com a loja ou a foto da caixa), mande no Claude e escreva: <i>"Cadastra essa amostra no meu painel"</i>. Ele lê o print, te mostra o que entendeu e cadastra depois do seu sim.</p>
+          <ul class="checks"><li><label><input type="checkbox" data-c="e5a"><span>Importei meu primeiro arquivo</span></label></li><li><label><input type="checkbox" data-c="e5b"><span>Lancei meu primeiro dia</span></label></li></ul>
+        </section>
+
+        <!-- 06 -->
+        <section class="etapa" id="e6" data-etapa>
+          <div class="tag"><span class="e">ETAPA 06</span><span class="g">Gravar</span></div>
+          <h2>Ensine o Claude a escrever seus roteiros</h2>
+          <p>Você ensina uma vez. Depois é só mandar o nome do produto. O texto já vai com as suas respostas da etapa 03.</p>
+          <div class="passos-aula"><div class="passo"><span class="pn">1</span><div class="pc"><p><b>Aperte Copiar</b>, vá na aba <b>Code</b> do Claude, clique na caixa de mensagem, cole (<b>Cmd + V</b> no Mac, <b>Ctrl + V</b> no Windows) e aperte <b>Enter</b>.</p><div class="prompt"><div class="hd"><span>Skill de roteiro + treino</span><button type="button" data-copiar="pInstRoteiro">Copiar</button></div><pre id="pInstRoteiro"></pre></div></div></div><div class="passo"><span class="pn">2</span><div class="pc"><p>O Claude vai pedir seus vídeos que venderam. <b>Cole o link</b> de 3 a 5 vídeos do seu TikTok. Não tem? Responda "não tenho" e ele segue.</p></div></div><div class="passo"><span class="pn">3</span><div class="pc"><p><b>No dia a dia</b>, mande só:</p><div class="prompt"><div class="hd"><span>Pedido do dia a dia</span><button type="button" data-copiar="pDiaRoteiro">Copiar</button></div><pre id="pDiaRoteiro"></pre></div></div></div></div>
+          
+          <ul class="checks"><li><label><input type="checkbox" data-c="e6a"><span>Treinei minha skill de roteiro</span></label></li><li><label><input type="checkbox" data-c="e6b"><span>Gravei um vídeo com roteiro do Claude</span></label></li></ul>
+        </section>
+
+        <!-- 07 -->
+        <section class="etapa" id="e7" data-etapa>
+          <div class="tag"><span class="e">ETAPA 07</span><span class="g">Gravar</span></div>
+          <h2>Copie a estrutura de um vídeo que vendeu</h2>
+          <p>Viu um vídeo bombando no seu nicho? O Claude separa a estrutura e escreve uma versão nova para o seu produto. Copiar a fala não vale; a estrutura sim. Precisa ter feito a etapa 06.</p>
+          <div class="passos-aula"><div class="passo"><span class="pn">1</span><div class="pc"><p>Cole o link do vídeo de referência e escreva o seu produto:</p><div><label class="lbl" for="ref">Vídeo de referência</label><textarea class="inp" id="ref" placeholder="https://www.tiktok.com/@... ou o texto que a pessoa fala"></textarea></div><div style="margin-top:10px"><label class="lbl" for="prod">Seu produto</label><input class="inp" id="prod" placeholder="ex.: garrafa térmica de 1 litro"></div></div></div><div class="passo"><span class="pn">2</span><div class="pc"><p><b>Aperte Copiar</b>, vá na aba <b>Code</b> do Claude, clique na caixa de mensagem, cole (<b>Cmd + V</b> no Mac, <b>Ctrl + V</b> no Windows) e aperte <b>Enter</b>.</p><div class="prompt"><div class="hd"><span>Pedido · modelar copy</span><button type="button" data-copiar="pModelar">Copiar</button></div><pre id="pModelar"></pre></div></div></div></div>
+          
+          <ul class="checks"><li><label><input type="checkbox" data-c="e7a"><span>Modelei a copy de um vídeo</span></label></li></ul>
+        </section>
+
+        <!-- 08 -->
+        <section class="etapa" id="e8" data-etapa>
+          <div class="tag"><span class="e">ETAPA 08</span><span class="g">Editar</span></div>
+          <h2>Deixe o Claude cortar seus vídeos</h2>
+          <p>O Claude tira os silêncios e os erros e entrega o vídeo pronto, em pé. Você só assiste e aprova.</p>
+          <div class="passos-aula"><div class="passo"><span class="pn">1</span><div class="pc"><p><b>Junte os brutos.</b> Crie uma pasta com a data (ex.: <i>Documentos/TikTok Shop/brutos/2026-11-20</i>) e coloque nela os vídeos do celular.</p></div></div><div class="passo"><span class="pn">2</span><div class="pc"><p><b>Abra essa pasta no Claude.</b> Na aba Code, clique no nome da pasta em cima da caixa de mensagem e escolha a pasta dos brutos.</p></div></div><div class="passo"><span class="pn">3</span><div class="pc"><p><b>Aperte Copiar</b>, vá na aba <b>Code</b> do Claude, clique na caixa de mensagem, cole (<b>Cmd + V</b> no Mac, <b>Ctrl + V</b> no Windows) e aperte <b>Enter</b>.</p><div class="prompt"><div class="hd"><span>Skill de edição + pedido</span><button type="button" data-copiar="pInstEditar">Copiar</button></div><pre id="pInstEditar"></pre></div></div></div><div class="passo"><span class="pn">4</span><div class="pc"><p><b>Assista o primeiro vídeo</b> e responda: "ficou bom", "corta mais seco" ou "ficou picotado". Ele faz o resto igual.</p></div></div><div class="passo"><span class="pn">5</span><div class="pc"><p><b>Nos próximos dias</b>, abra a pasta nova e mande só:</p><div class="prompt"><div class="hd"><span>Pedido do dia a dia</span><button type="button" data-copiar="pDiaEditar">Copiar</button></div><pre id="pDiaEditar"></pre></div></div></div></div>
+          <p class="nota"><b>Primeira vez:</b> o Claude vai pedir para instalar o <b>ffmpeg</b>, um programa gratuito de vídeo. Pode aceitar.</p>
+          <ul class="checks"><li><label><input type="checkbox" data-c="e8a"><span>Editei minha primeira pasta</span></label></li><li><label><input type="checkbox" data-c="e8b"><span>Aprovei o jeito da edição</span></label></li></ul>
+        </section>
+
+        <!-- 09 -->
+        <section class="etapa" id="e9" data-etapa>
+          <div class="tag"><span class="e">ETAPA 09</span><span class="g">Postar</span></div>
+          <h2>Agende seus vídeos</h2>
+          <p>O Claude sobe os vídeos no TikTok Studio, escreve a legenda e coloca o produto. Nada vai ao ar sem o seu sim.</p>
+          <div class="passos-aula"><div class="passo"><span class="pn">1</span><div class="pc"><p><b>Entre no TikTok Studio</b> pelo navegador. O login é sempre você quem faz.</p><div class="links"><a class="btn sec" href="https://www.tiktok.com/tiktokstudio" target="_blank" rel="noopener">Abrir o TikTok Studio</a></div></div></div><div class="passo"><span class="pn">2</span><div class="pc"><p><b>Aperte Copiar</b>, vá na aba <b>Code</b> do Claude, clique na caixa de mensagem, cole (<b>Cmd + V</b> no Mac, <b>Ctrl + V</b> no Windows) e aperte <b>Enter</b>.</p><div class="prompt"><div class="hd"><span>Skill de agendar + pedido</span><button type="button" data-copiar="pInstAgendar">Copiar</button></div><pre id="pInstAgendar"></pre></div></div></div><div class="passo"><span class="pn">3</span><div class="pc"><p><b>Confira a tabela</b> que o Claude mostrar (vídeo, produto, horário, legenda) e responda <i>"pode agendar"</i>.</p></div></div><div class="passo"><span class="pn">4</span><div class="pc"><p><b>Nos próximos dias</b>, mande só:</p><div class="prompt"><div class="hd"><span>Pedido do dia a dia</span><button type="button" data-copiar="pDiaAgendar">Copiar</button></div><pre id="pDiaAgendar"></pre></div></div></div></div>
+          <p class="nota"><b>Nunca</b> passe sua senha para o Claude. Se ele cair na tela de login, entre você mesmo e mande ele continuar.</p>
+          <ul class="checks"><li><label><input type="checkbox" data-c="e9a"><span>Agendei meus primeiros vídeos</span></label></li><li><label><input type="checkbox" data-c="e9b"><span>Conferi no painel quais horários vendem mais</span></label></li></ul>
+        </section>
+
+        </div>
+        <footer class="fim"><span class="assina">Ryan Alves</span><span>Dúvida em alguma etapa? Volte na aula dela.</span></footer>
+      </div>
+    </main>
+  </div>
+</div>
+<div class="veu" id="veu" hidden></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ====== CONFIGURAÇÃO DO GOOGLE FORMS ======
+   FORM_URL: link do formulário trocando "/viewform" por "/formResponse".
+   ENTRY_*: os códigos "entry.123456" de cada pergunta. Vazio = não salva (modo teste). */
+/* Skills completas do curso (o botão Copiar leva o texto inteiro) */
+var SKILLS = {"agendar-tiktok-shop": "---\nname: agendar-tiktok-shop\ndescription: Agenda os vídeos editados de TikTok Shop do aluno no TikTok Studio pelo navegador, com legenda, produto da vitrine e horário, sempre com aprovação do aluno antes. Use quando o aluno pedir para agendar, programar ou postar vídeos.\n---\n\n# Agendar vídeos de TikTok Shop\n\nO aluno é iniciante. Português simples. Nada vai ao ar sem o \"sim\" dele.\n\n## Antes de começar\n\n1. Use o navegador do Claude (ou o Claude no Chrome, se o aluno preferir).\n2. Abra https://www.tiktok.com/tiktokstudio\n3. Se aparecer a tela de login, PARE e diga: \"Entre na sua conta do TikTok nesta janela. Me avise quando terminar.\" **Nunca digite e-mail, senha ou código.**\n\n## Montar o plano (sempre antes de agendar)\n\n1. Liste os vídeos da pasta `editados` do dia.\n2. Para cada vídeo, proponha:\n   - **Horário**: espalhe entre 8h e 23h, com intervalo parecido (ou do jeito que o aluno pediu).\n   - **Legenda**: curta, começando pelo gancho do vídeo, 3 a 5 hashtags do nicho. Sem promessa proibida.\n   - **Produto**: o da vitrine que aparece no vídeo. Se não tiver certeza, pergunte.\n3. Se o aluno tem o painel (skill `painel-tiktok-shop`), olhe a tela Hoje: os produtos de \"Dê atenção\" e \"Principais\" ganham os melhores horários (12h e 19h a 21h).\n4. Mostre o plano numa tabela: vídeo | produto | dia | horário | legenda.\n5. Pergunte: \"Posso agendar assim?\" Só continue depois do sim.\n\n## Agendar\n\nPara cada vídeo, no TikTok Studio:\n1. Subir vídeo, escolher o arquivo.\n2. Colar a legenda.\n3. Adicionar link do produto (vitrine) e escolher o produto certo.\n4. Em \"Quando publicar\", escolher **Programar** com dia e hora. **Nunca clique em \"Publicar agora\".**\n5. Conferir na tela e clicar em Programar.\n6. Mover o arquivo para a pasta `agendados/AAAA-MM-DD` (o dia em que vai ao ar).\n\nSe algo travar (o TikTok mudou a tela, deu erro), pare, tire um print e explique ao aluno o que apareceu.\n\n## Depois\n\n- Se o aluno tem o painel: marque cada vídeo como `agendado` no dia certo (veja \"Marcar vídeos no painel\" na skill `painel-tiktok-shop`).\n- Diga no fim: quantos vídeos foram agendados e os horários.\n\n## Regras\n\n- Nunca publicar na hora. Só Programar.\n- Nunca digitar senha, código ou dado de pagamento.\n- Nunca apagar vídeo do TikTok.", "editar-tiktok-shop": "---\nname: editar-tiktok-shop\ndescription: Edita os vídeos brutos de TikTok Shop do aluno com cortes secos (tira silêncios, erros e repetições), em vertical. Use quando o aluno mandar uma pasta de vídeos para editar ou pedir para cortar vídeos.\n---\n\n# Editar vídeos de TikTok Shop\n\nO aluno é iniciante. Explique cada coisa antes de fazer. Português simples.\n\n## Antes da primeira edição\n\n1. Confira se o ffmpeg está instalado (`ffmpeg -version`).\n2. Se não estiver, diga: \"Preciso instalar um programa gratuito de vídeo chamado ffmpeg. Posso instalar?\" Só instale depois do sim.\n   - Mac: `brew install ffmpeg` (se não tiver o Homebrew, explique e peça permissão para instalar também).\n   - Windows: `winget install ffmpeg`.\n\n## Como editar\n\nEntrada: uma pasta com os vídeos brutos do dia (ex.: `TikTok Shop/brutos/2026-11-20`).\n\n1. Liste os vídeos da pasta com a duração de cada um.\n2. Para cada vídeo:\n   - Ache os silêncios com `silencedetect` (ruído abaixo de -35 dB por mais de 0,35 s).\n   - Corte SÓ entre frases, nunca no meio de uma palavra. Deixe 0,1 s de folga depois da última palavra.\n   - Tire falas repetidas e começos errados: quando a mesma frase aparece duas vezes, fique com a última.\n   - Comece direto no gancho: tire tudo antes da primeira frase.\n   - Saída: vertical 1080x1920, 30 fps, áudio original, sem música, sem efeito.\n3. Salve em uma pasta `editados` ao lado dos brutos, com o nome do produto e um número (ex.: `Garrafa 1.mp4`). Se não souber o produto, pergunte.\n4. **Edite só o primeiro vídeo e mostre ao aluno antes de fazer o resto.** Pergunte: \"Ficou bom? Quer o corte mais seco ou mais solto?\"\n5. Ajuste conforme a resposta e faça os outros.\n6. No fim, diga quantos vídeos ficaram prontos e onde estão.\n\n## O que o aluno pode pedir (ajuste e anote em \"Minhas preferências\")\n\n- \"Corta mais seco\" → silêncio mínimo menor (0,25 s) e folga 0,05 s.\n- \"Ficou picotado\" → silêncio mínimo maior (0,5 s) e folga 0,15 s.\n- \"Coloca legenda\" → legenda curta, até 3 palavras por vez, letra branca com sombra, longe do rosto e fora da parte de baixo da tela (onde fica o carrinho).\n- \"Coloca texto com os benefícios\" → 2 ou 3 textos curtos na tela, longe do rosto.\n\nQuando o aluno aprovar um jeito, escreva as preferências na seção abaixo (edite este arquivo) e use sempre.\n\n## Regras\n\n- Nunca apague os vídeos brutos.\n- Nunca poste nada: editar é só editar.\n- Se um vídeo estiver muito ruim (sem áudio, deitado), avise em vez de editar.\n\n## Minhas preferências\n\n(vazio: será preenchido quando o aluno aprovar a primeira edição)", "painel-tiktok-shop": "---\nname: painel-tiktok-shop\ndescription: Cria e mantém o painel de TikTok Shop do aluno como uma página privada do Claude (só ele abre). Use quando o aluno pedir para criar, abrir, atualizar ou consertar o painel, ou marcar vídeos no painel.\n---\n\n# Painel TikTok Shop\n\nO aluno é iniciante. Fale português simples, frases curtas, um passo por vez. Nunca use termo técnico sem explicar.\n\nModelo do painel (do curso do Ryan): https://claude.ai/artifact/88WqsUPtZDz6Bu49AZZjjj\n\n## Criar o painel (primeira vez)\n\n1. Crie o arquivo `painel.html` na pasta desta skill (`~/.claude/skills/painel-tiktok-shop/painel.html`) com exatamente estas 5 linhas:\n\n```html\n<meta charset=\"utf-8\">\n<title>Painel TikTok Shop<\/title>\n<link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css2?family=Allura&family=Montserrat:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,500;0,600;1,500&display=swap\">\n<link rel=\"stylesheet\" href=\"app.css\">\n<script src=\"app.js\" charset=\"utf-8\" defer><\/script>\n```\n\n2. Publique como página do Claude (ferramenta Artifact, publicar), copiando o código do modelo:\n   - `file_path`: o caminho completo desse `painel.html`\n   - `files`: `{\"app.js\": {\"artifact\": \"https://claude.ai/artifact/88WqsUPtZDz6Bu49AZZjjj\", \"path\": \"app.js\"}, \"app.css\": {\"artifact\": \"https://claude.ai/artifact/88WqsUPtZDz6Bu49AZZjjj\", \"path\": \"app.css\"}}`\n   - `capabilities`: `{\"db\": {}}`\n   - `icon`: `chart`\n   - `description`: `Meu painel de TikTok Shop`\n3. Abra a página para o aluno (`action: \"open\"`).\n4. Guarde o link do painel num arquivo `link-do-painel.txt` na pasta desta skill.\n5. Diga ao aluno, exatamente assim:\n   - \"Seu painel está pronto. Só você consegue abrir.\"\n   - \"Salve o link nos favoritos.\"\n   - \"Agora abra Meu perfil e coloque seu nome, seu @ e quanto quer vender no mês.\"\n   - \"Depois abra Importar e solte o arquivo de pedidos do TikTok Shop.\"\n\nSe der erro ao copiar do modelo, diga: \"Não consegui abrir o modelo do painel. Avise o Ryan.\" Não tente montar o painel de outro jeito.\nSe a ferramenta Artifact não existir, diga: \"Atualize o app do Claude e abra a aba Code de novo.\"\n\n## Abrir o painel de novo\n\nLeia `link-do-painel.txt` desta pasta e abra o link (`action: \"open\"`). Se o arquivo não existir, liste as páginas do aluno (`action: \"list\"`) e procure \"Painel TikTok Shop\".\n\n## Versão nova do painel\n\nQuando o aluno disser que saiu versão nova: publique de novo do mesmo jeito do passo 2, passando também `url` = o link guardado. O link continua o mesmo e os dados dele ficam.\n\n## Cadastrar amostra por print ou mensagem\n\nQuando o aluno mandar um print (tela de amostra do TikTok Shop, conversa com a loja, foto da caixa ou da etiqueta) ou escrever algo como \"recebi a amostra do X\":\n\n1. Leia o print e tire: **nome do produto** (do jeito que aparece no TikTok Shop), **data em que recebeu**, **prazo para postar** e **custo** (0 se foi grátis).\n2. O que não estiver no print: recebida = hoje, prazo = hoje + 7 dias, custo = 0. Não invente nome de produto: se não der para ler, pergunte.\n3. Mostre ao aluno, em 4 linhas curtas, e pergunte: \"Cadastro assim?\"\n   - Produto: ...\n   - Recebi em: dd/mm\n   - Postar até: dd/mm\n   - Custo: R$ ...\n4. Depois do sim, grave no banco da página (ferramenta ArtifactData, `url` = link do painel em `link-do-painel.txt`):\n   - Leia a coleção `config`, documento `amostras` (`get`). Se não existir, comece com `{ \"lista\": [] }`.\n   - Acrescente NO COMEÇO da lista:\n     ```json\n     { \"id\": 1732040000001, \"produto\": \"Nome do produto\", \"recebida_em\": \"2026-11-20\", \"prazo_postar\": \"2026-11-27\", \"custo\": 0, \"decisao\": \"testando\", \"obs\": \"cadastrada por print\" }\n     ```\n     (`id` = número grande e único, como a data em milissegundos; datas no formato AAAA-MM-DD)\n   - Grave com `set` no mesmo documento, passando o `if_version` lido (sem `if_version` se o documento não existia).\n5. Diga: \"Amostra cadastrada. Ela já entra nos testes do seu plano do dia.\" Se mandou vários prints, cadastre todos de uma vez e mostre a lista antes.\n\nPara mudar a decisão de uma amostra (\"o projetor vendeu, escala\"): mesmo documento, mude `decisao` para `testando`, `escalar`, `monitorar` ou `pausar`.\n\n## Marcar vídeos no painel (usado pela skill agendar-tiktok-shop)\n\nOs vídeos do dia ficam no banco da página (ferramenta ArtifactData), coleção `videos`, documento com a data (ex.: `2026-11-20`):\n\n```json\n{ \"lista\": [ { \"id\": 1732040000001, \"hora\": \"12:00\", \"produto\": \"Nome do produto\", \"bloco\": null, \"status\": \"agendado\" } ] }\n```\n\n- `status`: `rascunho` (a gravar), `agendado` ou `postado`.\n- Para marcar: leia o documento do dia (`get`), mude só o status do vídeo certo e grave com `set` usando o `if_version` lido.\n- Vídeo novo: acrescente na lista com `id` = número grande e único (a data em milissegundos).\n\n## O que cada tela faz (para explicar ao aluno)\n\n- **Hoje**: vendas de ontem, meta do mês, os produtos principais, os que estão começando a vender (\"Dê atenção\") e os que estão esfriando. \"Lançar no dia\" monta a lista de vídeos.\n- **Resultados**: vendas, comissão e pedidos do mês contra o mês anterior.\n- **Produtos**: produtos dos últimos 30 dias, com sinal e tendência.\n- **Vídeos**: agenda do dia e os vídeos que mais venderam.\n- **Amostras**: produtos recebidos para testar.\n- **Importar**: onde sobe o arquivo de pedidos.\n- **Meu perfil**: nome, @, meta, vídeos por dia, estilo (Clássico, Gráfico, Minimal) e cor.\n\n## Regras\n\n- Nunca mostre nem copie os números do aluno para fora do painel.\n- Nunca invente número.\n- Se o aluno pedir para apagar pedidos antigos, confirme antes quais meses vão sumir.", "roteiro-tiktok-shop": "---\nname: roteiro-tiktok-shop\ndescription: Escreve ganchos e roteiros de vídeo de TikTok Shop no jeito do aluno, e aprende esse jeito no primeiro uso. Use quando o aluno pedir roteiro, gancho, ideia de vídeo, ou quiser modelar a copy de um vídeo de referência.\n---\n\n# Roteiro TikTok Shop\n\nO aluno é iniciante. Português simples. Entregue pronto para ler na frente da câmera.\n\n## Primeiro uso: treinar\n\nSe a seção \"Meu jeito\" abaixo ainda estiver vazia, treine antes de escrever:\n\n1. Peça ao aluno 3 a 5 vídeos dele que venderam (link do TikTok ou o texto falado). Se ele não tiver, siga só com as respostas do passo 2.\n2. Pergunte, um de cada vez, com opções para ele escolher:\n   - Estilo: direto ao ponto / explicativo / review sincero / POV e rotina\n   - Duração: 15 s / 20 a 25 s / 30 s / 45 s\n   - Benefícios por vídeo: 2 / 3 / 4 / 5\n   - Gancho preferido: pergunta / dor do cliente / resultado primeiro / \"olha isso que eu achei\"\n   - Nicho\n3. Escreva o que aprendeu na seção \"Meu jeito\" deste arquivo (edite este SKILL.md): como ele começa, palavras que ele usa, ritmo, como chama pro carrinho.\n4. Diga: \"Pronto, aprendi seu jeito. Agora é só me mandar o produto.\"\n\nSe o aluno colar um texto do guia do curso com as escolhas dele, use essas respostas e pule as perguntas.\n\n## Escrever um roteiro\n\nEntrada: nome do produto (e, se tiver, link, preço, o que ele resolve).\n\nEntregue sempre:\n- **3 ganchos** diferentes, cada um com no máximo 2 segundos de fala.\n- **1 roteiro** completo, uma frase por linha.\n\nRegras do roteiro:\n- Tamanho: duração em segundos x 3 = número de palavras (30 s = cerca de 90 palavras).\n- Gancho no primeiro segundo, produto aparecendo logo.\n- Benefícios do jeito que o cliente fala, não da ficha técnica. Número de benefícios = o de \"Meu jeito\".\n- Responda a dúvida que trava a compra (\"vale o preço?\", \"funciona pra mim?\") mostrando, não com adjetivo.\n- Feche mandando para o carrinho laranja.\n- Proibido: promessa de cura ou resultado garantido, \"antes e depois\" de saúde, preço falso de antes, urgência inventada (\"só hoje\") se a loja não deu.\n- Não invente preço, desconto ou característica. O que não souber, deixe entre colchetes: [preço].\n\n## Modelar a copy de um vídeo\n\nQuando o aluno mandar um vídeo de referência (link ou texto) e o produto dele:\n1. Mostre a estrutura em tópicos: gancho, problema, demonstração, prova, chamada pro carrinho, com quantos segundos cada parte tem.\n2. Explique em 1 frase por que o gancho prende.\n3. Escreva um roteiro novo com a mesma estrutura, para o produto dele, no jeito dele.\n4. Nunca copie frases da referência. Só a estrutura.\n\n## Meu jeito\n\n(vazio: será preenchido no primeiro uso)"};
+var COMPLETO = {};
+var CONFIG = {
+  FORM_URL: "https://docs.google.com/forms/d/e/1FAIpQLScbcD9iGyX-IvZ8zMilsP5TF9newyiMsyFtGXFyYzL7q7uD3A/formResponse",
+  ENTRY_NOME: "entry.2005620554",
+  ENTRY_EMAIL: "entry.1045781291",
+  ENTRY_WHATS: "entry.1065046570",
+  ENTRY_TIKTOK: "entry.1166974658",
+  ENTRY_ACEITE: "entry.839337160",
+  ACEITE_TEXTO: "Aceitou receber avisos por e-mail e WhatsApp (guia do curso)"
+};
+
+(function(){
+  var $=function(s){return document.querySelector(s)}, $$=function(s){return [].slice.call(document.querySelectorAll(s))};
+  function ler(k,d){try{var v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}}
+  function gravar(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+  function toast(t){var e=$('#toast');e.textContent=t;e.classList.add('on');setTimeout(function(){e.classList.remove('on')},1700)}
+
+  /* ---------- Cadastro ---------- */
+  var KA='ttk-guia-acesso';
+  function abrirGuia(){ $('#gate').hidden=true; $('#guia').hidden=false; window.scrollTo(0,0); iniciar(); }
+  $('#cadastro').addEventListener('submit',function(ev){
+    ev.preventDefault();
+    var erro=$('#erro'), btn=$('#enviar');
+    var nome=$('#nome').value.trim(), email=$('#email').value.trim(), whats=$('#whats').value.trim(), tiktok=$('#tiktok').value.trim(), dig=whats.replace(/\D/g,'');
+    if(nome.length<2){erro.textContent='Coloque seu nome.';return}
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)){erro.textContent='Confira o e-mail: falta o @ ou o final (ex.: .com).';return}
+    if(dig.length<10||dig.length>13){erro.textContent='Coloque o WhatsApp com DDD (ex.: 27912345678).';return}
+    if(tiktok.replace('@','').length<2){erro.textContent='Coloque seu @ do TikTok.';return}
+    if(!$('#aceite').checked){erro.textContent='Marque a caixinha de avisos para liberar o guia.';return}
+    if(tiktok.charAt(0)!=='@') tiktok='@'+tiktok;
+    erro.textContent=''; btn.disabled=true; btn.textContent='Liberando...';
+    function fim(){ gravar(KA,{em:new Date().toISOString(),tiktok:tiktok}); abrirGuia(); }
+    if(!CONFIG.FORM_URL){ console.warn('Google Forms não configurado: cadastro não foi salvo.'); fim(); return; }
+    var d=new URLSearchParams();
+    d.append(CONFIG.ENTRY_NOME,nome); d.append(CONFIG.ENTRY_EMAIL,email); d.append(CONFIG.ENTRY_WHATS,dig); d.append(CONFIG.ENTRY_TIKTOK,tiktok);
+    if(CONFIG.ENTRY_ACEITE) d.append(CONFIG.ENTRY_ACEITE,CONFIG.ACEITE_TEXTO);
+    fetch(CONFIG.FORM_URL,{method:'POST',mode:'no-cors',body:d}).then(fim).catch(function(){
+      btn.disabled=false; btn.textContent='Liberar meu guia'; erro.textContent='Não consegui enviar. Confira sua internet e tente de novo.';
+    });
+  });
+  $('#sair').addEventListener('click',function(){ try{localStorage.removeItem(KA)}catch(e){} location.reload(); });
+
+  /* ---------- Questionário ---------- */
+  var KP='ttk-guia-perfil', KC='ttk-guia-checks';
+  var Q=[
+    {k:'nicho',t:'Seu nicho principal',multi:true,ops:['Tech e eletrônicos','Casa e cozinha','Beleza e cuidados','Moda','Fitness e saúde','Achadinhos variados']},
+    {k:'videos',t:'Quantos vídeos você posta por dia',s:'Conte o que você aguenta gravar de verdade, toda semana.',ops:['3','5','8','10','15']},
+    {k:'estilo',t:'Como você gosta dos seus vídeos',ops:['Direto ao ponto','Explicativo, com calma','Review sincero','POV e rotina']},
+    {k:'duracao',t:'Duração do vídeo',ops:['15 s','20 a 25 s','30 s','45 s']},
+    {k:'beneficios',t:'Quantos benefícios por vídeo',s:'Menos benefícios deixa o vídeo mais curto e mais claro.',ops:['2','3','4','5']},
+    {k:'gancho',t:'Gancho que mais combina com você',ops:['Pergunta','Dor do cliente','Resultado primeiro','Achado / "olha isso"']},
+    {k:'edicao',t:'Como quer a edição',ops:['Só cortes secos','Cortes + legenda','Cortes + texto na tela']},
+    {k:'horario',t:'Quando postar',ops:['Espalhado das 8h às 23h','Picos: almoço e noite','Só à noite']}
+  ];
+  var RYAN={nicho:['Tech e eletrônicos','Achadinhos variados'],videos:'15',estilo:'Direto ao ponto',duracao:'20 a 25 s',beneficios:'3',gancho:'Pergunta',edicao:'Só cortes secos',horario:'Espalhado das 8h às 23h',ryan:true};
+  var perfil=ler(KP,{nicho:[]}); if(!Array.isArray(perfil.nicho)) perfil.nicho=[];
+  var checks=ler(KC,{});
+
+  function montarQuiz(){
+    var box=$('#quiz'); box.innerHTML='';
+    Q.forEach(function(q){
+      var it=document.createElement('div'); it.className='item';
+      var l=document.createElement('div'); l.className='lbl'; l.textContent=q.t+(q.multi?' (pode marcar mais de um)':'');
+      if(q.s){var sm=document.createElement('small');sm.textContent=q.s;l.appendChild(sm)}
+      var ch=document.createElement('div'); ch.className='chips';
+      q.ops.forEach(function(o){
+        var b=document.createElement('button'); b.type='button'; b.className='chip'; b.textContent=q.k==='videos'?o+' por dia':o;
+        var on=q.multi?perfil[q.k].indexOf(o)>-1:perfil[q.k]===o; b.setAttribute('aria-pressed',on?'true':'false');
+        b.addEventListener('click',function(){
+          if(q.multi){var a=perfil[q.k],i=a.indexOf(o); if(i>-1)a.splice(i,1); else a.push(o);} else perfil[q.k]=o;
+          perfil.ryan=false; gravar(KP,perfil); montarQuiz(); atualizarPedidos();
+        });
+        ch.appendChild(b);
+      });
+      it.appendChild(l); it.appendChild(ch); box.appendChild(it);
+    });
+  }
+  $('#usarRyan').addEventListener('click',function(){ perfil=JSON.parse(JSON.stringify(RYAN)); gravar(KP,perfil); montarQuiz(); atualizarPedidos(); toast('Estilo do Ryan aplicado'); });
+
+  /* ---------- Pedidos personalizados ---------- */
+  function v(k,pad){var x=perfil[k]; if(Array.isArray(x)) return x.length?x.join(' e ').toLowerCase():pad; return x||pad}
+  function segs(){var d=v('duracao','20 a 25 s'); var m=d.match(/\d+/g); return m?Math.round(m.reduce(function(a,b){return a+ +b},0)/m.length):22}
+  function palavras(){return Math.round(segs()*3.25)}
+  function nVideos(){return parseInt(v('videos','5'),10)}
+  function horarios(){
+    var h=v('horario','Espalhado das 8h às 23h');
+    if(h.indexOf('Picos')===0) return 'concentrados nos picos: entre 11h e 13h e entre 18h e 22h';
+    if(h.indexOf('noite')>-1) return 'à noite, entre 18h e 23h, com pelo menos 30 minutos entre um e outro';
+    return 'espalhados das 8h às 23h, com intervalo parecido entre eles';
+  }
+  function divisao(){
+    var n=nVideos(); if(n<8) return 'Escolha os produtos que mais venderam nos últimos 30 dias pelo meu painel e deixe 1 vídeo por dia para testar produto novo.';
+    var a=Math.round(n*.4), b=Math.round(n*.4), c=n-a-b;
+    return 'Divida assim: '+a+' vídeos dos meus 3 produtos principais (os que mais deram comissão no painel), '+b+' de produtos que já venderam mas ainda não são campeões, e '+c+' de testes (produto novo ou ângulo novo).';
+  }
+  function edicaoTxt(){
+    var e=v('edicao','Só cortes secos');
+    var base='tira silêncios, respiros e erros cortando só entre as frases, nunca no meio da fala, e começa direto no gancho. Mantém vertical 1080x1920 e o áudio original';
+    if(e.indexOf('legenda')>-1) return base+'. Coloca legenda curta, no máximo 3 palavras por vez, fonte limpa, longe do rosto e fora da área do botão do carrinho.';
+    if(e.indexOf('texto')>-1) return base+'. Coloca 2 ou 3 textos curtos na tela com os benefícios principais, longe do rosto e fora da área do botão do carrinho.';
+    return base+'. Só cortes secos: sem efeito, sem legenda, sem música.';
+  }
+
+  function atualizarPedidos(){
+    var ok=!!perfil.estilo&&!!perfil.videos;
+    $('#resumo').innerHTML='';
+    var r=document.createElement('div');
+    if(!ok){ r.textContent='Escolha pelo menos o número de vídeos e o estilo para personalizar os pedidos.'; }
+    else{
+      r.innerHTML='<b>Seu resumo:</b> ';
+      r.appendChild(document.createTextNode((perfil.ryan?'estilo do Ryan · ':'')+nVideos()+' vídeos por dia · '+v('estilo','').toLowerCase()+' · '+v('duracao','20 a 25 s')+' (cerca de '+palavras()+' palavras) · '+v('beneficios','3')+' benefícios · gancho '+v('gancho','pergunta').toLowerCase()+' · '+v('edicao','só cortes secos').toLowerCase()+'.'));
+    }
+    $('#resumo').appendChild(r);
+
+    var nicho=v('nicho','achadinhos variados'), estilo=v('estilo','direto ao ponto'), gancho=v('gancho','pergunta');
+    // Texto de colar: instala a skill (texto inteiro) e já faz o pedido
+    function colar(id, nome, pedido){
+      var completo='Instale esta skill do curso do Ryan e depois faça o meu pedido.\n\n'+
+        '1. Crie a pasta ~/.claude/skills/'+nome+'/ (se ainda não existir).\n'+
+        '2. Dentro dela, crie o arquivo SKILL.md com TUDO o que está entre ===COMEÇO DA SKILL=== e ===FIM DA SKILL===, sem mudar nada. Se o arquivo já existir, troque pelo texto novo.\n'+
+        '3. Depois de salvar, use a skill '+nome+' para o meu pedido:\n\n'+pedido+'\n\n'+
+        '===COMEÇO DA SKILL===\n'+SKILLS[nome]+'\n===FIM DA SKILL===';
+      COMPLETO[id]=completo;
+      var linhas=SKILLS[nome].split('\n').length, pre=$('#'+id);
+      pre.textContent='Instale esta skill do curso do Ryan e depois faça o meu pedido:\n\n'+pedido+'\n';
+      var m=document.createElement('span'); m.className='mais'; m.textContent='+ a skill completa ('+linhas+' linhas) vai junto quando você aperta Copiar.'; pre.appendChild(m);
+    }
+    colar('pInstPainel','painel-tiktok-shop','Crie o meu painel de TikTok Shop.');
+    colar('pInstRoteiro','roteiro-tiktok-shop',
+'Faça o treino com o meu jeito:\n'+
+'- Nicho: '+nicho+'\n'+
+'- Estilo: '+estilo+'\n'+
+'- Duração: '+v('duracao','20 a 25 s')+' (cerca de '+palavras()+' palavras)\n'+
+'- Benefícios por vídeo: '+v('beneficios','3')+'\n'+
+'- Gancho preferido: '+gancho+'\n'+
+'Depois me peça os links dos meus vídeos que venderam.');
+    $('#pDiaRoteiro').textContent='Roteiro para [nome do produto]';
+    var ref=$('#ref').value.trim()||'[cole o link ou o texto do vídeo de referência]';
+    var prod=$('#prod').value.trim()||'[seu produto]';
+    $('#pModelar').textContent='Use a skill roteiro-tiktok-shop e modele a copy deste vídeo para o meu produto.\n\nVídeo de referência:\n'+ref+'\n\nMeu produto: '+prod;
+    colar('pInstEditar','editar-tiktok-shop','Edite os vídeos desta pasta.\nComo eu gosto: '+edicaoTxt()+'\nMe mostre o primeiro antes de fazer o resto.');
+    $('#pDiaEditar').textContent='Edite os vídeos desta pasta.';
+    colar('pInstAgendar','agendar-tiktok-shop','Agende os vídeos da pasta "editados": '+nVideos()+' por dia, '+horarios()+'.\n'+divisao()+'\nLegenda curta com o gancho e hashtags do meu nicho ('+nicho+'). Me mostre a tabela antes de agendar.');
+    $('#pDiaAgendar').textContent='Agende os vídeos editados de hoje.';
+
+    $$('.pers').forEach(function(e){e.remove()});
+    if(!ok){ ['pInstRoteiro','pModelar','pInstEditar','pInstAgendar'].map(function(id){return $('#'+id).closest('.prompt').querySelector('.hd span')}).forEach(function(s){var p=document.createElement('span');p.className='pers nao';p.textContent=' · responda a etapa 03';s.appendChild(p)}); }
+  }
+  $('#ref').addEventListener('input',atualizarPedidos);
+  $('#prod').addEventListener('input',atualizarPedidos);
+
+  /* ---------- Copiar ---------- */
+  $$('[data-copiar]').forEach(function(b){
+    b.addEventListener('click',function(){
+      var id=b.getAttribute('data-copiar'), el=document.getElementById(id), txt=COMPLETO[id]||el.textContent;
+      function ok(){b.textContent='Copiado';b.classList.add('ok');setTimeout(function(){b.textContent='Copiar';b.classList.remove('ok')},2000)}
+      function alt(){ var t=document.createElement('textarea'); t.value=txt; t.style.position='fixed'; t.style.opacity='0'; document.body.appendChild(t); t.select();
+        var deu=false; try{deu=document.execCommand('copy')}catch(e){} document.body.removeChild(t); if(deu) ok(); else toast('Não consegui copiar. Tente de novo.'); }
+      try{navigator.clipboard.writeText(txt).then(ok,alt)}catch(e){alt()}
+    });
+  });
+
+  /* ---------- Progresso ---------- */
+  function progresso(){
+    var bx=$$('[data-c]'), feitos=0;
+    bx.forEach(function(b){ if(b.checked) feitos++; });
+    var p=bx.length?Math.round(feitos/bx.length*100):0;
+    $('#pct').textContent=p+'%'; $('#pctTop').textContent=p+'%';
+    $('#cnt').textContent=feitos+' de '+bx.length+' marcados';
+    $('#ringfg').setAttribute('stroke-dashoffset',(125.66*(1-p/100)).toFixed(2));
+    $$('[data-etapa]').forEach(function(s){
+      var c=s.querySelectorAll('[data-c]'), todos=c.length>0;
+      [].forEach.call(c,function(i){if(!i.checked)todos=false});
+      var a=document.querySelector('.nav a[href="#'+s.id+'"]'); if(a) a.classList.toggle('feito',todos);
+      s.classList.toggle('feita',todos); s.dataset.feita=todos?'1':'';
+    });
+    var agora=proxima(), etapas=$$('[data-etapa]');
+    etapas.forEach(function(s){ var st=s.querySelector('.cab-etapa .st'); if(!st) return;
+      var f=s.dataset.feita==='1'; st.className='st'+(f?' feito':(s===agora?' agora':''));
+      st.textContent=f?'Feito':(s===agora?'Agora':'Depois'); });
+    var cp=$('#cntPainel'); if(cp) cp.textContent=etapas.filter(function(s){return s.dataset.feita==='1'}).length+' de '+etapas.length+' feitas';
+  }
+  function proxima(){ var l=$$('[data-etapa]'); for(var i=0;i<l.length;i++) if(l[i].dataset.feita!=='1') return l[i]; return l[l.length-1]; }
+  function abrirEtapa(s,sim,rolar){ if(!s) return; s.classList.toggle('aberta',sim); var b=s.querySelector('.cab-etapa'); if(b) b.setAttribute('aria-expanded',sim?'true':'false');
+    if(sim&&rolar) setTimeout(function(){ s.scrollIntoView({behavior:'smooth',block:'start'}); },30); }
+  function montarAcordeao(){
+    $$('[data-etapa]').forEach(function(s,i){
+      if(s.querySelector('.cab-etapa')) return;
+      var tag=s.querySelector('.tag'), h2=s.querySelector('h2'), grupo=tag?tag.querySelector('.g').textContent:'';
+      var corpo=document.createElement('div'); corpo.className='corpo'; corpo.id='corpo-'+s.id;
+      while(h2.nextSibling) corpo.appendChild(h2.nextSibling);
+      var b=document.createElement('button'); b.type='button'; b.className='cab-etapa'; b.setAttribute('aria-expanded','false'); b.setAttribute('aria-controls',corpo.id);
+      b.innerHTML='<span class="num">'+(i<9?'0':'')+(i+1)+'</span><span class="tit"><small></small></span><span class="st"></span><span class="seta" aria-hidden="true">›</span>';
+      b.querySelector('.tit small').textContent=grupo; b.querySelector('.tit').insertAdjacentHTML('beforeend',h2.innerHTML);
+      if(tag) tag.remove(); h2.remove(); s.appendChild(b); s.appendChild(corpo);
+      b.addEventListener('click',function(){ abrirEtapa(s,!s.classList.contains('aberta'),false); });
+    });
+  }
+  document.addEventListener('click',function(e){
+    var c=e.target.closest('[data-continuar]'); if(c){ e.preventDefault(); fecharMenu(); abrirEtapa(proxima(),true,true); return; }
+    var a=e.target.closest('a[href^="#e"]'); if(a){ var s=document.getElementById(a.getAttribute('href').slice(1)); if(s&&s.hasAttribute('data-etapa')){ e.preventDefault(); fecharMenu(); abrirEtapa(s,true,true); try{history.replaceState(null,'','#'+s.id)}catch(_){} } }
+  });
+  $$('[data-c]').forEach(function(b){
+    b.checked=!!checks[b.getAttribute('data-c')];
+    b.addEventListener('change',function(){ checks[b.getAttribute('data-c')]=b.checked; gravar(KC,checks); progresso(); });
+  });
+
+  /* ---------- Menu: etapa atual e gaveta ---------- */
+  function marcarAtual(){
+    var atual=null;
+    $$('[data-etapa]').forEach(function(s){ if(s.getBoundingClientRect().top<160) atual=s.id; });
+    $$('.nav a').forEach(function(a){ a.classList.toggle('on',a.getAttribute('href')==='#'+atual); });
+  }
+  function fecharMenu(){ $('#side').classList.remove('aberto'); $('#veu').hidden=true; }
+  $('#abrirMenu').addEventListener('click',function(){ $('#side').classList.add('aberto'); $('#veu').hidden=false; });
+  $('#veu').addEventListener('click',fecharMenu);
+  $$('.nav a').forEach(function(a){ a.addEventListener('click',fecharMenu); });
+
+  var iniciado=false;
+  function iniciar(){
+    if(iniciado) return; iniciado=true;
+    montarAcordeao(); montarQuiz(); atualizarPedidos(); progresso(); marcarAtual();
+    addEventListener('scroll',marcarAtual,{passive:true});
+    var alvo=location.hash?document.getElementById(location.hash.slice(1)):null;
+    if(alvo&&alvo.hasAttribute('data-etapa')) abrirEtapa(alvo,true,true); else abrirEtapa(proxima(),true,false);
+  }
+  if(ler(KA,null)) abrirGuia();
+})();
+</script>
+</body>
+</html>
