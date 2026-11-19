@@ -1178,11 +1178,11 @@ function ttkLigar(el, { per, hoje }) {
   $("#ttk-novo-video", el).onclick = () => ttkFormVideo(el, null, dia);
 }
 
-function ttkFormVideo(el, v, dia) {
+function ttkFormVideo(el, v, dia, pre) {
   const nomes = [...new Set(ttkX.pedidos.slice(-2000).filter(ttkValido).map((p) => p.produto).filter(Boolean))].slice(0, 80);
   abrirForm({
     titulo: v ? "Editar vídeo" : "Novo vídeo",
-    valores: v ? { ...v, hora: v.hora ? String(v.hora).slice(0, 5) : "" } : { data: dia, status: "rascunho" },
+    valores: v ? { ...v, hora: v.hora ? String(v.hora).slice(0, 5) : "" } : { data: dia, status: "rascunho", ...(pre || {}) },
     campos: [
       { n: "produto", r: "Produto", req: true, inteiro: true, lista: nomes, ph: "Comece a digitar ou escolha um que já vende" },
       { n: "data", r: "Dia", t: "date", req: true },

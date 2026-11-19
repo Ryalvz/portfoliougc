@@ -33,6 +33,48 @@ function ttkPlanoDoDia() {
   return { principais, comVendas, testes: testes.slice(0, 3) };
 }
 
+// Horários pras vagas que faltam: de 30 em 30 min entre 8h e 23h, longe dos já agendados e (hoje) depois de agora
+function ttkHorariosLivres(vids, qtd, dia) {
+  if (qtd <= 0) return [];
+  const paraMin = (h) => { const [a, b] = String(h).split(":").map(Number); return a * 60 + (b || 0); };
+  const fmt = (t) => `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
+  const ocup = vids.filter((v) => v.hora).map((v) => paraMin(v.hora));
+  const agora = new Date(), desde = dia === hojeISO() ? agora.getHours() * 60 + agora.getMinutes() + 20 : 0;
+  const grade = (passo) => { const g = []; for (let t = 8 * 60; t <= 23 * 60; t += passo) g.push(t); return g.filter((t) => t >= desde && ocup.every((o) => Math.abs(o - t) >= Math.min(25, passo))); };
+  let livres = grade(30);
+  if (livres.length < qtd) livres = grade(15);
+  const out = [];
+  if (livres.length <= qtd) livres.forEach((t) => out.push(fmt(t)));
+  else for (let k = 0; k < qtd; k++) out.push(fmt(livres[Math.floor((k * livres.length) / qtd)]));
+  while (out.length < qtd) out.push(""); // o dia acabou: fica sem horário
+  return out;
+}
+// Produtos pras vagas: segue o plano dos 15 (principais 2 vezes, com vendas, testes), sem repetir o que já está agendado
+function ttkSugestoesDoDia(plano, vids, qtd) {
+  if (qtd <= 0) return [];
+  const chave = (t) => semAcento(String(t || "")).toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim().slice(0, 22);
+  const usados = new Map();
+  vids.forEach((v) => { const k = chave(v.produto); usados.set(k, (usados.get(k) || 0) + 1); });
+  const ja = (nome) => { const k = chave(nome); for (const [u, n] of usados) if (n > 0 && (u.includes(k) || k.includes(u))) { usados.set(u, n - 1); return true; } return false; };
+  const filas = {
+    // Primeiro um vídeo de cada principal; o 2º de cada um vai pro fim do dia
+    principal: [0, 1].flatMap((n) => plano.principais.map((x) => ({ nome: x.nome, bloco: "principal", de: n ? "2º vídeo do dia" : x.id === TTK_TOP_ANTONELLA ? "principal, todo dia" : `principal · ${x.dias.size} dias com venda` }))),
+    com_vendas: plano.comVendas.map((x) => ({ nome: x.nome, bloco: "com_vendas", de: `${real(x.g)} em 30 dias` })),
+    teste: plano.testes.map((x) => ({ nome: x.nome, bloco: "teste", de: x.de || "teste" }))
+  };
+  Object.keys(filas).forEach((k) => { filas[k] = filas[k].filter((x) => x.nome && !ja(x.nome)); });
+  const ordem = ["principal", "com_vendas", "principal", "com_vendas", "teste"], out = [];
+  let i = 0, vazias = 0;
+  while (out.length < qtd && vazias < ordem.length) {
+    const f = filas[ordem[i % ordem.length]]; i++;
+    if (f.length) { out.push(f.shift()); vazias = 0; } else vazias++;
+  }
+  // A meta é maior que o plano: repete quem mais vende
+  const extra = [...plano.comVendas, ...plano.principais].filter((x) => x.nome);
+  let j = 0; while (out.length < qtd && extra.length) { const x = extra[j++ % extra.length]; out.push({ nome: x.nome, bloco: "com_vendas", de: "mais um de quem vende" }); }
+  return out;
+}
+
 function ttkTelaHoje(el) {
   if (typeof ttkSug !== "undefined" && !ttkSug.status) { el.innerHTML = `<p class="vazio">Abrindo o seu dia...</p>`; ttkSugCarregar().then(() => desenharTikTok(el)); return; }
   const hoje = hojeISO(), ontem = ttkSomaDias(hoje, -1);
@@ -58,6 +100,13 @@ function ttkTelaHoje(el) {
   const noAr = vids.filter((v) => v.status !== "rascunho").length;
   const porBloco = (b) => vids.filter((v) => v.bloco === b).length;
   const plano = ttkPlanoDoDia();
+  const postados = vids.filter((v) => v.status === "postado").length, agendados = vids.filter((v) => v.status === "agendado").length, rascunhos = vids.filter((v) => v.status === "rascunho").length;
+  // Vagas: o que falta pra meta vira sugestão com horário e produto
+  const faltamVagas = Math.max(0, metaV - vids.length);
+  const sugs = ttkSugestoesDoDia(plano, vids, faltamVagas), horas = ttkHorariosLivres(vids, sugs.length, hoje);
+  const vagas = sugs.map((sg, i) => ({ s: sg, hora: horas[i], i }));
+  ttkX.vagasHoje = vagas;
+  const linhas = [...vids.map((v) => ({ v, h: v.hora ? String(v.hora).slice(0, 5) : "99" })), ...vagas.map((x) => ({ ...x, h: x.hora || "99" }))].sort((a, b) => a.h.localeCompare(b.h));
   // Amostras com prazo
   const amostras = (ttkX.amostras || []).filter((a) => a.decisao === "testando").sort((a, b) => String(a.prazo_postar || "9").localeCompare(String(b.prazo_postar || "9")));
   const liqDesde = (a) => (a.grupo_id ? ttkX.todos.filter((p) => p.grupo === a.grupo_id && p.cat === "liq" && (!a.recebida_em || p.dia >= a.recebida_em)).reduce((s, p) => s + p.liq, 0) : 0);
@@ -90,24 +139,36 @@ function ttkTelaHoje(el) {
       </section>
     </div>
 
-    <section class="ini-card ttk-bloco">
-      <div class="ini-card-topo"><h2>Vídeos de hoje</h2><span class="sub">${noAr} de ${metaV} agendados ou postados</span><span class="espaco"></span>
-        <button class="link-btn" type="button" id="ttk-meta-videos">mudar a meta</button><button class="btn pequeno" type="button" id="ttk-novo-video">${ic("mais")}Adicionar</button></div>
-      <div class="ttk-meta-barra" style="margin:0 0 12px"><i style="width:${Math.min(100, Math.round(noAr / metaV * 100))}%"></i></div>
+    <section class="ini-card ttk-bloco ttk-md">
+      <div class="ttk-md-topo">
+        <div><span class="ttk-md-rot">Meta de hoje</span><strong class="ttk-md-num">${noAr} <span>de ${metaV} vídeos</span></strong></div>
+        <span class="ttk-md-falta">${noAr >= metaV ? "meta batida" : `faltam <b>${metaV - noAr}</b>`}</span>
+        <span class="espaco"></span>
+        <button class="link-btn" type="button" id="ttk-meta-videos">mudar a meta</button><button class="btn pequeno" type="button" id="ttk-novo-video">${ic("mais")}Adicionar</button>
+      </div>
+      <div class="ttk-md-barra"><i style="width:${Math.min(100, Math.round((noAr / metaV) * 100))}%"></i></div>
+      <p class="ttk-md-dica">${postados} ${postados === 1 ? "postado" : "postados"}, ${agendados} ${agendados === 1 ? "agendado" : "agendados"}${rascunhos ? `, ${rascunhos} em rascunho` : ""}.${vagas.length ? ` As ${vagas.length} vagas que faltam já têm horário e produto sugeridos, tirados do plano dos 15: toque em Agendar.` : " Todas as vagas da meta estão preenchidas."}</p>
+      <ol class="ttk-agenda">${linhas.map((x) => x.v ? `<li class="ttk-ag ttk-ag-${x.v.status}">
+          <span class="ttk-ag-hora">${x.v.hora ? String(x.v.hora).slice(0, 5) : "--:--"}</span>
+          <span class="ttk-ag-txt"><b>${esc(x.v.produto)}</b>${x.v.bloco ? ` <span class="ttk-bloco-chip ttk-b-${x.v.bloco}">${esc((TTK_BLOCOS.find(([k]) => k === x.v.bloco) || [0, x.v.bloco])[1])}</span>` : ""}
+            ${x.v.legenda ? `<small>${esc(String(x.v.legenda).slice(0, 140))}</small>` : `<small class="ttk-sem-leg">sem legenda</small>`}</span>
+          ${x.v.legenda ? `<button class="btn pequeno" type="button" data-ttk-copiar="${x.v.id}">Copiar legenda</button>` : "<span></span>"}
+          <button class="pilula ttk-st-${x.v.status}" type="button" data-ttk-status="${x.v.id}" title="Toque pra mudar o status">${esc((TTK_STATUS_VIDEO.find(([k]) => k === x.v.status) || [0, x.v.status])[1])}</button>
+          <button class="icone-btn" type="button" data-ttk-video="${x.v.id}" aria-label="Editar">${ic("editar")}</button></li>`
+        : `<li class="ttk-ag ttk-ag-sug">
+          <span class="ttk-ag-hora">${x.hora || "--:--"}</span>
+          <span class="ttk-ag-txt"><b>${esc(String(x.s.nome).slice(0, 70))}</b> <span class="ttk-bloco-chip ttk-b-${x.s.bloco}">${esc((TTK_BLOCOS.find(([k]) => k === x.s.bloco) || [0, x.s.bloco])[1])}</span><small>${esc(x.s.de || "")}${x.hora ? "" : " · o dia já está no fim"}</small></span>
+          <span></span>
+          <span class="pilula ttk-st-sugestao">sugestão</span>
+          <button class="btn pequeno" type="button" data-ttk-agendar="${x.i}">Agendar</button></li>`).join("") || `<li class="sub">Defina a meta de vídeos pra montar o dia.</li>`}</ol>
+      <details class="ttk-md-plano"><summary>Ver o plano dos 15 (principais, com vendas e testes)</summary>
       <div class="ttk-plano">
         ${[["principal", "Principais", 6, plano.principais.map((x) => ({ nome: x.nome, de: x.id === TTK_TOP_ANTONELLA ? "sempre, 2 vídeos" : `2 vídeos · ${x.dias.size} dias com venda` }))],
            ["com_vendas", "Com vendas", 6, plano.comVendas.map((x) => ({ nome: x.nome, de: `${real(x.g)} em 30 dias` }))],
            ["teste", "Testes", 3, plano.testes]].map(([k, n, alvo, itens]) => { const f = porBloco(k); return `<div class="ttk-plano-col">
           <div class="ttk-plano-topo"><b>${n}</b><span class="ini-selo ${f >= alvo ? "sobe" : ""}">${f} de ${alvo}</span></div>
           <ol>${itens.map((x) => `<li><span>${esc(String(x.nome || "").slice(0, 60))}</span><small>${esc(x.de || "")}</small></li>`).join("") || `<li class="sub">Nada aqui ainda.</li>`}</ol></div>`; }).join("")}
-      </div>
-      <ul class="ttk-hoje-vids">${vids.map((v) => `<li>
-          <span class="ttk-hora">${v.hora ? String(v.hora).slice(0, 5) : "--:--"}</span>
-          <span class="ttk-hoje-vtexto"><b>${esc(v.produto)}</b>${v.bloco ? ` <span class="ttk-bloco-chip ttk-b-${v.bloco}">${esc((TTK_BLOCOS.find(([k]) => k === v.bloco) || [0, v.bloco])[1])}</span>` : ""}
-            ${v.legenda ? `<small>${esc(String(v.legenda).slice(0, 160))}</small>` : `<small class="ttk-sem-leg">sem legenda</small>`}</span>
-          ${v.legenda ? `<button class="btn pequeno" type="button" data-ttk-copiar="${v.id}">Copiar legenda</button>` : "<span></span>"}
-          <button class="pilula ttk-st-${v.status}" type="button" data-ttk-status="${v.id}" title="Toque pra mudar o status">${esc((TTK_STATUS_VIDEO.find(([k]) => k === v.status) || [0, v.status])[1])}</button>
-          <button class="icone-btn" type="button" data-ttk-video="${v.id}" aria-label="Editar">${ic("editar")}</button></li>`).join("") || `<li class="sub">Nenhum vídeo agendado pra hoje ainda. Quando o Claude agendar, eles aparecem aqui com a legenda.</li>`}</ul>
+      </div></details>
     </section>
 
     <div class="grade-2 ttk-grade2">
@@ -123,6 +184,10 @@ function ttkTelaHoje(el) {
       </section>
     </div>`;
 
+  el.querySelectorAll("[data-ttk-agendar]").forEach((b) => b.onclick = () => {
+    const x = (ttkX.vagasHoje || [])[Number(b.dataset.ttkAgendar)]; if (!x) return;
+    ttkFormVideo(el, null, hoje, { produto: x.s.nome, hora: x.hora || "", bloco: x.s.bloco, status: "agendado" });
+  });
   el.querySelectorAll("[data-ttk-copiar]").forEach((b) => b.onclick = async () => {
     const v = ttkX.videos.find((x) => String(x.id) === b.dataset.ttkCopiar); if (!v) return;
     try { await navigator.clipboard.writeText(v.legenda); b.textContent = "Copiada"; } catch (_) { avisar("Não consegui copiar. Abra o vídeo no lápis e copie de lá.", true); }
@@ -215,6 +280,25 @@ function ttkTelaGravar(el) {
     .ttk-plano-topo { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
     .ttk-plano ol { margin: 0; padding-left: 18px; display: grid; gap: 5px; font-size: 13px; }
     .ttk-plano li small { display: block; color: var(--muted); font-size: 11.5px; }
+    .ttk-md-topo { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 10px; }
+    .ttk-md-rot { display: block; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 2px; }
+    .ttk-md-num { font-size: 30px; font-weight: 800; line-height: 1.05; font-variant-numeric: tabular-nums; }
+    .ttk-md-num span { font-size: 16px; font-weight: 600; color: var(--muted); }
+    .ttk-md-falta { font-size: 14px; color: var(--muted); padding-bottom: 4px; }
+    .ttk-md-falta b { color: var(--text); font-size: 18px; }
+    .ttk-md-barra { height: 12px; border-radius: 99px; background: var(--tint); overflow: hidden; }
+    .ttk-md-barra i { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, #5a3a1c, #a8742c); }
+    .ttk-md-dica { margin: 10px 0 12px; font-size: 13px; color: var(--muted); }
+    .ttk-agenda { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 6px; }
+    .ttk-ag { display: grid; grid-template-columns: 66px minmax(0, 1fr) auto auto auto; gap: 12px; align-items: center; padding: 8px 10px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); font-size: 13.5px; }
+    .ttk-ag-hora { text-align: center; padding: 7px 0; border-radius: 9px; background: #f3e2c7; color: #5a3a12; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+    .ttk-ag-postado .ttk-ag-hora { background: var(--green-bg); color: var(--green); }
+    .ttk-ag-txt { min-width: 0; }
+    .ttk-ag-txt small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ttk-ag-sug { background: transparent; border-style: dashed; }
+    .ttk-ag-sug .ttk-ag-hora { background: transparent; border: 1.5px dashed #c9a46a; color: #7a5310; }
+    .ttk-st-sugestao { background: #fbf0d6; color: #7a5310; }
+    .ttk-md-plano summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 10px; }
     .ttk-hoje-vids { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
     .ttk-hoje-vids li { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto auto auto; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px dashed var(--line); font-size: 13.5px; }
     .ttk-hoje-vids li:last-child { border-bottom: 0; }
@@ -237,6 +321,6 @@ function ttkTelaGravar(el) {
     .ttk-kcard small { display: block; color: var(--muted); margin-top: 2px; }
     .ttk-kacoes { display: flex; justify-content: space-between; margin-top: 6px; }
     .ttk-kvazio { text-align: center; margin: 10px 0; }
-    @media (max-width: 900px) { .ttk-hoje-topo, .ttk-plano { grid-template-columns: 1fr; } .ttk-hoje-nums { grid-template-columns: 1fr 1fr; } .ttk-hoje-vids li { grid-template-columns: 46px minmax(0, 1fr) auto; } .ttk-hoje-vids li > button.btn { grid-column: 2; justify-self: start; } }`;
+    @media (max-width: 900px) { .ttk-hoje-topo, .ttk-plano { grid-template-columns: 1fr; } .ttk-hoje-nums { grid-template-columns: 1fr 1fr; } .ttk-hoje-vids li { grid-template-columns: 46px minmax(0, 1fr) auto; } .ttk-hoje-vids li > button.btn { grid-column: 2; justify-self: start; } .ttk-ag { grid-template-columns: 58px minmax(0, 1fr) auto; } .ttk-ag > .btn, .ttk-ag > span:empty { grid-column: 2; justify-self: start; } }`;
   document.head.appendChild(st);
 })();
