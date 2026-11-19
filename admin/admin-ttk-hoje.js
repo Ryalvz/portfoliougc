@@ -49,32 +49,6 @@ function ttkHorariosLivres(vids, qtd, dia) {
   while (out.length < qtd) out.push(""); // o dia acabou: fica sem horário
   return out;
 }
-// Produtos pras vagas: segue o plano dos 15 (principais 2 vezes, com vendas, testes), sem repetir o que já está agendado
-function ttkSugestoesDoDia(plano, vids, qtd) {
-  if (qtd <= 0) return [];
-  const chave = (t) => semAcento(String(t || "")).toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim().slice(0, 22);
-  const usados = new Map();
-  vids.forEach((v) => { const k = chave(v.produto); usados.set(k, (usados.get(k) || 0) + 1); });
-  const ja = (nome) => { const k = chave(nome); for (const [u, n] of usados) if (n > 0 && (u.includes(k) || k.includes(u))) { usados.set(u, n - 1); return true; } return false; };
-  const filas = {
-    // Primeiro um vídeo de cada principal; o 2º de cada um vai pro fim do dia
-    principal: [0, 1].flatMap((n) => plano.principais.map((x) => ({ nome: x.nome, bloco: "principal", de: n ? "2º vídeo do dia" : x.id === TTK_TOP_ANTONELLA ? "principal, todo dia" : `principal · ${x.dias.size} dias com venda` }))),
-    com_vendas: plano.comVendas.map((x) => ({ nome: x.nome, bloco: "com_vendas", de: `${real(x.g)} em 30 dias` })),
-    teste: plano.testes.map((x) => ({ nome: x.nome, bloco: "teste", de: x.de || "teste" }))
-  };
-  Object.keys(filas).forEach((k) => { filas[k] = filas[k].filter((x) => x.nome && !ja(x.nome)); });
-  const ordem = ["principal", "com_vendas", "principal", "com_vendas", "teste"], out = [];
-  let i = 0, vazias = 0;
-  while (out.length < qtd && vazias < ordem.length) {
-    const f = filas[ordem[i % ordem.length]]; i++;
-    if (f.length) { out.push(f.shift()); vazias = 0; } else vazias++;
-  }
-  // A meta é maior que o plano: repete quem mais vende
-  const extra = [...plano.comVendas, ...plano.principais].filter((x) => x.nome);
-  let j = 0; while (out.length < qtd && extra.length) { const x = extra[j++ % extra.length]; out.push({ nome: x.nome, bloco: "com_vendas", de: "mais um de quem vende" }); }
-  return out;
-}
-
 function ttkTelaHoje(el) {
   if (typeof ttkSug !== "undefined" && !ttkSug.status) { el.innerHTML = `<p class="vazio">Abrindo o seu dia...</p>`; ttkSugCarregar().then(() => desenharTikTok(el)); return; }
   const hoje = hojeISO(), ontem = ttkSomaDias(hoje, -1);
@@ -101,11 +75,15 @@ function ttkTelaHoje(el) {
   const porBloco = (b) => vids.filter((v) => v.bloco === b).length;
   const plano = ttkPlanoDoDia();
   const postados = vids.filter((v) => v.status === "postado").length, agendados = vids.filter((v) => v.status === "agendado").length, rascunhos = vids.filter((v) => v.status === "rascunho").length;
-  // Vagas: o que falta pra meta vira sugestão com horário e produto
+  // Vagas: o que falta pra meta aparece só com um horário livre (o produto é você quem escolhe)
   const faltamVagas = Math.max(0, metaV - vids.length);
-  const sugs = ttkSugestoesDoDia(plano, vids, faltamVagas), horas = ttkHorariosLivres(vids, sugs.length, hoje);
-  const vagas = sugs.map((sg, i) => ({ s: sg, hora: horas[i], i }));
+  const horas = ttkHorariosLivres(vids, faltamVagas, hoje);
+  const vagas = horas.map((hora, i) => ({ hora, i }));
   ttkX.vagasHoje = vagas;
+  // Ideias pra postar, se quiser seguir: quem já vende (principais e com vendas), sem produto de teste
+  const ideias = [...plano.principais.map((x) => ({ nome: x.nome, bloco: "principal", de: x.id === TTK_TOP_ANTONELLA ? "o que mais vende, vale todo dia" : `${x.dias.size} dias com venda nos últimos 30` })),
+    ...plano.comVendas.map((x) => ({ nome: x.nome, bloco: "com_vendas", de: `${real(x.g)} em vendas nos últimos 30 dias` }))].filter((x) => x.nome);
+  ttkX.ideiasHoje = ideias;
   const linhas = [...vids.map((v) => ({ v, h: v.hora ? String(v.hora).slice(0, 5) : "99" })), ...vagas.map((x) => ({ ...x, h: x.hora || "99" }))].sort((a, b) => a.h.localeCompare(b.h));
   // Amostras com prazo
   const amostras = (ttkX.amostras || []).filter((a) => a.decisao === "testando").sort((a, b) => String(a.prazo_postar || "9").localeCompare(String(b.prazo_postar || "9")));
@@ -147,7 +125,7 @@ function ttkTelaHoje(el) {
         <button class="link-btn" type="button" id="ttk-meta-videos">mudar a meta</button><button class="btn pequeno" type="button" id="ttk-novo-video">${ic("mais")}Adicionar</button>
       </div>
       <div class="ttk-md-barra"><i style="width:${Math.min(100, Math.round((noAr / metaV) * 100))}%"></i></div>
-      <p class="ttk-md-dica">${postados} ${postados === 1 ? "postado" : "postados"}, ${agendados} ${agendados === 1 ? "agendado" : "agendados"}${rascunhos ? `, ${rascunhos} em rascunho` : ""}.${vagas.length ? ` As ${vagas.length} vagas que faltam já têm horário e produto sugeridos, tirados do plano dos 15: toque em Agendar.` : " Todas as vagas da meta estão preenchidas."}</p>
+      <p class="ttk-md-dica">${postados} ${postados === 1 ? "postado" : "postados"}, ${agendados} ${agendados === 1 ? "agendado" : "agendados"}${rascunhos ? `, ${rascunhos} em rascunho` : ""}.${vagas.length ? ` ${vagas.length === 1 ? "Falta 1 vídeo" : `Faltam ${vagas.length} vídeos`}: cada vaga já tem um horário livre.` : " Todas as vagas da meta estão preenchidas."}</p>
       <ol class="ttk-agenda">${linhas.map((x) => x.v ? `<li class="ttk-ag ttk-ag-${x.v.status}">
           <span class="ttk-ag-hora">${x.v.hora ? String(x.v.hora).slice(0, 5) : "--:--"}</span>
           <span class="ttk-ag-txt"><b>${esc(x.v.produto)}</b>${x.v.bloco ? ` <span class="ttk-bloco-chip ttk-b-${x.v.bloco}">${esc((TTK_BLOCOS.find(([k]) => k === x.v.bloco) || [0, x.v.bloco])[1])}</span>` : ""}
@@ -157,18 +135,13 @@ function ttkTelaHoje(el) {
           <button class="icone-btn" type="button" data-ttk-video="${x.v.id}" aria-label="Editar">${ic("editar")}</button></li>`
         : `<li class="ttk-ag ttk-ag-sug">
           <span class="ttk-ag-hora">${x.hora || "--:--"}</span>
-          <span class="ttk-ag-txt"><b>${esc(String(x.s.nome).slice(0, 70))}</b> <span class="ttk-bloco-chip ttk-b-${x.s.bloco}">${esc((TTK_BLOCOS.find(([k]) => k === x.s.bloco) || [0, x.s.bloco])[1])}</span><small>${esc(x.s.de || "")}${x.hora ? "" : " · o dia já está no fim"}</small></span>
-          <span></span>
-          <span class="pilula ttk-st-sugestao">sugestão</span>
+          <span class="ttk-ag-txt"><b>Vaga livre</b><small>${x.hora ? "horário livre pra mais um vídeo" : "o dia já está no fim"}</small></span>
+          <span></span><span></span>
           <button class="btn pequeno" type="button" data-ttk-agendar="${x.i}">Agendar</button></li>`).join("") || `<li class="sub">Defina a meta de vídeos pra montar o dia.</li>`}</ol>
-      <details class="ttk-md-plano"><summary>Ver o plano dos 15 (principais, com vendas e testes)</summary>
-      <div class="ttk-plano">
-        ${[["principal", "Principais", 6, plano.principais.map((x) => ({ nome: x.nome, de: x.id === TTK_TOP_ANTONELLA ? "sempre, 2 vídeos" : `2 vídeos · ${x.dias.size} dias com venda` }))],
-           ["com_vendas", "Com vendas", 6, plano.comVendas.map((x) => ({ nome: x.nome, de: `${real(x.g)} em 30 dias` }))],
-           ["teste", "Testes", 3, plano.testes]].map(([k, n, alvo, itens]) => { const f = porBloco(k); return `<div class="ttk-plano-col">
-          <div class="ttk-plano-topo"><b>${n}</b><span class="ini-selo ${f >= alvo ? "sobe" : ""}">${f} de ${alvo}</span></div>
-          <ol>${itens.map((x) => `<li><span>${esc(String(x.nome || "").slice(0, 60))}</span><small>${esc(x.de || "")}</small></li>`).join("") || `<li class="sub">Nada aqui ainda.</li>`}</ol></div>`; }).join("")}
-      </div></details>
+      ${ideias.length ? `<details class="ttk-md-plano"><summary>Ideias pra postar hoje, se quiser seguir (${ideias.length})</summary>
+        <p class="sub" style="margin:0 0 8px">Produtos que já vendem pra você. É só ideia: usa se fizer sentido.</p>
+        <ul class="ttk-ideias">${ideias.map((x, i) => `<li><span><b>${esc(String(x.nome).slice(0, 70))}</b><small>${esc(x.de)}</small></span><button class="btn pequeno" type="button" data-ttk-ideia="${i}">Usar</button></li>`).join("")}</ul>
+      </details>` : ""}
     </section>
 
     <div class="grade-2 ttk-grade2">
@@ -186,7 +159,13 @@ function ttkTelaHoje(el) {
 
   el.querySelectorAll("[data-ttk-agendar]").forEach((b) => b.onclick = () => {
     const x = (ttkX.vagasHoje || [])[Number(b.dataset.ttkAgendar)]; if (!x) return;
-    ttkFormVideo(el, null, hoje, { produto: x.s.nome, hora: x.hora || "", bloco: x.s.bloco, status: "agendado" });
+    ttkFormVideo(el, null, hoje, { hora: x.hora || "", status: "agendado" });
+  });
+  // Usar uma ideia: abre o vídeo com o produto, no primeiro horário livre
+  el.querySelectorAll("[data-ttk-ideia]").forEach((b) => b.onclick = () => {
+    const x = (ttkX.ideiasHoje || [])[Number(b.dataset.ttkIdeia)]; if (!x) return;
+    const vaga = (ttkX.vagasHoje || []).find((v) => v.hora);
+    ttkFormVideo(el, null, hoje, { produto: x.nome, bloco: x.bloco, hora: vaga ? vaga.hora : "", status: "agendado" });
   });
   el.querySelectorAll("[data-ttk-copiar]").forEach((b) => b.onclick = async () => {
     const v = ttkX.videos.find((x) => String(x.id) === b.dataset.ttkCopiar); if (!v) return;
@@ -298,6 +277,9 @@ function ttkTelaGravar(el) {
     .ttk-ag-sug { background: transparent; border-style: dashed; }
     .ttk-ag-sug .ttk-ag-hora { background: transparent; border: 1.5px dashed #c9a46a; color: #7a5310; }
     .ttk-st-sugestao { background: #fbf0d6; color: #7a5310; }
+    .ttk-ideias { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+    .ttk-ideias li { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; font-size: 13.5px; }
+    .ttk-ideias small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
     .ttk-md-plano summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 10px; }
     .ttk-hoje-vids { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
     .ttk-hoje-vids li { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto auto auto; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px dashed var(--line); font-size: 13.5px; }
