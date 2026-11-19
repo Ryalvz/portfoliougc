@@ -85,8 +85,8 @@ function ttkTelaHoje(el) {
   const funcionam = [
     ...plano.principais.map((x) => ({ nome: x.nome, bloco: "principal", de: x.id === TTK_TOP_ANTONELLA ? "o que mais vende, vale todo dia" : `${x.dias.size} dias com venda nos últimos 30` })),
     ...plano.comVendas.map((x) => ({ nome: x.nome, bloco: "com_vendas", de: `${real(x.g)} em vendas nos últimos 30 dias` }))].filter((x) => x.nome);
-  const testes = plano.testes.filter((x) => x.nome).map((x) => ({ nome: x.nome, bloco: "teste", de: x.de || "produto em teste" }));
-  const ideiasF = [], ideiasT = testes.slice(0, nTeste);
+  // Teste é só o espaço reservado: o produto (amostra ou outro) é você quem escolhe
+  const ideiasF = [], ideiasT = Array.from({ length: nTeste }, () => ({ nome: "Teste", bloco: "teste", de: "amostra ou outro produto pra testar", vazio: true }));
   // Se faltar teste, a vaga volta pro que já funciona; se faltar produto, repete os mais fortes (2º vídeo)
   for (let k = 0; ideiasF.length < nFunciona + (nTeste - ideiasT.length) && funcionam.length; k++) {
     const x = funcionam[k % funcionam.length], volta = Math.floor(k / funcionam.length);
@@ -152,7 +152,7 @@ function ttkTelaHoje(el) {
           <button class="btn pequeno" type="button" data-ttk-agendar="${x.i}">Agendar</button></li>`).join("") || `<li class="sub">Defina a meta de vídeos pra montar o dia.</li>`}</ol>
       ${ideias.length ? `<details class="ttk-md-plano"><summary>Ideias pra postar hoje, se quiser seguir (${ideias.length})</summary>
         <p class="sub" style="margin:0 0 8px">Uma ideia por vaga que falta: ${ideias.filter((x) => x.bloco !== "teste").length} do que já vende pra você e ${ideias.filter((x) => x.bloco === "teste").length} de teste (80/20). É só ideia: usa se fizer sentido.</p>
-        <ul class="ttk-ideias">${ideias.map((x, i) => `<li><span><b>${esc(String(x.nome).slice(0, 70))}</b> <span class="ttk-bloco-chip ttk-b-${x.bloco}">${x.bloco === "teste" ? "Teste" : x.bloco === "principal" ? "Principal" : "Com vendas"}</span><small>${esc(x.de)}</small></span><button class="btn pequeno" type="button" data-ttk-ideia="${i}">Usar</button></li>`).join("")}</ul>
+        <ul class="ttk-ideias">${ideias.map((x, i) => `<li><span>${x.vazio ? `<b>Teste</b> <small style="display:inline">(amostra ou outro produto pra testar)</small>` : `<b>${esc(String(x.nome).slice(0, 70))}</b> <span class="ttk-bloco-chip ttk-b-${x.bloco}">${x.bloco === "principal" ? "Principal" : "Com vendas"}</span><small>${esc(x.de)}</small>`}</span><button class="btn pequeno" type="button" data-ttk-ideia="${i}">Usar</button></li>`).join("")}</ul>
       </details>` : ""}
     </section>
 
@@ -177,7 +177,7 @@ function ttkTelaHoje(el) {
   el.querySelectorAll("[data-ttk-ideia]").forEach((b) => b.onclick = () => {
     const x = (ttkX.ideiasHoje || [])[Number(b.dataset.ttkIdeia)]; if (!x) return;
     const vaga = (ttkX.vagasHoje || []).find((v) => v.hora);
-    ttkFormVideo(el, null, hoje, { produto: x.nome, bloco: x.bloco, hora: vaga ? vaga.hora : "", status: "agendado" });
+    ttkFormVideo(el, null, hoje, { produto: x.vazio ? "" : x.nome, bloco: x.bloco, hora: vaga ? vaga.hora : "", status: "agendado" });
   });
   el.querySelectorAll("[data-ttk-copiar]").forEach((b) => b.onclick = async () => {
     const v = ttkX.videos.find((x) => String(x.id) === b.dataset.ttkCopiar); if (!v) return;

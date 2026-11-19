@@ -500,8 +500,60 @@ function ttkTelaGeral(el) {
         </section>
       </div>
     </div>
+    ${ttkBlocoRaioX(per)}
     ${ttkBlocoCategorias(per)}
     ${ttkFrase(`Liquidada no mês é a comissão que o TikTok pagou nesses dias (valor final recebido), comparada com o que caiu nos mesmos dias do mês anterior. Pendente é a estimativa dos pedidos do mês que ainda vão liquidar, em média 7 dias depois do pedido. As análises completas ficam nas outras seções do menu.`)}`;
+}
+
+/* Raio-x da conta: os números do período e o GMV por categoria e por canal, em rosca (como no TikTok) */
+// Cada categoria tem a sua cor fixa: a cor acompanha a categoria, não a posição
+const TTK_COR_CAT = { iluminacao: "#D9A23A", audio: "#2F6B5E", mobile: "#3E6FA3", gravacao: "#5B7B8C", eletronicos: "#6E5A9E", casa_inteligente: "#4AA3A2",
+  beleza: "#C2667A", perfumes: "#8E3F5C", vestuario: "#A98247", casa: "#7A8B3A", outros: "#A39A8C", a_classificar: "#CFC6B6", _resto: "#B8AE9C" };
+const TTK_COR_CANAL = { "Vídeo": "#2F6B5E", "Live": "#C2667A", "LIVE": "#C2667A", "Cartão de produto": "#D9A23A", "Cartões de produto": "#D9A23A", _resto: "#B8AE9C" };
+function ttkRosca(fatias, total, rotulo) {
+  const R = 64, C = 2 * Math.PI * R, gap = fatias.length > 1 ? 3 : 0;
+  let ac = 0;
+  const arcos = fatias.filter((f) => f.v > 0).map((f) => {
+    const len = (f.v / total) * C, d = Math.max(0, len - gap);
+    const c = `<circle cx="80" cy="80" r="${R}" fill="none" stroke="${f.cor}" stroke-width="24" stroke-dasharray="${d.toFixed(2)} ${(C - d).toFixed(2)}" stroke-dashoffset="${(-ac).toFixed(2)}" transform="rotate(-90 80 80)"><title>${esc(f.nome)}: ${ttkFmtPct(ttkPct(f.v, total))} (${real(f.v)})</title></circle>`;
+    ac += len; return c;
+  }).join("");
+  return `<svg class="ttk-rosca" viewBox="0 0 160 160" role="img" aria-label="${esc(rotulo)}">${arcos}<text x="80" y="76" text-anchor="middle" class="ttk-rosca-v">${esc(ttkCurto(total))}</text><text x="80" y="96" text-anchor="middle" class="ttk-rosca-r">GMV</text></svg>`;
+}
+function ttkLegenda(fatias, total) {
+  return `<ul class="ttk-rosca-leg">${fatias.map((f) => `<li><i style="background:${f.cor}"></i><span class="ttk-rl-nome">${esc(f.nome)}</span><b>${ttkFmtPct(ttkPct(f.v, total))}</b><small>${real(f.v)}</small></li>`).join("")}</ul>`;
+}
+function ttkBlocoRaioX(per) {
+  const doPer = ttkX.todos.filter((p) => ttkValido(p) && ttkNoPeriodo(p, per.ini, per.fim));
+  if (!doPer.length) return "";
+  const A = ttkSomar(doPer), tot = A.g;
+  // Categoria: as 5 maiores e o resto junto
+  const porCat = {};
+  doPer.forEach((p) => { const k = TTK_CATS[p.subcat] ? p.subcat : "a_classificar"; porCat[k] = (porCat[k] || 0) + p.g; });
+  const ord = Object.entries(porCat).sort((a, b) => b[1] - a[1]);
+  const cats = ord.slice(0, 5).map(([k, v]) => ({ nome: ttkNomeCat(k), v, cor: TTK_COR_CAT[k] || TTK_COR_CAT._resto }));
+  const restoCat = ord.slice(5).reduce((s, [, v]) => s + v, 0);
+  if (restoCat > 0) cats.push({ nome: `Outras (${ord.length - 5})`, v: restoCat, cor: TTK_COR_CAT._resto });
+  // Canal: de onde veio a venda (vídeo, LIVE, cartão de produto)
+  const porCanal = {};
+  doPer.forEach((p) => { const k = String(p.tipo_conteudo || "").trim() || "Sem origem"; porCanal[k] = (porCanal[k] || 0) + p.g; });
+  const canais = Object.entries(porCanal).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ nome: k, v, cor: TTK_COR_CANAL[k] || TTK_COR_CANAL._resto }));
+  const tech = doPer.filter((p) => p.area === "tech").reduce((s, p) => s + p.g, 0);
+  const dias = per.acum ? Math.max(1, Math.round((new Date(per.fim) - new Date(per.ini)) / 864e5) + 1) : per.N;
+  return `<div class="ini-card ttk-bloco ttk-raiox">
+    <div class="ini-card-topo"><h2>Raio-x da conta</h2><span class="sub">${per.acum ? `desde ${dataBR(per.ini)}` : `${dataBR(per.ini)} a ${dataBR(per.fim)}`} · todas as categorias</span></div>
+    <div class="ttk-rx-nums">
+      <div><span>GMV</span><strong>${real(tot)}</strong><small>${real(tot / dias)} por dia</small></div>
+      <div><span>Unidades vendidas</span><strong>${num(A.i)}</strong><small>${num(A.pedidos)} pedidos</small></div>
+      <div><span>GMV por pedido</span><strong>${real(A.pedidos ? tot / A.pedidos : 0)}</strong><small>ticket médio</small></div>
+      <div><span>Comissão estimada</span><strong>${real(A.c)}</strong><small>${ttkFmtPct(ttkPct(A.c, tot))} do GMV</small></div>
+    </div>
+    <div class="ttk-rx-roscas">
+      <div class="ttk-rx-par"><h3 class="ttk-sub">GMV por categoria</h3><div class="ttk-rx-grafico">${ttkRosca(cats, tot, "GMV por categoria")}${ttkLegenda(cats, tot)}</div></div>
+      <div class="ttk-rx-par"><h3 class="ttk-sub">GMV por canal de venda</h3><div class="ttk-rx-grafico">${ttkRosca(canais, tot, "GMV por canal de venda")}${ttkLegenda(canais, tot)}</div></div>
+    </div>
+    ${ttkFrase(`Tech foi ${ttkFmtPct(ttkPct(tech, tot))} do GMV desse período (${real(tech)}). ${cats[0] ? `A maior categoria foi ${cats[0].nome}, com ${ttkFmtPct(ttkPct(cats[0].v, tot))}.` : ""} ${canais[0] ? `${canais[0].nome} trouxe ${ttkFmtPct(ttkPct(canais[0].v, tot))} das vendas.` : ""} Conta pedidos Liquidados e Pendentes. Produto sem categoria aparece como "a classificar": dá pra corrigir em Produtos e SKUs.`)}
+  </div>`;
 }
 
 /* Todo o GMV do período por categoria (como o gráfico do TikTok) e a virada mês a mês pra Tech.
@@ -1348,6 +1400,25 @@ async function ttkImportar(arq, el) {
     .ttk-st-rascunho { background: var(--tint); color: var(--muted); }
     .ttk-st-agendado { background: var(--olive-tint); color: #5d5a3c; }
     .ttk-st-postado { background: var(--green-bg); color: var(--green); }
+    .ttk-rx-nums { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 4px 0 18px; }
+    .ttk-rx-nums > div { border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; min-width: 0; }
+    .ttk-rx-nums span { display: block; font-size: 12.5px; color: var(--muted); }
+    .ttk-rx-nums strong { display: block; font-size: 22px; font-weight: 800; margin: 4px 0 2px; font-variant-numeric: tabular-nums; }
+    .ttk-rx-nums small { font-size: 12px; color: var(--muted); }
+    .ttk-rx-roscas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+    .ttk-rx-par { min-width: 0; }
+    .ttk-rx-grafico { display: flex; align-items: center; gap: 18px; }
+    .ttk-rosca { width: 150px; height: 150px; flex: none; }
+    .ttk-rosca-v { font-size: 17px; font-weight: 800; fill: var(--text); }
+    .ttk-rosca-r { font-size: 11px; fill: var(--muted); letter-spacing: .06em; }
+    .ttk-rosca-leg { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; flex: 1; min-width: 0; font-size: 13px; }
+    .ttk-rosca-leg li { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; column-gap: 8px; align-items: center; }
+    .ttk-rosca-leg i { width: 10px; height: 10px; border-radius: 50%; }
+    .ttk-rl-nome { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ttk-rosca-leg b { font-variant-numeric: tabular-nums; }
+    .ttk-rosca-leg small { grid-column: 2 / -1; color: var(--muted); font-size: 11.5px; margin-top: -3px; }
+    @media (max-width: 900px) { .ttk-rx-nums { grid-template-columns: 1fr 1fr; } .ttk-rx-roscas { grid-template-columns: 1fr; } }
+    @media (max-width: 480px) { .ttk-rx-grafico { flex-direction: column; align-items: stretch; } .ttk-rosca { align-self: center; } }
     .ttk-escopo { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: -6px 0 16px; }
     .ttk-subcats { flex-wrap: wrap; margin: -6px 0 16px; border-radius: 16px; }
     .ttk-aviso-outras { margin: -6px 0 14px; }
