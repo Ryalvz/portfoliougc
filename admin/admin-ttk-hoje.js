@@ -80,9 +80,21 @@ function ttkTelaHoje(el) {
   const horas = ttkHorariosLivres(vids, faltamVagas, hoje);
   const vagas = horas.map((hora, i) => ({ hora, i }));
   ttkX.vagasHoje = vagas;
-  // Ideias pra postar, se quiser seguir: quem já vende (principais e com vendas), sem produto de teste
-  const ideias = [...plano.principais.map((x) => ({ nome: x.nome, bloco: "principal", de: x.id === TTK_TOP_ANTONELLA ? "o que mais vende, vale todo dia" : `${x.dias.size} dias com venda nos últimos 30` })),
+  // Ideias pra postar, se quiser seguir: uma por vaga, 80% do que já vende e 20% de teste
+  const nTeste = Math.round(faltamVagas * 0.2), nFunciona = faltamVagas - nTeste;
+  const funcionam = [
+    ...plano.principais.map((x) => ({ nome: x.nome, bloco: "principal", de: x.id === TTK_TOP_ANTONELLA ? "o que mais vende, vale todo dia" : `${x.dias.size} dias com venda nos últimos 30` })),
     ...plano.comVendas.map((x) => ({ nome: x.nome, bloco: "com_vendas", de: `${real(x.g)} em vendas nos últimos 30 dias` }))].filter((x) => x.nome);
+  const testes = plano.testes.filter((x) => x.nome).map((x) => ({ nome: x.nome, bloco: "teste", de: x.de || "produto em teste" }));
+  const ideiasF = [], ideiasT = testes.slice(0, nTeste);
+  // Se faltar teste, a vaga volta pro que já funciona; se faltar produto, repete os mais fortes (2º vídeo)
+  for (let k = 0; ideiasF.length < nFunciona + (nTeste - ideiasT.length) && funcionam.length; k++) {
+    const x = funcionam[k % funcionam.length], volta = Math.floor(k / funcionam.length);
+    ideiasF.push(volta ? { ...x, de: `${volta + 1}º vídeo do dia · ${x.de}` } : x);
+  }
+  // Mistura: a cada 4 do que funciona, 1 teste
+  const ideias = [];
+  while (ideiasF.length || ideiasT.length) { ideias.push(...ideiasF.splice(0, 4)); if (ideiasT.length) ideias.push(ideiasT.shift()); }
   ttkX.ideiasHoje = ideias;
   const linhas = [...vids.map((v) => ({ v, h: v.hora ? String(v.hora).slice(0, 5) : "99" })), ...vagas.map((x) => ({ ...x, h: x.hora || "99" }))].sort((a, b) => a.h.localeCompare(b.h));
   // Amostras com prazo
@@ -139,8 +151,8 @@ function ttkTelaHoje(el) {
           <span></span><span></span>
           <button class="btn pequeno" type="button" data-ttk-agendar="${x.i}">Agendar</button></li>`).join("") || `<li class="sub">Defina a meta de vídeos pra montar o dia.</li>`}</ol>
       ${ideias.length ? `<details class="ttk-md-plano"><summary>Ideias pra postar hoje, se quiser seguir (${ideias.length})</summary>
-        <p class="sub" style="margin:0 0 8px">Produtos que já vendem pra você. É só ideia: usa se fizer sentido.</p>
-        <ul class="ttk-ideias">${ideias.map((x, i) => `<li><span><b>${esc(String(x.nome).slice(0, 70))}</b><small>${esc(x.de)}</small></span><button class="btn pequeno" type="button" data-ttk-ideia="${i}">Usar</button></li>`).join("")}</ul>
+        <p class="sub" style="margin:0 0 8px">Uma ideia por vaga que falta: ${ideias.filter((x) => x.bloco !== "teste").length} do que já vende pra você e ${ideias.filter((x) => x.bloco === "teste").length} de teste (80/20). É só ideia: usa se fizer sentido.</p>
+        <ul class="ttk-ideias">${ideias.map((x, i) => `<li><span><b>${esc(String(x.nome).slice(0, 70))}</b> <span class="ttk-bloco-chip ttk-b-${x.bloco}">${x.bloco === "teste" ? "Teste" : x.bloco === "principal" ? "Principal" : "Com vendas"}</span><small>${esc(x.de)}</small></span><button class="btn pequeno" type="button" data-ttk-ideia="${i}">Usar</button></li>`).join("")}</ul>
       </details>` : ""}
     </section>
 
