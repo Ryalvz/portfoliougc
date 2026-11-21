@@ -1008,9 +1008,11 @@ REGRAS: entregue tudo agora, sem fazer perguntas antes: o que faltar fica [entre
     const marcaCena = (l) => /^CENA\s*\d+\b/i.test(l), marcaParte = (l) => /^\[[^\]]{2,60}\]$/.test(l) || /^\d+\s*[.)-]\s*[A-ZÁÉÍÓÚÂÊÔÃÕÇ][A-ZÁÉÍÓÚÂÊÔÃÕÇ0-9 +/,-]{2,50}:?$/.test(l) || /^[A-ZÁÉÍÓÚÂÊÔÃÕÇ][A-ZÁÉÍÓÚÂÊÔÃÕÇ +/-]{3,40}:$/.test(l);
     const meta = (l) => /\b(palavras|segundos)\b.*(\d)/i.test(l) && /(fala lida|total|preenchendo|deve fechar|contagem)/i.test(l);
     const cenas = []; let atual = null;
+    const temMarca = corpo.some((l) => marcaCena(l) || marcaParte(l));
     const nova = (nome) => { atual = { parte: nome, fala: [], imagem: [], texto: [] }; cenas.push(atual); };
     corpo.forEach((l) => {
       if (!l || meta(l)) return;
+      if (temMarca && !atual && !marcaCena(l) && !marcaParte(l)) return;   // comentário do Claude antes da primeira cena
       if (marcaCena(l)) { nova(""); const resto = l.replace(/^CENA\s*\d+\s*[:.)-]?\s*/i, ""); if (resto) atual.parte = resto; return; }
       if (marcaParte(l)) { nova(l.replace(/^\[|\]$/g, "").replace(/^\d+\s*[.)-]\s*/, "").replace(/:$/, "").trim()); return; }
       if (!atual) nova("");
@@ -1020,7 +1022,11 @@ REGRAS: entregue tudo agora, sem fazer perguntas antes: o que faltar fica [entre
       else if ((m = l.match(/^TEXTO NA TELA\s*:\s*(.*)$/i))) { if (!/^\(?(nenhum|sem texto|-|n[aã]o tem)\)?\.?$/i.test(m[1].trim())) atual.texto.push(m[1]); }
       else atual.fala.push(l);
     });
-    const parte = (x) => x ? x.charAt(0).toUpperCase() + x.slice(1).toLowerCase() : "";
+    const parte = (x) => {
+      if (!x) return "";
+      let y = x.replace(/^[(\[]|[)\]]$/g, "").replace(/\b(cerca de|aprox\.?|aproximadamente|~)\s*/gi, "").replace(/\s*,\s*(\d+\s*(s|seg|segundos)\b)/i, " · $1").replace(/\s+/g, " ").trim().toLowerCase();
+      return y.charAt(0).toUpperCase() + y.slice(1);
+    };
     return { cenas: cenas.map((c) => ({ parte: parte(c.parte), fala: c.fala.join(" "), imagem: c.imagem.join(" "), texto: c.texto.join(" ") })).filter((c) => c.fala || c.imagem), ganchos };
   }
   function abrirRoteiro(txt, produto) {
