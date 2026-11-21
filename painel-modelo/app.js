@@ -982,7 +982,9 @@ PRODUTO DO MEU VÍDEO: ${produto}
 O QUE MUDA (o resto fica igual à referência):
 ${muda.length ? muda.join("\n") : "- só o produto"}
 
-O QUE EU SEI DO PRODUTO: ${f.sabe || "nada além do nome; o que faltar, deixe [entre colchetes]"}
+O QUE EU SEI DO PRODUTO: ${f.modo === "mesmo"
+  ? `é o MESMO produto da referência: use as características, números, benefícios e o que vem na caixa que a pessoa fala no vídeo, sem inventar nada além disso.${f.sabe ? " Além disso: " + f.sabe : ""} Deixe [entre colchetes] só o que é pessoal meu (minha história, minha reação) e o que a loja mostra (preço, cupom, frete).`
+  : (f.sabe || "nada além do nome; o que faltar, deixe [entre colchetes]")}
 
 ENTREGUE, em português do Brasil, nesta ordem:
 MAPA DA REFERÊNCIA: as partes do vídeo numeradas (gancho, problema, demonstração, prova, chamada pro carrinho), com os segundos de cada uma. Calcule pelos números de palavras: palavras ÷ 3,25 = segundos.
