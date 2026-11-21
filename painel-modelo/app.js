@@ -523,11 +523,14 @@
     $("#quem").textContent = [S.perfil.nome, S.perfil.tiktok].filter(Boolean).join(" · ") || (S.user && S.user.email) || "";
     $("#telaNomeCel").textContent = NOMES[S.tela] || "";
   }
-  async function irPara(tela) {
+  async function irPara(tela, manterRolagem) {
+    const y = window.scrollY;
     S.tela = tela; try { history.replaceState(null, "", "#" + tela); } catch (_) {}
-    fecharMenu(); montarMenu(); window.scrollTo(0, 0);
+    fecharMenu(); montarMenu(); if (!manterRolagem) window.scrollTo(0, 0);
     const el = $("#conteudo");
+    if (manterRolagem) el.style.minHeight = el.offsetHeight + "px";   // segura a altura enquanto redesenha
     try { await DESENHOS[tela](el); } catch (e) { console.error(e); el.innerHTML = `<div class="aviso">Não consegui abrir esta tela: ${esc(traduz(e))}</div>`; }
+    if (manterRolagem) { el.style.minHeight = ""; window.scrollTo(0, y); }
   }
   const semDados = () => `<div class="card"><div class="card-topo"><h2>Comece importando seus pedidos</h2></div><p class="vazio">Ainda não tem nenhum pedido aqui. Exporte o relatório de pedidos de afiliado do TikTok Shop e suba na aba Importar.</p><button class="btn" type="button" data-tela="importar">Importar agora</button></div>`;
   function avisoImport() {
@@ -1068,7 +1071,7 @@ REGRAS: entregue tudo agora, sem fazer perguntas antes: o que faltar fica [entre
           <ul class="refs">${lista.map((x) => `<li><button type="button" data-acao="ref" data-id="${esc(x.id)}" aria-pressed="${x.id === S.refSel}">${x.copy ? '<span class="selo sobe">Copy pronta</span>' : ""}<b>${esc(tituloDa(x))}</b><small>${esc(x.autor || "")}</small></button></li>`).join("") || '<li><p class="vazio">Nenhuma referência ainda. Cole o link e o texto de um vídeo que vendeu.</p></li>'}</ul>
         </div>
         <div class="criar-dir">${r ? `
-          <div class="card"><div class="card-topo"><h2>${esc(tituloDa(r))}</h2></div>
+          <div class="card"><div class="card-topo"><h2>${esc(tituloDa(r))}</h2>${r.copy ? '<span class="espaco"></span><button class="btn pequeno" type="button" data-acao="ver-roteiro">Ver roteiro de gravação</button>' : ""}</div>
             <p class="sub-ref">${r.link ? `<a href="${esc(r.link)}" target="_blank" rel="noopener">Abrir o vídeo</a>` : ""}${r.autor ? " · " + esc(r.autor) : ""}</p>
             <p class="lbl">Texto da referência</p>${r.texto ? `<div class="transcricao">${esc(r.texto)}</div>` : `<div class="aviso-texto"><b>Falta o texto do vídeo.</b> ${!r.link ? "Cole abaixo o que a pessoa fala no vídeo." : API.transcrever ? `Clique em <b>Transcrever</b>: o painel escuta o vídeo e escreve aqui. Usa 1 crédito da Supadata e leva até 3 minutos.` : `Clique em <b>Transcrever automático</b>, cole o pedido na aba Code do Claude e depois clique em <b>Atualizar</b>. O Claude baixa o vídeo, escuta e escreve aqui.`}</div>
             ${r.link ? `<div class="controles" style="margin-bottom:10px"><button class="btn pequeno" type="button" data-acao="transcrever">${API.transcrever ? "Transcrever" : "Transcrever automático"}</button>${API.transcrever ? "" : '<button class="btn sec pequeno" type="button" data-acao="atualizar-refs">Atualizar</button>'}</div>` : ""}
@@ -1093,7 +1096,7 @@ REGRAS: entregue tudo agora, sem fazer perguntas antes: o que faltar fica [entre
           </div>
           <div class="card"><div class="card-topo"><h2>Copy pronta</h2></div>
             <p class="frase" style="margin:0 0 8px">${temClaude ? "O Claude escreve aqui. Ajuste o que quiser e salve." : "Cole aqui o que o Claude devolveu e salve."} Fica guardado junto com a referência.</p>
-            <textarea class="inp copy-pronta" id="refCopy" rows="14" placeholder="A copy aparece aqui.">${esc(r.copy || "")}</textarea>
+            <textarea class="inp copy-pronta" id="refCopy" rows="14" placeholder="A copy aparece aqui.">${esc(S.rascunhoCopy && S.rascunhoCopy.id === r.id ? S.rascunhoCopy.v : (r.copy || ""))}</textarea>
             <div class="controles" style="justify-content:flex-end;margin-top:10px">
               <button class="link" type="button" data-acao="apagar-ref">Apagar referência</button>
               <button class="btn sec pequeno" type="button" data-acao="agenda-ref">Mandar pra agenda de hoje</button>
@@ -1154,9 +1157,9 @@ REGRAS: entregue tudo agora, sem fazer perguntas antes: o que faltar fica [entre
         const k = t.dataset.k, passos = { ...(S.perfil.passos || {}) }; passos[k] = !passos[k];
         await API.salvarPerfil({ passos }); S.perfil.passos = passos; irPara("hoje");
       } else if (a === "ref") { S.refSel = t.dataset.id; irPara("criar"); }
-      else if (a === "ref-filtro") { S.refFiltro = t.dataset.v; irPara("criar"); }
-      else if (a === "ref-modo") { S.refForm.modo = t.dataset.v; irPara("criar"); }
-      else if (a === "atualizar-refs") { S.refs = await API.referencias(); const r2 = S.refs.find((x) => x.id === S.refSel); toast(r2 && r2.texto ? "Texto chegou. Agora é só gerar." : "Ainda sem texto. Espere o Claude terminar e clique de novo."); irPara("criar"); }
+      else if (a === "ref-filtro") { S.refFiltro = t.dataset.v; irPara("criar", true); }
+      else if (a === "ref-modo") { const ta = $("#refCopy"); if (ta) S.rascunhoCopy = { id: S.refSel, v: ta.value }; S.refForm.modo = t.dataset.v; irPara("criar", true); }
+      else if (a === "atualizar-refs") { S.refs = await API.referencias(); const r2 = S.refs.find((x) => x.id === S.refSel); toast(r2 && r2.texto ? "Texto chegou. Agora é só gerar." : "Ainda sem texto. Espere o Claude terminar e clique de novo."); irPara("criar", true); }
       else if (a === "fechar-roteiro") { const m = $("#roteiroCenas"); if (m) m.remove(); document.body.classList.remove("com-roteiro"); }
       else if (a === "imprimir-roteiro") { window.print(); }
       else if (a === "gerar" || a === "copiar-pedido" || a === "salvar-copy" || a === "agenda-ref" || a === "apagar-ref" || a === "salvar-texto" || a === "transcrever" || a === "ver-roteiro") {
@@ -1172,18 +1175,18 @@ REGRAS: entregue tudo agora, sem fazer perguntas antes: o que faltar fica [entre
           const res = await API.transcrever(r.link, (seg) => { t.textContent = `Ouvindo... ${seg}s`; });
           if (res && res.texto) { r.texto = String(res.texto).slice(0, 6000); await API.salvarReferencia(r); toast("Texto pronto. Confira e clique em Copiar o pedido."); }
           else { t.disabled = false; t.textContent = rot; toast((res && res.erro) || "Não deu para transcrever.", true); }
-          irPara("criar"); return;
+          irPara("criar", true); return;
         }
         if (a === "transcrever") {
           const txt = "Transcreva as referências do meu painel (aba Criar) que estão sem texto.";
           try { await navigator.clipboard.writeText(txt); } catch (_) { const ta = document.createElement("textarea"); ta.value = txt; document.body.appendChild(ta); ta.select(); try { document.execCommand("copy"); } catch (__) {} ta.remove(); }
           toast("Pedido copiado. Cole na aba Code do Claude e depois clique em Atualizar."); return;
         }
-        if (a === "salvar-texto") { const tx = ($("#refTextoFalta").value || "").trim(); if (!tx) { toast("Cole o texto do vídeo.", true); return; } r.texto = tx.slice(0, 6000); await API.salvarReferencia(r); toast("Texto salvo. Agora é só gerar."); irPara("criar"); return; }
+        if (a === "salvar-texto") { const tx = ($("#refTextoFalta").value || "").trim(); if (!tx) { toast("Cole o texto do vídeo.", true); return; } r.texto = tx.slice(0, 6000); await API.salvarReferencia(r); toast("Texto salvo. Agora é só gerar."); irPara("criar", true); return; }
         if ((a === "gerar" || a === "copiar-pedido") && !r.texto) { toast("Falta o texto do vídeo. Cole o que a pessoa fala.", true); return; }
         if (a === "gerar") await gerarCopy(r, t);
         else if (a === "copiar-pedido") { const txt = pedidoCopy(r); try { await navigator.clipboard.writeText(txt); toast("Pedido copiado. Cole no Claude."); } catch (_) { const ta = document.createElement("textarea"); ta.value = txt; document.body.appendChild(ta); ta.select(); try { document.execCommand("copy"); toast("Pedido copiado. Cole no Claude."); } catch (__) { toast("Não consegui copiar.", true); } ta.remove(); } }
-        else if (a === "salvar-copy") { r.copy = $("#refCopy").value; await API.salvarReferencia(r); toast("Copy salva."); irPara("criar"); }
+        else if (a === "salvar-copy") { r.copy = $("#refCopy").value; await API.salvarReferencia(r); toast("Copy salva."); S.rascunhoCopy = null; irPara("criar", true); }
         else if (a === "agenda-ref") {
           const f = S.refForm, produto = f.modo === "meu" ? f.produto : f.modo === "outro" ? f.outro : (f.mesmo || "");
           const nome = (produto || tituloDa(r)).slice(0, 300); r.copy = $("#refCopy").value; await API.salvarReferencia(r);
