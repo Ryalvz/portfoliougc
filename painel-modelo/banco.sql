@@ -27,6 +27,8 @@ alter table public.perfis add column if not exists cor text not null default 'ca
 -- Como você quer ser chamado e os primeiros passos marcados (modo Começando)
 alter table public.perfis add column if not exists apelido text check (char_length(apelido) <= 40);
 alter table public.perfis add column if not exists passos jsonb not null default '{}'::jsonb;
+-- A sua chave da Supadata (transcrição da aba Criar). Só você lê: a trava do perfil vale para ela também.
+alter table public.perfis add column if not exists supadata_key text check (char_length(supadata_key) <= 200);
 alter table public.perfis enable row level security;
 drop policy if exists "aluno le o proprio perfil" on public.perfis;
 create policy "aluno le o proprio perfil" on public.perfis
@@ -152,6 +154,13 @@ begin
     execute format('create policy "so o dono" on public.%I for all to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid())', t);
   end loop;
 end $$;
+
+-- Libera as tabelas para o painel logado (vale mesmo se "Grant API access to new tables" ficou desmarcado).
+-- Quem garante que cada um só vê o que é seu são as travas (RLS) acima.
+grant usage on schema public to authenticated;
+grant select, insert, update, delete on public.perfis, public.pedidos, public.produtos, public.importacoes, public.videos, public.amostras, public.referencias to authenticated;
+grant usage, select on all sequences in schema public to authenticated;
+revoke all on public.perfis, public.pedidos, public.produtos, public.importacoes, public.videos, public.amostras, public.referencias from anon;
 
 -- Se você criou o seu usuário ANTES de rodar este arquivo, o perfil nasce aqui
 insert into public.perfis (user_id, email)

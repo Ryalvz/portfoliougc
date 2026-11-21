@@ -98,6 +98,43 @@
   /* =============================================================
      DADOS: Supabase ou demonstração (mesmos métodos nos dois)
      ============================================================= */
+  // Supadata direto do navegador (a Supadata libera chamadas de qualquer site)
+  function erroSupadata(status, corpo) {
+    const codigo = String((corpo && corpo.error) || "").toLowerCase(), det = String((corpo && (corpo.details || corpo.message)) || "");
+    if (codigo === "limit-exceeded" || status === 429 || status === 402) {
+      if (/plan usage|usage limit|credits/i.test(det) || status === 402) return { tipo: "cota", erro: "Os créditos da Supadata deste mês acabaram. Eles voltam no começo do mês que vem." };
+      return { tipo: "ritmo", erro: "Foram muitos pedidos seguidos. Espere 1 minutinho e tente de novo." };
+    }
+    if (status === 401 || status === 403 || codigo === "unauthorized") return { tipo: "chave-errada", erro: "A sua chave da Supadata não funcionou. Copie de novo no site da Supadata (API Keys, começa com sd_) e cole em Meu perfil." };
+    if (status === 206 || codigo === "transcript-unavailable") return { tipo: "sem-fala", erro: "Não achei fala nesse vídeo. Costuma ser vídeo só com música ou só com texto na tela." };
+    if (status === 404 || codigo === "not-found") return { tipo: "nao-achou", erro: "Não encontrei esse vídeo. Ele pode ser privado, ter sido apagado ou o link está incompleto." };
+    if (status === 400 || codigo === "invalid-request") return { tipo: "link", erro: "Esse link não é aceito. Use o link completo do vídeo do TikTok." };
+    return { tipo: "outro", erro: "A Supadata não conseguiu transcrever agora. Tente de novo em instantes." };
+  }
+  function textoSupadata(d) {
+    const c = d && d.content; const texto = typeof c === "string" ? c.trim() : Array.isArray(c) ? c.map((x) => (x && x.text) || "").join(" ").replace(/\s+/g, " ").trim() : "";
+    return !texto || (d && d.lang === "none") ? { tipo: "sem-fala", erro: "Não achei fala nesse vídeo. Costuma ser vídeo só com música ou só com texto na tela." } : { texto };
+  }
+  async function supadataDireto(chave, link, aoAndar) {
+    const pedir = async (caminho) => { const r = await fetch("https://api.supadata.ai/v1" + caminho, { headers: { "x-api-key": chave } }); let d = {}; try { d = await r.json(); } catch (_) {} return { r, d }; };
+    try {
+      if (!/^https?:\/\//i.test(link)) return { tipo: "link", erro: "Esse link não parece de um vídeo. Ele precisa começar com https://" };
+      let { r, d } = await pedir(`/transcript?url=${encodeURIComponent(link)}&mode=auto&text=true&lang=pt`);
+      const job = r.status === 202 || d.jobId ? d.jobId : null;
+      if (!job) return !r.ok || r.status === 206 ? erroSupadata(r.status, d) : textoSupadata(d);
+      const ini = Date.now();
+      while (Date.now() - ini < 6 * 60000) {
+        aoAndar && aoAndar(Math.round((Date.now() - ini) / 1000));
+        await new Promise((ok) => setTimeout(ok, 5000));
+        ({ r, d } = await pedir(`/transcript/${encodeURIComponent(job)}`));
+        if (!r.ok) return erroSupadata(r.status, d);
+        if (d.status === "failed") return { tipo: "sem-fala", erro: "A Supadata não conseguiu ouvir esse vídeo. Ele pode não ter fala." };
+        if (d.status === "completed" || d.content !== undefined) return textoSupadata(d);
+      }
+      return { erro: "Passou de 6 minutos e não ficou pronto. Tente de novo daqui a pouco." };
+    } catch (_) { return { erro: "Não consegui falar com a Supadata. Confira sua internet e tente de novo." }; }
+  }
+
   function apiSupabase() {
     const sb = window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY);
     let uid = null;
@@ -149,15 +186,18 @@
       async referencias() { return ok(await sb.from("referencias").select("*").order("criado_em", { ascending: false })); },
       async salvarReferencia(r) { ok(await sb.from("referencias").upsert({ id: r.id, link: r.link || "", autor: r.autor || "", texto: r.texto || "", copy: r.copy || "", criado_em: r.criado_em, user_id: uid }, { onConflict: "id" })); },
       async apagarReferencia(id) { ok(await sb.from("referencias").delete().eq("id", id)); },
-      // Transcrição automática: a função "transcrever" do Supabase do aluno pede à Supadata (a chave fica no cofre do Supabase)
+      // Transcrição automática: o painel pede direto à Supadata, com a chave que o aluno colou em Meu perfil.
+      // (Sem chave no perfil, tenta a função "transcrever" do Supabase, para quem ligou por lá.)
       async transcrever(link, aoAndar) {
+        const chave = String((S.perfil && S.perfil.supadata_key) || "").trim();
+        if (chave) return await supadataDireto(chave, link, aoAndar);
         const chamar = async (corpo) => {
           const { data, error } = await sb.functions.invoke("transcrever", { body: corpo });
           if (!error) return data || { erro: "Não veio resposta. Tente de novo." };
           let j = null; try { j = await error.context.json(); } catch (_) {}
           if (j && j.erro) return j;
           const st = error.context && error.context.status;
-          if (st === 404 || /Failed to send|not found/i.test(String(error.message))) return { tipo: "sem-funcao", erro: "A transcrição ainda não foi ligada no seu Supabase. Peça ao Claude: \"ligue a transcrição do meu painel\"." };
+          if (st === 404 || /Failed to send|not found/i.test(String(error.message))) return { tipo: "sem-chave", erro: "Falta a sua chave da Supadata. Crie uma conta grátis em supadata.ai, copie a API key e cole em Meu perfil > Chave da Supadata." };
           return { erro: "Não deu para transcrever agora. Tente de novo em instantes." };
         };
         if (/(vm|vt)\.tiktok\.com\//i.test(link)) { const r0 = await chamar({ acao: "resolver", link }); if (r0 && r0.link) link = r0.link; }
@@ -268,6 +308,12 @@
   async function carregarTudo() {
     const [perfil, brutos, produtos, importacoes, amostras] = await Promise.all([API.perfil(), API.pedidos(), API.produtos(), API.importacoes(), API.amostras()]);
     S.perfil = perfil || { nome: "", meta_videos: 15 };
+    // Primeiro login: o perfil que o aluno preencheu no guia (config.js) entra sozinho
+    const ini = CFG.PERFIL_INICIAL;
+    if (!DEMO && ini && typeof ini === "object" && !(S.perfil.nome || "").trim()) {
+      const ok = {}; ["nome", "apelido", "tiktok", "meta_gmv", "meta_videos", "estilo", "cor"].forEach((k) => { if (ini[k] !== undefined && ini[k] !== null && ini[k] !== "") ok[k] = ini[k]; });
+      if (Object.keys(ok).length) { try { await API.salvarPerfil(ok); Object.assign(S.perfil, ok); } catch (_) {} }
+    }
     aplicarAparencia(S.perfil.estilo, S.perfil.cor);
     S.brutos = brutos; S.importacoes = importacoes; S.amostras = amostras;
     S.produtos = {}; produtos.forEach((p) => { S.produtos[p.produto_id] = p; });
@@ -850,6 +896,7 @@
         <div class="dupla"><div><label class="lbl" for="pNome">Nome</label><input class="inp" id="pNome" value="${esc(p.nome)}"></div>
           <div><label class="lbl" for="pApelido">Como quero ser chamado</label><input class="inp" id="pApelido" value="${esc(p.apelido)}" placeholder="ex.: Ju"></div></div>
         <div><label class="lbl" for="pTiktok">@ do TikTok</label><input class="inp" id="pTiktok" value="${esc(p.tiktok)}"></div>
+        ${API.transcrever ? `<div><label class="lbl" for="pSupadata">Chave da Supadata <small>para transcrever os vídeos da aba Criar</small></label><input class="inp" id="pSupadata" type="password" autocomplete="off" spellcheck="false" placeholder="sd_..." value="${esc(p.supadata_key || "")}"><p class="frase" style="margin:6px 0 0">Conta grátis em <a href="https://supadata.ai" target="_blank" rel="noopener">supadata.ai</a> (100 por mês). No painel deles, abra API Keys e copie a chave. Fica guardada só no seu banco.</p></div>` : ""}
         <div class="dupla"><div><label class="lbl" for="pMetaG">Quanto quero vender no mês (R$)</label><input class="inp" id="pMetaG" type="number" min="0" step="500" value="${esc(p.meta_gmv || "")}" placeholder="ex.: 30000"></div>
           <div><label class="lbl" for="pMetaV">Vídeos por dia</label><input class="inp" id="pMetaV" type="number" min="1" max="60" value="${esc(p.meta_videos || 15)}"></div></div>
         ${sug ? `<div class="sugestao"><span class="rot">Sugestão pelo seu crescimento</span><div class="meta-num">${real(sug.valor)}</div><p class="frase">${esc(sug.motivo)}</p><button class="btn sec pequeno" type="button" id="pUsarSug">Usar a sugestão</button></div>` : `<p class="frase">Depois que você importar seus pedidos, o painel sugere uma meta pelo seu crescimento.</p>`}
@@ -866,7 +913,8 @@
     $("#formPerfil").addEventListener("submit", async (e) => {
       e.preventDefault();
       let tk = $("#pTiktok").value.trim(); if (tk && tk[0] !== "@") tk = "@" + tk;
-      const novo = { nome: $("#pNome").value.trim().slice(0, 120), apelido: $("#pApelido").value.trim().slice(0, 40), tiktok: tk.slice(0, 60),
+      const sd = $("#pSupadata"), extra = sd ? { supadata_key: sd.value.trim().slice(0, 200) || null } : {};
+      const novo = { ...extra, nome: $("#pNome").value.trim().slice(0, 120), apelido: $("#pApelido").value.trim().slice(0, 40), tiktok: tk.slice(0, 60),
         meta_videos: Math.min(60, Math.max(1, parseInt($("#pMetaV").value, 10) || 15)), meta_gmv: Number($("#pMetaG").value) || null };
       try { await API.salvarPerfil(novo); Object.assign(S.perfil, novo); montarMenu(); toast("Perfil salvo."); } catch (er) { toast(traduz(er), true); }
     });
@@ -939,10 +987,58 @@ O QUE EU SEI DO PRODUTO: ${f.sabe || "nada além do nome; o que faltar, deixe [e
 ENTREGUE, em português do Brasil, nesta ordem:
 MAPA DA REFERÊNCIA: as partes do vídeo numeradas (gancho, problema, demonstração, prova, chamada pro carrinho), com os segundos de cada uma. Calcule pelos números de palavras: palavras ÷ 3,25 = segundos.
 POR QUE PRENDE: 1 frase sobre o gancho.
-ROTEIRO NOVO: pronto para gravar, uma frase por linha, mesmo tamanho da referência.
+ROTEIRO NOVO: pronto para gravar, mesmo tamanho da referência, dividido em cenas. Use EXATAMENTE este formato, uma cena por parte do mapa, sem comentários entre as cenas:
+CENA 1
+FALA: o que eu falo, do jeito que eu falo
+IMAGEM: o que aparece na tela (enquadramento, produto, demonstração)
+TEXTO NA TELA: só se tiver (na cena 1, a headline do gancho)
 3 GANCHOS ALTERNATIVOS: um por linha.
 
 REGRAS: entregue tudo agora, sem fazer perguntas antes: o que faltar fica [entre colchetes] para eu ajustar. Não copie frases da referência, só a estrutura. Nada de promessa de cura, resultado garantido, preço de antes falso ou urgência que a loja não deu. Não invente preço nem característica: o que não souber fica [entre colchetes]. Sem emoji e sem travessão.`;
+  }
+  // Lê a copy do Claude e separa as cenas. Entende "CENA 1 / FALA: / IMAGEM:", partes "[1. GANCHO]" e títulos "1. Gancho".
+  function cenasDaCopy(txt) {
+    const linhas = String(txt).replace(/\r/g, "").replace(/\*\*|__|^#+\s*/gm, "").split("\n").map((l) => l.trim());
+    const eRoteiro = (l) => /^ROTEIRO( NOVO)?\b/i.test(l), eGanchos = (l) => /^(\d+\s+)?GANCHOS?( ALTERNATIVOS| PARA TESTAR)?\b/i.test(l), eFim = (l) => /^(RISCOS|CUIDADOS|OBSERVA|ANTES DE GRAVAR|DICAS)/i.test(l);
+    let a = linhas.findIndex(eRoteiro); a = a < 0 ? 0 : a + 1;
+    let b = linhas.findIndex((l, k) => k >= a && (eGanchos(l) || eFim(l))); if (b < 0) b = linhas.length;
+    const corpo = linhas.slice(a, b);
+    const ganchos = []; const g = linhas.findIndex(eGanchos);
+    if (g >= 0) for (let k = g + 1; k < linhas.length && ganchos.length < 3; k++) { const l = linhas[k]; if (!l) continue; if (eFim(l)) break; ganchos.push(l.replace(/^\s*[-•\d.)]+\s*/, "")); }
+    const marcaCena = (l) => /^CENA\s*\d+\b/i.test(l), marcaParte = (l) => /^\[[^\]]{2,60}\]$/.test(l) || /^\d+\s*[.)-]\s*[A-ZÁÉÍÓÚÂÊÔÃÕÇ][A-ZÁÉÍÓÚÂÊÔÃÕÇ0-9 +/,-]{2,50}:?$/.test(l) || /^[A-ZÁÉÍÓÚÂÊÔÃÕÇ][A-ZÁÉÍÓÚÂÊÔÃÕÇ +/-]{3,40}:$/.test(l);
+    const meta = (l) => /\b(palavras|segundos)\b.*(\d)/i.test(l) && /(fala lida|total|preenchendo|deve fechar|contagem)/i.test(l);
+    const cenas = []; let atual = null;
+    const nova = (nome) => { atual = { parte: nome, fala: [], imagem: [], texto: [] }; cenas.push(atual); };
+    corpo.forEach((l) => {
+      if (!l || meta(l)) return;
+      if (marcaCena(l)) { nova(""); const resto = l.replace(/^CENA\s*\d+\s*[:.)-]?\s*/i, ""); if (resto) atual.parte = resto; return; }
+      if (marcaParte(l)) { nova(l.replace(/^\[|\]$/g, "").replace(/^\d+\s*[.)-]\s*/, "").replace(/:$/, "").trim()); return; }
+      if (!atual) nova("");
+      let m;
+      if ((m = l.match(/^FALA\s*:\s*(.*)$/i))) atual.fala.push(m[1]);
+      else if ((m = l.match(/^(IMAGEM|CENA|TELA|VISUAL)\s*:\s*(.*)$/i))) atual.imagem.push(m[2]);
+      else if ((m = l.match(/^TEXTO NA TELA\s*:\s*(.*)$/i))) { if (!/^\(?(nenhum|sem texto|-|n[aã]o tem)\)?\.?$/i.test(m[1].trim())) atual.texto.push(m[1]); }
+      else atual.fala.push(l);
+    });
+    const parte = (x) => x ? x.charAt(0).toUpperCase() + x.slice(1).toLowerCase() : "";
+    return { cenas: cenas.map((c) => ({ parte: parte(c.parte), fala: c.fala.join(" "), imagem: c.imagem.join(" "), texto: c.texto.join(" ") })).filter((c) => c.fala || c.imagem), ganchos };
+  }
+  function abrirRoteiro(txt, produto) {
+    const { cenas, ganchos } = cenasDaCopy(txt);
+    const palavras = cenas.reduce((n, c) => n + (c.fala.replace(/\[[^\]]*\]/g, "").match(/\S+/g) || []).length, 0), seg = Math.round(palavras / 3.25);
+    const comCena = cenas.some((c) => c.imagem), nomeProd = String(produto || "").trim().slice(0, 60);
+    const antigo = $("#roteiroCenas"); if (antigo) antigo.remove();
+    const m = document.createElement("div"); m.id = "roteiroCenas"; m.className = "roteiro-tela"; m.setAttribute("role", "dialog"); m.setAttribute("aria-label", "Roteiro de gravação");
+    m.innerHTML = `<div class="roteiro-caixa">
+      <div class="roteiro-topo"><div><p class="rot">Roteiro de gravação</p><h2>Vídeo TikTok${nomeProd ? " · " + esc(nomeProd) : ""}</h2><p class="sub">${cenas.length} cenas · ~${seg}s de fala (${palavras} palavras)</p></div>
+        <div class="controles"><button class="btn sec pequeno" type="button" data-acao="imprimir-roteiro">Imprimir</button><button class="btn pequeno" type="button" data-acao="fechar-roteiro">Fechar</button></div></div>
+      <div class="roteiro-colunas${comCena ? "" : " uma"}"><span>Áudio / fala</span>${comCena ? "<span>Imagem / cena</span>" : ""}</div>
+      ${cenas.map((c, i) => `<div class="roteiro-linha${comCena ? "" : " uma"}"><div class="r-fala"><p class="rot">Fala ${i + 1}${c.parte ? " · " + esc(c.parte) : ""}</p><p>${esc(c.fala || "(sem fala)").replace(/\[([^\]]*)\]/g, '<span class="r-lacuna">[$1]</span>')}</p>${c.texto ? `<p class="r-texto">Texto na tela: <b>${esc(c.texto)}</b></p>` : ""}</div>${comCena ? `<div class="r-cena"><p class="rot">Cena ${i + 1}</p><p>${c.imagem ? esc(c.imagem) : "<i>sem cena descrita</i>"}</p></div>` : ""}</div>`).join("") || '<p class="vazio">Não achei cenas nessa copy.</p>'}
+      ${ganchos.length ? `<div class="roteiro-ganchos"><p class="rot">Ganchos para testar</p><ol>${ganchos.map((g) => `<li>${esc(g)}</li>`).join("")}</ol></div>` : ""}
+    </div>`;
+    document.body.appendChild(m); document.body.classList.add("com-roteiro");
+    m.addEventListener("click", (e) => { if (e.target === m) { m.remove(); document.body.classList.remove("com-roteiro"); } });
+    m.querySelectorAll("[data-acao]").forEach((b) => b.addEventListener("click", () => { if (b.dataset.acao === "imprimir-roteiro") window.print(); else { m.remove(); document.body.classList.remove("com-roteiro"); } }));
   }
   async function telaCriar(el) {
     S.refForm = S.refForm || { modo: "mesmo", produto: "", outro: "", muda: { gancho: true, jeito: true }, sabe: "" };
@@ -993,6 +1089,7 @@ REGRAS: entregue tudo agora, sem fazer perguntas antes: o que faltar fica [entre
             <div class="controles" style="justify-content:flex-end;margin-top:10px">
               <button class="link" type="button" data-acao="apagar-ref">Apagar referência</button>
               <button class="btn sec pequeno" type="button" data-acao="agenda-ref">Mandar pra agenda de hoje</button>
+              <button class="btn sec pequeno" type="button" data-acao="ver-roteiro">Ver roteiro de gravação</button>
               <button class="btn pequeno" type="button" data-acao="salvar-copy">Salvar copy</button>
             </div></div>`
         : `<div class="card"><p class="vazio" style="text-align:center;padding:40px 0">Escolha uma referência ao lado pra modelar a copy.</p></div>`}</div>
@@ -1052,8 +1149,16 @@ REGRAS: entregue tudo agora, sem fazer perguntas antes: o que faltar fica [entre
       else if (a === "ref-filtro") { S.refFiltro = t.dataset.v; irPara("criar"); }
       else if (a === "ref-modo") { S.refForm.modo = t.dataset.v; irPara("criar"); }
       else if (a === "atualizar-refs") { S.refs = await API.referencias(); const r2 = S.refs.find((x) => x.id === S.refSel); toast(r2 && r2.texto ? "Texto chegou. Agora é só gerar." : "Ainda sem texto. Espere o Claude terminar e clique de novo."); irPara("criar"); }
-      else if (a === "gerar" || a === "copiar-pedido" || a === "salvar-copy" || a === "agenda-ref" || a === "apagar-ref" || a === "salvar-texto" || a === "transcrever") {
+      else if (a === "fechar-roteiro") { const m = $("#roteiroCenas"); if (m) m.remove(); document.body.classList.remove("com-roteiro"); }
+      else if (a === "imprimir-roteiro") { window.print(); }
+      else if (a === "gerar" || a === "copiar-pedido" || a === "salvar-copy" || a === "agenda-ref" || a === "apagar-ref" || a === "salvar-texto" || a === "transcrever" || a === "ver-roteiro") {
         const r = (S.refs || []).find((x) => x.id === S.refSel); if (!r) return;
+        if (a === "ver-roteiro") {
+          const txt = ($("#refCopy") && $("#refCopy").value) || r.copy || "";
+          if (!txt.trim()) { toast("Ainda não tem copy. Gere ou cole a copy primeiro.", true); return; }
+          const f = S.refForm, prod = (f.modo === "meu" ? f.produto : f.modo === "outro" ? f.outro : f.mesmo) || "";
+          abrirRoteiro(txt, prod); return;
+        }
         if (a === "transcrever" && API.transcrever) {
           t.disabled = true; const rot = t.textContent; toast("Ouvindo o vídeo. Leva até 3 minutos, pode deixar a aba aberta.");
           const res = await API.transcrever(r.link, (seg) => { t.textContent = `Ouvindo... ${seg}s`; });

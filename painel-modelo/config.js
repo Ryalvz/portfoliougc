@@ -5,5 +5,7 @@
    Vazio = abre em modo demonstração, com dados de exemplo. */
 window.PAINEL_CONFIG = {
   SUPABASE_URL: "",
-  SUPABASE_ANON_KEY: ""
+  SUPABASE_ANON_KEY: "",
+  // Perfil que entra sozinho no primeiro login (vem do que o aluno preencheu no guia)
+  PERFIL_INICIAL: null
 };
