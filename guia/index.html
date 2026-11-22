@@ -511,7 +511,16 @@ var CONFIG = {
         var l=document.createElement('label'); l.className='lbl'; l.htmlFor='qp_'+k; l.textContent=rot;
         var i=document.createElement('input'); i.className='inp'; i.id='qp_'+k; i.placeholder=ph; i.value=P[k]||''; i.autocomplete='off';
         if(tipo){i.type=tipo; i.inputMode='numeric'; i.min='0'; i.step='500';}
-        i.addEventListener('input',function(){ perfil.painel[k]=i.value.trim(); gravar(KP,perfil); atualizarPedidos(); });
+        i.addEventListener('input',function(){
+          var v=i.value.trim();
+          if(k==='supa_url'||k==='supa_key'){
+            // aceita a linha inteira do Supabase (NEXT_PUBLIC_...=valor) e até as duas linhas juntas
+            var mu=v.match(/https:\/\/[a-z0-9]+\.supabase\.co/i), mk=v.match(/sb_(publishable|secret)_[A-Za-z0-9_-]+|eyJ[A-Za-z0-9._-]{20,}/);
+            if(k==='supa_url'&&mu) v=mu[0]; else if(k==='supa_key'&&mk) v=mk[0]; else if(/=/.test(v)) v=v.split('=').slice(1).join('=').trim();
+            if(mu&&mk){ perfil.painel.supa_url=mu[0]; perfil.painel.supa_key=mk[0]; var ou=document.getElementById(k==='supa_url'?'qp_supa_key':'qp_supa_url'); if(ou) ou.value=k==='supa_url'?mk[0]:mu[0]; }
+            if(v!==i.value) i.value=v;
+          }
+          perfil.painel[k]=v; gravar(KP,perfil); atualizarPedidos(); });
         d.appendChild(l); d.appendChild(i); return d;
       }
       function chips(k,rot,ops){
