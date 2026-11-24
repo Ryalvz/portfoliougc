@@ -146,7 +146,7 @@ function desenharEstudio(el) {
             ${est.i < n - 1 && L.t === "texto" ? `<label class="check est-continua"><input type="checkbox" data-cam-continua ${L.continua ? "checked" : ""}> Continua no próximo slide (o resto aparece quando a pessoa arrasta)</label>` : ""}` : ""}
           ${["foto", "forma", "imagem", "janela", "celular"].includes(L.t) ? `${estFaixa("w", "Largura", 40, W, 10, L.w, "px")}${estFaixa("h", "Altura", 40, H, 10, L.h, "px")}${estFaixa("rot", "Girar", -20, 20, 1, L.rot || 0, "°")}` : ""}
           ${L.t === "imagem" ? estFaixa("foco", "Enquadramento da foto (cima / baixo)", 0, 1, 0.02, L.foco ?? 0.4) : ""}
-          ${L.t === "fundoFoto" ? `<small class="sub">Arraste a foto no slide pra posicionar. A bolinha do canto ou a rodinha do mouse aumentam e diminuem.</small>
+          ${L.t === "fundoFoto" ? `<small class="sub">Arraste a foto no slide pra posicionar. A bolinha do canto aumenta e diminui.</small>
             ${estFaixa("zoom", "Tamanho da foto", 0.4, 4, 0.01, L.zoom || 1, "x")}
             ${estFaixa("px", "Posição na horizontal", -W, W, 5, L.px || 0, "px")}
             ${estFaixa("py", "Posição na vertical", -H, H, 5, L.py || 0, "px")}
@@ -427,15 +427,7 @@ function desenharEstudio(el) {
   tela.addEventListener("pointerup", soltar);
   tela.addEventListener("pointercancel", soltar);
   tela.addEventListener("dblclick", () => { const f = $("[data-cam-texto]", el); if (f) { f.focus(); f.select(); } });
-  tela.addEventListener("wheel", (e) => {
-    const l = est.sel && camadas.find((x) => x.id === est.sel);
-    if (l && l.t === "fundoFoto") { e.preventDefault(); marcar(); l.zoom = Math.round(Math.max(0.4, Math.min(4, (l.zoom || 1) * (e.deltaY < 0 ? 1.04 : 1 / 1.04))) * 100) / 100; editado(); repintarJa(); miniDepois(); return; }
-    if (!l || !CAMADAS.TEXTOS.includes(l.t)) return;
-    e.preventDefault(); marcar();
-    l.tam = Math.round(Math.max(10, Math.min(260, l.tam * (e.deltaY < 0 ? 1.04 : 1 / 1.04)) * 2) / 2);
-    const f = $('[data-cam-num="tam"]', el); if (f) { f.value = l.tam; $('[data-cam-saida="tam"]', el).textContent = Math.round(l.tam) + "px"; }
-    editado(); repintarJa(); miniDepois();
-  }, { passive: false });
+  // A rodinha do mouse só rola a página (o tamanho muda pela bolinha do canto ou pelo painel)
   if (window.__estResize) window.removeEventListener("resize", window.__estResize);
   window.__estResize = mostrarSel; window.addEventListener("resize", mostrarSel);
 
