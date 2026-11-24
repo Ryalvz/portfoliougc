@@ -44,15 +44,34 @@
   }
 
   /* ---------- Aparência: estilo e cor (escolhidos em Meu perfil) ---------- */
-  const ESTILOS = { classico: ["Clássico", "Cartões e listas, direto ao ponto"], grafico: ["Gráfico", "Números grandes e gráfico de vendas"], minimal: ["Minimal", "Cantos redondos, ícones e muito respiro"] };
-  const CORES = { cafe: ["Café", "#2B241C", "#A8864A"], grafite: ["Grafite", "#141414", "#8A8A8E"], rosa: ["Rosa", "#3A1F2B", "#D46A8C"], oliva: ["Oliva", "#26301F", "#7C8B4A"], azul: ["Azul", "#14213D", "#3D6FB6"] };
+  // Aparência: 4 estilos (forma) x 8 paletas (cores) + cor principal opcional. Tudo combina com tudo.
+  const ESTILOS = {
+    light: ["Modern Light", "Claro e limpo, borda fina. A cor aparece só onde importa."],
+    dark: ["Dark Pro", "Fundo escuro, números fortes e destaque com brilho leve."],
+    glass: ["Glass / Aurora", "Fundo com luzes da paleta e cards de vidro. Leve e moderno."],
+    bold: ["Bold Modern", "Blocos de cor, títulos grandes e muito contraste."]
+  };
+  const PALETAS = {
+    cafe: ["Café", ["#2B241C", "#A8864A", "#D7C3A0", "#F6F2EB"]], oliva: ["Oliva", ["#3F4A2B", "#7C8B4A", "#B8C28A", "#F3F3EA"]],
+    grafite: ["Grafite", ["#1C1C1E", "#6E6E73", "#A1A1A6", "#EDEDEF"]], rosa: ["Rosa", ["#6E2F48", "#C45A80", "#E8A7BD", "#FBF1F4"]],
+    azul: ["Azul", ["#14213D", "#3D6FB6", "#8FB3E3", "#EEF2F8"]], lavanda: ["Lavanda", ["#3B2A5C", "#8E6CCB", "#C3B2E8", "#F4F1FA"]],
+    terracota: ["Terracota", ["#6B2E1F", "#C46A3C", "#E3B08E", "#F8F1EA"]], energia: ["Energia", ["#14452F", "#D9A514", "#8DBF6A", "#F3F5EE"]]
+  };
+  const CORES = PALETAS;
+  const ESTILO_ANTIGO = { clean: "light", editorial: "light", classico: "light", grafico: "light", minimal: "light", colorful: "bold" };
+  const LAYOUT_HOJE = { light: "classico", dark: "classico", glass: "classico", bold: "classico" };
+  const APARENCIA_PADRAO = { estilo: "light", cor: "cafe", custom: null };
+  const normEstilo = (e) => { e = ESTILO_ANTIGO[e] || e; return ESTILOS[e] ? e : APARENCIA_PADRAO.estilo; };
+  const normPaleta = (c) => (PALETAS[c] ? c : APARENCIA_PADRAO.cor);
+  const normCustom = (c) => (/^#[0-9a-f]{6}$/i.test(String(c || "")) ? String(c).toLowerCase() : null);
   function lerAparencia() { try { return JSON.parse(localStorage.getItem("painel-aparencia") || "{}") || {}; } catch (_) { return {}; } }
-  function aplicarAparencia(estilo, cor) {
-    const r = document.documentElement;
-    r.dataset.estilo = ESTILOS[estilo] ? estilo : "classico"; r.dataset.cor = CORES[cor] ? cor : "cafe";
-    try { localStorage.setItem("painel-aparencia", JSON.stringify({ estilo: r.dataset.estilo, cor: r.dataset.cor })); } catch (_) {}
+  function aplicarAparencia(estilo, cor, custom, alvo) {
+    const r = alvo || document.documentElement, c = normCustom(custom);
+    r.dataset.estilo = normEstilo(estilo); r.dataset.paleta = normPaleta(cor);
+    if (c) r.style.setProperty("--p-principal", c); else r.style.removeProperty("--p-principal");
+    if (!alvo) try { localStorage.setItem("painel-aparencia", JSON.stringify({ estilo: r.dataset.estilo, cor: r.dataset.paleta, custom: c })); } catch (_) {}
   }
-  (() => { const a = lerAparencia(); aplicarAparencia(a.estilo, a.cor); })();
+  (() => { const a = lerAparencia(); aplicarAparencia(a.estilo, a.cor, a.custom); })();
 
   /* ---------- Categorias e status ---------- */
   const CATS = { tech: "Tech e eletrônicos", casa: "Casa e cozinha", beleza: "Beleza e cuidados", moda: "Moda e acessórios", fitness: "Fitness e saúde", infantil: "Infantil e pets", outros: "Outros" };
@@ -260,7 +279,7 @@
     return {
       async sessao() { return B.perfil ? { id: "demo", email: B.perfil.email } : null; },
       aoMudar() {},
-      async entrar(email) { B.perfil = B.perfil || { user_id: "demo", email: email || "voce@exemplo.com", nome: "Aluno de exemplo", whatsapp: "27912345678", tiktok: "@seuuser", aceite_avisos: true, meta_videos: 15, meta_gmv: 100000, estilo: lerAparencia().estilo || "classico", cor: lerAparencia().cor || "cafe" }; return { id: "demo", email: B.perfil.email }; },
+      async entrar(email) { B.perfil = B.perfil || { user_id: "demo", email: email || "voce@exemplo.com", nome: "Aluno de exemplo", whatsapp: "27912345678", tiktok: "@seuuser", aceite_avisos: true, meta_videos: 15, meta_gmv: 100000, estilo: lerAparencia().estilo || "light", cor: lerAparencia().cor || "cafe", cor_custom: lerAparencia().custom || null }; return { id: "demo", email: B.perfil.email }; },
       async cadastrar(c) { B.perfil = { user_id: "demo", email: c.email, nome: c.nome, whatsapp: c.whatsapp, tiktok: c.tiktok, aceite_avisos: c.aceite, meta_videos: 15, meta_gmv: null, estilo: "classico", cor: "cafe" }; return { id: "demo", email: c.email }; },
       async recuperar() {}, async novaSenha() {}, async sair() { B.perfil = null; },
       async perfil() { return clone(B.perfil); },
@@ -314,7 +333,8 @@
       const ok = {}; ["nome", "apelido", "tiktok", "meta_gmv", "meta_videos", "estilo", "cor"].forEach((k) => { if (ini[k] !== undefined && ini[k] !== null && ini[k] !== "") ok[k] = ini[k]; });
       if (Object.keys(ok).length) { try { await API.salvarPerfil(ok); Object.assign(S.perfil, ok); } catch (_) {} }
     }
-    aplicarAparencia(S.perfil.estilo, S.perfil.cor);
+    aplicarAparencia(S.perfil.estilo, S.perfil.cor, S.perfil.cor_custom);
+    aplicarMenuRecolhido(lerMenuRecolhido());
     S.brutos = brutos; S.importacoes = importacoes; S.amostras = amostras;
     S.produtos = {}; produtos.forEach((p) => { S.produtos[p.produto_id] = p; });
     reprocessar();
@@ -517,10 +537,15 @@
 
   function montarMenu() {
     const atrasadas = S.amostras.filter((a) => a.decisao === "testando" && a.prazo_postar && a.prazo_postar < hojeISO()).length;
-    $("#menuItens").innerHTML = TELAS.map(([id, nome]) => `<button class="menu-item" type="button" data-tela="${id}"${S.tela === id ? ' aria-current="page"' : ""}><svg class="i" viewBox="0 0 24 24">${ICONES[id]}</svg>${nome}${id === "amostras" && atrasadas ? `<span class="bolinha" title="amostras com prazo vencido">${atrasadas}</span>` : ""}</button>`).join("");
+    $("#menuItens").innerHTML = TELAS.map(([id, nome]) => `<button class="menu-item" type="button" data-tela="${id}" data-dica="${nome}"${S.tela === id ? ' aria-current="page"' : ""}><svg class="i" viewBox="0 0 24 24">${ICONES[id]}</svg><span class="rotulo">${nome}</span>${id === "amostras" && atrasadas ? `<span class="bolinha" title="amostras com prazo vencido">${atrasadas}</span>` : ""}</button>`).join("");
     $$('.menu-rodape [data-tela]').forEach((b) => b.toggleAttribute("aria-current", S.tela === b.dataset.tela));
     $$(".assina").forEach((el) => { el.textContent = (S.perfil.nome || "").trim() || "Meu painel"; });
-    $("#quem").textContent = [S.perfil.nome, S.perfil.tiktok].filter(Boolean).join(" · ") || (S.user && S.user.email) || "";
+    const nomeQuem = (S.perfil.nome || "").trim() || (S.user && S.user.email) || "", arroba = (S.perfil.tiktok || "").trim();
+    $("#quem").innerHTML = `<b>${esc(nomeQuem)}</b>${arroba ? `<span>${esc(arroba)}</span>` : ""}`;
+    const ini = nomeQuem.split(/[\s@.]+/).filter(Boolean);
+    $("#avatar").textContent = ((ini[0] || "?")[0] + (ini.length > 1 ? ini[ini.length - 1][0] : "")).toUpperCase();
+    $("#marcaSinal").textContent = (((S.perfil.nome || "").trim() || "M")[0]).toUpperCase();
+    $("#sair").dataset.dica = nomeQuem ? "Sair (" + nomeQuem + ")" : "Sair";
     $("#telaNomeCel").textContent = NOMES[S.tela] || "";
   }
   async function irPara(tela, manterRolagem) {
@@ -551,7 +576,7 @@
     const an = analiseProdutos(), f = foco(an), plano = planoDoDia(an, f);
     const vids = S.videosHoje, feitos = vids.filter((v) => v.status !== "rascunho").length;
     const rotRef = ref === hoje ? "Hoje até agora" : ref === somaDias(hoje, -1) ? "Ontem" : "Último dia: " + dataBR(ref);
-    const meta = +S.perfil.meta_gmv || 0, est = document.documentElement.dataset.estilo;
+    const meta = +S.perfil.meta_gmv || 0, est = LAYOUT_HOJE[document.documentElement.dataset.estilo] || "classico";
     const kVid = `<p class="rot">Vídeos de hoje</p><div class="val">${feitos} de ${plano.N}</div><div class="barra"><i style="width:${Math.min(100, feitos / plano.N * 100).toFixed(1)}%"></i></div><small>${vids.length ? `${plural(vids.length, "planejado", "planejados")}, ${plural(feitos, "agendado ou postado", "agendados ou postados")}` : "Nenhum vídeo planejado ainda."}</small>`;
     let topo;
     if (est === "grafico") topo = `<div class="grade g21">
@@ -655,15 +680,15 @@
   }
 
   /* ---------- TODO O PERÍODO ---------- */
-  const CORES_ROSCA = ["#009994", "#FFC24D", "#0063C7", "#00C9B0", "#A06CD5", "#E8743B"];
+  const CORES_ROSCA = ["var(--g1)", "var(--g2)", "var(--g3)", "var(--g4)", "var(--g5)", "var(--g6)"];
   function rosca(itens) {
     const tot = itens.reduce((a, [, v]) => a + v, 0);
     if (!tot) return '<p class="vazio">Sem vendas válidas no período.</p>';
     let l = [...itens].sort((a, b) => b[1] - a[1]);
     if (l.length > 6) { const resto = l.slice(5).reduce((a, [, v]) => a + v, 0); l = [...l.slice(0, 5), ["Outros", resto]]; }
     const R = 70, C = 2 * Math.PI * R; let acc = 0;
-    const arcos = l.map(([n, v], i) => { const f = v / tot, d = `<circle r="${R}" cx="90" cy="90" fill="none" stroke="${CORES_ROSCA[i]}" stroke-width="28" stroke-dasharray="${(f * C).toFixed(2)} ${C.toFixed(2)}" stroke-dashoffset="${(-acc * C).toFixed(2)}" transform="rotate(-90 90 90)"><title>${esc(n)}: ${pct(f * 100)} (${real(v)})</title></circle>`; acc += f; return d; }).join("");
-    const sep = l.length > 1 ? l.map((_, i) => { const ang = (l.slice(0, i).reduce((a, [, v]) => a + v, 0) / tot) * 2 * Math.PI - Math.PI / 2; return `<line x1="${90 + 55 * Math.cos(ang)}" y1="${90 + 55 * Math.sin(ang)}" x2="${90 + 85 * Math.cos(ang)}" y2="${90 + 85 * Math.sin(ang)}" stroke="#fff" stroke-width="2"/>`; }).join("") : "";
+    const arcos = l.map(([n, v], i) => { const f = v / tot, d = `<circle r="${R}" cx="90" cy="90" fill="none" style="stroke:${CORES_ROSCA[i]}" stroke-width="28" stroke-dasharray="${(f * C).toFixed(2)} ${C.toFixed(2)}" stroke-dashoffset="${(-acc * C).toFixed(2)}" transform="rotate(-90 90 90)"><title>${esc(n)}: ${pct(f * 100)} (${real(v)})</title></circle>`; acc += f; return d; }).join("");
+    const sep = l.length > 1 ? l.map((_, i) => { const ang = (l.slice(0, i).reduce((a, [, v]) => a + v, 0) / tot) * 2 * Math.PI - Math.PI / 2; return `<line x1="${90 + 55 * Math.cos(ang)}" y1="${90 + 55 * Math.sin(ang)}" x2="${90 + 85 * Math.cos(ang)}" y2="${90 + 85 * Math.sin(ang)}" style="stroke:var(--card)" stroke-width="2"/>`; }).join("") : "";
     const pct2 = (f) => (f * 100).toFixed(2).replace(".", ",") + "%";
     return `<div class="rosca"><svg viewBox="0 0 180 180" role="img" aria-label="Divisão das vendas">${arcos}${sep}</svg>
       <ul class="rosca-leg">${l.map(([n, v], i) => `<li><i style="background:${CORES_ROSCA[i]}"></i><span class="n">${esc(n)}</span><b>${pct2(v / tot)}</b><small>${real(v)}</small></li>`).join("")}</ul></div>`;
@@ -892,9 +917,9 @@
 
   /* ---------- PERFIL ---------- */
   async function telaPerfil(el) {
-    const p = S.perfil, sug = sugestaoMeta(), est = document.documentElement.dataset.estilo, cor = document.documentElement.dataset.cor;
+    const p = S.perfil, sug = sugestaoMeta();
     el.innerHTML = `<div class="cabeca"><div><h1>Meu perfil</h1><p>Seus dados, suas metas e o jeito que o painel aparece pra você.</p></div></div>
-      <div class="grade g2 alto">
+      <div class="grade">
       <div class="card"><div class="card-topo"><h2>Dados e metas</h2></div><form class="form" id="formPerfil">
         <div class="dupla"><div><label class="lbl" for="pNome">Nome</label><input class="inp" id="pNome" value="${esc(p.nome)}"></div>
           <div><label class="lbl" for="pApelido">Como quero ser chamado</label><input class="inp" id="pApelido" value="${esc(p.apelido)}" placeholder="ex.: Ju"></div></div>
@@ -905,13 +930,10 @@
         ${sug ? `<div class="sugestao"><span class="rot">Sugestão pelo seu crescimento</span><div class="meta-num">${real(sug.valor)}</div><p class="frase">${esc(sug.motivo)}</p><button class="btn sec pequeno" type="button" id="pUsarSug">Usar a sugestão</button></div>` : `<p class="frase">Depois que você importar seus pedidos, o painel sugere uma meta pelo seu crescimento.</p>`}
         <div><button class="btn" type="submit">Salvar</button></div>
       </form></div>
-      <div class="card"><div class="card-topo"><h2>Aparência</h2><span class="sub">muda na hora</span></div>
-        <p class="lbl">Estilo do painel</p>
-        <div class="estilos">${Object.entries(ESTILOS).map(([k, [n, d]]) => `<button type="button" class="estilo-op" data-acao="estilo" data-v="${k}" aria-pressed="${est === k}"><span class="mini mini-${k}"><i></i><i></i><i></i></span><b>${n}</b><small>${d}</small></button>`).join("")}</div>
-        <p class="lbl" style="margin-top:18px">Cor</p>
-        <div class="cores">${Object.entries(CORES).map(([k, [n, c1, c2]]) => `<button type="button" class="cor-op" data-acao="cor" data-v="${k}" aria-pressed="${cor === k}" title="${n}"><span style="background:linear-gradient(135deg, ${c1} 50%, ${c2} 50%)"></span>${n}</button>`).join("")}</div>
-        <p class="frase">Abra a tela Hoje depois de trocar: é onde os estilos mudam mais.</p>
-      </div></div>`;
+      </div>
+      <div class="card" id="cardAparencia"></div>`;
+    S.ap = { estilo: normEstilo(p.estilo || document.documentElement.dataset.estilo), cor: normPaleta(p.cor || document.documentElement.dataset.paleta), custom: normCustom(p.cor_custom) };
+    desenharAparencia();
     const u = $("#pUsarSug"); if (u) u.addEventListener("click", () => { $("#pMetaG").value = sug.valor; toast("Sugestão colocada. Clique em Salvar."); });
     $("#formPerfil").addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -921,6 +943,59 @@
         meta_videos: Math.min(60, Math.max(1, parseInt($("#pMetaV").value, 10) || 15)), meta_gmv: Number($("#pMetaG").value) || null };
       try { await API.salvarPerfil(novo); Object.assign(S.perfil, novo); montarMenu(); toast("Perfil salvo."); } catch (er) { toast(traduz(er), true); }
     });
+  }
+
+  /* ---------- APARÊNCIA: escolher estilo, paleta e ver a prévia ---------- */
+  // Prévia feita com as peças reais do painel (cartões, números, gráfico, lista) e os números do próprio usuário
+  function dadosPrevia() {
+    const ref = (S.ultimo || hojeISO()).slice(0, 7), per = periodo(ref), t = somar(entre(per.ini, per.fim));
+    const dias = []; for (let k = 13; k >= 0; k--) dias.push(somaDias(S.ultimo || hojeISO(), -k));
+    const porDia = dias.map((d) => S.pedidos.filter((x) => x.dia === d && valido(x)).reduce((a, x) => a + x.g, 0));
+    const an = S.pedidos.length ? analiseProdutos().lista.slice().sort((a, b) => b.c30 - a.c30).slice(0, 3) : [];
+    const temDados = porDia.some((v) => v > 0);
+    return { t, porDia: temDados ? porDia : [3, 5, 4, 6, 5, 7, 6, 8, 7, 9, 8, 10, 9, 11], exemplo: !temDados, an, N: +S.perfil.meta_videos || 15, feitos: (S.videosHoje || []).filter((v) => v.status !== "rascunho").length };
+  }
+  function amostra(estilo, cor, custom, d) {
+    const nome = esc((S.perfil.apelido || "").trim() || (S.perfil.nome || "").split(" ")[0] || "você"), max = Math.max(...d.porDia, 1);
+    const barras = d.porDia.map((v, i) => { const h = Math.max(2, v / max * 70); return `<rect class="${i === d.porDia.length - 1 ? "b-hoje" : "b-atual"}" x="${i * 20 + 3}" y="${78 - h}" width="13" height="${h}" rx="3"/>`; }).join("");
+    const lista = d.an.length ? d.an.map((x) => `<li><span class="nome">${esc(x.nome)}</span><span class="val">${realCurto(x.c30)}</span></li>`).join("") : "<li><span class=\"nome\">Seus produtos aparecem aqui</span><span class=\"val\">-</span></li>";
+    const c = normCustom(custom);
+    return `<div class="tema-amostra" data-estilo="${estilo}" data-paleta="${cor}"${c ? ` style="--p-principal:${c}"` : ""}>
+      <div class="ta-topo"><div><p class="lbl" style="margin:0">Hoje</p><h3>Bom dia, <em>${nome}</em>.</h3></div><span class="btn pequeno">Lançar no dia</span></div>
+      <div class="ta-kpis">
+        <div class="card kpi escuro"><p class="rot">Vendas no mês</p><div class="val">${realCurto(d.t.g)}</div></div>
+        <div class="card kpi"><p class="rot">Comissão</p><div class="val">${realCurto(d.t.c)}</div><span class="selo sobe">no mês</span></div>
+        <div class="card kpi"><p class="rot">Vídeos de hoje</p><div class="val">${d.feitos} de ${d.N}</div><div class="barra"><i style="width:${Math.min(100, d.feitos / d.N * 100).toFixed(0)}%"></i></div></div>
+      </div>
+      <div class="ta-grade">
+        <div class="card"><div class="card-topo"><h2>Vendas por dia</h2><span class="sub">${d.exemplo ? "exemplo" : "14 dias"}</span></div><svg class="graf" viewBox="0 0 280 82" aria-hidden="true">${barras}</svg></div>
+        <div class="card"><div class="card-topo"><h2>Principais</h2></div><ul class="lista-foco">${lista}</ul><div class="chips" style="margin-top:10px"><span class="chip" aria-pressed="true">Todas</span><span class="chip">Tech</span></div></div>
+      </div></div>`;
+  }
+  function desenharAparencia() {
+    const box = $("#cardAparencia"); if (!box) return;
+    const a = S.ap, d = dadosPrevia(), atual = document.documentElement;
+    const salvo = normEstilo(S.perfil.estilo || atual.dataset.estilo) === a.estilo && normPaleta(S.perfil.cor || atual.dataset.paleta) === a.cor && normCustom(S.perfil.cor_custom) === a.custom;
+    const corBase = a.custom || PALETAS[a.cor][1][0];
+    box.innerHTML = `<div class="card-topo"><h2>Aparência</h2><span class="sub">escolha o estilo e a paleta: tudo combina com tudo</span></div>
+      <div class="ap-passo"><p class="lbl"><b>1</b>Estilo</p>
+        <div class="ap-estilos">${Object.entries(ESTILOS).map(([k, [n, desc]]) => `<button type="button" class="ap-estilo" data-acao="ap-estilo" data-v="${k}" aria-pressed="${a.estilo === k}">${amostra(k, a.cor, a.custom, d)}<b>${n}</b><small>${desc}</small></button>`).join("")}</div></div>
+      <div class="ap-passo"><p class="lbl"><b>2</b>Paleta</p>
+        <div class="ap-paletas">${Object.entries(PALETAS).map(([k, [n, cs]]) => `<button type="button" class="ap-paleta" data-acao="ap-paleta" data-v="${k}" aria-pressed="${a.cor === k}"><span class="ap-cores">${cs.map((x) => `<i style="background:${x}"></i>`).join("")}</span>${n}</button>`).join("")}</div>
+        <div class="ap-custom"><label for="apCor">Cor principal personalizada</label><input type="color" id="apCor" value="${corBase}">${a.custom ? `<button class="link" type="button" data-acao="ap-sem-custom">usar a cor da paleta</button>` : `<span class="sub" style="color:var(--muted)">opcional</span>`}</div></div>
+      <div class="ap-passo ap-previa"><p class="lbl"><b>3</b>Prévia ${salvo ? "· é o que você está usando" : "· ainda não aplicado"}</p>
+        ${amostra(a.estilo, a.cor, a.custom, d)}
+        <div class="ap-acoes"><button class="btn sec pequeno" type="button" data-acao="ap-restaurar">Restaurar padrão</button><button class="btn pequeno" type="button" data-acao="ap-aplicar"${salvo ? " disabled" : ""}>Aplicar estilo</button></div></div>`;
+    const inp = $("#apCor");
+    inp.addEventListener("input", () => { $$("#cardAparencia .tema-amostra").forEach((x) => x.style.setProperty("--p-principal", inp.value)); });
+    inp.addEventListener("change", () => { S.ap.custom = normCustom(inp.value); desenharAparencia(); });
+  }
+  async function salvarAparencia(estilo, cor, custom) {
+    aplicarAparencia(estilo, cor, custom);
+    const novo = { estilo, cor, cor_custom: custom };
+    Object.assign(S.perfil, novo);
+    try { await API.salvarPerfil(novo); return true; }
+    catch (e) { console.warn(e); toast("Apliquei neste aparelho. Para guardar na sua conta, atualize o banco do painel (peça ao Claude: \"saiu versão nova do painel\").", true); return false; }
   }
 
   /* ---------- COMEÇANDO (ainda sem vendas) ---------- */
@@ -1145,11 +1220,12 @@ REGRAS: entregue tudo agora, sem fazer perguntas antes: o que faltar fica [entre
     if (t.dataset.tela) { irPara(t.dataset.tela); return; }
     const a = t.dataset.acao, id = Number(t.dataset.id);
     try {
-      if (a === "estilo" || a === "cor") {
-        const campo = a === "estilo" ? "estilo" : "cor", v = t.dataset.v;
-        aplicarAparencia(campo === "estilo" ? v : S.perfil.estilo, campo === "cor" ? v : S.perfil.cor);
-        S.perfil[campo] = v; await API.salvarPerfil({ [campo]: v }); irPara("perfil"); toast(a === "estilo" ? `Estilo ${ESTILOS[v][0]} aplicado.` : `Cor ${CORES[v][0]} aplicada.`);
-      } else if (a === "usar-sugestao") {
+      if (a === "ap-estilo") { S.ap.estilo = t.dataset.v; desenharAparencia(); }
+      else if (a === "ap-paleta") { S.ap.cor = t.dataset.v; S.ap.custom = null; desenharAparencia(); }
+      else if (a === "ap-sem-custom") { S.ap.custom = null; desenharAparencia(); }
+      else if (a === "ap-aplicar") { t.disabled = true; const ok = await salvarAparencia(S.ap.estilo, S.ap.cor, S.ap.custom); montarMenu(); desenharAparencia(); if (ok) toast(`${ESTILOS[S.ap.estilo][0]} com ${PALETAS[S.ap.cor][0]} aplicado.`); }
+      else if (a === "ap-restaurar") { S.ap = { ...APARENCIA_PADRAO }; const ok = await salvarAparencia(S.ap.estilo, S.ap.cor, null); desenharAparencia(); if (ok) toast("Aparência padrão restaurada."); }
+      else if (a === "usar-sugestao") {
         const sg = sugestaoMeta(); if (!sg) return; await API.salvarPerfil({ meta_gmv: sg.valor }); S.perfil.meta_gmv = sg.valor; toast(`Meta de ${real(sg.valor)} salva.`); irPara(S.tela);
       } else if (a === "periodo") { S.mes = t.dataset.v === "tudo" ? "tudo" : (S.ultimo || hojeISO()).slice(0, 7); irPara("resultados");
       } else if (a === "mes") { S.mes = mesDesloca(S.mes, +t.dataset.n); irPara("resultados"); }
@@ -1227,6 +1303,39 @@ REGRAS: entregue tudo agora, sem fazer perguntas antes: o que faltar fica [entre
   function fecharMenu() { $("#menu").classList.remove("aberto"); $("#veu").hidden = true; }
   $("#abrirMenu").addEventListener("click", () => { $("#menu").classList.add("aberto"); $("#veu").hidden = false; });
   $("#veu").addEventListener("click", fecharMenu);
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && $("#menu").classList.contains("aberto")) { fecharMenu(); $("#abrirMenu").focus(); } });
+
+  /* ---------- Menu recolhido (computador): guarda a escolha de cada usuário ---------- */
+  const chaveMenu = () => "painel-menu-recolhido:" + ((S.user && S.user.id) || "anon");
+  function aplicarMenuRecolhido(sim) {
+    $("#app").classList.toggle("recolhido", !!sim);
+    const b = $("#alternaMenu"); b.setAttribute("aria-expanded", String(!sim)); b.setAttribute("aria-label", sim ? "Abrir menu" : "Recolher menu");
+    esconderDica();
+  }
+  function lerMenuRecolhido() {
+    try { const v = localStorage.getItem(chaveMenu()); if (v !== null) return v === "1"; } catch (_) {}
+    return !!(S.perfil && S.perfil.menu_recolhido);
+  }
+  $("#alternaMenu").addEventListener("click", () => {
+    const sim = !$("#app").classList.contains("recolhido");
+    aplicarMenuRecolhido(sim);
+    try { localStorage.setItem(chaveMenu(), sim ? "1" : "0"); } catch (_) {}
+    if (S.perfil) { S.perfil.menu_recolhido = sim; API.salvarPerfil({ menu_recolhido: sim }).catch(() => {}); }   // na conta também (se o banco já tiver a coluna)
+  });
+  // Dica com o nome do item quando o menu está recolhido (fica fora do menu para não ser cortada)
+  const dica = document.createElement("div"); dica.className = "dica-menu"; dica.hidden = true; dica.setAttribute("role", "tooltip"); document.body.appendChild(dica);
+  function esconderDica() { dica.hidden = true; }
+  function mostrarDica(el) {
+    if (!$("#app").classList.contains("recolhido") || window.innerWidth <= 900 || !el.dataset.dica) return esconderDica();
+    const r = el.getBoundingClientRect();
+    dica.textContent = el.dataset.dica; dica.style.left = (r.right + 12) + "px"; dica.style.top = (r.top + r.height / 2) + "px"; dica.hidden = false;
+  }
+  $("#menu").addEventListener("mouseover", (e) => { const el = e.target.closest("[data-dica]"); if (el) mostrarDica(el); else esconderDica(); });
+  $("#menu").addEventListener("mouseleave", esconderDica);
+  $("#menu").addEventListener("focusin", (e) => { const el = e.target.closest("[data-dica]"); if (el) mostrarDica(el); });
+  $("#menu").addEventListener("focusout", esconderDica);
+  $("#menu").addEventListener("scroll", esconderDica);
+  $("#menu").addEventListener("click", esconderDica);
 
   /* =============================================================
      ENTRADA: entrar, criar conta, esqueci a senha
