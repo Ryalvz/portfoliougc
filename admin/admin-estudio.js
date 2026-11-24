@@ -90,6 +90,7 @@ function desenharEstudio(el) {
       </aside>
       <div class="est-palco">
         <div class="est-tela" id="est-tela"><canvas class="est-grande" id="est-grande" width="${W}" height="${H}" aria-label="Slide ${est.i + 1} de ${n}"></canvas>
+          <div class="est-guias" id="est-guias" aria-hidden="true"></div>
           <div class="est-sel" id="est-sel" hidden><span class="est-sel-nome"></span>
             <button type="button" class="est-alca-l" id="est-alca-l" aria-label="Largura da caixa"></button>
             <button type="button" class="est-alca" id="est-alca" aria-label="Tamanho"></button></div></div>
@@ -181,9 +182,48 @@ function desenharEstudio(el) {
   const cvG = $("#est-grande", el);
   const pintarMini = (i) => { const cv = $(`[data-est-mini="${i}"]`, el); if (cv && car.slides[i]) CAMADAS.pintar(cv, car, i, { aoCarregar: () => pintarMini(i) }); };
   const pintarGrande = () => { if (!cvG) return; CAMADAS.pintar(cvG, car, est.i, { guia: est.guia, aoCarregar: pintarGrande }); mostrarSel(); avisarBorda(); };
+  /* ---------- Guias inteligentes (como no Canva) ----------
+     Linhas rosas quando a peça alinha com a borda ou o centro de outra peça,
+     com o centro do slide ou com a borda de segurança; aviso de mesma largura e altura. */
+  const LIM_GUIA = 8;
+  const outrasCaixas = (id) => (cvG.__caixas || []).filter((b) => b.id !== id && !(b.x1 - b.x0 >= W * 0.95 && b.y1 - b.y0 >= H * 0.95));
+  const pontosEixo = (b, eixo) => (eixo === "x" ? [b.x0, (b.x0 + b.x1) / 2, b.x1] : [b.y0, (b.y0 + b.y1) / 2, b.y1]);
+  function encaixar(box, outros, eixo, lim = LIM_GUIA) {
+    let melhor = null;
+    const meus = pontosEixo(box, eixo), pagina = eixo === "x" ? [M, W / 2, W - M] : [M, H / 2, H - M];
+    const testa = (t, o) => meus.forEach((m) => { const d = t - m; if (Math.abs(d) <= lim && (!melhor || Math.abs(d) < Math.abs(melhor.d))) melhor = { d, p: t, o }; });
+    outros.forEach((o) => pontosEixo(o, eixo).forEach((t) => testa(t, o)));
+    pagina.forEach((t) => testa(t, null));
+    return melhor;
+  }
+  // Linhas de alinhamento e avisos de tamanho pra uma caixa (lim 1 = só o que já está exato)
+  function guiasDe(box, outros, lim) {
+    const linhas = [], rotulos = [];
+    ["x", "y"].forEach((eixo) => {
+      const meus = pontosEixo(box, eixo), pagina = eixo === "x" ? [M, W / 2, W - M] : [M, H / 2, H - M], vistos = new Set();
+      const add = (t, o) => { const k = Math.round(t); if (vistos.has(k)) return; vistos.add(k);
+        if (eixo === "x") linhas.push({ v: true, p: t, a: o ? Math.min(box.y0, o.y0) : 0, b: o ? Math.max(box.y1, o.y1) : H });
+        else linhas.push({ v: false, p: t, a: o ? Math.min(box.x0, o.x0) : 0, b: o ? Math.max(box.x1, o.x1) : W }); };
+      outros.forEach((o) => pontosEixo(o, eixo).forEach((t) => { if (meus.some((m) => Math.abs(t - m) <= lim)) add(t, o); }));
+      pagina.forEach((t) => { if (meus.some((m) => Math.abs(t - m) <= lim)) add(t, null); });
+    });
+    const bw = box.x1 - box.x0, bh = box.y1 - box.y0;
+    if (outros.some((o) => Math.abs(o.x1 - o.x0 - bw) <= Math.max(1, lim / 4))) rotulos.push({ x: (box.x0 + box.x1) / 2, y: box.y1 + 46, t: "mesma largura" });
+    if (outros.some((o) => Math.abs(o.y1 - o.y0 - bh) <= Math.max(1, lim / 4))) rotulos.push({ x: box.x1, y: (box.y0 + box.y1) / 2, t: "mesma altura", lado: true });
+    if (Math.abs((box.x0 + box.x1) / 2 - W / 2) <= lim) rotulos.push({ x: W / 2, y: box.y1 + 96, t: "no centro" });
+    return { linhas, rotulos };
+  }
+  function mostrarGuias(g) {
+    const alvo = $("#est-guias", el); if (!alvo) return;
+    if (!g) { alvo.innerHTML = ""; return; }
+    const f = cvG.clientWidth / cvG.width;
+    alvo.innerHTML = g.linhas.map((x) => x.v ? `<i class="est-g v" style="left:${x.p * f}px;top:${x.a * f}px;height:${Math.max(1, (x.b - x.a) * f)}px"></i>` : `<i class="est-g h" style="top:${x.p * f}px;left:${x.a * f}px;width:${Math.max(1, (x.b - x.a) * f)}px"></i>`).join("")
+      + g.rotulos.map((r) => `<span class="est-g-rot ${r.lado ? "lado" : ""}" style="left:${r.x * f}px;top:${r.y * f}px">${esc(r.t)}</span>`).join("");
+  }
   const mostrarSel = () => {
     const caixa = $("#est-sel", el); if (!caixa) return;
     const b = est.sel && (cvG.__caixas || []).find((x) => x.id === est.sel);
+    if (!est.arrastando) mostrarGuias(b && !(b.x1 - b.x0 >= W * 0.95 && b.y1 - b.y0 >= H * 0.95) ? guiasDe(b, outrasCaixas(b.id), 1) : null);
     if (!b) { caixa.hidden = true; return; }
     const f = cvG.clientWidth / cvG.width, m = 10;
     Object.assign(caixa.style, { left: (b.x0 - m) * f + "px", top: (b.y0 - m) * f + "px", width: (b.x1 - b.x0 + 2 * m) * f + "px", height: (b.y1 - b.y0 + 2 * m) * f + "px" });
@@ -309,19 +349,20 @@ function desenharEstudio(el) {
     const l = est.sel && camadas.find((x) => x.id === est.sel);
     const b = l && (cvG.__caixas || []).find((x) => x.id === l.id);
     if (l && b && e.target.closest("#est-alca-l")) {
-      marcar(true); arrasto = { tipo: "largura", l, x0: pt[0], w0: l.w };
+      marcar(true); arrasto = { tipo: "largura", l, x0: pt[0], w0: l.w, outros: outrasCaixas(l.id), b0: b };
     } else if (l && b && e.target.closest("#est-alca")) {
       const cx = b.x0, cy = b.y0;
-      marcar(true); arrasto = { tipo: "tamanho", l, cx, cy, d0: Math.hypot(pt[0] - cx, pt[1] - cy) || 1, tam0: l.tam, w0: l.w, h0: l.h, zoom0: l.zoom || 1 };
+      marcar(true); arrasto = { tipo: "tamanho", l, cx, cy, d0: Math.hypot(pt[0] - cx, pt[1] - cy) || 1, tam0: l.tam, w0: l.w, h0: l.h, zoom0: l.zoom || 1, outros: outrasCaixas(l.id), b0: b };
     } else {
       const id = camadaNoPonto(pt);
       if (!id) { if (est.sel) { est.sel = null; desenhar(); } return; }
       const c = camadas.find((x) => x.id === id), cb = (cvG.__caixas || []).find((x) => x.id === id);
       marcar(true);
-      arrasto = c.t === "fundoFoto" ? { tipo: "foto", l: c, x0: pt[0], y0: pt[1], px: c.px || 0, py: c.py || 0, mudou: est.sel !== id, andou: false } : { tipo: "mover", l: c, x0: pt[0], y0: pt[1], px: c.x, py: c.y, ox: cb.x0 - c.x, oy: cb.y0 - c.y, bw: cb.x1 - cb.x0, bh: cb.y1 - cb.y0, mudou: est.sel !== id, andou: false };
+      arrasto = c.t === "fundoFoto" ? { tipo: "foto", l: c, x0: pt[0], y0: pt[1], px: c.px || 0, py: c.py || 0, mudou: est.sel !== id, andou: false } : { tipo: "mover", l: c, x0: pt[0], y0: pt[1], px: c.x, py: c.y, ox: cb.x0 - c.x, oy: cb.y0 - c.y, bw: cb.x1 - cb.x0, bh: cb.y1 - cb.y0, mudou: est.sel !== id, andou: false, outros: outrasCaixas(id) };
       est.sel = id; mostrarSel();
     }
     e.preventDefault();
+    est.arrastando = true;
     try { tela.setPointerCapture(e.pointerId); } catch (_) {}
   });
   tela.addEventListener("pointermove", (e) => {
@@ -335,8 +376,12 @@ function desenharEstudio(el) {
       let x = a.px + pt[0] - a.x0, y = a.py + pt[1] - a.y0;
       if (Math.abs(pt[0] - a.x0) + Math.abs(pt[1] - a.y0) > 3) a.andou = true;
       const decor = l.t === "forma" || l.t === "linha";
-      // Gruda no meio do slide
-      if (Math.abs(x + a.ox + a.bw / 2 - W / 2) < 10) x = W / 2 - a.bw / 2 - a.ox;
+      // Gruda nas outras peças, no centro e na borda (Alt solta)
+      if (!e.altKey) {
+        const box = { x0: x + a.ox, x1: x + a.ox + a.bw, y0: y + a.oy, y1: y + a.oy + a.bh };
+        const sx = encaixar(box, a.outros, "x"), sy = encaixar(box, a.outros, "y");
+        if (sx) x += sx.d; if (sy) y += sy.d;
+      }
       // Não deixa sair da borda de segurança (Alt solta; o que continua no próximo slide pode passar pela direita)
       if (!e.altKey && !decor) {
         const lim = limites();
@@ -344,18 +389,37 @@ function desenharEstudio(el) {
         if (a.bh <= lim.y1 - lim.y0) y = Math.max(lim.y0 - a.oy, Math.min(lim.y1 - a.bh - a.oy, y));
       }
       l.x = Math.round(x); l.y = Math.round(y);
+      const box = { x0: l.x + a.ox, x1: l.x + a.ox + a.bw, y0: l.y + a.oy, y1: l.y + a.oy + a.bh };
+      mostrarGuias(e.altKey ? null : guiasDe(box, a.outros, 1));
     } else if (a.tipo === "largura") {
       const max = l.continua || e.altKey ? W : W - M - l.x;
       l.w = Math.round(Math.max(60, Math.min(max, a.w0 + pt[0] - a.x0)));
+      // Gruda na largura de outra peça e na borda direita / centro de outra
+      if (!e.altKey) {
+        const dx0 = a.b0.x0 - l.x, mesmo = a.outros.find((o) => Math.abs(o.x1 - o.x0 - l.w) <= LIM_GUIA);
+        if (mesmo) l.w = Math.round(mesmo.x1 - mesmo.x0);
+        else { const sx = encaixar({ x0: l.x + dx0 + l.w, x1: l.x + dx0 + l.w, y0: a.b0.y0, y1: a.b0.y1 }, a.outros, "x"); if (sx) l.w = Math.round(l.w + sx.d); }
+        const box = { x0: a.b0.x0, x1: a.b0.x0 + l.w, y0: a.b0.y0, y1: a.b0.y1 };
+        mostrarGuias(guiasDe(box, a.outros, 1));
+      }
     } else {
       const k = Math.hypot(pt[0] - a.cx, pt[1] - a.cy) / a.d0;
       if (l.t === "fundoFoto") l.zoom = Math.round(Math.max(0.4, Math.min(4, a.zoom0 * k)) * 100) / 100;
       else if (CAMADAS.TEXTOS.includes(l.t)) l.tam = Math.round(Math.max(10, Math.min(260, a.tam0 * k)));
-      else { l.w = Math.round(Math.max(30, a.w0 * k)); if (a.h0) l.h = Math.round(Math.max(30, a.h0 * k)); }
+      else {
+        l.w = Math.round(Math.max(30, a.w0 * k)); if (a.h0) l.h = Math.round(Math.max(30, a.h0 * k));
+        // Gruda no mesmo tamanho de outra peça
+        if (!e.altKey && a.outros) {
+          const mesmo = a.outros.find((o) => Math.abs(o.x1 - o.x0 - l.w) <= LIM_GUIA);
+          if (mesmo) { const k2 = (mesmo.x1 - mesmo.x0) / a.w0; l.w = Math.round(a.w0 * k2); if (a.h0) l.h = Math.round(a.h0 * k2); }
+          mostrarGuias(guiasDe({ x0: a.b0.x0, y0: a.b0.y0, x1: a.b0.x0 + l.w, y1: a.b0.y0 + (a.h0 ? l.h : a.b0.y1 - a.b0.y0) }, a.outros, 1));
+        }
+      }
     }
     editado(); repintarJa();
   });
   const soltar = () => {
+    est.arrastando = false; mostrarGuias(null);
     if (!arrasto) return; const a = arrasto; arrasto = null;
     if ((a.tipo === "mover" || a.tipo === "foto") && !a.andou) est.hist.pop(); // só clicou: nada pra desfazer
     if (a.mudou || (a.tipo !== "mover" && a.tipo !== "foto")) desenhar(); else { pintarGrande(); miniDepois(); }

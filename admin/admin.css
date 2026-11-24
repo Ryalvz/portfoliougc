@@ -1902,3 +1902,11 @@ td .pc-follow { display: table; }
 .est-seta { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--line); background: var(--card); color: var(--text); font-size: 18px; line-height: 1; cursor: pointer; }
 .est-seta:disabled { opacity: .35; cursor: default; }
 .est-seta:not(:disabled):hover { border-color: var(--cobalt); color: var(--cobalt); }
+
+/* Estúdio: guias inteligentes */
+.est-guias { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+.est-g { position: absolute; background: #FF3EA5; }
+.est-g.v { width: 1px; }
+.est-g.h { height: 1px; }
+.est-g-rot { position: absolute; transform: translate(-50%, -135%); background: #FF3EA5; color: #fff; font-size: 11px; font-weight: 700; line-height: 1.2; padding: 3px 7px; border-radius: 6px; white-space: nowrap; }
+.est-g-rot.lado { transform: translate(10px, -50%); }
