@@ -165,7 +165,7 @@ const CAMADAS = (() => {
 
   /* ---------- Desenho de cada camada; devolve a caixa (pra selecionar) ---------- */
   const TEXTOS = ["texto", "bolha", "pilula", "bilhete", "caixa", "aviso", "cartao", "selo", "stat", "legenda", "fita", "comentario", "claquete", "rec", "prompt", "comentarioBox"];
-  const ENFEITES = ["forma", "linha", "enfeite", "seta", "visor", "grade", "timeline"];
+  const ENFEITES = ["forma", "linha", "enfeite", "seta", "visor", "grade", "timeline", "fundoFoto"];
   const caminhoRedondo = (ctx, x, y, w, h, r) => { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); };
   const sombra = (ctx, forca = 0.22, blur = 34, dy = 14) => { ctx.shadowColor = `rgba(58,38,24,${forca})`; ctx.shadowBlur = blur; ctx.shadowOffsetY = dy; };
   const semSombra = (ctx) => { ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0; };
@@ -228,6 +228,20 @@ const CAMADAS = (() => {
         if (l.texto) { ctx.font = `400 ${Math.round(pe * 0.55)}px ${FONTE_MARCADOR}`; ctx.fillStyle = "#3A2C20"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(l.texto, l.x + l.w / 2, l.y + l.h + pe / 2); }
         if (l.fita !== false) { ctx.save(); ctx.translate(l.x + l.w / 2, c.y0 + 4); ctx.rotate(-0.08); ctx.fillStyle = "rgba(242,212,107,.82)"; ctx.fillRect(-l.w * 0.22, -24, l.w * 0.44, 48); ctx.restore(); }
       });
+      return c;
+    }
+    if (l.t === "fundoFoto") { // a foto de fundo do slide: arrasta, aumenta e diminui
+      const img = fotoCarrossel(s.foto, aoCarregar), c = { x0: l.x, y0: l.y, x1: l.x + l.w, y1: l.y + l.h };
+      ctx.save(); ctx.beginPath(); ctx.rect(l.x, l.y, l.w, l.h); ctx.clip();
+      if (img) {
+        const e0 = Math.max(l.w / img.width, l.h / img.height) * (l.zoom || 1), iw = img.width * e0, ih = img.height * e0;
+        ctx.drawImage(img, l.x + (l.w - iw) / 2 + (l.px || 0), l.y + (l.h - ih) * (l.foco ?? 0.3) + (l.py || 0), iw, ih);
+      } else fotoCobre(ctx, null, l.x, l.y, l.w, l.h);
+      if (l.escurecer !== false) {
+        const g = ctx.createLinearGradient(0, l.y, 0, l.y + l.h); g.addColorStop(0, "rgba(10,8,6,.45)"); g.addColorStop(0.22, "rgba(10,8,6,0)"); g.addColorStop(0.5, "rgba(10,8,6,.08)"); g.addColorStop(1, "rgba(10,8,6,.86)");
+        ctx.fillStyle = g; ctx.fillRect(l.x, l.y, l.w, l.h);
+      }
+      ctx.restore();
       return c;
     }
     if (l.t === "grade") { // pontinhos de laboratório
@@ -403,7 +417,7 @@ const CAMADAS = (() => {
     }
     return null;
   }
-  const ESPECIAIS = ["enfeite", "seta", "janela", "polaroid", "selo", "caixa", "aviso", "cartao", "stat", "visor", "rec", "celular", "legenda", "fita", "comentario", "claquete", "grade", "timeline", "imagem", "prompt", "comentarioBox"];
+  const ESPECIAIS = ["enfeite", "seta", "janela", "polaroid", "selo", "caixa", "aviso", "cartao", "stat", "visor", "rec", "celular", "legenda", "fita", "comentario", "claquete", "grade", "timeline", "imagem", "prompt", "comentarioBox", "fundoFoto"];
   function textoDe(l, i, n) {
     if (l.vinc && !l.solto && idAtual && idAtual[l.vinc] != null && l.vinc !== "logo") return idAtual[l.vinc];
     if (l.auto === "num" && l.numFmt === "barra2") return `${String(i + 1).padStart(2, "0")} / ${String(n).padStart(2, "0")}`;
@@ -484,12 +498,12 @@ const CAMADAS = (() => {
   function fundo(ctx, car, s, tema, W, H, aoCarregar) {
     ctx.save(); ctx.fillStyle = tema.fundo; ctx.fillRect(0, 0, W, H);
     if (car.estilo === "ryan") {
-      if (tema.tom === "rfoto") {
+      if (tema.tom === "rfoto" && !(s.camadas || []).some((l) => l.t === "fundoFoto")) {
         const img = fotoCarrossel(s.foto, aoCarregar), foco = { topo: 0.15, meio: 0.45, baixo: 0.8 }[s.enquadrar] ?? 0.3;
         fotoCobre(ctx, img, 0, 0, W, H, foco);
         const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "rgba(10,8,6,.45)"); g.addColorStop(0.22, "rgba(10,8,6,0)"); g.addColorStop(0.5, "rgba(10,8,6,.08)"); g.addColorStop(1, "rgba(10,8,6,.86)");
         ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); texturaPapel(ctx, 0.05);
-      } else texturaPapel(ctx, tema.tom === "rescuro" ? 0.1 : 0.07);
+      } else if (tema.tom !== "rfoto") texturaPapel(ctx, tema.tom === "rescuro" ? 0.1 : 0.07);
       ctx.restore(); return;
     }
     if (tema.tom === "setFoto") {
@@ -970,8 +984,11 @@ const CAMADAS = (() => {
   function garantir(car, i) {
     const s = car.slides[i]; if (!s) return [];
     const b = baseDe(car, s, i), prontas = fontesProntas();
-    if (Array.isArray(s.camadas) && (s.camadasEditadas || (s.camadasBase === b && (s.camadasFontes || !prontas)))) return s.camadas;
-    s.camadas = gerar(car, i); s.camadasBase = b; s.camadasFontes = prontas;
+    if (!(Array.isArray(s.camadas) && (s.camadasEditadas || (s.camadasBase === b && (s.camadasFontes || !prontas))))) { s.camadas = gerar(car, i); s.camadasBase = b; s.camadasFontes = prontas; }
+    if (car.estilo === "ryan" && s.foto && compDe(car, s, i) === "frame" && !s.camadas.some((l) => l.t === "fundoFoto")) {
+      const { w: W, h: H } = dims(car);
+      s.camadas.unshift({ id: novoId(), nome: "Foto de fundo", papel: "fundoFoto", t: "fundoFoto", x: 0, y: 0, w: W, h: H, zoom: 1, px: 0, py: 0, foco: { topo: 0.15, meio: 0.45, baixo: 0.8 }[s.enquadrar] ?? 0.3 });
+    }
     return s.camadas;
   }
 
