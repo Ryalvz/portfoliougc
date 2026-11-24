@@ -102,6 +102,13 @@ create table if not exists public.produtos (
   primary key (user_id, produto_id)
 );
 
+-- Categorias novas (10 + Outros) com subcategoria, e produto esgotado (sai das sugestões até vender de novo).
+-- Os nomes antigos de categoria continuam aceitos: o painel converte sozinho.
+alter table public.produtos drop constraint if exists produtos_categoria_check;
+alter table public.produtos add constraint produtos_categoria_check check (categoria in ('moda', 'beleza', 'casa', 'eletronicos', 'auto', 'pets', 'bebe', 'saude', 'alimentos', 'joias', 'outros', 'tech', 'fitness', 'infantil'));
+alter table public.produtos add column if not exists subcategoria text check (char_length(subcategoria) <= 60);
+alter table public.produtos add column if not exists esgotado_em date;
+
 -- 4. IMPORTAÇÕES: um registro por arquivo enviado
 create table if not exists public.importacoes (
   id            bigint generated always as identity primary key,

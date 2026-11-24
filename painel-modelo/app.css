@@ -223,7 +223,6 @@ ol.passos { margin: 0; padding-left: 20px; display: flex; flex-direction: column
 /* =============================================================
    ESTILO GRÁFICO (como o painel do Ryan)
    ============================================================= */
-[data-estilo="editorial"] .cabeca::before { content: "TikTok"; display: block; width: 100%; font-size: 11.5px; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; color: var(--ouro); padding-left: 34px; position: relative; margin-bottom: -6px; background: linear-gradient(var(--ouro), var(--ouro)) left center / 24px 2px no-repeat; }
 .hero { background: var(--kpi-dest-bg); color: var(--kpi-dest-txt); border-color: transparent; padding: 26px 28px; }
 .hero .card-topo h2 { color: var(--kpi-dest-txt); }
 .etiqueta { font-size: 11.5px; font-weight: 700; padding: 4px 11px; border-radius: 999px; background: rgba(255, 255, 255, .12); color: rgba(255, 255, 255, .85); }
@@ -362,10 +361,13 @@ ol.passos { margin: 0; padding-left: 20px; display: flex; flex-direction: column
   --barra-cor: var(--p-principal); --destaque-cor: var(--p-destaque); --sobre: #FFFFFF;
   --kpi-dest-bg: #FFFFFF; --kpi-dest-txt: #111318;
   --btn-raio: 9px; --btn-sombra: none; --btn-transform: none; --btn-esp: 0; --btn-tam: 13px; --btn-peso: 600;
+  --btn-bg: var(--cafe); --btn-txt: var(--sobre); --btn-sec-bg: transparent; --btn-sec-txt: var(--cafe); --btn-sec-borda: 1px solid var(--cafe);
+  --chip-at-bg: var(--cafe); --chip-at-txt: var(--sobre);
+  --kpi-dest-borda: var(--card-borda); --kpi-dest-sombra: inset 3px 0 0 var(--p-principal), var(--sombra); --kpi-dest-val: var(--p-principal);
+  --barra-fill: var(--ouro); --meta-fill: var(--cafe); --barra-brilho: none; --barra-trilho: var(--tint); --barra-alt: 8px;
+  --lista-bg: var(--campo); --lista-borda: 1px solid var(--linha); --esp-h1: var(--esp-titulo);
 }
 /* MODERN LIGHT: claro, limpo, borda fina, a cor só onde importa */
-[data-estilo="light"] .kpi.escuro { border: var(--card-borda); box-shadow: inset 3px 0 0 var(--p-principal), var(--sombra); }
-[data-estilo="light"] .kpi.escuro .val { color: var(--p-principal); }
 
 /* DARK PRO: fundo quase preto, cards grafite, destaque vivo com brilho leve */
 [data-estilo="dark"] {
@@ -377,13 +379,12 @@ ol.passos { margin: 0; padding-left: 20px; display: flex; flex-direction: column
   --barra-cor: var(--p-vivo); --destaque-cor: var(--p-vivo); --sobre: #0A0C10;
   --kpi-dest-bg: linear-gradient(180deg, color-mix(in srgb, var(--p-vivo) 14%, #11151C), #11151C 75%); --kpi-dest-txt: #FFFFFF;
   --btn-sombra: 0 0 22px color-mix(in srgb, var(--p-vivo) 35%, transparent);
+  --kpi-dest-borda: 1px solid color-mix(in srgb, var(--p-vivo) 45%, transparent); --kpi-dest-sombra: 0 0 32px color-mix(in srgb, var(--p-vivo) 14%, transparent); --kpi-dest-val: #FFFFFF;
+  --barra-fill: linear-gradient(90deg, var(--p-destaque), var(--p-vivo)); --meta-fill: var(--barra-fill); --barra-brilho: 0 0 12px color-mix(in srgb, var(--p-vivo) 45%, transparent);
   --g1: var(--p-vivo); --g2: color-mix(in srgb, var(--p-vivo) 55%, #fff); --g3: color-mix(in srgb, var(--p-destaque) 70%, #fff);
   --g4: color-mix(in srgb, var(--p-vivo) 60%, #000); --g5: #d4d4d8; --g6: #8b8b95;
   --verde: #4ade80; --verde-bg: rgba(74, 222, 128, .13); --vermelho: #f87171; --vermelho-bg: rgba(248, 113, 113, .15); --ambar: #fbbf24; --ambar-bg: rgba(251, 191, 36, .13);
 }
-[data-estilo="dark"] .kpi.escuro { border: 1px solid color-mix(in srgb, var(--p-vivo) 45%, transparent); box-shadow: 0 0 32px color-mix(in srgb, var(--p-vivo) 14%, transparent); }
-[data-estilo="dark"] .barra i, [data-estilo="dark"] .meta-barra i { background: linear-gradient(90deg, var(--p-destaque), var(--p-vivo)); box-shadow: 0 0 12px color-mix(in srgb, var(--p-vivo) 45%, transparent); }
-[data-estilo="dark"] .card-topo h2, [data-estilo="dark"] .solta strong { font-family: var(--display); }
 
 /* GLASS / AURORA: fundo com luzes da paleta, cards de vidro, cantos grandes */
 [data-estilo="glass"] {
@@ -394,11 +395,11 @@ ol.passos { margin: 0; padding-left: 20px; display: flex; flex-direction: column
   --tam-h1: clamp(26px, 2.6vw, 32px); --tam-num: clamp(21px, 2vw, 28px);
   --kpi-dest-bg: linear-gradient(135deg, var(--p-principal), color-mix(in srgb, var(--p-principal) 68%, var(--p-destaque))); --kpi-dest-txt: #FFFFFF;
   --btn-raio: 12px; --btn-sombra: 0 6px 18px color-mix(in srgb, var(--p-principal) 25%, transparent);
+  --btn-bg: linear-gradient(135deg, var(--p-principal), color-mix(in srgb, var(--p-principal) 62%, var(--p-destaque))); --btn-txt: #FFFFFF;
+  --btn-sec-bg: rgba(255, 255, 255, .65); --btn-sec-txt: var(--txt); --btn-sec-borda: 1px solid rgba(255, 255, 255, .95);
+  --kpi-dest-borda: 1px solid transparent; --kpi-dest-sombra: var(--sombra); --kpi-dest-val: #FFFFFF;
+  --barra-fill: linear-gradient(90deg, var(--p-destaque), var(--p-principal)); --meta-fill: var(--barra-fill); --barra-trilho: rgba(255, 255, 255, .7);
 }
-[data-estilo="glass"] .btn:not(.sec) { background: linear-gradient(135deg, var(--p-principal), color-mix(in srgb, var(--p-principal) 62%, var(--p-destaque))); }
-[data-estilo="glass"] .btn.sec { background: rgba(255, 255, 255, .65); border-color: rgba(255, 255, 255, .95); color: var(--txt); }
-[data-estilo="glass"] .barra i, [data-estilo="glass"] .meta-barra i { background: linear-gradient(90deg, var(--p-destaque), var(--p-principal)); }
-[data-estilo="glass"] .barra { background: rgba(255, 255, 255, .7); }
 
 /* BOLD MODERN: blocos sólidos, títulos grandes, pílulas e alto contraste */
 [data-estilo="bold"] {
@@ -408,12 +409,10 @@ ol.passos { margin: 0; padding-left: 20px; display: flex; flex-direction: column
   --fonte-num: var(--display); --peso-num: 700; --tam-num: clamp(22px, 2.3vw, 32px);
   --kpi-dest-bg: var(--p-principal); --kpi-dest-txt: #FFFFFF;
   --btn-raio: 999px;
+  --btn-bg: #101114; --btn-txt: #FFFFFF; --btn-sec-txt: #101114; --btn-sec-borda: 1.5px solid #101114; --chip-at-bg: #101114; --chip-at-txt: #FFFFFF;
+  --kpi-dest-borda: 0 solid transparent; --kpi-dest-sombra: none; --kpi-dest-val: #FFFFFF;
+  --barra-alt: 12px; --lista-bg: var(--p-fundo); --lista-borda: 0 solid transparent; --esp-h1: -.035em;
 }
-[data-estilo="bold"] .btn:not(.sec), [data-estilo="bold"] .chip[aria-pressed="true"] { background: #101114; border-color: #101114; color: #FFFFFF; }
-[data-estilo="bold"] .btn.sec { border: 1.5px solid #101114; color: #101114; }
-[data-estilo="bold"] .cabeca h1 { letter-spacing: -.035em; }
-[data-estilo="bold"] .barra, [data-estilo="bold"] .meta-barra { height: 12px; }
-[data-estilo="bold"] .lista-foco li, [data-estilo="bold"] .dia-videos li, [data-estilo="bold"] .passo-item { border: 0; background: var(--p-fundo); }
 
 /* ---------- Tokens que o resto do CSS usa (recalculados em cada tema) ---------- */
 :root, [data-paleta], [data-estilo] {
@@ -593,6 +592,37 @@ ol.passos { margin: 0; padding-left: 20px; display: flex; flex-direction: column
 @media (max-width: 400px) { .sug-lista li { grid-template-columns: 18px 40px minmax(0, 1fr) auto; } .sug-lista li .bl { grid-column: 3; justify-self: start; } }
 .ap-previa .tema-amostra .ta-topo { flex-wrap: wrap; }
 @media (max-width: 400px) { .ap-previa .tema-amostra .ta-kpis { grid-template-columns: 1fr; } .ap-previa .tema-amostra .ta-topo h3 { font-size: 24px; } }
+
+/* Copy com mais de um roteiro: uma aba para cada */
+.roteiro-abas { display: flex; gap: 6px; flex-wrap: wrap; margin: 14px 2px 0; }
+.roteiro-abas .chip { font-weight: 600; max-width: 100%; white-space: normal; text-align: left; }
+@media print { .roteiro-abas { display: none; } }
+
+/* Esgotados e categoria com subcategoria */
+.lista-foco .esg { font-size: 12px; padding: 0; }
+.esgotados { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--linha); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.esgotados .lbl { width: 100%; margin: 0 0 2px; }
+.esgotados .chip { cursor: default; display: inline-flex; gap: 6px; align-items: center; white-space: normal; }
+.esgotados .chip .link { padding: 0; font-size: 12px; }
+td select.sel-cat { min-width: 190px; max-width: 240px; }
+
+/* App no celular e lembrete da manhã */
+.lembrete-manha { background: var(--ouro-tint); color: var(--texto); border: 1px solid color-mix(in srgb, var(--ouro) 35%, transparent); }
+.lembrete-manha .controles { flex-wrap: nowrap; }
+.aviso-app .passos { font-size: 13.5px; }
+@media (max-width: 520px) { .lembrete-manha .controles { width: 100%; justify-content: space-between; } }
+
+/* Regras de cada direção por tokens (assim a prévia de um estilo dentro de outro não se mistura) */
+.btn { background: var(--btn-bg); color: var(--btn-txt); }
+.btn.sec { background: var(--btn-sec-bg); color: var(--btn-sec-txt); border: var(--btn-sec-borda); }
+.chip[aria-pressed="true"] { background: var(--chip-at-bg); color: var(--chip-at-txt); border-color: transparent; }
+.kpi.escuro { border: var(--kpi-dest-borda); box-shadow: var(--kpi-dest-sombra); }
+.kpi.escuro .val { color: var(--kpi-dest-val); }
+.barra { background: var(--barra-trilho); height: var(--barra-alt); }
+.barra i { background: var(--barra-fill); box-shadow: var(--barra-brilho); }
+.meta-barra i { background: var(--meta-fill); box-shadow: var(--barra-brilho); }
+.cabeca h1 { letter-spacing: var(--esp-h1); }
+.lista-foco li, .dia-videos li, .passo-item { background: var(--lista-bg); border: var(--lista-borda); }
 
 /* Site do aluno: sem "Criar conta" */
 .abas-entrada, #formCriar { display: none !important; }
