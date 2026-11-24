@@ -363,6 +363,9 @@ const CAR_ESTILOS = (() => {
   /* ---------- O que cada estilo pede em cada página ---------- */
   const TIPOS = [["gancho", "Gancho"], ["contexto", "Contexto"], ["construcao", "Construção"], ["tensao", "Tensão"], ["recompensa", "Recompensa"], ["cta", "CTA"]];
   const ESTILOS = {
+    ryan: { nome: "Visual novo", quando: "A identidade do Ryan: cada página com a sua composição (tipografia, janela digital, laboratório de IA, frame de vídeo, comparação, camadas, objeto digital, comentário).", desenho: null,
+      campos: { gancho: ["foto", "lead", "titulo", "texto", "nota"], contexto: ["lead", "titulo", "texto", "foto", "nota"], construcao: ["lead", "titulo", "itens", "texto", "foto", "nota"], tensao: ["lead", "msgs", "titulo", "texto", "foto", "nota"], recompensa: ["lead", "titulo", "texto", "foto", "nota"], cta: ["lead", "titulo", "palavra", "texto", "nota"] },
+      rotulos: { _: { lead: "Etiqueta pequena (ou o nome da janela)", titulo: "A frase grande (*palavra* = destaque, **palavra** = vazada)", texto: "Texto de apoio (no laboratório vira o prompt)", itens: "Itens, um por linha (antes / depois vira comparação)", msgs: "Comentário: nome: texto", foto: "Foto ou print" } } },
     set: { nome: "Set de gravação", quando: "A sua marca: visor de câmera com REC, letra gigante, legenda de Reels, print no celular, takes em fita crepe e claquete no CTA.", desenho: null,
       campos: { gancho: ["foto", "titulo", "texto", "nota"], contexto: ["titulo", "msgs", "texto", "foto", "nota"], construcao: ["titulo", "itens", "texto", "foto", "nota"], tensao: ["msgs", "titulo", "texto"], recompensa: ["titulo", "texto", "foto", "nota"], cta: ["titulo", "palavra", "texto"] },
       rotulos: { _: { titulo: "A frase gigante (*palavra* = marca-texto)", texto: "Legenda de vídeo embaixo (*palavra* fica amarela)", msgs: "Comentário do Instagram: nome: texto (um por linha)", foto: "Print (aparece dentro de um celular)", itens: "Takes em fita crepe, um por linha", nota: "Letra à mão (opcional)" },
@@ -390,6 +393,14 @@ const CAR_ESTILOS = (() => {
   const ESTRUTURA = ["gancho", "contexto", "construcao", "construcao", "tensao", "recompensa", "cta"];
 
   const EXEMPLOS = {
+    ryan: { titulo: "O que eu passei pro Claude no meu TikTok Shop", slides: [
+      { tipo: "gancho", titulo: "o que eu passei pro *claude* no meu tiktok shop.", nota: "e o que continua comigo" },
+      { tipo: "contexto", lead: "rotina.txt", titulo: "eu posto todo dia. o que travava era o *depois.*", texto: "editar, escrever legenda, agendar e conferir." },
+      { tipo: "construcao", lead: "laboratório de ia", titulo: "o que o claude faz.", itens: "editar com corte seco e headline\nescrever legenda e hashtags\nagendar com link e horário" },
+      { tipo: "construcao", titulo: "o mesmo vídeo, *dois jeitos.*", lead: "na mão / com o claude", itens: "editar 15 vídeos por dia / gravar e revisar\nlegenda escrita do zero / legenda pronta pra ajustar\nagendar um por um / agenda inteira de uma vez" },
+      { tipo: "tensao", titulo: "a ia executa. **quem decide** sou eu.", texto: "escolher o produto, gravar e ler o que vendeu continua comigo." },
+      { tipo: "recompensa", titulo: "80% do que já vende. *20% de teste.*" },
+      { tipo: "cta", titulo: "quer ver o processo inteiro?", palavra: "SHOPFLOW", texto: "que eu te mando o link do grupo" }] },
     set: { titulo: "A marca pediu 1 vídeo pra black", slides: [
       { tipo: "gancho", titulo: "a marca pediu *1 vídeo* pra black.", nota: "eu mandei 3.", texto: "bastidor de um job de verdade" },
       { tipo: "contexto", titulo: "faltam *18 dias.*", texto: "e quase todo mundo vai postar *produto e preço.*" },
@@ -461,7 +472,7 @@ const CAR_ESTILOS = (() => {
     return notaCapturada;
   }
   function pintar(cv, s, i, total, estilo, aoCarregar, todos = []) {
-    if (["direto", "set", "papel", "colagem"].includes(estilo) && typeof CAMADAS !== "undefined") {
+    if (["ryan", "direto", "set", "papel", "colagem"].includes(estilo) && typeof CAMADAS !== "undefined") {
       const lista = todos && todos.length ? todos : [s];
       return CAMADAS.pintar(cv, { estilo, slides: lista }, Math.max(0, lista.indexOf(s)), { aoCarregar });
     }
@@ -489,7 +500,7 @@ const CAR_ESTILOS = (() => {
   /* ---------- Texto <-> slides: o formato que o Claude escreve ----------
      CARROSSEL: título | estilo: revista
      1 gancho | título | texto: ... | linha: ... | nota: ... | itens: a / b; c / d | msgs: marca: oi; eu: tudo | palavra: X | foto: ...  */
-  const CHAVES = { titulo: "titulo", "título": "titulo", texto: "texto", linha: "lead", lead: "lead", etapa: "lead", contato: "lead", nome: "lead", nota: "nota", itens: "itens", msgs: "msgs", mensagens: "msgs", palavra: "palavra", foto: "dicaFoto" };
+  const CHAVES = { comp: "comp", "composição": "comp", composicao: "comp", titulo: "titulo", "título": "titulo", texto: "texto", linha: "lead", lead: "lead", etapa: "lead", contato: "lead", nome: "lead", nota: "nota", itens: "itens", msgs: "msgs", mensagens: "msgs", palavra: "palavra", foto: "dicaFoto" };
   const TIPO_RE = /^(\d{1,2})[.)]?\s*(gancho|contexto|constru[cç][aã]o|tens[aã]o|recompensa|cta)\s*\|\s*(.*)$/i;
   const tipoDe = (t) => t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   function lerSlide(l) {
@@ -512,7 +523,7 @@ const CAR_ESTILOS = (() => {
     String(texto || "").split("\n").forEach((bruta) => {
       const l = bruta.replace(/^[\s>*•-]+/, "").replace(/^\|/, "").replace(/\|\s*$/, "").trim();
       const mc = l.replace(/\*\*/g, "").match(/^CARROSSEL\s*:\s*(.+)$/i);
-      if (mc) { const [tit, ...resto] = mc[1].split("|").map((x) => x.trim()); const me = resto.join(" ").match(/estilo\s*:?\s*(set de grava[cç][aã]o|set|papel|colagem|direto|bastidor|revista|conversa|fotos)/i); car = { titulo: tit, estilo: me ? me[1].toLowerCase().replace(/^set.*$/, "set").replace(/^papel$/, "set") : "", slides: [] }; cars.push(car); return; }
+      if (mc) { const [tit, ...resto] = mc[1].split("|").map((x) => x.trim()); const me = resto.join(" ").match(/estilo\s*:?\s*(visual novo|ryan|set de grava[cç][aã]o|set|papel|colagem|direto|bastidor|revista|conversa|fotos)/i); car = { titulo: tit, estilo: me ? me[1].toLowerCase().replace(/^visual novo$/, "ryan").replace(/^set.*$/, "set").replace(/^papel$/, "set") : "", slides: [] }; cars.push(car); return; }
       const s = lerSlide(l);
       if (s) { if (!car) { car = { titulo: "Carrossel", estilo: "", slides: [] }; cars.push(car); } car.slides.push(s); }
     });
@@ -520,14 +531,14 @@ const CAR_ESTILOS = (() => {
   }
   // As regras e o formato, para o pedido ao Claude (plano da semana e ideia solta)
   function formato(estilo) {
-    const lista = estilo ? [estilo] : Object.keys(ESTILOS);
+    const lista = estilo && ESTILOS[estilo] ? [estilo] : ["ryan"];
     return `Estrutura de 7 slides, nesta ordem: 1 gancho (provoca curiosidade com uma promessa forte), 2 contexto (o problema, direto), 3 e 4 construção (uma ideia só, explicada até não sobrar dúvida: é aqui que entra a autoridade), 5 tensão (desafia o que a pessoa acha), 6 recompensa (o "AHA", a solução clara) e 7 CTA (uma ação só; "comenta PALAVRA que eu te mando..." apenas se eu tiver algo pra mandar, senão portfólio no link da bio).
 COMO ESCREVER (vale para todo carrossel): prático, criativo, direto ao ponto e que converte. Fala de creator, não de empresa.
 - Uma ideia por slide, numa frase curta que parece pensamento em voz alta, em minúscula, e que deixa a pessoa querendo o próximo slide.
 - Comece no meio da situação real ("a marca pediu 1 vídeo pra black."), nunca com apresentação ou "neste carrossel".
 - Número concreto e exemplo real valem mais que adjetivo. Nada de frase de apostila, lista genérica ou palavra de LinkedIn (estratégia, potencializar, alavancar, jornada).
 - O CTA pede uma ação só e diz o que a pessoa ganha.
-Carrossel curto e quadrado (1080 x 1080): título de até 12 palavras e no máximo 22 palavras somando tudo do slide (no máximo 2 mensagens por slide). *palavra* é o destaque do slide (1 por título: no estilo Direto vira marca-texto) e **palavra** fica em negrito (no Direto) ou cinza (nos outros). Não use travessão. O que você não souber de mim vira campo entre parênteses.
+Carrossel curto em 4:5 (1080 x 1350). Cada slide pode escolher a composição com | comp: tipo, janela, lab, frame, comparacao, camadas, objeto ou cta (sem isso o painel escolhe). Comparação usa itens "antes / depois", um por linha. título de até 12 palavras e no máximo 22 palavras somando tudo do slide (no máximo 2 mensagens por slide). *palavra* é o destaque do slide (1 por título: no estilo Direto vira marca-texto) e **palavra** fica em negrito (no Direto) ou cinza (nos outros). Não use travessão. O que você não souber de mim vira campo entre parênteses.
 Use o estilo Direto na maioria dos carrosséis. Os outros só quando o assunto pedir (Conversa para negociação com marca, Fotos para rotina com foto).
 Escreva assim, um slide por linha, com o nome de cada campo (o primeiro campo sem nome é o título):
 CARROSSEL: título do carrossel | estilo: ${lista.join(" ou ")}

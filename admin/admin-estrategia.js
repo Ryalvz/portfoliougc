@@ -353,7 +353,7 @@ O QUE EU PRECISO (pesquise na internet de verdade, nada de tendência inventada)
    CHAMADA FINAL: o CTA do último slide, uma ação só.
    LEGENDA: gancho na primeira linha, o mesmo CTA, 3 a 5 hashtags.
    DICAS DE ARTE: o estilo, que foto usar (ou se é sem foto) e onde a nota escrita à mão continua no próximo slide.
-7. CARROSSÉIS PRONTOS: para cada carrossel do plano, escreva os slides num dos meus estilos (de preferência o Direto; Bastidor, Revista, Conversa ou Fotos só se o assunto pedir). O Direto pode repetir toda semana: o que muda é a capa, a foto e o tom de fundo.
+7. CARROSSÉIS PRONTOS: para cada carrossel do plano, escreva os slides no meu visual novo (estilo: ryan), escolhendo a composição de cada página (comp: tipo, janela, lab, frame, comparacao, camadas, objeto ou cta) pra não ficar tudo igual.
    ${CAR_ESTILOS.formato("").split("\n").join("\n   ")}
 
 Fale como gente de verdade, em português do Brasil, tom de conversa de café, sem cara de anúncio. Não use travessão em nenhum texto. Proibido: "não é X, é Y" e variações, "aí eu descobri", "foi aí que", "foi quando", "até que", "você sabia que" como gancho, "isso muda tudo", "isso muda o jogo". Não invente número ou resultado meu: o que você não sabe vira campo entre parênteses.`;
@@ -1124,7 +1124,7 @@ const novoSlide = (modelo) => ({ modelo, titulo: "", texto: "" });
 function desenharCarrossel(el) {
   if (igx.carrosseis === null) { el.innerHTML = `<p class="vazio">Abrindo o gerador...</p>`; Promise.all([carregarCarrosseis(), carregarFontesCarrossel()]).then(desenhar); return; }
   if (igx.faltaCarrosseis) { el.innerHTML = `<div class="aviso-falta">Falta rodar a parte 27 do banco.sql no Supabase.</div>`; return; }
-  if (!igx.car) igx.car = CAR_ESTILOS.exemplo("direto");
+  if (!igx.car) { igx.car = CAR_ESTILOS.exemplo("ryan"); igx.car.formato = "retrato"; }
   if (igx.car.estilo && CAR_ESTILOS.ESTILOS[igx.car.estilo]) return desenharEstilos(el);
   const car = igx.car;
   car.slides.forEach((s) => { if (!MODELOS_SLIDE.some((m) => m[0] === s.modelo)) s.modelo = s.modelo === "comparacao" ? "cartao" : "texto"; });
@@ -1611,7 +1611,7 @@ O post nasce de uma história, experiência ou prova REAL minha. Dica que qualqu
 CAPAS: 5 opções de texto pro slide 1, de ângulos diferentes, até 10 palavras cada. Uma por linha: 1. "frase" | ângulo | por que faz arrastar.
 OS 3 PRIMEIROS SLIDES: o que cada um mostra e por que a pessoa arrasta pro próximo.
 SLIDE A SLIDE: a função e o texto de cada uma das 7 páginas.
-SLIDES: o carrossel pronto, de preferência no estilo Direto (Bastidor, Revista, Conversa ou Fotos só se o assunto pedir), neste formato (é o que o Estúdio de arte do painel abre):
+SLIDES: o carrossel pronto no meu visual novo (estilo: ryan), com a composição de cada página, neste formato (é o que o Estúdio de arte do painel abre):
 ${CAR_ESTILOS.formato("")}
 CHAMADA FINAL: o CTA do último slide, uma ação só.
 LEGENDA: para o Instagram, gancho na primeira linha, o mesmo CTA e 3 a 5 hashtags.

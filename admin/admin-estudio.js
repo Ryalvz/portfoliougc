@@ -13,6 +13,14 @@ const guardarModoCarrossel = (m) => { try { localStorage.setItem("car-modo", m);
 const PAGINAS_CAR = ["Gancho", "Contexto", "Construção", "Construção", "Tensão", "Recompensa", "CTA"];
 const NOMES_COR_CAM = [["tinta", "Forte"], ["texto", "Normal"], ["ouro", "Destaque"], ["cinza", "Cinza"]];
 
+const FONTES_EST = [["grot", "Inter Tight"], ["mont", "Montserrat"], ["marcador", "Caveat Brush (à mão)"], ["mono", "Mono (código)"], ["serif", "Playfair (serifa)"]];
+const PESOS_EST = [["400", "Regular"], ["500", "Médio"], ["700", "Negrito"], ["800", "Extra"], ["900", "Black"]];
+const PALETA_EST = [["#1E1813", "Café"], ["#231A13", "Café alternativo"], ["#F1EAE0", "Creme"], ["#D9C48A", "Dourado"], ["#F2D46B", "Amarelo"], ["#A8742C", "Caramelo"], ["#B9783F", "Terra"], ["#8A7C66", "Cinza quente"], ["#E5483B", "Vermelho REC"], ["#FFFDF8", "Branco papel"]];
+const NOMES_VINC = { nome: "Nome", arroba: "@", assinatura: "Assinatura", logo: "Logo" };
+// A mesma peça em outra página: mesmo papel (título, nome, @...) e mesmo tipo
+const chaveCamada = (l) => `${l.papel || l.nome}|${l.t}`;
+const PROPS_GLOBAIS = ["fonte", "peso", "tam", "cor", "corDestaque", "corNegrito", "letra", "entre", "alinhar", "contorno", "fonteSolta", "fundoCor", "corTexto"];
+
 function estFoto(s) {
   return `<div class="est-bloco"><span class="est-rot">Foto</span><div class="car-foto">
       ${s.foto ? `<img src="${esc(s.foto)}" alt="" crossorigin="anonymous">` : `<span class="car-foto-vazia">${ic("portfolio")}</span>`}
@@ -30,7 +38,8 @@ function estFaixa(k, rotulo, min, max, passo, v, un = "") {
 function desenharEstudio(el) {
   const car = igx.car;
   if (est.car !== car) { est.car = car; est.i = 0; est.sel = null; est.hist = []; } // carrossel novo aberto: começa do primeiro slide
-  if (!car.formato) car.formato = "quadrado";
+  if (!car.formato) car.formato = car.estilo === "ryan" ? "retrato" : "quadrado";
+  const novo = car.estilo === "ryan", ID = novo ? CAMADAS.identidadeDe(car) : null;
   car.slides.forEach((s) => { if (!CAR_ESTILOS.TIPOS.some((t) => t[0] === s.tipo)) s.tipo = "construcao"; });
   if (est.i >= car.slides.length) est.i = car.slides.length - 1;
   if (est.i < 0) est.i = 0;
@@ -43,13 +52,16 @@ function desenharEstudio(el) {
   const destaques = Object.entries(CAR_ESTILOS.DESTAQUES);
   const temFoto = CAR_ESTILOS.campos(car.estilo, s.tipo).includes("foto") || camadas.some((l) => l.t === "foto");
   const npal = CAMADAS.palavras(camadas);
+  // Quantas outras páginas têm a mesma peça (pro "aplicar em todas")
+  const outrasCom = (l) => car.slides.filter((x, k) => k !== est.i && (x.camadas || CAMADAS.garantir(car, k)).some((o) => chaveCamada(o) === chaveCamada(l))).length;
+  const fonteDe = (l) => (novo && !l.fonteSolta && (l.papel === "titulo" || l.papel === "texto") ? (l.papel === "titulo" ? ID.fonteTitulo : ID.fonteTexto) : l.fonte || "sans");
 
   el.innerHTML = `
     <details class="cartao car-ideia" id="est-ideia">
       <summary><b>Da sua ideia ao carrossel</b> <span class="sub">você escreve a ideia, o Claude monta, você cola aqui</span></summary>
       <textarea class="campo" id="est-ideia-txt" rows="3" placeholder="Ex.: quero mostrar como eu respondo marca que pede desconto">${esc(igx.ideiaCar || "")}</textarea>
       <div class="car-ideia-acoes">
-        <select class="campo" id="est-ideia-estilo" aria-label="Estilo"><option value="auto">Estilo: o Claude escolhe</option>${Object.entries(CAR_ESTILOS.ESTILOS).map(([k, e]) => `<option value="${k}" ${k === car.estilo ? "selected" : ""}>${esc(e.nome)}</option>`).join("")}</select>
+        <input type="hidden" id="est-ideia-estilo" value="ryan">
         <button class="btn primario" type="button" id="est-ideia-copiar">${ic("transcricao")}Copiar pedido pro Claude</button>
       </div>
       <textarea class="campo" id="est-ideia-resp" rows="3" placeholder="Cole aqui a resposta do Claude (as linhas do CARROSSEL)"></textarea>
@@ -62,12 +74,14 @@ function desenharEstudio(el) {
       <select class="campo" id="est-formato" aria-label="Formato">${Object.entries(CAMADAS.FORMATOS).map(([k, f]) => `<option value="${k}" ${car.formato === k ? "selected" : ""}>${f.nome}</option>`).join("")}</select>
       <span class="espaco"></span>
       <button class="btn" type="button" id="est-desfazer" ${est.hist.length ? "" : "disabled"} title="Cmd + Z">Desfazer</button>
+      <button class="btn" type="button" id="est-refazer" ${(est.refazer || []).length ? "" : "disabled"} title="Cmd + Shift + Z">Refazer</button>
+      <button class="btn" type="button" id="est-ver-tudo">Ver o carrossel inteiro</button>
       <button class="btn" type="button" id="est-lista">Ver em lista</button>
       <button class="btn" type="button" id="est-novo">Novo</button>
       <button class="btn" type="button" id="est-salvar">Salvar</button>
       <button class="btn primario" type="button" id="est-baixar">${ic("baixar")}Baixar imagens</button>
     </section>
-    <div class="est-estilos" role="tablist" aria-label="Estilo">${ESTILOS_CHIPS().filter(([k]) => k !== "classico").map(([k, nome]) => `<button type="button" role="tab" data-est-estilo="${k}" aria-selected="${k === car.estilo}">${esc(nome)}</button>`).join("")}<span class="sub">${esc(E.quando)}</span></div>
+    ${novo ? "" : `<div class="est-antigo"><span>Este carrossel está num estilo antigo, que saiu do Estúdio. Ele continua abrindo, mas a identidade nova e o "aplicar em todas" só funcionam no visual novo.</span><button class="btn primario" type="button" id="est-converter">Converter pro visual novo</button></div>`}
 
     <div class="est-grade">
       <aside class="est-minis" aria-label="Slides">
@@ -81,7 +95,8 @@ function desenharEstudio(el) {
             <button type="button" class="est-alca" id="est-alca" aria-label="Tamanho"></button></div></div>
         <div class="est-nav"><button type="button" class="icone-btn" data-est-ir="-1" ${est.i === 0 ? "disabled" : ""} aria-label="Slide anterior">${ic("esq")}</button>
           <span>${est.i + 1} de ${n} · ${esc(PAGINAS_CAR[est.i] || "Extra")}</span>
-          <button type="button" class="icone-btn" data-est-ir="1" ${est.i === n - 1 ? "disabled" : ""} aria-label="Próximo slide">${ic("dir")}</button></div>
+          <button type="button" class="icone-btn" data-est-ir="1" ${est.i === n - 1 ? "disabled" : ""} aria-label="Próximo slide">${ic("dir")}</button>
+          <button type="button" class="btn pequeno" id="est-baixar-uma">${ic("baixar")}Baixar esta página</button></div>
         <label class="check est-guia-check"><input type="checkbox" id="est-guia" ${est.guia ? "checked" : ""}> Mostrar a borda de segurança (não sai na imagem)</label>
         <p class="sub est-ajuda">Clique em qualquer coisa do slide pra escolher. Arraste pra mover, a bolinha do lado muda a largura e a do canto muda o tamanho. Delete apaga, Cmd + Z desfaz.</p>
       </div>
@@ -92,24 +107,44 @@ function desenharEstudio(el) {
           <button type="button" class="icone-btn" data-est-duplicar ${n >= 10 ? "disabled" : ""} aria-label="Duplicar slide">${ic("mais")}</button>
           <button type="button" class="icone-btn" data-est-apagar ${n <= 1 ? "disabled" : ""} aria-label="Apagar slide">${ic("apagar")}</button></div>
 
+        ${novo ? (() => {
+          const linkadas = (k) => car.slides.filter((x) => (x.camadas || []).some((l) => l.vinc === k && !l.solto)).length;
+          const corBotoes = (campo, atual) => `<div class="est-paleta">${PALETA_EST.map(([c, nm]) => `<button type="button" data-id-cor="${campo}" data-cor="${c}" title="${nm}" aria-label="${nm}" aria-pressed="${String(atual).toLowerCase() === c.toLowerCase()}"><i style="background:${c}"></i></button>`).join("")}<input type="color" data-id-cor-livre="${campo}" value="${esc(atual)}" aria-label="Outra cor"></div>`;
+          return `<details class="est-bloco est-id" ${est.idAberta ? "open" : ""}><summary class="est-rot est-id-topo">Identidade do carrossel<small>vale pra todas as ${n} páginas</small></summary>
+          <div class="est-id-corpo">
+            ${[["nome", "Nome"], ["arroba", "@ do Instagram"], ["assinatura", "Assinatura"]].map(([k, r]) => `<label class="est-id-campo"><span>${r}<small>${linkadas(k)} ${linkadas(k) === 1 ? "página" : "páginas"}</small></span><input class="campo" data-id-txt="${k}" value="${esc(ID[k])}"></label>`).join("")}
+            <div class="est-id-campo"><span>Cor de destaque</span>${corBotoes("destaque", ID.destaque)}</div>
+            <div class="est-id-campo"><span>Cor principal (fundo escuro e texto)</span>${corBotoes("principal", ID.principal)}</div>
+            <label class="est-id-campo"><span>Fonte dos títulos</span><select class="campo" data-id-fonte="fonteTitulo">${FONTES_EST.map(([v, nm]) => `<option value="${v}" ${ID.fonteTitulo === v ? "selected" : ""}>${nm}</option>`).join("")}</select></label>
+            <label class="est-id-campo"><span>Fonte dos textos</span><select class="campo" data-id-fonte="fonteTexto">${FONTES_EST.map(([v, nm]) => `<option value="${v}" ${ID.fonteTexto === v ? "selected" : ""}>${nm}</option>`).join("")}</select></label>
+            <div class="est-id-campo"><span>Logo</span><div class="est-id-logo">${ID.logo ? `<img src="${esc(ID.logo)}" alt="" crossorigin="anonymous"><button type="button" class="btn pequeno" data-id-logo-todas>Colocar em todas as páginas</button><button type="button" class="btn pequeno" data-id-logo-tirar>Tirar</button>` : ""}<label class="btn pequeno">${ID.logo ? "Trocar" : "Subir logo"}<input type="file" accept="image/*" data-id-logo hidden></label></div></div>
+            <small class="sub">Muda aqui e atualiza todas as páginas. Uma peça que você desvincular numa página fica com o jeito dela.</small>
+          </div></details>`; })() : ""}
         ${npal > 25 ? `<p class="est-alerta">Muita coisa neste slide: ${npal} palavras. Carrossel bom tem até 25 por página. Esconda ou apague uma camada, ou passe uma parte pro próximo slide.</p>` : ""}
         <p class="est-alerta" id="est-fora" hidden></p>
 
         ${L ? `<div class="est-bloco est-cam-edit">
           <span class="est-rot">${esc(L.nome)}<small>camada escolhida</small></span>
+          ${novo && L.vinc ? `<div class="est-vinc ${L.solto ? "solto" : ""}">${L.solto ? `Desvinculado: nesta página o ${esc(NOMES_VINC[L.vinc] || L.vinc)} tem o jeito dele. <button type="button" class="link-btn" data-cam-vincular>Vincular de novo</button>` : `Vinculado à identidade (${esc(NOMES_VINC[L.vinc] || L.vinc)}). <button type="button" class="link-btn" data-cam-desvincular>Desvincular desta página</button>`}</div>` : ""}
           ${ehTexto && L.auto !== "num" ? `<textarea class="campo" data-cam-texto rows="${L.t === "texto" && String(L.texto).length > 60 ? 4 : 2}">${esc(L.texto)}</textarea>
             <small class="sub">*palavra* fica em destaque e **palavra** em cinza. Enter quebra a linha.</small>` : ""}
+          ${ehTexto && novo && L.vinc && L.solto ? `<div class="est-opcoes"><button type="button" data-cam-aplicar-texto="esta">Aplicar nesta página</button><button type="button" data-cam-aplicar-texto="todas">Aplicar em todas (${outrasCom(L) + 1})</button></div>` : ""}
           ${ehTexto ? `
-            ${estFaixa("tam", "Tamanho da letra", 12, 220, 1, L.tam, "px")}
+            <div class="est-opcoes"><label class="est-mini-campo"><span>Fonte</span><select class="campo" data-cam-fonte>${FONTES_EST.map(([v, nm]) => `<option value="${v}" ${fonteDe(L) === v ? "selected" : ""}>${nm}</option>`).join("")}</select></label>
+              <label class="est-mini-campo"><span>Peso</span><select class="campo" data-cam-peso>${PESOS_EST.map(([v, nm]) => `<option value="${v}" ${String(L.peso || 500) === v ? "selected" : ""}>${nm}</option>`).join("")}</select></label></div>
+            ${estFaixa("tam", "Tamanho da letra", 12, 260, 1, L.tam, "px")}
             ${estFaixa("letra", "Espaço entre letras", -6, 40, 0.5, L.letra || 0, "px")}
             ${estFaixa("entre", "Espaço entre linhas", 0.8, 2.2, 0.02, L.entre || 1.25)}
             ${estFaixa("w", "Largura da caixa", 80, L.continua ? W : W - 2 * M, 10, L.w, "px")}
             <div class="est-opcoes est-opcoes-3" role="group" aria-label="Alinhamento">${[["left", "Esquerda"], ["center", "Centro"], ["right", "Direita"]].map(([v, nome]) => `<button type="button" data-cam-alinhar="${v}" aria-pressed="${(L.alinhar || "left") === v}">${nome}</button>`).join("")}</div>
             ${L.t === "texto" ? `<div class="est-opcoes est-opcoes-4" role="group" aria-label="Cor do texto">${NOMES_COR_CAM.map(([v, nome]) => `<button type="button" data-cam-cor="${v}" aria-pressed="${(L.cor || "texto") === v}">${nome}</button>`).join("")}</div>
-              ${estFaixa("rot", "Girar", -20, 20, 1, L.rot || 0, "°")}` : ""}
+              <label class="est-mini-campo est-cor-livre"><span>Outra cor</span><input type="color" data-cam-cor-livre value="${/^#[0-9a-f]{6}$/i.test(L.cor || "") ? L.cor : "#1E1813"}"></label>` : ""}
+            ${estFaixa("rot", "Girar", -20, 20, 1, L.rot || 0, "°")}
             ${est.i < n - 1 && L.t === "texto" ? `<label class="check est-continua"><input type="checkbox" data-cam-continua ${L.continua ? "checked" : ""}> Continua no próximo slide (o resto aparece quando a pessoa arrasta)</label>` : ""}` : ""}
-          ${L.t === "foto" || L.t === "forma" ? `${estFaixa("w", "Largura", 40, W, 10, L.w, "px")}${estFaixa("h", "Altura", 40, H, 10, L.h, "px")}` : ""}
+          ${["foto", "forma", "imagem", "janela", "celular"].includes(L.t) ? `${estFaixa("w", "Largura", 40, W, 10, L.w, "px")}${estFaixa("h", "Altura", 40, H, 10, L.h, "px")}${estFaixa("rot", "Girar", -20, 20, 1, L.rot || 0, "°")}` : ""}
+          ${L.t === "imagem" ? estFaixa("foco", "Enquadramento da foto (cima / baixo)", 0, 1, 0.02, L.foco ?? 0.4) : ""}
           ${L.t === "linha" ? estFaixa("w", "Comprimento", 40, W, 10, L.w, "px") : ""}
+          ${novo && outrasCom(L) ? `<div class="est-global"><button type="button" class="btn" data-cam-global>Aplicar em todas as páginas</button><small>Leva fonte, peso, tamanho, cor e espaçamento desta peça pra ${outrasCom(L)} ${outrasCom(L) === 1 ? "outra página" : "outras páginas"} que têm ${esc(L.nome.toLowerCase())}. Posição e texto de cada página não mudam.</small></div>` : ""}
           <div class="est-opcoes"><button type="button" data-cam-dup>Duplicar</button><button type="button" data-cam-apagar="${L.id}">Apagar camada</button></div>
         </div>` : `<p class="sub est-dica">Clique num texto do slide (ou na lista abaixo) pra mudar o tamanho da letra, o espaço, a largura e o alinhamento.</p>`}
 
@@ -118,16 +153,18 @@ function desenharEstudio(el) {
             <button type="button" class="est-cam-nome" data-cam-sel="${l.id}"><b>${esc(l.nome)}</b><small>${esc(String(l.auto === "num" ? "número do slide" : l.texto || (l.t === "foto" ? "foto" : "forma")).replace(/\*/g, "").slice(0, 40))}</small></button>
             <button type="button" class="est-cam-acao" data-cam-olho="${l.id}">${l.oculto ? "Mostrar" : "Esconder"}</button>
             <button type="button" class="icone-btn" data-cam-apagar="${l.id}" aria-label="Apagar ${esc(l.nome)}">${ic("apagar")}</button></li>`).join("")}</ul>
-          <div class="est-opcoes"><button type="button" data-cam-novo>Adicionar texto</button><button type="button" data-cam-refazer>Refazer pelo estilo</button></div>
+          <div class="est-opcoes"><button type="button" data-cam-novo>Adicionar texto</button><label class="est-btn-arquivo">Adicionar imagem<input type="file" accept="image/*" data-cam-imagem hidden></label></div>
+          <div class="est-opcoes"><button type="button" data-cam-refazer>${novo ? "Refazer a página" : "Refazer pelo estilo"}</button></div>
         </div>
 
         <div class="est-bloco"><span class="est-rot est-rot-sec">Slide</span></div>
+        ${novo ? `<label class="est-bloco"><span class="est-rot">Composição da página</span><select class="campo" data-est-comp>${CAMADAS.COMPS.map(([v, nm]) => `<option value="${v}" ${CAMADAS.compDe(car, s, est.i) === v ? "selected" : ""}>${nm}</option>`).join("")}</select></label>` : ""}
         <label class="est-bloco"><span class="est-rot">Layout</span><select class="campo" data-est-tipo aria-label="Layout do slide">${CAR_ESTILOS.TIPOS.map(([v, nome]) => `<option value="${v}" ${s.tipo === v ? "selected" : ""}>${nome}</option>`).join("")}</select></label>
         <div class="est-bloco"><span class="est-rot">Fundo</span><div class="est-opcoes">
           <button type="button" data-est-fundo="" aria-pressed="${!s.fundo}">Como o estilo pede</button>
           <button type="button" data-est-fundo="trocar" aria-pressed="${s.fundo === "trocar"}">Trocar claro e escuro</button></div></div>
-        <div class="est-bloco"><span class="est-rot">Cor de destaque</span><div class="est-cores">${destaques.map(([k, d]) => `<button type="button" data-est-cor="${k}" aria-pressed="${(s.destaque || "dourado") === k}" title="${esc(d.nome)}" aria-label="${esc(d.nome)}"><i style="background:linear-gradient(135deg, ${d.cores[0]} 50%, ${d.cores[1]} 50%)"></i></button>`).join("")}</div></div>
-        ${temFoto ? estFoto(s) : ""}
+        ${novo ? "" : `<div class="est-bloco"><span class="est-rot">Cor de destaque</span><div class="est-cores">${destaques.map(([k, d]) => `<button type="button" data-est-cor="${k}" aria-pressed="${(s.destaque || "dourado") === k}" title="${esc(d.nome)}" aria-label="${esc(d.nome)}"><i style="background:linear-gradient(135deg, ${d.cores[0]} 50%, ${d.cores[1]} 50%)"></i></button>`).join("")}</div></div>`}
+        ${temFoto || novo ? estFoto(s) : ""}
         <button type="button" class="link-btn" data-est-todos>Usar este fundo e esta cor em todos os slides</button>
       </aside>
     </div>`;
@@ -165,11 +202,15 @@ function desenharEstudio(el) {
   // Desfazer: guarda uma cópia antes de cada mudança (no máximo uma a cada 0,7 s ao arrastar ou digitar)
   const marcar = (forcar) => {
     const agora = Date.now(); if (!forcar && agora - (est.ultMarca || 0) < 700) return;
-    est.ultMarca = agora; est.hist.push({ i: est.i, slides: JSON.stringify(car.slides), formato: car.formato });
+    est.ultMarca = agora; est.hist.push({ i: est.i, slides: JSON.stringify(car.slides), formato: car.formato, identidade: JSON.stringify(car.identidade || null), estilo: car.estilo });
+    est.refazer = [];
     if (est.hist.length > 60) est.hist.shift();
     const b = $("#est-desfazer", el); if (b) b.disabled = false;
   };
-  const desfazer = () => { const h = est.hist.pop(); if (!h) return; car.slides = JSON.parse(h.slides); car.formato = h.formato; est.i = Math.min(h.i, car.slides.length - 1); est.sel = null; desenhar(); };
+  const foto = () => ({ i: est.i, slides: JSON.stringify(car.slides), formato: car.formato, identidade: JSON.stringify(car.identidade || null), estilo: car.estilo });
+  const voltarPara = (h) => { car.slides = JSON.parse(h.slides); car.formato = h.formato; car.estilo = h.estilo || car.estilo; const idv = JSON.parse(h.identidade || "null"); if (idv) car.identidade = idv; else delete car.identidade; est.i = Math.min(h.i, car.slides.length - 1); est.sel = null; desenhar(); };
+  const desfazer = () => { const h = est.hist.pop(); if (!h) return; (est.refazer = est.refazer || []).push(foto()); voltarPara(h); };
+  const refazer = () => { const h = (est.refazer || []).pop(); if (!h) return; est.hist.push(foto()); voltarPara(h); };
   const limites = () => ({ x0: M, y0: M, x1: W - M, y1: H - M });
   function trazerPraDentro(l) {
     if (!l) return;
@@ -191,7 +232,7 @@ function desenharEstudio(el) {
   };
   $("#est-desfazer", el).onclick = desfazer;
   $("#est-lista", el).onclick = () => { guardarModoCarrossel("lista"); desenhar(); };
-  $("#est-novo", el).onclick = () => { igx.car = CAR_ESTILOS.exemplo(car.estilo); igx.car.formato = car.formato; est.i = 0; desenhar(); avisar("Exemplo novo: troque os textos e as fotos."); };
+  $("#est-novo", el).onclick = () => { igx.car = CAR_ESTILOS.exemplo("ryan"); igx.car.formato = "retrato"; est.i = 0; desenhar(); avisar("Exemplo novo: troque os textos e as fotos."); };
   $("#est-salvar", el).onclick = () => salvarCarrossel(car);
   $("#est-baixar", el).onclick = (e) => baixarCarrossel(e.target.closest("button"), car, (cv, i) => CAMADAS.pintar(cv, car, i));
   $$("[data-est-estilo]", el).forEach((b) => b.onclick = async () => {
@@ -214,9 +255,9 @@ function desenharEstudio(el) {
     const resp = $("#est-ideia-resp", el).value, lido = CAR_ESTILOS.lerTexto(resp)[0];
     if (!lido) { avisar("Não achei as linhas do carrossel. Cole a resposta inteira do Claude.", true); return; }
     const leg = (resp.match(/LEGENDA\s*:?\s*\n?([\s\S]+)$/i) || [])[1];
-    const estilo = lido.estilo || ($("#est-ideia-estilo", el).value !== "auto" ? $("#est-ideia-estilo", el).value : car.estilo);
-    igx.car = { titulo: lido.titulo, estilo, formato: car.formato, slides: lido.slides, legenda: leg ? leg.trim().split("\n")[0].replace(/\*\*/g, "") : "" };
-    est.i = 0; desenhar(); avisar(`Carrossel montado no estilo ${CAR_ESTILOS.ESTILOS[estilo].nome}. Suba as fotos e confira.`);
+    const estilo = "ryan";
+    igx.car = { titulo: lido.titulo, estilo, formato: "retrato", slides: lido.slides, legenda: leg ? leg.trim().split("\n")[0].replace(/\*\*/g, "") : "" };
+    est.i = 0; desenhar(); avisar("Carrossel montado no visual novo. Suba as fotos e confira.");
   };
 
   // Miniaturas e navegação
@@ -235,7 +276,7 @@ function desenharEstudio(el) {
     if (!document.body.contains(el) || !$("#est-grande", el) || el.closest("[hidden]")) return;
     const digitando = /INPUT|TEXTAREA|SELECT/.test((document.activeElement || {}).tagName || "") && (document.activeElement || {}).type !== "range";
     if (digitando || ($("#janela") && $("#janela").open)) return;
-    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") { e.preventDefault(); desfazer(); return; }
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") { e.preventDefault(); if (e.shiftKey) refazer(); else desfazer(); return; }
     const l = est.sel && camadas.find((x) => x.id === est.sel);
     if (l && /^Arrow/.test(e.key)) {
       e.preventDefault(); marcar(); const d = e.shiftKey ? 40 : 4;
@@ -384,4 +425,123 @@ function desenharEstudio(el) {
   });
   const tirarFoto = $("[data-est-tirar-foto]", painel);
   if (tirarFoto) tirarFoto.onclick = () => { delete s.foto; desenhar(); };
+
+  // Refazer, ver o carrossel inteiro, baixar uma página
+  $("#est-refazer", el).onclick = refazer;
+  $("#est-baixar-uma", el).onclick = async (e) => {
+    const b = e.target.closest("button"); b.disabled = true;
+    try {
+      await carregarFontesCarrossel(); await esperarFotos(car.slides);
+      const cv = document.createElement("canvas"); CAMADAS.pintar(cv, car, est.i);
+      const blob = await new Promise((ok) => cv.toBlob(ok, "image/jpeg", 0.93));
+      const nome = (car.titulo || "carrossel").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^\w]+/g, "-").replace(/^-|-$/g, "").toLowerCase().slice(0, 40) || "carrossel";
+      const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `${nome}-${String(est.i + 1).padStart(2, "0")}.jpg`; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      avisar(`Página ${est.i + 1} baixada (${cv.width} x ${cv.height}).`);
+    } catch (erro) { avisar("Não deu pra baixar: " + (erro.message || erro), true); }
+    b.disabled = false;
+  };
+  $("#est-ver-tudo", el).onclick = async () => {
+    await carregarFontesCarrossel();
+    const imgs = car.slides.map((_, k) => { const cv = document.createElement("canvas"); CAMADAS.pintar(cv, car, k); return cv.toDataURL("image/jpeg", 0.8); });
+    const d = abrirJanelaSimples(`${esc(car.titulo || "Carrossel")} · ${car.slides.length} páginas`, `<div class="est-tudo">${imgs.map((u, k) => `<button type="button" class="est-tudo-pag" data-ir-pag="${k}"><img src="${u}" alt="Página ${k + 1}"><span>${k + 1}</span></button>`).join("")}</div>`,
+      `<button type="button" class="btn primario" data-fechar>Fechar</button>`);
+    $$("[data-ir-pag]", d).forEach((b) => b.onclick = () => { d.close(); est.i = Number(b.dataset.irPag); est.sel = null; desenhar(); });
+  };
+  const conv = $("#est-converter", el);
+  if (conv) conv.onclick = async () => {
+    if (!(await confirmar("Converter pro visual novo? As páginas são refeitas com a identidade e as composições novas, no formato 4:5. Os textos continuam (dá pra desfazer).", "Converter"))) return;
+    marcar(true); car.estilo = "ryan"; car.formato = "retrato"; CAMADAS.identidadeDe(car);
+    car.slides.forEach((x) => { delete x.camadas; delete x.camadasEditadas; delete x.comp; });
+    est.sel = null; desenhar(); avisar("Pronto: carrossel no visual novo.");
+  };
+
+  // Composição da página
+  const comp = $("[data-est-comp]", painel);
+  if (comp) comp.onchange = async (e) => {
+    if (s.camadasEditadas && !(await confirmar("Trocar a composição refaz esta página. Os ajustes feitos à mão nela se perdem (dá pra desfazer).", "Trocar composição"))) { e.target.value = CAMADAS.compDe(car, s, est.i); return; }
+    marcar(true); s.comp = e.target.value; delete s.camadas; delete s.camadasEditadas; est.sel = null; desenhar();
+  };
+
+  // Identidade do carrossel: muda e todas as páginas vinculadas acompanham na hora
+  const idBox = $(".est-id", painel);
+  if (idBox) {
+    idBox.addEventListener("toggle", () => { est.idAberta = idBox.open; });
+    const repintarTudo = () => { pintarGrande(); car.slides.forEach((_, k) => pintarMini(k)); };
+    $$("[data-id-txt]", idBox).forEach((inp) => inp.addEventListener("input", () => { marcar(); ID[inp.dataset.idTxt] = inp.value; repintarJa(); clearTimeout(espera); espera = setTimeout(repintarTudo, 300); }));
+    $$("[data-id-cor]", idBox).forEach((b) => b.onclick = () => { marcar(true); ID[b.dataset.idCor] = b.dataset.cor; desenhar(); });
+    $$("[data-id-cor-livre]", idBox).forEach((inp) => { inp.addEventListener("input", () => { marcar(); ID[inp.dataset.idCorLivre] = inp.value; repintarJa(); }); inp.addEventListener("change", () => desenhar()); });
+    $$("[data-id-fonte]", idBox).forEach((sel) => sel.onchange = () => { marcar(true); ID[sel.dataset.idFonte] = sel.value; desenhar(); });
+    const up = $("[data-id-logo]", idBox);
+    if (up) up.onchange = async () => {
+      const f = up.files && up.files[0]; if (!f) return;
+      try { const url = await enviarArquivo(await prepararFoto(f), "carrosseis", "logo.jpg"); if (url) { marcar(true); ID.logo = url; desenhar(); avisar("Logo salvo. Toque em \"Colocar em todas as páginas\" pra ele aparecer."); } }
+      catch (erro) { avisar(erro.message || "Não deu pra usar esse logo.", true); }
+    };
+    const logoTodas = $("[data-id-logo-todas]", idBox);
+    if (logoTodas) logoTodas.onclick = () => {
+      marcar(true); let n2 = 0;
+      car.slides.forEach((x, k) => { const cs = CAMADAS.garantir(car, k); if (cs.some((l) => l.vinc === "logo")) return; const nomeL = cs.find((l) => l.vinc === "nome"); cs.push({ id: CAMADAS.novoId(), nome: "Logo", papel: "logo", vinc: "logo", t: "imagem", src: ID.logo, x: M, y: M - 8, w: 44, h: 44, raio: 22, sombra: false, moldura: true }); if (nomeL && !nomeL.solto && nomeL.x < M + 50) nomeL.x = M + 56; x.camadasEditadas = true; n2++; });
+      desenhar(); avisar(n2 ? `Logo colocado em ${n2} ${n2 === 1 ? "página" : "páginas"}.` : "Todas as páginas já tinham o logo.");
+    };
+    const logoTirar = $("[data-id-logo-tirar]", idBox);
+    if (logoTirar) logoTirar.onclick = () => { marcar(true); ID.logo = ""; car.slides.forEach((x) => { if (x.camadas) x.camadas = x.camadas.filter((l) => l.vinc !== "logo"); }); desenhar(); };
+  }
+  // O logo vinculado segue o logo da identidade
+  car.slides.forEach((x) => (x.camadas || []).forEach((l) => { if (l.vinc === "logo" && !l.solto && ID && ID.logo) l.src = ID.logo; }));
+
+  // Camada escolhida: fonte, peso, cor livre, vínculo e aplicar em todas
+  const fonteSel = $("[data-cam-fonte]", painel);
+  if (fonteSel) fonteSel.onchange = () => { const l = Lsel(); if (!l) return; marcar(true); l.fonte = fonteSel.value; if (l.papel === "titulo" || l.papel === "texto") l.fonteSolta = true; editado(); desenhar(); };
+  const pesoSel = $("[data-cam-peso]", painel);
+  if (pesoSel) pesoSel.onchange = () => { const l = Lsel(); if (!l) return; marcar(true); l.peso = Number(pesoSel.value); editado(); desenhar(); };
+  const corLivre = $("[data-cam-cor-livre]", painel);
+  if (corLivre) { corLivre.addEventListener("input", () => { const l = Lsel(); if (!l) return; marcar(); l.cor = corLivre.value; editado(); repintarJa(); }); corLivre.addEventListener("change", () => desenhar()); }
+  const desv = $("[data-cam-desvincular]", painel);
+  if (desv) desv.onclick = () => { const l = Lsel(); if (!l) return; marcar(true); l.texto = ID[l.vinc] != null && l.vinc !== "logo" ? ID[l.vinc] : l.texto; l.solto = true; editado(); desenhar(); };
+  const revinc = $("[data-cam-vincular]", painel);
+  if (revinc) revinc.onclick = () => { const l = Lsel(); if (!l) return; marcar(true); delete l.solto; editado(); desenhar(); };
+  // Texto de uma peça vinculada: digitar muda só esta página; "aplicar em todas" leva pra identidade
+  if (campoTexto) campoTexto.addEventListener("input", () => { const l = Lsel(); if (l && novo && l.vinc && !l.solto) { l.solto = true; } });
+  $$("[data-cam-aplicar-texto]", painel).forEach((b) => b.onclick = () => {
+    const l = Lsel(); if (!l || !l.vinc) return; marcar(true);
+    if (b.dataset.camAplicarTexto === "todas") {
+      ID[l.vinc] = l.texto; let n2 = 0;
+      car.slides.forEach((x) => (x.camadas || []).forEach((o) => { if (o.vinc === l.vinc && o.solto) { delete o.solto; n2++; } }));
+      delete l.solto; avisar(`${NOMES_VINC[l.vinc] || "Texto"} atualizado em todas as páginas.`);
+    } else avisar("Mudou só nesta página.");
+    editado(); desenhar();
+  });
+  const global = $("[data-cam-global]", painel);
+  if (global) global.onclick = () => {
+    const l = Lsel(); if (!l) return; marcar(true);
+    const chave = chaveCamada(l); let pags = 0;
+    car.slides.forEach((x, k) => {
+      if (k === est.i) return;
+      const cs = CAMADAS.garantir(car, k); let mexeu = false;
+      cs.forEach((o) => {
+        if (chaveCamada(o) !== chave) return;
+        PROPS_GLOBAIS.forEach((p) => { if (l[p] === undefined) delete o[p]; else o[p] = l[p]; });
+        if (l.vinc) { if (l.solto) { o.solto = true; o.texto = l.texto; } else delete o.solto; }
+        mexeu = true;
+      });
+      if (mexeu) { x.camadasEditadas = true; pags++; }
+    });
+    editado(); desenhar(); avisar(`Aplicado em ${pags} ${pags === 1 ? "página" : "páginas"}. Dá pra desfazer com Cmd + Z.`);
+  };
+  // Adicionar imagem solta
+  const novaImg = $("[data-cam-imagem]", painel);
+  if (novaImg) novaImg.onchange = async () => {
+    const f = novaImg.files && novaImg.files[0]; if (!f) return;
+    const rot = novaImg.closest("label"); rot.firstChild.textContent = "Enviando...";
+    try {
+      const arq = await prepararFoto(f), url = await enviarArquivo(arq, "carrosseis", "imagem.jpg");
+      if (!url) { rot.firstChild.textContent = "Adicionar imagem"; return; }
+      const dimsImg = await new Promise((ok) => { const im = new Image(); im.onload = () => ok([im.width, im.height]); im.onerror = () => ok([4, 3]); im.src = URL.createObjectURL(arq); });
+      const w = Math.round((W - 2 * M) * 0.6), h = Math.round(w * dimsImg[1] / dimsImg[0]);
+      marcar(true);
+      const c = { id: CAMADAS.novoId(), nome: "Imagem", papel: "imagem", t: "imagem", src: url, x: Math.round((W - w) / 2), y: Math.round(Math.max(M, (H - h) / 2)), w, h: Math.min(h, H - 2 * M), raio: 18, foco: 0.4 };
+      camadas.push(c); est.sel = c.id; editado(); desenhar(); avisar("Imagem no slide. Arraste e redimensione pela bolinha do canto.");
+    } catch (erro) { avisar(erro.message || "Não deu pra usar essa imagem.", true); rot.firstChild.textContent = "Adicionar imagem"; }
+  };
 }

@@ -1868,3 +1868,33 @@ td .pc-follow { display: table; }
 /* Roteiro aprovado da campanha (texto sem blocos) */
 .rc-texto { max-height: 62vh; overflow-y: auto; padding: 16px 18px; border-radius: 12px; background: var(--tint); font-size: 15px; line-height: 1.6; white-space: normal; }
 .rc-texto.grande { font-size: 24px; line-height: 1.5; }
+
+/* Estúdio: visual novo (identidade do carrossel, aplicar em todas) */
+.est-antigo { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-bottom: 14px; padding: 12px 14px; border-radius: 12px; background: #FBEDE6; color: #7A2E1A; font-size: 13px; }
+.est-antigo span { flex: 1 1 320px; }
+.est-id { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+.est-id-topo { cursor: pointer; list-style: none; display: flex; justify-content: space-between; color: var(--text); }
+.est-id-topo::-webkit-details-marker { display: none; }
+.est-id-corpo { display: grid; gap: 12px; margin-top: 12px; }
+.est-id-campo { display: grid; gap: 5px; font-size: 12.5px; font-weight: 600; }
+.est-id-campo > span { display: flex; justify-content: space-between; color: var(--muted); }
+.est-id-campo small { font-weight: 500; }
+.est-paleta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.est-paleta button { width: 28px; height: 28px; padding: 2px; border-radius: 50%; border: 2px solid transparent; background: none; cursor: pointer; }
+.est-paleta button i { display: block; width: 100%; height: 100%; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0,0,0,.15); }
+.est-paleta button[aria-pressed="true"] { border-color: var(--cobalt); }
+.est-paleta input[type="color"] { width: 34px; height: 28px; padding: 0; border: 1px solid var(--line); border-radius: 8px; background: none; cursor: pointer; }
+.est-id-logo { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.est-id-logo img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
+.est-vinc { font-size: 12.5px; padding: 8px 10px; border-radius: 9px; background: var(--tint); }
+.est-vinc.solto { background: #FBF0D6; color: #7a5310; }
+.est-global { display: grid; gap: 6px; padding-top: 4px; border-top: 1px dashed var(--line); }
+.est-global .btn { justify-content: center; }
+.est-global small { font-size: 11.5px; color: var(--muted); line-height: 1.4; }
+.est-mini-campo { display: grid; gap: 4px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.est-cor-livre input { width: 100%; height: 34px; padding: 0; border: 1px solid var(--line); border-radius: 8px; background: none; cursor: pointer; }
+.est-btn-arquivo { display: flex; align-items: center; justify-content: center; border: 1px solid var(--line); background: var(--card); font-size: 12.5px; font-weight: 600; padding: 8px; border-radius: 8px; cursor: pointer; color: var(--text); }
+.est-tudo { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; max-height: 70vh; overflow-y: auto; }
+.est-tudo-pag { position: relative; padding: 0; border: 0; background: none; cursor: pointer; }
+.est-tudo-pag img { display: block; width: 100%; height: auto; border-radius: 8px; box-shadow: 0 2px 8px rgba(43,36,28,.18); }
+.est-tudo-pag span { position: absolute; top: 6px; left: 6px; min-width: 22px; height: 22px; border-radius: 99px; background: rgba(43,36,28,.85); color: #F5F1EA; font-size: 11px; font-weight: 700; display: grid; place-items: center; }

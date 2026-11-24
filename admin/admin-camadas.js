@@ -40,6 +40,40 @@ const CAMADAS = (() => {
     conversa: { gancho: "escuro", contexto: "escuro", construcao: "escuro", tensao: "escuro", recompensa: "claro", cta: "escuro" },
     fotos: { gancho: "foto", contexto: "foto", construcao: "foto", tensao: "foto", recompensa: "foto", cta: "claro" }
   };
+  /* ---------- Visual novo (2026): identidade do carrossel + composições por página ---------- */
+  const RY = { creme: "#F1EAE0", dourado: "#D9C48A", caramelo: "#A8742C", terra: "#B9783F", cinza: "#8A7C66", rec: "#E5483B", papel: "#FFFDF8" };
+  const ID_PADRAO = { nome: "Ryan Alves", arroba: "@ryalvz", assinatura: "IA, conteúdo e TikTok Shop", destaque: "#F2D46B", principal: "#1E1813", fonteTitulo: "grot", fonteTexto: "grot", logo: "" };
+  // Sempre o mesmo objeto (o painel edita ele direto); só completa o que faltar
+  const identidadeDe = (car) => { if (!car.identidade) car.identidade = {}; Object.keys(ID_PADRAO).forEach((k) => { if (car.identidade[k] == null) car.identidade[k] = ID_PADRAO[k]; }); return car.identidade; };
+  let idAtual = null; // a identidade do carrossel que está sendo desenhado
+  const COMPS = [["tipo", "Tipografia"], ["janela", "Janela digital"], ["lab", "Laboratório de IA"], ["frame", "Frame de vídeo"], ["comparacao", "Comparação"], ["camadas", "Camadas"], ["objeto", "Objeto digital"], ["cta", "Comentário (CTA)"]];
+  const linhasDe0 = (v) => String(v || "").split("\n").map((x) => x.trim()).filter(Boolean);
+  function compDe(car, s, i) {
+    if (s.comp && COMPS.some(([k]) => k === s.comp)) return s.comp;
+    const pares = linhasDe0(s.itens).filter((l) => l.includes(" / ")).length >= 2;
+    if (s.tipo === "gancho") return s.foto ? "frame" : "tipo";
+    if (s.tipo === "contexto") return "janela";
+    if (s.tipo === "construcao") return pares ? "comparacao" : s.foto ? "objeto" : i % 2 ? "lab" : "camadas";
+    if (s.tipo === "cta") return "cta";
+    return "tipo";
+  }
+  const TOM_COMP = { janela: "claro", lab: "escuro", frame: "foto", comparacao: "claro", camadas: "claro", objeto: "escuro", cta: "escuro" };
+  function tomRyan(car, s, i) {
+    const c = compDe(car, s, i);
+    let t = TOM_COMP[c] || (s.tipo === "recompensa" ? "dourado" : "escuro");
+    if (c === "frame" && !s.foto) t = "escuro";
+    if (s.fundo === "trocar") t = t === "escuro" ? "claro" : t === "claro" ? "escuro" : t === "dourado" ? "escuro" : t;
+    return t;
+  }
+  function temaRyan(car, s, i) {
+    const id = identidadeDe(car), D = id.destaque, P = id.principal, t = tomRyan(car, s, i);
+    const base = { amarelo: D, laranja: "#E07A55", branco: "#FFFFFF", rec: RY.rec, papel: RY.papel, caixa: P, naCaixa: RY.creme, vidro: "rgba(0,0,0,.06)", tom: "r" + t, destaque: D, principal: P, creme: RY.creme };
+    if (t === "claro") return { ...base, fundo: RY.creme, tinta: P, texto: "#3A2C20", cinza: RY.cinza, ouro: RY.caramelo, naOuro: RY.creme, balao: "#E4D8C3", marca: D, naMarca: P, marcaTipo: "meia" };
+    if (t === "dourado") return { ...base, fundo: RY.dourado, tinta: P, texto: "#2E241A", cinza: "#5C5038", ouro: P, naOuro: RY.dourado, balao: "#EFE3C2", marca: P, naMarca: RY.dourado, marcaTipo: "bloco" };
+    if (t === "foto") return { ...base, fundo: "#15110D", tinta: "#FFFFFF", texto: "#FFFFFF", cinza: "rgba(255,255,255,.8)", ouro: D, naOuro: P, balao: "rgba(0,0,0,.5)", marca: D, naMarca: P, marcaTipo: "bloco" };
+    return { ...base, fundo: P, tinta: "#F6EEDF", texto: "#E9DFCC", cinza: "#A89A84", ouro: D, naOuro: P, balao: "#30261D", marca: D, naMarca: P, marcaTipo: "bloco" };
+  }
+
   function tomDe(car, s) {
     let t = ((TOM[car.estilo] || TOM.bastidor)[s.tipo]) || "claro";
     if (car.estilo === "set" || car.estilo === "papel") { const k = Math.max(0, (car.slides || []).indexOf(s)), n = (car.slides || []).length; t = s.tipo === "gancho" ? "setFoto" : k === n - 1 && n > 1 ? "setEscuro" : SEQ_SET[k % SEQ_SET.length] === "setFoto" ? "setEscuro" : SEQ_SET[k % SEQ_SET.length]; if (s.fundo === "trocar") return t === "setEscuro" ? "setClaro" : "setEscuro"; }
@@ -49,6 +83,7 @@ const CAMADAS = (() => {
     return t;
   }
   function temaDe(car, s) {
+    if (car.estilo === "ryan") return temaRyan(car, s, Math.max(0, (car.slides || []).indexOf(s)));
     const tom = tomDe(car, s), c = { ...TEMAS[tom], tom };
     const d = CAR_ESTILOS.DESTAQUES[s.destaque];
     if (d && s.destaque !== "dourado") {
@@ -75,7 +110,11 @@ const CAMADAS = (() => {
     }));
     return tk;
   }
-  function fonte(l, e, tam) {
+  const FONTE_MONO = "Menlo, Monaco, 'Courier New', monospace";
+  function fonte(l0, e, tam) {
+    let l = l0;
+    if (idAtual && !l0.fonteSolta && (l0.papel === "titulo" || l0.papel === "texto")) l = { ...l0, fonte: l0.papel === "titulo" ? idAtual.fonteTitulo : idAtual.fonteTexto };
+    if (l.fonte === "mono") return `${e === "n" ? l.peso || 500 : 700} ${tam}px ${FONTE_MONO}`;
     if (l.fonte === "mao") return `400 ${tam}px ${FONTE_MAO}`;
     if (l.fonte === "mont") return `${e === "n" ? l.peso || 500 : Math.max(800, l.peso || 500)} ${tam}px ${FONTE_BASTAO}`;
     if (l.fonte === "marcador") return `400 ${tam}px ${FONTE_MARCADOR}`;
@@ -116,14 +155,17 @@ const CAMADAS = (() => {
           if (cores.marcaTipo === "bloco") ctx.fillRect(cx - pad, base - m.tam * 0.8, it.w + junta + pad * 2, m.tam * 0.98);
           else ctx.fillRect(cx - pad, base - m.tam * 0.36, it.w + junta + pad * 2, m.tam * 0.44);
         }
-        ctx.font = fonte(l, it.e, m.tam); ctx.fillStyle = it.e === "a" ? cores.a : it.e === "b" ? cores.b : cores.n; ctx.fillText(it.t, cx, base); cx += it.w;
+        ctx.font = fonte(l, it.e, m.tam);
+        if (it.e === "b" && l.contorno) { ctx.strokeStyle = cores.n; ctx.lineWidth = Math.max(2, m.tam * 0.03); ctx.lineJoin = "round"; ctx.strokeText(it.t, cx, base); }
+        else { ctx.fillStyle = it.e === "a" ? cores.a : it.e === "b" ? cores.b : cores.n; ctx.fillText(it.t, cx, base); }
+        cx += it.w;
       });
     });
   }
 
   /* ---------- Desenho de cada camada; devolve a caixa (pra selecionar) ---------- */
-  const TEXTOS = ["texto", "bolha", "pilula", "bilhete", "caixa", "aviso", "cartao", "selo", "stat", "legenda", "fita", "comentario", "claquete", "rec"];
-  const ENFEITES = ["forma", "linha", "enfeite", "seta", "visor"];
+  const TEXTOS = ["texto", "bolha", "pilula", "bilhete", "caixa", "aviso", "cartao", "selo", "stat", "legenda", "fita", "comentario", "claquete", "rec", "prompt", "comentarioBox"];
+  const ENFEITES = ["forma", "linha", "enfeite", "seta", "visor", "grade", "timeline"];
   const caminhoRedondo = (ctx, x, y, w, h, r) => { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); };
   const sombra = (ctx, forca = 0.22, blur = 34, dy = 14) => { ctx.shadowColor = `rgba(58,38,24,${forca})`; ctx.shadowBlur = blur; ctx.shadowOffsetY = dy; };
   const semSombra = (ctx) => { ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0; };
@@ -137,6 +179,8 @@ const CAMADAS = (() => {
     if (l.t === "legenda" || l.t === "fita") { const fita = l.t === "fita", px = Math.round(l.tam * (fita ? 0.9 : 0.7)), py = Math.round(l.tam * (fita ? 0.45 : 0.42)); const m = montar(ctx, { ...l, w: l.w - px * 2 }); return { m, px, py, bw: Math.min(l.w, Math.ceil(m.larg) + px * 2), bh: Math.ceil(m.alt) + py * 2 }; }
     if (l.t === "comentario") { const av = Math.round(l.tam * 2), g = Math.round(l.tam * 0.7), tw = l.w - av - g; const m = montar(ctx, { ...l, w: tw }); const th = l.tam * 1.45; return { m, av, g, tw, th, bw: l.w, bh: Math.ceil(Math.max(av, th + m.alt + l.tam * 1.5)) }; }
     if (l.t === "claquete") { const m = montar(ctx, { ...l, w: l.w * 0.8 }); const barra = Math.round(l.w * 0.15); return { m, barra, bw: l.w, bh: Math.round(barra * 1.7) + Math.max(Math.round(l.w * 0.36), Math.ceil(m.alt + l.tam * 1.2)) }; }
+    if (l.t === "prompt") { const px = Math.round(l.tam * 1.1), py = Math.round(l.tam * 0.9), cab = Math.round(l.tam * 1.7); const m = montar(ctx, { ...l, w: l.w - px * 2 }); return { m, px, py, cab, bw: l.w, bh: Math.ceil(m.alt) + py * 2 + cab }; }
+    if (l.t === "comentarioBox") { const h = Math.round(l.tam * 2.7); const m = montar(ctx, { ...l, w: l.w - h * 2.4 }); return { m, bw: l.w, bh: Math.max(h, Math.ceil(m.alt) + Math.round(l.tam * 1.2)) }; }
     if (l.t === "stat") { const pad = 30, rt = 26; const m = montar(ctx, l); return { m, pad, rt, bw: l.w, bh: Math.ceil(m.alt + rt * 1.6) + pad * 2 }; }
     return null;
   }
@@ -167,9 +211,11 @@ const CAMADAS = (() => {
       const c = { x0: l.x, y0: l.y, x1: l.x + l.w, y1: l.y + l.h }, r = 28, barra = l.barra ? 46 : 0;
       ctx.save(); sombra(ctx); caminhoRedondo(ctx, l.x, l.y, l.w, l.h, r); ctx.fillStyle = "#FFFFFF"; ctx.fill(); ctx.restore();
       ctx.save(); caminhoRedondo(ctx, l.x, l.y, l.w, l.h, r); ctx.clip();
-      if (barra) { ctx.fillStyle = cor(tema, "tinta") === "#FFFFFF" ? "#2B1D13" : "#2B1D13"; ctx.fillRect(l.x, l.y, l.w, barra); ["#E9695B", "#F2C14E", "#7CC46B"].forEach((k, j) => { ctx.fillStyle = k; ctx.beginPath(); ctx.arc(l.x + 30 + j * 26, l.y + barra / 2, 7, 0, Math.PI * 2); ctx.fill(); }); }
+      if (barra) { ctx.fillStyle = cor(tema, "tinta") === "#FFFFFF" ? "#2B1D13" : "#2B1D13"; ctx.fillRect(l.x, l.y, l.w, barra); ["#E9695B", "#F2C14E", "#7CC46B"].forEach((k, j) => { ctx.fillStyle = k; ctx.beginPath(); ctx.arc(l.x + 30 + j * 26, l.y + barra / 2, 7, 0, Math.PI * 2); ctx.fill(); });
+        if (l.rotulo) { ctx.fillStyle = "rgba(246,238,223,.75)"; ctx.font = `600 20px ${FONTE_MONO}`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(l.rotulo, l.x + l.w / 2, l.y + barra / 2 + 1); ctx.textAlign = "left"; ctx.textBaseline = "alphabetic"; } }
       const img = fotoCarrossel(l.foto === "foto2" ? s.foto2 : s.foto, aoCarregar);
-      if (img) fotoCobre(ctx, img, l.x, l.y + barra, l.w, l.h - barra, { topo: 0.05, meio: 0.45, baixo: 0.85 }[s.enquadrar] ?? 0.1);
+      if (l.vazia) { /* janela só com o texto por cima */ }
+      else if (img) fotoCobre(ctx, img, l.x, l.y + barra, l.w, l.h - barra, l.foco ?? { topo: 0.05, meio: 0.45, baixo: 0.85 }[s.enquadrar] ?? 0.1);
       else { ctx.fillStyle = "#F4EFE7"; ctx.fillRect(l.x, l.y + barra, l.w, l.h - barra); ctx.fillStyle = "#A99A86"; ctx.font = `600 30px ${FONTE_BASTAO}`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("seu print aqui", l.x + l.w / 2, l.y + barra + (l.h - barra) / 2); }
       ctx.restore();
       return c;
@@ -181,6 +227,29 @@ const CAMADAS = (() => {
         ctx.save(); if (l.pb) ctx.filter = "grayscale(1) contrast(1.06)"; fotoCobre(ctx, fotoCarrossel(s.foto, aoCarregar), l.x, l.y, l.w, l.h, { topo: 0.15, meio: 0.45, baixo: 0.8 }[s.enquadrar] ?? 0.3); ctx.restore();
         if (l.texto) { ctx.font = `400 ${Math.round(pe * 0.55)}px ${FONTE_MARCADOR}`; ctx.fillStyle = "#3A2C20"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(l.texto, l.x + l.w / 2, l.y + l.h + pe / 2); }
         if (l.fita !== false) { ctx.save(); ctx.translate(l.x + l.w / 2, c.y0 + 4); ctx.rotate(-0.08); ctx.fillStyle = "rgba(242,212,107,.82)"; ctx.fillRect(-l.w * 0.22, -24, l.w * 0.44, 48); ctx.restore(); }
+      });
+      return c;
+    }
+    if (l.t === "grade") { // pontinhos de laboratório
+      ctx.fillStyle = cor(tema, l.cor || "tinta"); ctx.globalAlpha = l.alpha ?? 0.13; const p = l.tam || 44;
+      for (let x = l.x + p / 2; x <= l.x + l.w; x += p) for (let y = l.y + p / 2; y <= l.y + l.h; y += p) { ctx.beginPath(); ctx.arc(x, y, 2.4, 0, Math.PI * 2); ctx.fill(); }
+      return { x0: l.x, y0: l.y, x1: l.x + 30, y1: l.y + 30 };
+    }
+    if (l.t === "timeline") { // linha do tempo de vídeo: avança uma parte a cada página
+      const c = { x0: l.x, y0: l.y, x1: l.x + l.w, y1: l.y + 56 }, prog = Math.min(1, (i + 1) / n);
+      caminhoRedondo(ctx, l.x, l.y + 30, l.w, 8, 4); ctx.fillStyle = "rgba(255,255,255,.3)"; ctx.fill();
+      caminhoRedondo(ctx, l.x, l.y + 30, Math.max(8, l.w * prog), 8, 4); ctx.fillStyle = cor(tema, "destaque"); ctx.fill();
+      ctx.beginPath(); ctx.arc(l.x + l.w * prog, l.y + 34, 13, 0, Math.PI * 2); ctx.fillStyle = "#FFFFFF"; ctx.fill();
+      ctx.font = `600 22px ${FONTE_MONO}`; ctx.fillStyle = "rgba(255,255,255,.88)"; ctx.textBaseline = "alphabetic";
+      const tc = (t) => `00:${String(t).padStart(2, "0")}`;
+      ctx.textAlign = "left"; ctx.fillText(tc(Math.min(59, (i + 1) * 3)), l.x, l.y + 18); ctx.textAlign = "right"; ctx.fillText(tc(Math.min(59, n * 3)), l.x + l.w, l.y + 18);
+      return c;
+    }
+    if (l.t === "imagem") { // imagem solta (ou a foto do slide) com canto arredondado
+      const c = { x0: l.x, y0: l.y, x1: l.x + l.w, y1: l.y + l.h }, url = l.src === "@foto" ? s.foto : l.src;
+      girar0(c, () => {
+        if (l.sombra !== false) { ctx.save(); sombra(ctx, 0.28, 34, 14); caminhoRedondo(ctx, l.x, l.y, l.w, l.h, l.raio || 0); ctx.fillStyle = "#1E1813"; ctx.fill(); ctx.restore(); }
+        ctx.save(); caminhoRedondo(ctx, l.x, l.y, l.w, l.h, l.raio || 0); ctx.clip(); fotoCobre(ctx, fotoCarrossel(url, aoCarregar), l.x, l.y, l.w, l.h, l.foco ?? 0.4); ctx.restore();
       });
       return c;
     }
@@ -221,6 +290,35 @@ const CAMADAS = (() => {
       return c;
     }
     const q = medidaCaixa(ctx, lt);
+    if (l.t === "prompt") { // caixa de prompt de IA, com cursor no fim
+      const c = { x0: l.x, y0: l.y, x1: l.x + q.bw, y1: l.y + q.bh };
+      girar0(c, () => {
+        ctx.save(); sombra(ctx, 0.35, 30, 12); caminhoRedondo(ctx, l.x, l.y, q.bw, q.bh, 24); ctx.fillStyle = "#0F0C09"; ctx.fill(); ctx.restore();
+        ctx.save(); caminhoRedondo(ctx, l.x, l.y, q.bw, q.bh, 24); ctx.strokeStyle = cor(tema, "destaque"); ctx.globalAlpha = 0.45; ctx.lineWidth = 2; ctx.stroke(); ctx.restore();
+        ctx.font = `700 ${Math.round(l.tam * 0.78)}px ${FONTE_MONO}`; ctx.fillStyle = cor(tema, "destaque"); ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+        ctx.fillText(l.rotulo || "> pedido pro claude", l.x + q.px, l.y + q.py + l.tam * 0.8);
+        escrever(ctx, lt, q.m, l.x + q.px, l.y + q.py + q.cab, q.bw - q.px * 2, { n: "#F6EEDF", a: cor(tema, "destaque"), b: "#A89A84" }, "left");
+        const ult = q.m.linhas[q.m.linhas.length - 1] || { w: 0 }, lh = q.m.tam * q.m.entre;
+        ctx.fillStyle = cor(tema, "destaque"); ctx.fillRect(l.x + q.px + ult.w + 10, l.y + q.py + q.cab + (q.m.linhas.length - 1) * lh + lh * 0.1, q.m.tam * 0.5, q.m.tam * 0.95);
+      });
+      return c;
+    }
+    if (l.t === "comentarioBox") { // a caixa de comentário do Instagram, com a palavra
+      const c = { x0: l.x, y0: l.y, x1: l.x + q.bw, y1: l.y + q.bh }, h = q.bh, r = Math.min(h / 2, l.tam * 1.35);
+      girar0(c, () => {
+        ctx.save(); sombra(ctx, 0.3, 26, 10); caminhoRedondo(ctx, l.x, l.y, q.bw, h, r); ctx.fillStyle = RY.papel; ctx.fill(); ctx.restore();
+        ctx.beginPath(); ctx.arc(l.x + r, l.y + h / 2, r * 0.62, 0, Math.PI * 2); ctx.fillStyle = cor(tema, "principal"); ctx.fill();
+        ctx.fillStyle = cor(tema, "destaque"); ctx.font = `900 ${Math.round(r * 0.62)}px ${FONTE_GROT}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText(String((idAtual && idAtual.nome) || "R").charAt(0).toUpperCase(), l.x + r, l.y + h / 2 + 2);
+        ctx.textBaseline = "alphabetic"; ctx.textAlign = "left";
+        escrever(ctx, lt, q.m, l.x + r * 2.1, l.y + (h - q.m.alt) / 2, q.bw - r * 4.4, { n: "#3A2C20", a: "#1E1813", b: "#8A7C66", marca: cor(tema, "destaque"), marcaTipo: "meia" }, "left");
+        const ax = l.x + q.bw - r, ay = l.y + h / 2;
+        ctx.beginPath(); ctx.arc(ax, ay, r * 0.62, 0, Math.PI * 2); ctx.fillStyle = cor(tema, "destaque"); ctx.fill();
+        ctx.strokeStyle = cor(tema, "principal"); ctx.lineWidth = 4; ctx.lineCap = ctx.lineJoin = "round";
+        ctx.beginPath(); ctx.moveTo(ax - r * 0.24, ay + r * 0.22); ctx.lineTo(ax + r * 0.22, ay - r * 0.22); ctx.moveTo(ax - r * 0.04, ay - r * 0.24); ctx.lineTo(ax + r * 0.22, ay - r * 0.22); ctx.lineTo(ax + r * 0.2, ay + r * 0.02); ctx.stroke();
+      });
+      return c;
+    }
     if (l.t === "legenda") { // legenda de Reels: fundo preto, palavra-chave amarela
       const x0 = l.alinhar === "left" ? l.x : l.x + (l.w - q.bw) / 2, c = { x0, y0: l.y, x1: x0 + q.bw, y1: l.y + q.bh };
       caminhoRedondo(ctx, x0, l.y, q.bw, q.bh, 16); ctx.fillStyle = "rgba(12,10,8,.88)"; ctx.fill();
@@ -305,8 +403,10 @@ const CAMADAS = (() => {
     }
     return null;
   }
-  const ESPECIAIS = ["enfeite", "seta", "janela", "polaroid", "selo", "caixa", "aviso", "cartao", "stat", "visor", "rec", "celular", "legenda", "fita", "comentario", "claquete"];
+  const ESPECIAIS = ["enfeite", "seta", "janela", "polaroid", "selo", "caixa", "aviso", "cartao", "stat", "visor", "rec", "celular", "legenda", "fita", "comentario", "claquete", "grade", "timeline", "imagem", "prompt", "comentarioBox"];
   function textoDe(l, i, n) {
+    if (l.vinc && !l.solto && idAtual && idAtual[l.vinc] != null && l.vinc !== "logo") return idAtual[l.vinc];
+    if (l.auto === "num" && l.numFmt === "barra2") return `${String(i + 1).padStart(2, "0")} / ${String(n).padStart(2, "0")}`;
     if (l.auto === "num" && l.numEspaco) return `${i + 1} / ${n}`;
     if (l.auto === "tempo") return `00:${String(Math.min(59, i * 3)).padStart(2, "0")}`;
     if (l.auto === "num") return l.numDois ? `${String(i + 1).padStart(2, "0")}/${String(n).padStart(2, "0")}` : `${i + 1}/${n}`;
@@ -314,6 +414,7 @@ const CAMADAS = (() => {
   }
   function desenharCamada(ctx, l, tema, s, i, n, aoCarregar) {
     ctx.save(); ctx.letterSpacing = "0px"; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+    if (l.alpha != null && l.t !== "grade") ctx.globalAlpha = l.alpha;
     let caixa = null;
     const girarEm = (c, desenho) => {
       if (l.rot) { const cx = (c.x0 + c.x1) / 2, cy = (c.y0 + c.y1) / 2; ctx.translate(cx, cy); ctx.rotate((l.rot * Math.PI) / 180); ctx.translate(-cx, -cy); }
@@ -323,6 +424,7 @@ const CAMADAS = (() => {
       caixa = { x0: l.x, y0: l.y, x1: l.x + l.w, y1: l.y + l.h };
       ctx.fillStyle = cor(tema, l.cor || "vidro");
       if (l.forma === "circulo") { ctx.beginPath(); ctx.ellipse(l.x + l.w / 2, l.y + l.h / 2, l.w / 2, l.h / 2, 0, 0, Math.PI * 2); ctx.fill(); }
+      else if (l.raio) { caminhoRedondo(ctx, l.x, l.y, l.w, l.h, l.raio); ctx.fill(); }
       else ctx.fillRect(l.x, l.y, l.w, l.h);
       if (l.texto) { ctx.fillStyle = cor(tema, l.corTexto || "naOuro"); ctx.font = `800 ${l.tam || 32}px ${FONTE_BASTAO}`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(l.texto, l.x + l.w / 2, l.y + l.h / 2 + 2); }
     } else if (ESPECIAIS.includes(l.t)) {
@@ -369,8 +471,8 @@ const CAMADAS = (() => {
       } else if (l.t === "pilula") {
         const bw = m.larg + m.tam * 1.4, bh = m.alt + m.tam * 0.5, x0 = l.x + (l.w - bw) / 2;
         caixa = { x0, y0: l.y, x1: x0 + bw, y1: l.y + bh };
-        retanguloRedondo(ctx, x0, l.y, bw, bh, bh / 2, cor(tema, "ouro"));
-        const tc = cor(tema, "naOuro");
+        retanguloRedondo(ctx, x0, l.y, bw, bh, bh / 2, cor(tema, l.fundoCor || "ouro"));
+        const tc = cor(tema, l.corTexto || "naOuro");
         escrever(ctx, lt, m, x0, l.y + m.tam * 0.25, bw, { n: tc, a: tc, b: tc }, "center");
       }
     }
@@ -381,6 +483,15 @@ const CAMADAS = (() => {
   /* ---------- Fundo do slide ---------- */
   function fundo(ctx, car, s, tema, W, H, aoCarregar) {
     ctx.save(); ctx.fillStyle = tema.fundo; ctx.fillRect(0, 0, W, H);
+    if (car.estilo === "ryan") {
+      if (tema.tom === "rfoto") {
+        const img = fotoCarrossel(s.foto, aoCarregar), foco = { topo: 0.15, meio: 0.45, baixo: 0.8 }[s.enquadrar] ?? 0.3;
+        fotoCobre(ctx, img, 0, 0, W, H, foco);
+        const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "rgba(10,8,6,.45)"); g.addColorStop(0.22, "rgba(10,8,6,0)"); g.addColorStop(0.5, "rgba(10,8,6,.08)"); g.addColorStop(1, "rgba(10,8,6,.86)");
+        ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); texturaPapel(ctx, 0.05);
+      } else texturaPapel(ctx, tema.tom === "rescuro" ? 0.1 : 0.07);
+      ctx.restore(); return;
+    }
     if (tema.tom === "setFoto") {
       const img = fotoCarrossel(s.foto, aoCarregar), foco = { topo: 0.15, meio: 0.45, baixo: 0.8 }[s.enquadrar] ?? 0.3;
       fotoCobre(ctx, img, 0, 0, W, H, foco);
@@ -417,6 +528,8 @@ const CAMADAS = (() => {
     const tema = temaDe(car, s), L = [], mold = { moldura: true };
     // Capa no quadrado: o perfil mostra só o meio (3:4), então o texto fica longe das laterais
     const capa = i === 0 && W === H, xC = capa ? 160 : M, wC = W - 2 * xC;
+    idAtual = e === "ryan" ? identidadeDe(car) : null;
+    if (e === "ryan") return gerarRyan(car, i, s, n, W, H, tema, ctx);
     if (e === "direto") return gerarDireto(car, i, s, n, W, H, tema, ctx);
     if (e === "set" || e === "papel") return gerarSet(car, i, s, n, W, H, tema, ctx);
     if (e === "colagem") return gerarColagem(car, i, s, n, W, H, tema, ctx);
@@ -574,6 +687,165 @@ const CAMADAS = (() => {
     return L;
   }
 
+  /* ---------- Visual novo: cada página com a sua composição, a mesma identidade ---------- */
+  function gerarRyan(car, i, s, n, W, H, tema, ctx) {
+    const id = identidadeDe(car), comp = compDe(car, s, i), L = [], mold = { moldura: true };
+    const G = (nome, texto, o) => T(nome, texto, { fonte: "grot", ...o });
+    const minus = (v) => String(v || "").toLowerCase();
+    const wC = W - 2 * M, topo = M + 84, fimBase = H - M - 84;
+    if (comp === "lab") L.push({ id: novoId(), nome: "Grade de pontos", papel: "grade", t: "grade", x: 0, y: 0, w: W, h: H, tam: 46, cor: "tinta" });
+    // Identidade: vinculada à área "Identidade do carrossel" (muda em todas as páginas de uma vez)
+    if (id.logo) L.push({ id: novoId(), nome: "Logo", papel: "logo", vinc: "logo", t: "imagem", src: id.logo, x: M, y: M - 8, w: 44, h: 44, raio: 22, sombra: false, ...mold });
+    L.push(G("Nome", id.nome, { papel: "nome", vinc: "nome", x: M + (id.logo ? 56 : 0), y: M, w: 460, tam: 26, peso: 800, cor: "tinta", entre: 1.2, ...mold }));
+    L.push(G("@", id.arroba, { papel: "arroba", vinc: "arroba", x: W - M - 420, y: M, w: 420, tam: 26, peso: 800, cor: "tinta", alinhar: "right", entre: 1.2, ...mold }));
+    L.push(G("Número da página", "", { papel: "num", auto: "num", numFmt: "barra2", x: M, y: H - M - 28, w: 150, tam: 22, peso: 800, cor: "cinza", letra: 2, entre: 1.2, ...mold }));
+    L.push(G("Assinatura", id.assinatura, { papel: "assinatura", vinc: "assinatura", x: M + 140, y: H - M - 28, w: 520, tam: 22, peso: 500, cor: "cinza", entre: 1.2, ...mold }));
+    L.push(T("Arrasta pro lado", "arrasta →", { papel: "arrasta", auto: "arrasta", fonte: "marcador", x: W - M - 300, y: H - M - 52, w: 300, tam: 42, cor: "ouro", alinhar: "right", entre: 1.1, rot: -4, ...mold }));
+    const aperto = (t) => -Math.round(t * 0.03);
+    const titulo = (tam, o = {}) => G("Título", minus(s.titulo), { papel: "titulo", x: M, w: wC, tam, peso: 900, cor: "tinta", marca: true, contorno: true, entre: 0.92, letra: aperto(tam), ...o });
+    const texto = (o = {}) => G("Texto", s.texto, { papel: "texto", x: M, w: wC, tam: 38, peso: 500, cor: "texto", corNegrito: "tinta", entre: 1.32, ...o });
+    const etiqueta = (txt, o = {}) => { const l = { id: novoId(), nome: "Etiqueta", papel: "lead", t: "pilula", texto: minus(txt), x: M, w: wC, tam: 26, fonte: "grot", peso: 800, cor: "tinta", fundoCor: "destaque", corTexto: "principal", entre: 1.1, letra: 1, alinhar: "left", ...o }; const m = montar(ctx, l); l.w = Math.ceil(m.larg + m.tam * 1.4); return l; };
+    const nota = (o = {}) => T("Nota à mão", minus(s.nota), { papel: "nota", fonte: "marcador", tam: 64, cor: "ouro", rot: -4, entre: 1.05, w: 3000, ...o });
+    const encolher = (C, tit) => () => { if (tit && tit.tam > 56) { tit.tam -= 4; tit.letra = aperto(tit.tam); return; } C.forEach((l) => { if (l !== tit && l.tam > 22) l.tam -= 2; if (l.h && l.t !== "texto" && l.h > 160) l.h -= 16; }); };
+    const notaNoFim = (C, fim) => {
+      if (!s.nota) return;
+      const nl = nota(); let m = montar(ctx, nl);
+      while (m.larg > wC * 0.8 && nl.tam > 40) { nl.tam -= 4; m = montar(ctx, nl); }
+      nl.w = Math.ceil(m.larg) + 12; nl.x = W - M - nl.w;
+      const ocupado = C.reduce((a, l) => Math.max(a, l.y + alturaDe(ctx, l)), topo);
+      nl.y = Math.round(Math.min(fim - m.alt, ocupado + 24)); L.push(nl);
+    };
+    const reservaNota = () => (s.nota ? 110 : 0);
+    const msgs = msgsDe(s.msgs).slice(0, 2).map((m) => ({ id: novoId(), nome: "Comentário", papel: "mensagem", t: "comentario", quem: m.eu ? id.arroba.replace("@", "") : m.quem, texto: m.texto, x: M, w: Math.min(wC, 780), tam: 32, fonte: "grot", peso: 500, cor: "texto", entre: 1.3, letra: 0, alinhar: "left", gap: 24 }));
+
+    if (comp === "frame" && s.foto) { // a sua foto como frame de vídeo, com a linha do tempo
+      L.push({ id: novoId(), nome: "Cantos do frame", papel: "cantos", t: "visor", x: 44, y: 44, w: W - 88, h: H - 88, tam: 60, cor: "branco" });
+      const fim = H - M - 140, C = [];
+      if (s.lead) C.push({ ...etiqueta(s.lead), gap: 22 });
+      if (s.titulo) C.push({ ...titulo(W === H ? 132 : 148), gap: 28 });
+      if (s.texto) C.push({ id: novoId(), nome: "Legenda", papel: "texto", t: "legenda", texto: s.texto, x: M, w: wC, tam: 34, fonte: "grot", peso: 800, cor: "branco", entre: 1.25, letra: 0, alinhar: "left" });
+      const tit = C.find((l) => l.papel === "titulo");
+      empilhar(ctx, C, topo + 200, fim - reservaNota(), "baixo", encolher(C, tit));
+      L.push(...C);
+      L.push({ id: novoId(), nome: "Linha do tempo", papel: "timeline", t: "timeline", x: M, y: H - M - 116, w: wC });
+      if (s.nota) { const nl = nota({ cor: "destaque" }); const m = montar(ctx, nl); nl.w = Math.ceil(m.larg) + 12; nl.x = M; nl.y = Math.max(topo, (C[0] ? C[0].y : fim) - m.alt - 20); L.push(nl); }
+      return L;
+    }
+    if (comp === "janela") { // o texto dentro de uma janela de app
+      const pad = 54, C = [];
+      const tit = s.titulo ? titulo(W === H ? 84 : 92, { x: M + pad, w: wC - pad * 2, cor: "principal", marca: true }) : null;
+      const tx = s.texto ? texto({ x: M + pad, w: wC - pad * 2, tam: 36, cor: "#3A2C20", corNegrito: "principal" }) : null;
+      const temImg = !!s.foto;
+      const fim = fimBase - reservaNota();
+      let imgH = temImg ? (W === H ? 280 : 380) : 0;
+      const altura = () => 46 + pad + (tit ? montar(ctx, tit).alt : 0) + (tx ? 28 + montar(ctx, tx).alt : 0) + (temImg ? 30 + imgH : 0) + pad;
+      let voltas = 0; while (altura() > fim - topo && voltas++ < 60) { if (tit && tit.tam > 52) { tit.tam -= 4; tit.letra = aperto(tit.tam); } else if (imgH > 180) imgH -= 20; else if (tx && tx.tam > 24) tx.tam -= 2; else break; }
+      const hJ = altura(), yJ = Math.round(topo + Math.max(0, (fim - topo - hJ) * 0.4));
+      L.push({ id: novoId(), nome: "Janela", papel: "janela", t: "janela", barra: true, vazia: true, rotulo: s.lead ? minus(s.lead) : "ideia.txt", x: M, y: yJ, w: wC, h: hJ });
+      let y = yJ + 46 + pad;
+      if (tit) { tit.y = y; L.push(tit); y += montar(ctx, tit).alt + 28; }
+      if (tx) { tx.y = Math.round(y); L.push(tx); y += montar(ctx, tx).alt + 30; }
+      if (temImg) L.push({ id: novoId(), nome: "Imagem na janela", papel: "foto", t: "imagem", src: "@foto", x: M + pad, y: Math.round(y), w: wC - pad * 2, h: imgH, raio: 16, sombra: false });
+      if (s.nota) { const nl = nota(); const m = montar(ctx, nl); nl.w = Math.ceil(m.larg) + 12; nl.x = W - M - nl.w - 10; nl.y = Math.min(fimBase - m.alt, yJ + hJ - 20); L.push(nl); }
+      return L;
+    }
+    if (comp === "lab") { // laboratório de IA: etiqueta, frase e a caixa de prompt
+      const C = [];
+      C.push({ ...etiqueta(s.lead || "laboratório de ia"), gap: 26 });
+      msgs.forEach((m) => C.push(m));
+      if (s.titulo) C.push({ ...titulo(W === H ? 110 : 124), gap: 40 });
+      const itens = linhasDe(s.itens);
+      const pedido = s.texto || (itens.length ? itens.map((x, k) => `${k + 1}. ${x.replace(/\s+\/\s+/, ": ")}`).join("\n") : "");
+      if (pedido) C.push({ id: novoId(), nome: "Prompt", papel: "texto", t: "prompt", texto: pedido, rotulo: "> pedido pro claude", x: M, w: wC, tam: 32, fonte: "mono", fonteSolta: true, peso: 500, cor: "texto", entre: 1.45, letra: 0, alinhar: "left" });
+      const tit = C.find((l) => l.papel === "titulo");
+      empilhar(ctx, C, topo, fimBase - reservaNota(), "topo", encolher(C, tit));
+      L.push(...C); notaNoFim(C, fimBase); return L;
+    }
+    if (comp === "comparacao") { // antes e depois
+      const C = [], fim = fimBase - reservaNota();
+      if (s.titulo) C.push({ ...titulo(W === H ? 92 : 104), gap: 34 });
+      const tit = C.find((l) => l.papel === "titulo");
+      let yIni = topo;
+      if (C.length) { empilhar(ctx, C, topo, topo + (fim - topo) * 0.42, "topo", encolher(C, tit)); L.push(...C); yIni = C[C.length - 1].y + alturaDe(ctx, C[C.length - 1]) + 36; }
+      const pares = linhasDe(s.itens).map(par).filter(([a, b]) => a && b);
+      const [rotA, rotB] = s.lead && s.lead.includes(" / ") ? par(s.lead) : ["antes", "depois"];
+      const colW = Math.round((wC - 24) / 2), hC = Math.max(260, fim - yIni);
+      [[M, "#E4D8C3", minus(rotA), "principal", "creme", "#3A2C20", pares.map((x) => x[0])], [M + colW + 24, "principal", minus(rotB), "destaque", "principal", "#F6EEDF", pares.map((x) => x[1])]].forEach(([x, fundoC, rot, pillBg, pillTx, txCor, linhas], k) => {
+        L.push({ id: novoId(), nome: k ? "Cartão depois" : "Cartão antes", papel: k ? "cartaoB" : "cartaoA", t: "forma", forma: "ret", raio: 28, x, y: Math.round(yIni), w: colW, h: Math.round(hC), cor: fundoC });
+        const pl = etiqueta(rot, { x: x + 30, fundoCor: pillBg, corTexto: pillTx, papel: k ? "rotuloB" : "rotuloA", nome: k ? "Rótulo depois" : "Rótulo antes" }); pl.y = Math.round(yIni + 30); L.push(pl);
+        const txt = T(k ? "Texto depois" : "Texto antes", linhas.length ? linhas.join("\n\n") : "escreva aqui", { papel: k ? "ladoB" : "ladoA", fonte: "grot", peso: 700, x: x + 30, y: Math.round(yIni + 110), w: colW - 60, tam: 44, cor: txCor, entre: 1.28 });
+        while (montar(ctx, txt).alt > hC - 140 && txt.tam > 22) txt.tam -= 2;
+        L.push(txt);
+      });
+      if (s.nota) { const nl = nota(); const m = montar(ctx, nl); nl.w = Math.ceil(m.larg) + 12; nl.x = W - M - nl.w; nl.y = Math.min(fimBase - m.alt, yIni + hC + 10); L.push(nl); }
+      return L;
+    }
+    if (comp === "camadas") { // camadas sobrepostas: foto com bloco atrás, ou cartões
+      if (s.foto) {
+        const fw = Math.round(wC * 0.8), fh = Math.round((fimBase - topo) * (W === H ? 0.5 : 0.56)), fx = M + 30, fy = topo + 20;
+        L.push({ id: novoId(), nome: "Bloco atrás da foto", papel: "bloco", t: "forma", forma: "ret", x: fx + 26, y: fy + 26, w: fw, h: fh, cor: "destaque", rot: 0 });
+        L.push({ id: novoId(), nome: "Foto", papel: "foto", t: "imagem", src: "@foto", x: fx, y: fy, w: fw, h: fh, raio: 0, rot: -2 });
+        const C = [];
+        if (s.titulo) C.push({ ...titulo(W === H ? 104 : 118), gap: 26 });
+        if (s.texto) C.push(texto());
+        const tit = C.find((l) => l.papel === "titulo");
+        empilhar(ctx, C, fy + fh - 70, fimBase - reservaNota(), "topo", encolher(C, tit));
+        L.push(...C); notaNoFim(C, fimBase); return L;
+      }
+      const C = [];
+      if (s.lead) C.push({ ...etiqueta(s.lead), gap: 30 });
+      msgs.forEach((m) => C.push(m));
+      if (s.titulo) C.push({ id: novoId(), nome: "Cartão do título", papel: "titulo", t: "caixa", texto: minus(s.titulo), x: M, w: wC, tam: W === H ? 76 : 84, fonte: "grot", peso: 900, cor: "creme", entre: 1.0, letra: -2, alinhar: "left", rot: -2, fundoCor: "principal", gap: -30 });
+      const itens = linhasDe(s.itens);
+      const apoio = s.texto || (itens.length ? itens.map((x, k) => `${k + 1}. ${x.replace(/\s+\/\s+/, ": ")}`).join("\n") : "");
+      if (apoio) C.push({ id: novoId(), nome: "Bilhete", papel: "texto", t: "bilhete", texto: apoio, x: M + Math.round(wC * 0.22), w: Math.round(wC * 0.74), tam: 36, fonte: "grot", peso: 500, cor: "tinta", entre: 1.4, letra: 0, rot: 3, alinhar: "left" });
+      const tit = C.find((l) => l.papel === "titulo");
+      empilhar(ctx, C, topo, fimBase - reservaNota(), "meio", encolher(C, tit));
+      L.push(...C); notaNoFim(C, fimBase); return L;
+    }
+    if (comp === "objeto") { // objeto digital: o celular com o print e as ferramentas flutuando
+      const C = [];
+      if (s.lead) C.push({ ...etiqueta(s.lead), gap: 22 });
+      if (s.titulo) C.push({ ...titulo(W === H ? 96 : 108), gap: 30 });
+      const tit = C.find((l) => l.papel === "titulo");
+      const fimT = topo + (fimBase - topo) * 0.36;
+      empilhar(ctx, C, topo, fimT, "topo", encolher(C, tit));
+      L.push(...C);
+      const yObj = Math.round((C.length ? C[C.length - 1].y + alturaDe(ctx, C[C.length - 1]) : topo) + 30);
+      const ph = Math.max(300, fimBase - yObj - (s.texto ? 90 : 10)), pw = Math.round(ph * 0.5);
+      L.push({ id: novoId(), nome: "Celular com print", papel: "foto", t: "celular", x: W - M - pw - 20, y: yObj, w: pw, h: ph, rot: 4 });
+      linhasDe(s.itens).slice(0, 4).forEach((x, k) => {
+        const ch = etiqueta(x.replace(/\s+\/\s+.*/, ""), { fundoCor: k % 2 ? "destaque" : "papel", corTexto: "principal", tam: 30, rot: k % 2 ? 3 : -3, nome: `Ferramenta ${k + 1}`, papel: "ferramenta" });
+        ch.x = M + (k % 2 ? 40 : 0); ch.y = Math.round(yObj + 30 + k * 96); L.push(ch);
+      });
+      if (s.texto) L.push({ id: novoId(), nome: "Legenda", papel: "texto", t: "legenda", texto: s.texto, x: M, w: wC - pw - 60, tam: 32, fonte: "grot", peso: 800, cor: "branco", entre: 1.25, letra: 0, alinhar: "left", y: Math.round(fimBase - 80) });
+      return L;
+    }
+    if (comp === "cta") { // fechamento: a caixa de comentário com a palavra
+      const C = [];
+      if (s.lead) C.push({ ...etiqueta(s.lead), gap: 24 });
+      if (s.titulo) C.push({ ...titulo(W === H ? 120 : 136), gap: 44 });
+      const palavra = String(s.palavra || "").replace(/\*/g, "").toUpperCase();
+      if (palavra || s.texto) C.push({ id: novoId(), nome: "Caixa de comentário", papel: "palavra", t: "comentarioBox", texto: palavra ? `comenta *${palavra}*` : s.texto, x: M, w: wC, tam: 40, fonte: "grot", peso: 700, cor: "texto", entre: 1.2, letra: 0, alinhar: "left", gap: 26 });
+      if (palavra && s.texto) C.push(texto({ tam: 34, cor: "cinza" }));
+      const tit = C.find((l) => l.papel === "titulo");
+      empilhar(ctx, C, topo, fimBase - reservaNota(), "meio", encolher(C, tit));
+      L.push(...C); notaNoFim(C, fimBase); return L;
+    }
+    // Tipografia experimental: frase gigante, **palavra** vazada e o número da página fantasma no fundo
+    L.unshift(G("Número de fundo", String(i + 1).padStart(2, "0"), { papel: "fantasma", x: W - M - 640, y: Math.round(H * (s.tipo === "gancho" ? 0.12 : 0.42)), w: 640, tam: W === H ? 380 : 440, peso: 900, cor: "tinta", alinhar: "right", alpha: 0.07, entre: 1, letra: -10 }));
+    const C = [];
+    if (s.lead) C.push({ ...etiqueta(s.lead), gap: 26 });
+    msgs.forEach((m) => C.push(m));
+    const sozinha = !s.texto && !s.msgs;
+    if (s.titulo) C.push({ ...titulo(sozinha ? (W === H ? 164 : 182) : W === H ? 138 : 152), gap: 40 });
+    if (s.texto) C.push(texto());
+    const tit = C.find((l) => l.papel === "titulo");
+    empilhar(ctx, C, topo, fimBase - reservaNota(), s.tipo === "gancho" ? "baixo" : s.tipo === "recompensa" ? "meio" : "topo", encolher(C, tit));
+    L.push(...C); notaNoFim(C, fimBase);
+    return L;
+  }
+
   /* ---------- Ajudas pros estilos Set e Colagem ---------- */
   function msgsDe(v) { return linhasDe(v).map((l) => { const m = l.match(/^\s*(eu|ryan|eu mesmo)\s*:\s*(.*)$/i), o = l.match(/^\s*([^:]{1,24}):\s*(.*)$/); return m ? { eu: true, quem: "Ryan", texto: m[2] } : o ? { eu: false, quem: o[1].trim(), texto: o[2] } : { eu: false, quem: "Marca", texto: l }; }); }
   function alturaDe(ctx, l) { const q = medidaCaixa(ctx, l); if (q) return q.bh; if (l.t === "janela") return l.h; if (l.t === "bolha") return montar(ctx, l).alt + 48; if (l.t === "pilula") { const m = montar(ctx, l); return m.alt + m.tam * 0.5; } if (l.t === "bilhete") { const m = montar(ctx, l); return m.alt + Math.round(m.tam * 1.8); } if (l.t === "polaroid") return l.h + l.w * 0.26; return montar(ctx, l).alt; }
@@ -694,7 +966,7 @@ const CAMADAS = (() => {
 
   // As camadas do slide: nascem dos campos e só refazem sozinhas enquanto ninguém mexeu à mão
   const fontesProntas = () => { try { return document.fonts.check(`700 60px ${FONTE_SERIFA}`) && document.fonts.check(`500 40px ${FONTE_BASTAO}`) && document.fonts.check(`400 60px ${FONTE_MAO}`) && document.fonts.check(`900 60px ${FONTE_GROT}`) && document.fonts.check(`400 60px ${FONTE_MARCADOR}`); } catch (_) { return true; } };
-  const baseDe = (car, s, i) => JSON.stringify([car.estilo, car.formato || "quadrado", i === 0, s.tipo, s.fundo || "", s.titulo, s.texto, s.lead, s.itens, s.msgs, s.palavra, s.nota, s.notaContinua]);
+  const baseDe = (car, s, i) => JSON.stringify([car.estilo, car.formato || "quadrado", i === 0, s.tipo, s.fundo || "", s.titulo, s.texto, s.lead, s.itens, s.msgs, s.palavra, s.nota, s.notaContinua, car.estilo === "ryan" ? [s.comp || "", !!s.foto, !!(car.identidade && car.identidade.logo), car.slides.length, i] : ""]);
   function garantir(car, i) {
     const s = car.slides[i]; if (!s) return [];
     const b = baseDe(car, s, i), prontas = fontesProntas();
@@ -721,6 +993,7 @@ const CAMADAS = (() => {
     const { w: W, h: H } = dims(car), s = car.slides[i], n = car.slides.length;
     cv.width = W; cv.height = H;
     const ctx = cv.getContext("2d"), tema = temaDe(car, s), camadas = garantir(car, i);
+    idAtual = car.estilo === "ryan" ? identidadeDe(car) : null;
     fundo(ctx, car, s, tema, W, H, aoCarregar);
     // O que passa da borda direita do slide anterior continua aqui (efeito de arrastar)
     if (i > 0) {
@@ -750,6 +1023,6 @@ const CAMADAS = (() => {
   function palavras(camadas) {
     return camadas.filter((l) => !l.oculto && !l.moldura && TEXTOS.includes(l.t)).map((l) => String(l.texto || "")).join(" ").replace(/\*/g, "").split(/\s+/).filter(Boolean).length;
   }
-  const medir = (l) => { const m = montar(ctxMedir(), l); return { larg: m.larg, alt: m.alt }; };
-  return { M, FORMATOS, TEXTOS, dims, pintar, garantir, gerar, foraDaBorda, palavras, novoId, medir, texto: T, temaDe };
+  const medir = (l, car) => { if (car) idAtual = car.estilo === "ryan" ? identidadeDe(car) : null; const m = montar(ctxMedir(), l); return { larg: m.larg, alt: m.alt }; };
+  return { M, FORMATOS, TEXTOS, COMPS, ID_PADRAO, identidadeDe, compDe, dims, pintar, garantir, gerar, foraDaBorda, palavras, novoId, medir, texto: T, temaDe };
 })();
