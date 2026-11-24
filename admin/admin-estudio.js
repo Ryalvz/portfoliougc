@@ -93,7 +93,9 @@ function desenharEstudio(el) {
           <div class="est-sel" id="est-sel" hidden><span class="est-sel-nome"></span>
             <button type="button" class="est-alca-l" id="est-alca-l" aria-label="Largura da caixa"></button>
             <button type="button" class="est-alca" id="est-alca" aria-label="Tamanho"></button></div></div>
-        <div class="est-nav"><button type="button" class="icone-btn" data-est-ir="-1" ${est.i === 0 ? "disabled" : ""} aria-label="Slide anterior">${ic("esq")}</button>
+        <div class="est-nav"><button type="button" class="est-seta" data-est-desfaz ${est.hist.length ? "" : "disabled"} title="Desfazer (Cmd + Z)" aria-label="Desfazer">&#8630;</button>
+          <button type="button" class="est-seta" data-est-refaz ${(est.refazer || []).length ? "" : "disabled"} title="Refazer (Cmd + Shift + Z)" aria-label="Refazer">&#8631;</button>
+          <button type="button" class="icone-btn" data-est-ir="-1" ${est.i === 0 ? "disabled" : ""} aria-label="Slide anterior">${ic("esq")}</button>
           <span>${est.i + 1} de ${n} · ${esc(PAGINAS_CAR[est.i] || "Extra")}</span>
           <button type="button" class="icone-btn" data-est-ir="1" ${est.i === n - 1 ? "disabled" : ""} aria-label="Próximo slide">${ic("dir")}</button>
           <button type="button" class="btn pequeno" id="est-baixar-uma">${ic("baixar")}Baixar esta página</button></div>
@@ -143,6 +145,12 @@ function desenharEstudio(el) {
             ${est.i < n - 1 && L.t === "texto" ? `<label class="check est-continua"><input type="checkbox" data-cam-continua ${L.continua ? "checked" : ""}> Continua no próximo slide (o resto aparece quando a pessoa arrasta)</label>` : ""}` : ""}
           ${["foto", "forma", "imagem", "janela", "celular"].includes(L.t) ? `${estFaixa("w", "Largura", 40, W, 10, L.w, "px")}${estFaixa("h", "Altura", 40, H, 10, L.h, "px")}${estFaixa("rot", "Girar", -20, 20, 1, L.rot || 0, "°")}` : ""}
           ${L.t === "imagem" ? estFaixa("foco", "Enquadramento da foto (cima / baixo)", 0, 1, 0.02, L.foco ?? 0.4) : ""}
+          ${L.t === "fundoFoto" ? `<small class="sub">Arraste a foto no slide pra posicionar. A bolinha do canto ou a rodinha do mouse aumentam e diminuem.</small>
+            ${estFaixa("zoom", "Tamanho da foto", 0.4, 4, 0.01, L.zoom || 1, "x")}
+            ${estFaixa("px", "Posição na horizontal", -W, W, 5, L.px || 0, "px")}
+            ${estFaixa("py", "Posição na vertical", -H, H, 5, L.py || 0, "px")}
+            <label class="check"><input type="checkbox" data-cam-escurecer ${L.escurecer !== false ? "checked" : ""}> Escurecer em cima e embaixo (deixa o texto legível)</label>
+            <div class="est-opcoes"><button type="button" data-cam-encaixar>Encaixar de novo</button></div>` : ""}
           ${L.t === "linha" ? estFaixa("w", "Comprimento", 40, W, 10, L.w, "px") : ""}
           ${novo && outrasCom(L) ? `<div class="est-global"><button type="button" class="btn" data-cam-global>Aplicar em todas as páginas</button><small>Leva fonte, peso, tamanho, cor e espaçamento desta peça pra ${outrasCom(L)} ${outrasCom(L) === 1 ? "outra página" : "outras páginas"} que têm ${esc(L.nome.toLowerCase())}. Posição e texto de cada página não mudam.</small></div>` : ""}
           <div class="est-opcoes"><button type="button" data-cam-dup>Duplicar</button><button type="button" data-cam-apagar="${L.id}">Apagar camada</button></div>
@@ -205,7 +213,8 @@ function desenharEstudio(el) {
     est.ultMarca = agora; est.hist.push({ i: est.i, slides: JSON.stringify(car.slides), formato: car.formato, identidade: JSON.stringify(car.identidade || null), estilo: car.estilo });
     est.refazer = [];
     if (est.hist.length > 60) est.hist.shift();
-    const b = $("#est-desfazer", el); if (b) b.disabled = false;
+    [$("#est-desfazer", el), $("[data-est-desfaz]", el)].forEach((b) => { if (b) b.disabled = false; });
+    [$("#est-refazer", el), $("[data-est-refaz]", el)].forEach((b) => { if (b) b.disabled = true; });
   };
   const foto = () => ({ i: est.i, slides: JSON.stringify(car.slides), formato: car.formato, identidade: JSON.stringify(car.identidade || null), estilo: car.estilo });
   const voltarPara = (h) => { car.slides = JSON.parse(h.slides); car.formato = h.formato; car.estilo = h.estilo || car.estilo; const idv = JSON.parse(h.identidade || "null"); if (idv) car.identidade = idv; else delete car.identidade; est.i = Math.min(h.i, car.slides.length - 1); est.sel = null; desenhar(); };
@@ -303,13 +312,13 @@ function desenharEstudio(el) {
       marcar(true); arrasto = { tipo: "largura", l, x0: pt[0], w0: l.w };
     } else if (l && b && e.target.closest("#est-alca")) {
       const cx = b.x0, cy = b.y0;
-      marcar(true); arrasto = { tipo: "tamanho", l, cx, cy, d0: Math.hypot(pt[0] - cx, pt[1] - cy) || 1, tam0: l.tam, w0: l.w, h0: l.h };
+      marcar(true); arrasto = { tipo: "tamanho", l, cx, cy, d0: Math.hypot(pt[0] - cx, pt[1] - cy) || 1, tam0: l.tam, w0: l.w, h0: l.h, zoom0: l.zoom || 1 };
     } else {
       const id = camadaNoPonto(pt);
       if (!id) { if (est.sel) { est.sel = null; desenhar(); } return; }
       const c = camadas.find((x) => x.id === id), cb = (cvG.__caixas || []).find((x) => x.id === id);
       marcar(true);
-      arrasto = { tipo: "mover", l: c, x0: pt[0], y0: pt[1], px: c.x, py: c.y, ox: cb.x0 - c.x, oy: cb.y0 - c.y, bw: cb.x1 - cb.x0, bh: cb.y1 - cb.y0, mudou: est.sel !== id, andou: false };
+      arrasto = c.t === "fundoFoto" ? { tipo: "foto", l: c, x0: pt[0], y0: pt[1], px: c.px || 0, py: c.py || 0, mudou: est.sel !== id, andou: false } : { tipo: "mover", l: c, x0: pt[0], y0: pt[1], px: c.x, py: c.y, ox: cb.x0 - c.x, oy: cb.y0 - c.y, bw: cb.x1 - cb.x0, bh: cb.y1 - cb.y0, mudou: est.sel !== id, andou: false };
       est.sel = id; mostrarSel();
     }
     e.preventDefault();
@@ -319,7 +328,10 @@ function desenharEstudio(el) {
     const pt = pontoNoSlide(e);
     if (!arrasto) { cvG.style.cursor = camadaNoPonto(pt) ? "move" : ""; return; }
     const a = arrasto, l = a.l;
-    if (a.tipo === "mover") {
+    if (a.tipo === "foto") {
+      if (Math.abs(pt[0] - a.x0) + Math.abs(pt[1] - a.y0) > 3) a.andou = true;
+      l.px = Math.round(a.px + pt[0] - a.x0); l.py = Math.round(a.py + pt[1] - a.y0);
+    } else if (a.tipo === "mover") {
       let x = a.px + pt[0] - a.x0, y = a.py + pt[1] - a.y0;
       if (Math.abs(pt[0] - a.x0) + Math.abs(pt[1] - a.y0) > 3) a.andou = true;
       const decor = l.t === "forma" || l.t === "linha";
@@ -337,21 +349,23 @@ function desenharEstudio(el) {
       l.w = Math.round(Math.max(60, Math.min(max, a.w0 + pt[0] - a.x0)));
     } else {
       const k = Math.hypot(pt[0] - a.cx, pt[1] - a.cy) / a.d0;
-      if (CAMADAS.TEXTOS.includes(l.t)) l.tam = Math.round(Math.max(10, Math.min(260, a.tam0 * k)));
+      if (l.t === "fundoFoto") l.zoom = Math.round(Math.max(0.4, Math.min(4, a.zoom0 * k)) * 100) / 100;
+      else if (CAMADAS.TEXTOS.includes(l.t)) l.tam = Math.round(Math.max(10, Math.min(260, a.tam0 * k)));
       else { l.w = Math.round(Math.max(30, a.w0 * k)); if (a.h0) l.h = Math.round(Math.max(30, a.h0 * k)); }
     }
     editado(); repintarJa();
   });
   const soltar = () => {
     if (!arrasto) return; const a = arrasto; arrasto = null;
-    if (a.tipo === "mover" && !a.andou) est.hist.pop(); // só clicou: nada pra desfazer
-    if (a.mudou || a.tipo !== "mover") desenhar(); else { pintarGrande(); miniDepois(); }
+    if ((a.tipo === "mover" || a.tipo === "foto") && !a.andou) est.hist.pop(); // só clicou: nada pra desfazer
+    if (a.mudou || (a.tipo !== "mover" && a.tipo !== "foto")) desenhar(); else { pintarGrande(); miniDepois(); }
   };
   tela.addEventListener("pointerup", soltar);
   tela.addEventListener("pointercancel", soltar);
   tela.addEventListener("dblclick", () => { const f = $("[data-cam-texto]", el); if (f) { f.focus(); f.select(); } });
   tela.addEventListener("wheel", (e) => {
     const l = est.sel && camadas.find((x) => x.id === est.sel);
+    if (l && l.t === "fundoFoto") { e.preventDefault(); marcar(); l.zoom = Math.round(Math.max(0.4, Math.min(4, (l.zoom || 1) * (e.deltaY < 0 ? 1.04 : 1 / 1.04))) * 100) / 100; editado(); repintarJa(); miniDepois(); return; }
     if (!l || !CAMADAS.TEXTOS.includes(l.t)) return;
     e.preventDefault(); marcar();
     l.tam = Math.round(Math.max(10, Math.min(260, l.tam * (e.deltaY < 0 ? 1.04 : 1 / 1.04)) * 2) / 2);
@@ -426,8 +440,15 @@ function desenharEstudio(el) {
   const tirarFoto = $("[data-est-tirar-foto]", painel);
   if (tirarFoto) tirarFoto.onclick = () => { delete s.foto; desenhar(); };
 
+  const esc0 = $("[data-cam-escurecer]", painel);
+  if (esc0) esc0.onchange = () => { const l = Lsel(); if (!l) return; marcar(true); l.escurecer = esc0.checked; editado(); desenhar(); };
+  const enc = $("[data-cam-encaixar]", painel);
+  if (enc) enc.onclick = () => { const l = Lsel(); if (!l) return; marcar(true); l.zoom = 1; l.px = 0; l.py = 0; editado(); desenhar(); };
+
   // Refazer, ver o carrossel inteiro, baixar uma página
   $("#est-refazer", el).onclick = refazer;
+  $("[data-est-desfaz]", el).onclick = desfazer;
+  $("[data-est-refaz]", el).onclick = refazer;
   $("#est-baixar-uma", el).onclick = async (e) => {
     const b = e.target.closest("button"); b.disabled = true;
     try {

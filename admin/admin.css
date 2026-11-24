@@ -1898,3 +1898,7 @@ td .pc-follow { display: table; }
 .est-tudo-pag { position: relative; padding: 0; border: 0; background: none; cursor: pointer; }
 .est-tudo-pag img { display: block; width: 100%; height: auto; border-radius: 8px; box-shadow: 0 2px 8px rgba(43,36,28,.18); }
 .est-tudo-pag span { position: absolute; top: 6px; left: 6px; min-width: 22px; height: 22px; border-radius: 99px; background: rgba(43,36,28,.85); color: #F5F1EA; font-size: 11px; font-weight: 700; display: grid; place-items: center; }
+
+.est-seta { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--line); background: var(--card); color: var(--text); font-size: 18px; line-height: 1; cursor: pointer; }
+.est-seta:disabled { opacity: .35; cursor: default; }
+.est-seta:not(:disabled):hover { border-color: var(--cobalt); color: var(--cobalt); }
