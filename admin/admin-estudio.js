@@ -54,7 +54,7 @@ function desenharEstudio(el) {
   const npal = CAMADAS.palavras(camadas);
   // Quantas outras páginas têm a mesma peça (pro "aplicar em todas")
   const outrasCom = (l) => car.slides.filter((x, k) => k !== est.i && (x.camadas || CAMADAS.garantir(car, k)).some((o) => chaveCamada(o) === chaveCamada(l))).length;
-  const fonteDe = (l) => (novo && !l.fonteSolta && (l.papel === "titulo" || l.papel === "texto") ? (l.papel === "titulo" ? ID.fonteTitulo : ID.fonteTexto) : l.fonte || "sans");
+  const fonteDe = (l) => (novo && !l.fonteSolta && (l.papel === "titulo" || l.papel === "texto") ? (l.papel === "titulo" ? CAMADAS.idDaPagina(car, s).fonteTitulo : CAMADAS.idDaPagina(car, s).fonteTexto) : l.fonte || "sans");
 
   el.innerHTML = `
     <details class="cartao car-ideia" id="est-ideia">
@@ -112,16 +112,19 @@ function desenharEstudio(el) {
 
         ${novo ? (() => {
           const linkadas = (k) => car.slides.filter((x) => (x.camadas || []).some((l) => l.vinc === k && !l.solto)).length;
+          const IDP = CAMADAS.idDaPagina(car, s), local = Object.keys(s.idLocal || {}).length;
           const corBotoes = (campo, atual) => `<div class="est-paleta">${PALETA_EST.map(([c, nm]) => `<button type="button" data-id-cor="${campo}" data-cor="${c}" title="${nm}" aria-label="${nm}" aria-pressed="${String(atual).toLowerCase() === c.toLowerCase()}"><i style="background:${c}"></i></button>`).join("")}<input type="color" data-id-cor-livre="${campo}" value="${esc(atual)}" aria-label="Outra cor"></div>`;
-          return `<details class="est-bloco est-id" ${est.idAberta ? "open" : ""}><summary class="est-rot est-id-topo">Identidade do carrossel<small>vale pra todas as ${n} páginas</small></summary>
+          return `<details class="est-bloco est-id" ${est.idAberta ? "open" : ""}><summary class="est-rot est-id-topo">Identidade do carrossel<small>${est.idTodas ? `todas as ${n} páginas` : "só esta página"}</small></summary>
           <div class="est-id-corpo">
-            ${[["nome", "Nome"], ["arroba", "@ do Instagram"], ["assinatura", "Assinatura"]].map(([k, r]) => `<label class="est-id-campo"><span>${r}<small>${linkadas(k)} ${linkadas(k) === 1 ? "página" : "páginas"}</small></span><input class="campo" data-id-txt="${k}" value="${esc(ID[k])}"></label>`).join("")}
-            <div class="est-id-campo"><span>Cor de destaque</span>${corBotoes("destaque", ID.destaque)}</div>
-            <div class="est-id-campo"><span>Cor principal (fundo escuro e texto)</span>${corBotoes("principal", ID.principal)}</div>
-            <label class="est-id-campo"><span>Fonte dos títulos</span><select class="campo" data-id-fonte="fonteTitulo">${FONTES_EST.map(([v, nm]) => `<option value="${v}" ${ID.fonteTitulo === v ? "selected" : ""}>${nm}</option>`).join("")}</select></label>
-            <label class="est-id-campo"><span>Fonte dos textos</span><select class="campo" data-id-fonte="fonteTexto">${FONTES_EST.map(([v, nm]) => `<option value="${v}" ${ID.fonteTexto === v ? "selected" : ""}>${nm}</option>`).join("")}</select></label>
+            <label class="check est-id-todas"><input type="checkbox" data-id-todas ${est.idTodas ? "checked" : ""}> Aplicar em todas as páginas (${n})</label>
+            <small class="sub">${est.idTodas ? "Marcado: o que você mudar aqui vale pro carrossel inteiro." : "Desmarcado: o que você mudar aqui vale só pra esta página."}${local ? ` Esta página tem ${local === 1 ? "1 ajuste só dela" : `${local} ajustes só dela`}. <button type="button" class="link-btn" data-id-voltar>Voltar ao padrão do carrossel</button>` : ""}</small>
+            ${[["nome", "Nome"], ["arroba", "@ do Instagram"], ["assinatura", "Assinatura"]].map(([k, r]) => `<label class="est-id-campo"><span>${r}<small>${linkadas(k)} ${linkadas(k) === 1 ? "página" : "páginas"}</small></span><input class="campo" data-id-txt="${k}" value="${esc(IDP[k])}"></label>`).join("")}
+            <div class="est-id-campo"><span>Cor de destaque</span>${corBotoes("destaque", IDP.destaque)}</div>
+            <div class="est-id-campo"><span>Cor principal (fundo escuro e texto)</span>${corBotoes("principal", IDP.principal)}</div>
+            <label class="est-id-campo"><span>Fonte dos títulos</span><select class="campo" data-id-fonte="fonteTitulo">${FONTES_EST.map(([v, nm]) => `<option value="${v}" ${IDP.fonteTitulo === v ? "selected" : ""}>${nm}</option>`).join("")}</select></label>
+            <label class="est-id-campo"><span>Fonte dos textos</span><select class="campo" data-id-fonte="fonteTexto">${FONTES_EST.map(([v, nm]) => `<option value="${v}" ${IDP.fonteTexto === v ? "selected" : ""}>${nm}</option>`).join("")}</select></label>
             <div class="est-id-campo"><span>Logo</span><div class="est-id-logo">${ID.logo ? `<img src="${esc(ID.logo)}" alt="" crossorigin="anonymous"><button type="button" class="btn pequeno" data-id-logo-todas>Colocar em todas as páginas</button><button type="button" class="btn pequeno" data-id-logo-tirar>Tirar</button>` : ""}<label class="btn pequeno">${ID.logo ? "Trocar" : "Subir logo"}<input type="file" accept="image/*" data-id-logo hidden></label></div></div>
-            <small class="sub">Muda aqui e atualiza todas as páginas. Uma peça que você desvincular numa página fica com o jeito dela.</small>
+            <small class="sub">Uma peça que você desvincular numa página fica com o jeito dela.</small>
           </div></details>`; })() : ""}
         ${npal > 25 ? `<p class="est-alerta">Muita coisa neste slide: ${npal} palavras. Carrossel bom tem até 25 por página. Esconda ou apague uma camada, ou passe uma parte pro próximo slide.</p>` : ""}
         <p class="est-alerta" id="est-fora" hidden></p>
@@ -545,10 +548,18 @@ function desenharEstudio(el) {
   if (idBox) {
     idBox.addEventListener("toggle", () => { est.idAberta = idBox.open; });
     const repintarTudo = () => { pintarGrande(); car.slides.forEach((_, k) => pintarMini(k)); };
-    $$("[data-id-txt]", idBox).forEach((inp) => inp.addEventListener("input", () => { marcar(); ID[inp.dataset.idTxt] = inp.value; repintarJa(); clearTimeout(espera); espera = setTimeout(repintarTudo, 300); }));
-    $$("[data-id-cor]", idBox).forEach((b) => b.onclick = () => { marcar(true); ID[b.dataset.idCor] = b.dataset.cor; desenhar(); });
-    $$("[data-id-cor-livre]", idBox).forEach((inp) => { inp.addEventListener("input", () => { marcar(); ID[inp.dataset.idCorLivre] = inp.value; repintarJa(); }); inp.addEventListener("change", () => desenhar()); });
-    $$("[data-id-fonte]", idBox).forEach((sel) => sel.onchange = () => { marcar(true); ID[sel.dataset.idFonte] = sel.value; desenhar(); });
+    const gravaId = (k, v) => {
+      if (est.idTodas) { ID[k] = v; car.slides.forEach((x) => { if (x.idLocal) { delete x.idLocal[k]; if (!Object.keys(x.idLocal).length) delete x.idLocal; } }); }
+      else { s.idLocal = s.idLocal || {}; if (ID[k] === v) delete s.idLocal[k]; else s.idLocal[k] = v; if (!Object.keys(s.idLocal).length) delete s.idLocal; s.camadasEditadas = true; }
+    };
+    const todas = $("[data-id-todas]", idBox);
+    if (todas) todas.onchange = () => { est.idTodas = todas.checked; desenhar(); };
+    const voltarId = $("[data-id-voltar]", idBox);
+    if (voltarId) voltarId.onclick = () => { marcar(true); delete s.idLocal; desenhar(); };
+    $$("[data-id-txt]", idBox).forEach((inp) => inp.addEventListener("input", () => { marcar(); gravaId(inp.dataset.idTxt, inp.value); repintarJa(); clearTimeout(espera); espera = setTimeout(repintarTudo, 300); }));
+    $$("[data-id-cor]", idBox).forEach((b) => b.onclick = () => { marcar(true); gravaId(b.dataset.idCor, b.dataset.cor); desenhar(); });
+    $$("[data-id-cor-livre]", idBox).forEach((inp) => { inp.addEventListener("input", () => { marcar(); gravaId(inp.dataset.idCorLivre, inp.value); repintarJa(); }); inp.addEventListener("change", () => desenhar()); });
+    $$("[data-id-fonte]", idBox).forEach((sel) => sel.onchange = () => { marcar(true); gravaId(sel.dataset.idFonte, sel.value); desenhar(); });
     const up = $("[data-id-logo]", idBox);
     if (up) up.onchange = async () => {
       const f = up.files && up.files[0]; if (!f) return;

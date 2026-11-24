@@ -45,7 +45,8 @@ const CAMADAS = (() => {
   const ID_PADRAO = { nome: "Ryan Alves", arroba: "@ryalvz", assinatura: "IA, conteúdo e TikTok Shop", destaque: "#F2D46B", principal: "#1E1813", fonteTitulo: "grot", fonteTexto: "grot", logo: "" };
   // Sempre o mesmo objeto (o painel edita ele direto); só completa o que faltar
   const identidadeDe = (car) => { if (!car.identidade) car.identidade = {}; Object.keys(ID_PADRAO).forEach((k) => { if (car.identidade[k] == null) car.identidade[k] = ID_PADRAO[k]; }); return car.identidade; };
-  let idAtual = null; // a identidade do carrossel que está sendo desenhado
+  let idAtual = null; // a identidade da página que está sendo desenhada
+  const idDaPagina = (car, s) => ({ ...identidadeDe(car), ...((s && s.idLocal) || {}) });
   const COMPS = [["tipo", "Tipografia"], ["janela", "Janela digital"], ["lab", "Laboratório de IA"], ["frame", "Frame de vídeo"], ["comparacao", "Comparação"], ["camadas", "Camadas"], ["objeto", "Objeto digital"], ["cta", "Comentário (CTA)"]];
   const linhasDe0 = (v) => String(v || "").split("\n").map((x) => x.trim()).filter(Boolean);
   function compDe(car, s, i) {
@@ -66,7 +67,7 @@ const CAMADAS = (() => {
     return t;
   }
   function temaRyan(car, s, i) {
-    const id = identidadeDe(car), D = id.destaque, P = id.principal, t = tomRyan(car, s, i);
+    const id = idDaPagina(car, s), D = id.destaque, P = id.principal, t = tomRyan(car, s, i);
     const base = { amarelo: D, laranja: "#E07A55", branco: "#FFFFFF", rec: RY.rec, papel: RY.papel, caixa: P, naCaixa: RY.creme, vidro: "rgba(0,0,0,.06)", tom: "r" + t, destaque: D, principal: P, creme: RY.creme };
     if (t === "claro") return { ...base, fundo: RY.creme, tinta: P, texto: "#3A2C20", cinza: RY.cinza, ouro: RY.caramelo, naOuro: RY.creme, balao: "#E4D8C3", marca: D, naMarca: P, marcaTipo: "meia" };
     if (t === "dourado") return { ...base, fundo: RY.dourado, tinta: P, texto: "#2E241A", cinza: "#5C5038", ouro: P, naOuro: RY.dourado, balao: "#EFE3C2", marca: P, naMarca: RY.dourado, marcaTipo: "bloco" };
@@ -542,7 +543,7 @@ const CAMADAS = (() => {
     const tema = temaDe(car, s), L = [], mold = { moldura: true };
     // Capa no quadrado: o perfil mostra só o meio (3:4), então o texto fica longe das laterais
     const capa = i === 0 && W === H, xC = capa ? 160 : M, wC = W - 2 * xC;
-    idAtual = e === "ryan" ? identidadeDe(car) : null;
+    idAtual = e === "ryan" ? idDaPagina(car, car.slides[i]) : null;
     if (e === "ryan") return gerarRyan(car, i, s, n, W, H, tema, ctx);
     if (e === "direto") return gerarDireto(car, i, s, n, W, H, tema, ctx);
     if (e === "set" || e === "papel") return gerarSet(car, i, s, n, W, H, tema, ctx);
@@ -1010,7 +1011,7 @@ const CAMADAS = (() => {
     const { w: W, h: H } = dims(car), s = car.slides[i], n = car.slides.length;
     cv.width = W; cv.height = H;
     const ctx = cv.getContext("2d"), tema = temaDe(car, s), camadas = garantir(car, i);
-    idAtual = car.estilo === "ryan" ? identidadeDe(car) : null;
+    idAtual = car.estilo === "ryan" ? idDaPagina(car, s) : null;
     fundo(ctx, car, s, tema, W, H, aoCarregar);
     // O que passa da borda direita do slide anterior continua aqui (efeito de arrastar)
     if (i > 0) {
@@ -1041,5 +1042,5 @@ const CAMADAS = (() => {
     return camadas.filter((l) => !l.oculto && !l.moldura && TEXTOS.includes(l.t)).map((l) => String(l.texto || "")).join(" ").replace(/\*/g, "").split(/\s+/).filter(Boolean).length;
   }
   const medir = (l, car) => { if (car) idAtual = car.estilo === "ryan" ? identidadeDe(car) : null; const m = montar(ctxMedir(), l); return { larg: m.larg, alt: m.alt }; };
-  return { M, FORMATOS, TEXTOS, COMPS, ID_PADRAO, identidadeDe, compDe, dims, pintar, garantir, gerar, foraDaBorda, palavras, novoId, medir, texto: T, temaDe };
+  return { M, FORMATOS, TEXTOS, COMPS, ID_PADRAO, identidadeDe, idDaPagina, compDe, dims, pintar, garantir, gerar, foraDaBorda, palavras, novoId, medir, texto: T, temaDe };
 })();
