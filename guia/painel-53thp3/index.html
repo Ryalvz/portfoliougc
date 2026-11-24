@@ -1,0 +1,639 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Shopflow · Guia do painel</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Allura&family=Montserrat:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap">
+<style>
+/* Guia no estilo vidro: fundo areia com luz de janela, painéis de vidro fosco,
+   etapas como pílulas que abrem e fecham, botão preto arredondado. Identidade: assinatura Ryan Alves em Allura. */
+:root{
+  --tinta:#1E1813; --tinta2:#5B4D42; --tinta3:#8C7C6E; --preto:#151110; --ouro:#A8864A;
+  --vidro:rgba(255,251,246,.58); --vidro2:rgba(255,253,250,.78); --borda:rgba(255,255,255,.75); --linha:rgba(60,42,28,.12);
+  --laranja:#B9542A; --verde:#4E6A39; --verde-bg:rgba(94,128,66,.16); --cinza-bg:rgba(60,42,28,.07);
+  --sans:Montserrat,ui-sans-serif,system-ui,-apple-system,sans-serif; --assina:Allura,cursive;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+[hidden]{display:none!important}
+body{min-height:100vh;color:var(--tinta);font-family:var(--sans);font-size:15px;line-height:1.6;background:#D9C9B6}
+body::before{content:"";position:fixed;inset:0;z-index:-2;background:radial-gradient(90% 70% at 88% 6%,#FBF5EC 0%,rgba(251,245,236,0) 60%),linear-gradient(118deg,#F1E8DC 0%,#E5D6C4 38%,#BFA78F 72%,#6F5B4A 100%)}
+body::after{content:"";position:fixed;inset:-25%;z-index:-1;pointer-events:none;filter:blur(34px);opacity:.75;
+  background:repeating-linear-gradient(118deg,rgba(255,247,234,0) 0 140px,rgba(255,247,234,.55) 190px 300px,rgba(255,247,234,0) 350px 520px)}
+a{color:inherit}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--preto);outline-offset:3px}
+.assina{font-family:var(--assina);font-size:34px;line-height:1;color:var(--tinta)}
+.vidro{background:var(--vidro);-webkit-backdrop-filter:blur(22px) saturate(1.15);backdrop-filter:blur(22px) saturate(1.15);border:1px solid var(--borda);border-radius:30px;box-shadow:0 40px 70px -30px rgba(70,45,25,.45),inset 0 1px 0 rgba(255,255,255,.85)}
+.marca{display:flex;align-items:center;gap:10px}
+.marca .ponto{width:22px;height:22px;border-radius:50%;border:5px solid var(--ouro);background:var(--preto);flex:none}
+
+/* ---------- botões, campos ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;border:0;border-radius:999px;padding:15px 26px;background:var(--preto);color:#fff;font-weight:600;font-size:15px;cursor:pointer;text-decoration:none;box-shadow:0 12px 24px -12px rgba(20,15,10,.6)}
+.btn.sec{background:rgba(255,255,255,.6);color:var(--tinta);border:1px solid var(--borda);box-shadow:inset 0 1px 0 #fff}
+.btn:disabled{opacity:.6;cursor:wait}
+.lbl{display:block;font-size:13px;font-weight:700;color:var(--tinta);margin-bottom:6px}
+.inp{width:100%;font:15px var(--sans);color:var(--tinta);background:rgba(255,255,255,.72);border:1px solid var(--borda);border-radius:18px;padding:13px 16px;outline:none;box-shadow:inset 0 1px 2px rgba(60,42,28,.06)}
+.inp:focus{border-color:var(--tinta3);background:#fff}
+textarea.inp{min-height:90px;resize:vertical}
+.consent{display:flex;gap:10px;align-items:flex-start;font-size:13px;color:var(--tinta2);cursor:pointer}
+.consent input{margin-top:3px;width:18px;height:18px;accent-color:var(--preto);flex:none}
+.erro{color:var(--laranja);font-size:13px;margin:0;min-height:1.2em}
+.mini{font-size:12px;color:var(--tinta3);text-align:center;margin:0}
+
+/* ---------- cadastro ---------- */
+.gate{min-height:100vh;min-height:100dvh;display:grid;place-items:center;padding-block:32px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.gate-card{width:100%;max-width:470px;padding:34px 30px 28px;display:flex;flex-direction:column;gap:16px}
+.gate h1{font-size:clamp(28px,6vw,36px);font-weight:700;letter-spacing:-.02em;line-height:1.1;margin:0;text-wrap:balance}
+.gate p.sub{margin:0;color:var(--tinta2)}
+.gate form{display:flex;flex-direction:column;gap:12px}
+.gate .btn{width:100%;padding:17px}
+
+/* ---------- estrutura ---------- */
+.app{display:grid;grid-template-columns:330px minmax(0,1fr);gap:28px;max-width:1240px;margin:0 auto;padding-block:28px;padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px));min-height:100vh}
+.side{position:sticky;top:28px;align-self:start;max-height:calc(100vh - 56px);overflow-y:auto;padding:26px 22px;display:flex;flex-direction:column;gap:18px}
+.side .titulo{font-size:15px;font-weight:700;margin-top:4px}
+.side .titulo b{font-weight:700;color:var(--ouro)}
+.prog{display:flex;gap:14px;align-items:center;padding:12px 16px;border-radius:22px;background:rgba(255,255,255,.55);border:1px solid var(--borda)}
+.ring{width:46px;height:46px;flex:none}
+.ring circle{fill:none;stroke-width:5}
+.ring .bg{stroke:rgba(60,42,28,.12)} .ring .fg{stroke:var(--preto);stroke-linecap:round;transition:stroke-dashoffset .4s}
+.prog strong{display:block;font-size:18px;font-variant-numeric:tabular-nums}
+.prog span{font-size:12px;color:var(--tinta3);font-variant-numeric:tabular-nums}
+.grupo{font-size:17px;font-weight:700;margin:10px 0 2px}
+.nav{display:flex;flex-direction:column;gap:6px}
+.nav a{display:flex;align-items:center;gap:12px;text-decoration:none;font-size:14px;padding:11px 16px 11px 12px;border-radius:999px;color:var(--tinta2);transition:background .2s}
+.nav a .n{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;flex:none;font-size:11px;font-weight:700;background:rgba(60,42,28,.08);color:var(--tinta2)}
+.nav a::after{content:"→";margin-left:auto;color:var(--tinta3);font-size:15px}
+.nav a:hover{background:rgba(255,255,255,.5)}
+.nav a.on{background:rgba(255,255,255,.85);color:var(--tinta);font-weight:600;box-shadow:0 10px 22px -12px rgba(70,45,25,.4),inset 0 1px 0 #fff}
+.nav a.feito .n{background:var(--verde);color:#fff}
+.nav a.feito::after{content:"✓";color:var(--verde);font-weight:800}
+.continuar{margin-top:8px}
+.continuar .btn{width:100%}
+.side .sair{font-size:12px;color:var(--tinta3);background:none;border:0;cursor:pointer;text-decoration:underline;padding:0;align-self:center}
+.topbar{display:none}
+
+.col{min-width:0;display:flex;flex-direction:column;gap:24px}
+.hero{padding:34px 34px 30px;display:flex;flex-direction:column;gap:12px}
+.selo-rz{margin:0;font-size:12px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:var(--ouro)}
+.hero h1{font-size:clamp(30px,4.2vw,48px);font-weight:700;letter-spacing:-.025em;line-height:1.06;margin:0;text-wrap:balance;max-width:20ch}
+.hero p{margin:0;color:var(--tinta2);max-width:60ch;font-size:16px}
+.hero .acoes{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+.painel-etapas{padding:18px;display:flex;flex-direction:column;gap:10px}
+.painel-etapas > .tit-painel{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:10px 10px 6px}
+.painel-etapas > .tit-painel h2{font-size:20px;margin:0;font-weight:700}
+.painel-etapas > .tit-painel span{font-size:13px;color:var(--tinta3)}
+
+/* ---------- etapa = pílula que abre ---------- */
+section.etapa{scroll-margin-top:24px;border-radius:28px;transition:background .25s}
+section.etapa.aberta{background:rgba(255,255,255,.42);border:1px solid var(--borda);box-shadow:inset 0 1px 0 rgba(255,255,255,.9)}
+.cab-etapa{width:100%;display:flex;align-items:center;gap:14px;text-align:left;cursor:pointer;padding:14px 16px 14px 14px;border-radius:999px;border:1px solid var(--borda);background:rgba(255,255,255,.62);box-shadow:0 10px 24px -16px rgba(70,45,25,.45),inset 0 1px 0 #fff}
+.etapa.aberta .cab-etapa{background:rgba(255,255,255,.9)}
+.cab-etapa .num{width:36px;height:36px;border-radius:50%;flex:none;display:grid;place-items:center;font-weight:700;font-size:13px;background:rgba(60,42,28,.08)}
+.cab-etapa .tit{flex:1;min-width:0;font-weight:600;font-size:15.5px;line-height:1.3}
+.cab-etapa .tit small{display:block;font-size:11.5px;font-weight:600;color:var(--tinta3);letter-spacing:.04em}
+.cab-etapa .tit em{font-style:normal}
+.cab-etapa .st{flex:none;font-size:12px;font-weight:700;padding:6px 14px;border-radius:999px;background:var(--cinza-bg);color:var(--tinta3)}
+.cab-etapa .st.agora{background:var(--laranja);color:#fff}
+.cab-etapa .st.feito{background:var(--verde-bg);color:var(--verde)}
+.etapa.feita .num{background:var(--verde);color:#fff}
+.cab-etapa .seta{flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:18px;transition:transform .25s}
+.etapa.aberta .cab-etapa .seta{transform:rotate(90deg)}
+.corpo{display:none;padding:20px 20px 24px;flex-direction:column;gap:16px}
+.etapa.aberta .corpo{display:flex}
+.corpo > p{margin:0;color:var(--tinta2);max-width:68ch}
+h3{font-size:13px;font-weight:700;margin:6px 0 0}
+
+.bloco{background:rgba(255,255,255,.6);border:1px solid var(--borda);border-radius:24px;padding:20px}
+ol.passos{margin:0;padding:0;list-style:none;counter-reset:p;display:flex;flex-direction:column;gap:12px}
+ol.passos li{counter-increment:p;display:grid;grid-template-columns:30px 1fr;gap:12px;align-items:start}
+ol.passos li::before{content:counter(p);width:28px;height:28px;border-radius:50%;background:var(--preto);color:#fff;font-weight:700;font-size:12px;display:grid;place-items:center}
+.links{display:flex;flex-wrap:wrap;gap:10px}
+
+.prompt{border:1px solid var(--borda);border-radius:24px;overflow:hidden;background:rgba(255,255,255,.75)}
+.prompt .hd{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px 10px 18px;border-bottom:1px solid var(--linha)}
+.prompt .hd span{font-size:12.5px;font-weight:700;color:var(--tinta2)}
+.prompt .hd button{font-size:13px;font-weight:600;padding:9px 18px;border-radius:999px;border:0;background:var(--preto);color:#fff;cursor:pointer}
+.prompt .hd button.ok{background:var(--verde)}
+.prompt pre{margin:0;padding:18px;font-family:var(--sans);font-size:13.5px;line-height:1.6;white-space:pre-wrap;word-break:break-word;max-height:300px;overflow:auto}
+.pers{font-size:12px;color:var(--verde);font-weight:600}
+.pers.nao{color:var(--laranja)}
+
+.checks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.checks label{display:flex;gap:12px;align-items:center;cursor:pointer;font-size:14px;padding:10px 14px;border-radius:999px;background:rgba(255,255,255,.45);border:1px solid var(--borda)}
+.checks input{appearance:none;-webkit-appearance:none;width:22px;height:22px;border-radius:50%;border:1.5px solid var(--tinta3);background:#fff;flex:none;margin:0;display:grid;place-items:center;cursor:pointer}
+.checks input:checked{background:var(--verde);border-color:var(--verde)}
+.checks input:checked::after{content:"✓";color:#fff;font-size:12px;font-weight:800}
+.checks input:checked + span{color:var(--tinta3);text-decoration:line-through}
+
+.passos-aula{display:flex;flex-direction:column;gap:16px}
+.passo{display:grid;grid-template-columns:34px minmax(0,1fr);gap:14px;align-items:start}
+.passo .pn{width:32px;height:32px;border-radius:50%;background:var(--preto);color:#fff;font-weight:700;font-size:13px;display:grid;place-items:center}
+.passo .pc{min-width:0;display:flex;flex-direction:column;gap:10px}
+.passo .pc > p{margin:5px 0 0}
+.prompt pre .mais{display:block;margin-top:10px;color:var(--tinta3);font-style:italic}
+.nota{font-size:13.5px;padding:14px 18px;border-radius:20px;background:rgba(60,42,28,.07);color:var(--tinta)}
+
+.q{display:flex;flex-direction:column;gap:22px}
+.q .item > .lbl{margin-bottom:10px}
+.q .item small{display:block;font-weight:500;color:var(--tinta3);font-size:12px;margin-top:2px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1px solid var(--borda);background:rgba(255,255,255,.65);border-radius:999px;padding:9px 16px;font-size:13.5px;cursor:pointer;box-shadow:inset 0 1px 0 #fff}
+.chip:hover{background:#fff}
+.chip[aria-pressed="true"]{background:var(--preto);color:#fff;border-color:var(--preto)}
+.preset{display:flex;gap:14px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:18px 20px;border-radius:24px;background:rgba(255,255,255,.55);border:1px solid var(--borda)}
+.preset p{margin:0;font-size:14px;max-width:52ch}
+.preset p b{font-size:16px}
+.resumo{font-size:13.5px;color:var(--tinta2);padding:14px 18px;border-radius:20px;background:rgba(255,255,255,.45)}
+.resumo b{color:var(--tinta)}
+
+footer.fim{text-align:center;color:var(--tinta2);font-size:13px;display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 0 20px}
+.toast{position:fixed;bottom:calc(24px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%) translateY(20px);background:var(--preto);color:#fff;padding:12px 20px;border-radius:999px;font-size:13px;opacity:0;transition:.25s;pointer-events:none;z-index:50}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+
+@media (max-width:900px){
+  .app{grid-template-columns:1fr;padding-block:0 28px;gap:18px}
+  .side{position:fixed;inset:10px auto 10px 10px;width:min(86vw,330px);max-height:none;z-index:40;transform:translateX(-110%);transition:transform .25s;padding-top:calc(26px + env(safe-area-inset-top,0px))}
+  .side.aberto{transform:none}
+  .veu{position:fixed;inset:0;background:rgba(40,28,18,.3);z-index:30}
+  .topbar{display:flex;position:sticky;top:0;z-index:20;justify-content:space-between;align-items:center;gap:12px;margin:0 calc(-1 * max(20px, env(safe-area-inset-left,0px))) 0;padding-block:calc(10px + env(safe-area-inset-top,0px)) 10px;padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px));background:rgba(245,236,224,.7);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border-bottom:1px solid var(--borda)}
+  .topbar .assina{font-size:28px}
+  .topbar button{border:1px solid var(--borda);background:rgba(255,255,255,.7);border-radius:999px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer}
+  .hero{padding:26px 22px}
+  .painel-etapas{padding:10px;border-radius:26px}
+  .corpo{padding:16px 10px 20px}
+  .cab-etapa .st{display:none}
+  .bloco{padding:16px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<!-- =============== CADASTRO =============== -->
+<main class="gate" id="gate">
+  <div class="gate-card vidro">
+    <div class="assina">Ryan Alves</div>
+    <h1>Shopflow</h1>
+    <p class="sub"><b>O passo a passo para vender no TikTok Shop com a ajuda do Claude.</b></p>
+    <p class="sub">Todo o passo a passo das aulas, com os pedidos prontos e personalizados pro seu jeito de gravar. Coloque seus dados para liberar. É por aqui que eu aviso quando sair aula nova.</p>
+    <form id="cadastro" novalidate>
+      <div><label class="lbl" for="nome">Seu nome</label><input class="inp" id="nome" type="text" autocomplete="name" placeholder="Como você quer ser chamado"></div>
+      <div><label class="lbl" for="email">E-mail</label><input class="inp" id="email" type="email" autocomplete="email" placeholder="voce@email.com"></div>
+      <div><label class="lbl" for="whats">WhatsApp com DDD</label><input class="inp" id="whats" type="tel" autocomplete="tel" inputmode="tel" placeholder="(27) 91234-5678"></div>
+      <div><label class="lbl" for="tiktok">Seu @ no TikTok</label><input class="inp" id="tiktok" type="text" autocomplete="off" placeholder="@seuuser"></div>
+      <label class="consent"><input id="aceite" type="checkbox"><span>Aceito receber avisos de aulas, atualizações e novos cursos por e-mail e WhatsApp. Posso pedir para sair quando quiser.</span></label>
+      <p class="erro" id="erro" role="alert"></p>
+      <button class="btn" id="enviar" type="submit">Liberar meu guia</button>
+    </form>
+    <p class="mini">Seus dados ficam só comigo e não são compartilhados.</p>
+  </div>
+</main>
+
+<!-- =============== GUIA =============== -->
+<div class="app" id="guia" hidden>
+  <aside class="side vidro" id="side">
+    <div>
+      <div class="marca"><span class="ponto" aria-hidden="true"></span><span class="assina">Ryan Alves</span></div>
+      <div class="titulo"><b>Shopflow</b> · o guia</div>
+    </div>
+    <div class="prog">
+      <svg class="ring" viewBox="0 0 48 48" aria-hidden="true"><circle class="bg" cx="24" cy="24" r="20"/><circle class="fg" id="ringfg" cx="24" cy="24" r="20" transform="rotate(-90 24 24)" stroke-dasharray="125.66" stroke-dashoffset="125.66"/></svg>
+      <div><strong id="pct">0%</strong><span id="cnt">0 de 0 marcados</span></div>
+    </div>
+    <nav class="nav" id="nav">
+      <div class="grupo">Painel</div>
+      <a href="#e4"><span class="n">01</span>Criar seu painel</a>
+      <a href="#e5"><span class="n">02</span>Subir suas vendas</a>
+      <div class="grupo">Criar</div>
+      <a href="#e7"><span class="n">03</span>Copiar estrutura de vídeo</a>
+    </nav>
+    <div class="continuar"><button class="btn" type="button" data-continuar>Continuar de onde parei</button></div>
+    <button class="sair" id="sair" type="button">Sair deste aparelho</button>
+  </aside>
+
+  <div>
+    <div class="topbar"><span class="assina">Ryan Alves</span><button type="button" id="abrirMenu">Etapas · <span id="pctTop">0%</span></button></div>
+    <main class="main">
+      <div class="col">
+
+        <header class="hero vidro">
+          <div class="marca"><span class="ponto" aria-hidden="true"></span><span class="assina">Ryan Alves</span></div>
+          <p class="selo-rz">Shopflow · Painel</p>
+          <h1>Seu painel de TikTok Shop.</h1>
+          <p>O que vender, o que gravar e onde focar, com as suas vendas de verdade. São 3 etapas. Abra pelo mesmo navegador do guia principal: as respostas da etapa 03 de lá já vêm junto.</p>
+          <div class="acoes"><button class="btn" type="button" data-continuar>Continuar de onde parei</button><a class="btn sec" href="../">Voltar ao guia principal</a></div>
+        </header>
+
+        <div class="painel-etapas vidro">
+          <div class="tit-painel"><h2>Etapas</h2><span id="cntPainel"></span></div>
+        <!-- 04 -->
+        <section class="etapa" id="e4" data-etapa>
+          <div class="tag"><span class="e">ETAPA 01</span><span class="g">Painel</span></div>
+          <h2>Crie seu painel</h2>
+          <p>Seu painel é um site seu, com login e com o seu próprio banco de dados. Só você entra, abre no celular e funciona mesmo se você ainda não vende nada.</p>
+          <div class="passos-aula"><div class="passo"><span class="pn">1</span><div class="pc"><p><b>Crie 2 contas grátis</b> (uma vez só): o <b>GitHub</b>, onde o site fica no ar, e o <b>Supabase</b>, onde ficam os seus dados. No Supabase, entre com o GitHub e clique em <b>New project</b> (nome <i>painel-tiktok</i>, região São Paulo).</p><div class="links"><a class="btn sec" href="https://github.com/signup" target="_blank" rel="noopener">Criar conta no GitHub</a><a class="btn sec" href="https://supabase.com/dashboard/sign-up" target="_blank" rel="noopener">Criar conta no Supabase</a></div></div></div><div class="passo"><span class="pn">2</span><div class="pc"><p><b>Preencha aqui</b> como quer o seu painel e os dados do seu Supabase. O texto de copiar já leva tudo isso.</p><div class="bloco q" id="quizPainel"></div></div></div><div class="passo"><span class="pn">3</span><div class="pc"><p><b>Aperte Copiar</b>, vá na aba <b>Code</b> do Claude, clique na caixa de mensagem, cole (<b>Cmd + V</b> no Mac, <b>Ctrl + V</b> no Windows) e aperte <b>Enter</b>.</p><div class="prompt"><div class="hd"><span>Skill do painel + pedido</span><button type="button" data-copiar="pInstPainel">Copiar</button></div><pre id="pInstPainel"></pre></div></div></div><div class="passo"><span class="pn">4</span><div class="pc"><p><b>Siga o Claude, um passo por vez.</b> Ele baixa o painel, te mostra onde colar o banco no Supabase, como criar o seu login e publica o site no seu GitHub. Clique em <b>Permitir</b> quando ele pedir.</p></div></div><div class="passo"><span class="pn">5</span><div class="pc"><p><b>Ligue a transcrição</b> (2 minutos): crie uma conta grátis na <b>Supadata</b>, abra <b>API Keys</b>, copie a sua chave e cole no painel em <b>Meu perfil</b> &gt; <b>Chave da Supadata</b>. É ela que escreve a fala dos vídeos de referência na aba Criar.</p><div class="links"><a class="btn sec" href="https://supadata.ai" target="_blank" rel="noopener">Abrir a Supadata</a></div></div></div><div class="passo"><span class="pn">6</span><div class="pc"><p>Abra o endereço do painel, entre com o seu e-mail e senha e <b>salve nos favoritos</b>. Ainda não vende? A tela Hoje mostra os <b>Primeiros passos</b>.</p></div></div></div>
+          <p class="nota"><b>Senha e chave secreta, nunca no Claude.</b> A senha do login você cria no site do Supabase e a chave da Supadata você cola no seu painel. Na conversa só vai a chave <b>publishable</b> do Supabase, que é pública.</p>
+          <ul class="checks"><li><label><input type="checkbox" data-c="e4a"><span>Meu painel está no ar</span></label></li><li><label><input type="checkbox" data-c="e4b"><span>Entrei com meu e-mail e senha</span></label></li><li><label><input type="checkbox" data-c="e4c"><span>Liguei a transcrição</span></label></li></ul>
+        </section>
+
+        <!-- 05 -->
+        <section class="etapa" id="e5" data-etapa>
+          <div class="tag"><span class="e">ETAPA 02</span><span class="g">Painel</span></div>
+          <h2>Suba suas vendas</h2>
+          <p>Tudo pelo celular: a Central de afiliados não abre no computador. Toda manhã você baixa o extrato de pedidos e sobe no painel. Quando sair a primeira venda, o painel vira o painel completo.</p>
+          <div class="passos-aula"><div class="passo"><span class="pn">1</span><div class="pc"><p><b>Instale o painel como app.</b> Abra o endereço do seu painel no celular. iPhone: no <b>Safari</b>, toque em <b>Compartilhar</b> e em <b>Adicionar à Tela de Início</b>. Android: no <b>Chrome</b>, toque nos <b>três pontinhos</b> e em <b>Instalar app</b>. De manhã, ao abrir, ele te lembra de subir o extrato.</p></div></div><div class="passo"><span class="pn">2</span><div class="pc"><p>No <b>app do TikTok</b>, entre na <b>Central de afiliados</b> e vá em <b>Pedidos</b>. Escolha o período (até 90 dias) e toque em <b>Exportar</b>. O arquivo vai para <b>Arquivos</b> (iPhone) ou <b>Downloads</b> (Android).</p></div></div><div class="passo"><span class="pn">3</span><div class="pc"><p>No painel, abra <b>Importar</b>, toque em <b>Escolher arquivo</b> e pegue o extrato. Pode subir de novo quando quiser: pedido repetido não duplica.</p></div></div><div class="passo"><span class="pn">4</span><div class="pc"><p>Abra <b>Hoje</b>. Ali estão os <b>Principais</b> (o que mais te paga), o <b>Dê atenção</b> (produtos começando a vender: grave mais deles) e o <b>Esfriando</b>.</p></div></div><div class="passo"><span class="pn">5</span><div class="pc"><p>Clique em <b>Lançar no dia</b> para montar a lista de vídeos de hoje com horários.</p></div></div></div>
+          <p class="nota"><b>Recebeu amostra?</b> Tire um print (a tela da amostra no TikTok, a conversa com a loja ou a foto da caixa), mande no Claude e escreva: <i>"Cadastra essa amostra no meu painel"</i>. Ele lê o print, te mostra o que entendeu e cadastra depois do seu sim.</p>
+          <ul class="checks"><li><label><input type="checkbox" data-c="e5c"><span>Instalei o painel como app no celular</span></label></li><li><label><input type="checkbox" data-c="e5a"><span>Importei meu primeiro extrato</span></label></li><li><label><input type="checkbox" data-c="e5b"><span>Lancei meu primeiro dia</span></label></li></ul>
+        </section>
+
+        <!-- 07 -->
+        <section class="etapa" id="e7" data-etapa>
+          <div class="tag"><span class="e">ETAPA 03</span><span class="g">Gravar</span></div>
+          <h2>Modele a copy de um vídeo que vendeu</h2>
+          <p>Fica dentro do seu painel, na aba <b>Criar</b>. Você pega um vídeo que deu certo, mantém a estrutura, o tom e a ordem, e troca o produto, a dor e o cenário.</p>
+          <div class="passos-aula"><div class="passo"><span class="pn">1</span><div class="pc"><p>No painel, abra a aba <b>Criar</b>.</p></div></div><div class="passo"><span class="pn">2</span><div class="pc"><p>Cole o <b>link</b> do vídeo do TikTok, clique em <b>Adicionar referência</b> e depois em <b>Transcrever</b>. Em até 3 minutos a fala aparece escrita (usa 1 crédito da Supadata).</p></div></div><div class="passo"><span class="pn">3</span><div class="pc"><p>Escolha o <b>produto</b> (o mesmo do vídeo, um dos seus ou outro) e marque <b>o que muda</b>: gancho, jeito de falar, história, dor ou oferta.</p></div></div><div class="passo"><span class="pn">4</span><div class="pc"><p>Clique em <b>Copiar o pedido</b>, cole no Claude e traga a resposta para a caixa <b>Copy pronta</b>. Clique em <b>Ver roteiro de gravação</b>: aparece cena por cena, a fala e o que mostrar na tela. Ajuste o que quiser e clique em <b>Salvar copy</b>.</p></div></div><div class="passo"><span class="pn">5</span><div class="pc"><p>Clique em <b>Mandar pra agenda de hoje</b> para o vídeo entrar no seu plano do dia.</p></div></div></div>
+          <p class="nota"><b>A transcrição às vezes erra nome de marca:</b> dê uma lida no texto antes de copiar o pedido. Os créditos grátis da Supadata (100 por mês) voltam todo mês.</p>
+          <ul class="checks"><li><label><input type="checkbox" data-c="e7a"><span>Modelei minha primeira copy</span></label></li></ul>
+        </section>
+
+        </div>
+        <footer class="fim"><span class="assina">Ryan Alves</span><span>Shopflow · Dúvida em alguma etapa? Volte na aula dela.</span></footer>
+      </div>
+    </main>
+  </div>
+</div>
+<div class="veu" id="veu" hidden></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ====== CONFIGURAÇÃO DO GOOGLE FORMS ======
+   FORM_URL: link do formulário trocando "/viewform" por "/formResponse".
+   ENTRY_*: os códigos "entry.123456" de cada pergunta. Vazio = não salva (modo teste). */
+/* Skills completas do curso (o botão Copiar leva o texto inteiro) */
+var SKILLS = {"painel-tiktok-shop": "---\nname: painel-tiktok-shop\ndescription: Cria e mantém o painel de TikTok Shop do aluno (curso Shopflow) como um site próprio no GitHub Pages, com o Supabase do aluno (login, banco e transcrição pela Supadata). Use quando o aluno pedir para criar, publicar, abrir, atualizar ou consertar o painel, ligar a transcrição, cadastrar amostra ou marcar vídeos no painel.\n---\n\n# Painel TikTok Shop (site do aluno)\n\nO aluno é iniciante. Fale português simples, frases curtas, UM passo por vez, e espere ele dizer \"pronto\" antes do próximo. Nunca use termo técnico sem explicar. Diga sempre ONDE clicar, com o nome exato do botão.\n\n- Modelo do painel (do curso do Ryan): `https://ugc.ryalvz.com.br/painel-modelo/` (arquivos: `index.html`, `app.js`, `app.css`, `banco.sql`, `manifest.webmanifest`, `sw.js`, `icone-192.png`, `icone-512.png`, `icone-maskable-512.png`, `apple-touch-icon.png`).\n- Pasta do painel no computador do aluno: `Documentos/Shopflow/painel` (Windows: `Documents\\Shopflow\\painel`).\n- Guarde em `~/.claude/skills/painel-tiktok-shop/meu-painel.txt`: o endereço do painel, o e-mail de login, o usuário do GitHub e a URL do Supabase (nunca senha, nunca chave).\n\n**Segurança, sempre:** nunca peça, digite nem guarde senha, código de verificação ou chave secreta (`secret`, `service_role`, a chave da Supadata). Quem cola senha e chave secreta é o aluno, no site do Supabase. A única chave que entra nos arquivos é a **publishable** (ou `anon public`), que é pública.\n\n## Criar o painel (primeira vez)\n\nO pedido do guia traz: nome, como quer ser chamado, @, meta, vídeos por dia, estilo, cor, a URL do Supabase, a chave publishable e o e-mail de login. Se faltar a URL ou a chave, explique onde achar (passo 1) e espere.\n\n1. **Supabase (conta e projeto).** Se o aluno ainda não tem: supabase.com > Start your project > entrar com o GitHub > New project: nome `painel-tiktok`; Database password = clique em **Generate a password** e guarde num lugar seguro (o painel não usa); Region = **Americas** serve (ou São Paulo em \"Need a specific region?\"); em Data access deixe **Enable Data API** e **Grant API access...** marcados e marque também **Enable RLS on new tables automatically** > **Create new project**. Espere ficar verde. A URL e a chave: botão **Connect** no topo do projeto > aba **Framework** (a primeira; se abrir na aba MCP, troque). Copie o que vem depois do `=` em `SUPABASE_URL` e em `SUPABASE_PUBLISHABLE_KEY` (ou `ANON_KEY`). A chave também fica em **Project Settings** (engrenagem) > **API Keys**, a que começa com `sb_publishable_`. Se a chave começar com `sb_secret_` ou tiver `service_role`, PARE: \"Essa é a chave secreta. Apague da conversa e me mande a Publishable.\"\n2. **Baixar o painel.** Crie a pasta e baixe os 10 arquivos do modelo para ela (`curl -fsSL -o <arquivo> https://ugc.ryalvz.com.br/painel-modelo/<arquivo>`). Crie o `config.js` com a URL e a chave:\n   ```js\n   window.PAINEL_CONFIG = {\n     SUPABASE_URL: \"https://xxxx.supabase.co\",\n     SUPABASE_ANON_KEY: \"sb_publishable_...\",\n     PERFIL_INICIAL: { nome: \"Juliana Souza\", apelido: \"Ju\", tiktok: \"@jusouza\", meta_gmv: 5000, meta_videos: 5, estilo: \"glass\", cor: \"rosa\" }\n   };\n   ```\n   O `PERFIL_INICIAL` vem do pedido do guia e entra sozinho no perfil no primeiro login. `estilo`: Modern Light = `light`, Dark Pro = `dark`, Glass / Aurora = `glass`, Bold Modern = `bold` (nome antigo, como Clássico ou Gráfico = `light`). `cor`: `cafe`, `oliva`, `grafite`, `rosa`, `azul`, `lavanda`, `terracota`, `energia`. Meta \"ainda não sei\" = `null`. Campo \"(não informado)\": deixe de fora.\n3. **Criar o banco.** Copie o `banco.sql` para a área de transferência (Mac: `pbcopy < banco.sql`; Windows: `Get-Content banco.sql -Raw | Set-Clipboard`) e diga: \"No Supabase, clique em **SQL Editor** (menu da esquerda) > **New query**, cole (Cmd+V ou Ctrl+V) e clique em **Run**. Tem que aparecer Success.\" Pode rodar de novo sem medo: não apaga nada. No Mac, se aparecer \"Colando de iPhone\", cancele no x e copie de novo (é a área de transferência do iPhone atrapalhando).\n4. **Criar o seu login.** Diga: \"Clique em **Authentication** > **Users** > **Add user** > **Create new user**. Coloque o seu e-mail (<e-mail do pedido>), crie uma senha, marque **Auto Confirm User** e clique em **Create user**.\" Depois: \"Em **Authentication** > **Sign In / Providers**, desligue **Allow new users to sign up** e salve. Assim ninguém mais cria conta no seu painel.\"\n5. **Publicar no GitHub Pages.**\n   - Precisa do `git` e do `gh` (GitHub CLI). Se faltar, peça o sim e instale (Mac: `brew install gh git`; Windows: `winget install GitHub.cli Git.Git`).\n   - `gh auth status`; se não estiver logado: `gh auth login --web --git-protocol https`. O aluno entra pelo navegador (nunca digite a senha dele).\n   - Na pasta do painel: `git init -b main`, `git add .`, `git commit -m \"Meu painel TikTok Shop\"`, `gh repo create painel-tiktok-shop --public --source . --push`.\n   - Ligue o Pages: `gh api -X POST repos/<usuario>/painel-tiktok-shop/pages -f \"source[branch]=main\" -f \"source[path]=/\"`.\n   - Endereço: `https://<usuario>.github.io/painel-tiktok-shop/`. Espere 1 ou 2 minutos e confira com `curl -sI` até responder 200.\n   - O código fica público, os dados não: quem protege são as travas do banco.\n6. **Endereço do painel no Supabase** (para o \"esqueci minha senha\" funcionar): \"Em **Authentication** > **URL Configuration**, coloque o endereço do painel em **Site URL** e salve.\"\n7. Guarde o `meu-painel.txt`, abra o endereço no navegador e diga, exatamente assim:\n   - \"Seu painel está no ar: <endereço>. Salve nos favoritos, abre no celular também.\"\n   - \"Entre com o seu e-mail e a senha que você criou no Supabase. Só você entra. Seu nome e seu estilo já vão estar lá.\"\n   - \"Último passo: ligar a transcrição dos vídeos de referência. Leva 2 minutos.\" (siga para a seção abaixo)\n\nSe o curl do modelo falhar, diga: \"Não consegui baixar o modelo do painel. Avise o Ryan.\" Não monte o painel de outro jeito.\n\n## Ligar a transcrição (Supadata)\n\nA aba Criar transcreve sozinha o vídeo de referência pelo link. Quem ouve é a Supadata. São 3 passos, todos do aluno (a chave nunca passa pela conversa):\n\n1. \"Crie uma conta grátis em **supadata.ai** (100 transcrições por mês, sem cartão). Pode entrar com o Google.\"\n2. \"No painel da Supadata, abra **API Keys** e copie a sua chave (começa com `sd_`).\"\n3. \"No seu painel, abra **Meu perfil**, cole em **Chave da Supadata** e clique em **Salvar**.\"\n\nTeste: aba **Criar** > cole o link de um vídeo do TikTok > **Adicionar referência** > **Transcrever**. Leva até 3 minutos.\nSe o painel disser que a chave não funcionou: copie de novo no site da Supadata (nunca de outro lugar) e salve em Meu perfil.\n\n## Abrir o painel de novo\n\nLeia `meu-painel.txt` e abra o endereço no navegador.\n\n## Versão nova do painel\n\nQuando o aluno disser que saiu versão nova: na pasta do painel, baixe de novo todos os arquivos do modelo (`index.html`, `app.js`, `app.css`, `banco.sql`, `manifest.webmanifest`, `sw.js` e os 4 ícones .png) (NUNCA sobrescreva o `config.js`). Copie o `banco.sql` e peça para rodar no SQL Editor (traz as tabelas novas, sem apagar nada). Depois `git add . && git commit -m \"Versão nova do painel\" && git push`. Em 1 ou 2 minutos o site atualiza; os dados continuam no Supabase.\n\n## Cadastrar amostra por print ou mensagem\n\nQuando o aluno mandar um print (tela de amostra do TikTok Shop, conversa com a loja, foto da caixa) ou escrever \"recebi a amostra do X\":\n\n1. Tire do print: **produto** (como aparece no TikTok Shop), **data em que recebeu**, **prazo para postar** e **custo** (0 se foi grátis). O que faltar: recebida = hoje, prazo = hoje + 7 dias, custo = 0. Não invente nome de produto: se não der para ler, pergunte.\n2. Mostre em 4 linhas (Produto, Recebi em, Postar até, Custo) e pergunte: \"Cadastro assim?\"\n3. Depois do sim, há dois jeitos (ofereça o primeiro):\n   - **No painel:** \"Abra a aba **Amostras** e preencha: ...\" (com os dados prontos para copiar).\n   - **Pelo SQL Editor:** monte, copie para a área de transferência e peça para colar e rodar:\n     ```sql\n     insert into public.amostras (user_id, produto, recebida_em, prazo_postar, custo, decisao, obs)\n     values ((select id from auth.users where email = '<e-mail do meu-painel.txt>'), 'Nome do produto', '2026-11-20', '2026-11-27', 0, 'testando', 'cadastrada por print');\n     ```\n     Vários prints: um `insert` com várias linhas em `values`.\n4. Para mudar a decisão (\"o projetor vendeu, escala\"): na aba Amostras, ou `update public.amostras set decisao = 'escalar' where produto = '...'` (`testando`, `escalar`, `monitorar` ou `pausar`).\n\n## Marcar vídeos no painel (usado pela skill agendar-tiktok-shop)\n\nOs vídeos do dia ficam na tabela `videos` (`data`, `hora`, `produto`, `bloco`, `status`). `status`: `rascunho` (a gravar), `agendado` ou `postado`. `bloco`: `principal`, `com_vendas` ou `teste`.\n\nNo fim de um agendamento, monte UM comando com todos os vídeos, copie e peça para colar no SQL Editor e rodar:\n\n```sql\ninsert into public.videos (user_id, data, hora, produto, bloco, status) values\n  ((select id from auth.users where email = '<e-mail>'), '2026-11-22', '12:00', 'Nome do produto', 'principal', 'agendado'),\n  ((select id from auth.users where email = '<e-mail>'), '2026-11-22', '13:00', 'Outro produto', 'teste', 'agendado');\n```\n\nSe o vídeo já estava na agenda do dia (lançado pela Sugestão do dia), use `update public.videos set status = 'agendado', hora = '12:00' where id = (select id from public.videos where data = '2026-11-22' and produto = '...' and status = 'rascunho' order by id limit 1);` em vez de criar outro. O aluno também pode só tocar no status do vídeo na aba Vídeos.\n\n## O que cada tela faz (para explicar ao aluno)\n\n- **Hoje**: sem vendas ainda, mostra os primeiros passos, os produtos para testar e o plano do dia (modo Começando). Com vendas: vendas de ontem, meta do mês, os produtos principais, os que estão começando a vender (\"Dê atenção\") e os que estão esfriando. \"Lançar no dia\" monta a lista de vídeos.\n- **Resultados**: vendas, comissão, pedidos e ticket médio do mês contra o mês anterior. **Todo o período**: total desde o começo, ticket médio, gráfico mês a mês, divisão por canal e por categoria. Para ver mais para trás, exporte do TikTok de 90 em 90 dias e importe todos (pedido repetido não duplica).\n- **Produtos**: produtos dos últimos 30 dias, com sinal e tendência.\n- **Vídeos**: a **Sugestão do dia** (a meta de Meu perfil dividida em 40% principais, 40% com vendas, 20% testes, com horário e botão de lançar), a agenda do dia e os vídeos que mais venderam.\n- **Criar**: modelar a copy de um vídeo que vendeu. Cola o link, clica em **Transcrever** (Supadata, com a chave de Meu perfil), escolhe o produto e o que muda, clica em **Copiar o pedido**, cola no Claude e traz a resposta para a caixa Copy pronta. **Ver roteiro de gravação** mostra cena por cena (fala, o que mostrar na tela, texto na tela) e dá para imprimir. Fica salvo.\n- **Amostras**: produtos recebidos ou escolhidos para testar.\n- **Importar**: onde sobe o arquivo de pedidos do TikTok Shop (Central de afiliados > Pedidos > Exportar, no computador).\n- **Meu perfil**: nome, como quer ser chamado, @, chave da Supadata, meta, vídeos por dia, estilo e cor.\n\n## Regras\n\n- Nunca mostre nem copie os números do aluno para fora do painel.\n- Nunca invente número.\n- Se o aluno pedir para apagar pedidos antigos, confirme antes quais meses vão sumir.\n- Nunca mexa em senha, chave secreta ou chave da Supadata."};
+var ARQUIVOS = {};
+var COMPLETO = {};
+var CONFIG = {
+  FORM_URL: "https://docs.google.com/forms/d/e/1FAIpQLScbcD9iGyX-IvZ8zMilsP5TF9newyiMsyFtGXFyYzL7q7uD3A/formResponse",
+  ENTRY_NOME: "entry.2005620554",
+  ENTRY_EMAIL: "entry.1045781291",
+  ENTRY_WHATS: "entry.1065046570",
+  ENTRY_TIKTOK: "entry.1166974658",
+  ENTRY_ACEITE: "entry.839337160",
+  ACEITE_TEXTO: "Aceitou receber avisos por e-mail e WhatsApp (guia do curso)"
+};
+
+(function(){
+  var $=function(s){return document.querySelector(s)}, $$=function(s){return [].slice.call(document.querySelectorAll(s))};
+  function ler(k,d){try{var v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}}
+  function gravar(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+  function toast(t){var e=$('#toast');e.textContent=t;e.classList.add('on');setTimeout(function(){e.classList.remove('on')},1700)}
+
+  /* ---------- Cadastro ---------- */
+  var KA='ttk-guia-acesso';
+  function abrirGuia(){ $('#gate').hidden=true; $('#guia').hidden=false; window.scrollTo(0,0); iniciar(); }
+  $('#cadastro').addEventListener('submit',function(ev){
+    ev.preventDefault();
+    var erro=$('#erro'), btn=$('#enviar');
+    var nome=$('#nome').value.trim(), email=$('#email').value.trim(), whats=$('#whats').value.trim(), tiktok=$('#tiktok').value.trim(), dig=whats.replace(/\D/g,'');
+    if(nome.length<2){erro.textContent='Coloque seu nome.';return}
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)){erro.textContent='Confira o e-mail: falta o @ ou o final (ex.: .com).';return}
+    if(dig.length<10||dig.length>13){erro.textContent='Coloque o WhatsApp com DDD (ex.: 27912345678).';return}
+    if(tiktok.replace('@','').length<2){erro.textContent='Coloque seu @ do TikTok.';return}
+    if(!$('#aceite').checked){erro.textContent='Marque a caixinha de avisos para liberar o guia.';return}
+    if(tiktok.charAt(0)!=='@') tiktok='@'+tiktok;
+    erro.textContent=''; btn.disabled=true; btn.textContent='Liberando...';
+    function fim(){ gravar(KA,{em:new Date().toISOString(),tiktok:tiktok,nome:nome,email:email}); abrirGuia(); }
+    if(!CONFIG.FORM_URL){ console.warn('Google Forms não configurado: cadastro não foi salvo.'); fim(); return; }
+    var d=new URLSearchParams();
+    d.append(CONFIG.ENTRY_NOME,nome); d.append(CONFIG.ENTRY_EMAIL,email); d.append(CONFIG.ENTRY_WHATS,dig); d.append(CONFIG.ENTRY_TIKTOK,tiktok);
+    if(CONFIG.ENTRY_ACEITE) d.append(CONFIG.ENTRY_ACEITE,CONFIG.ACEITE_TEXTO);
+    fetch(CONFIG.FORM_URL,{method:'POST',mode:'no-cors',body:d}).then(fim).catch(function(){
+      btn.disabled=false; btn.textContent='Liberar meu guia'; erro.textContent='Não consegui enviar. Confira sua internet e tente de novo.';
+    });
+  });
+  $('#sair').addEventListener('click',function(){ try{localStorage.removeItem(KA)}catch(e){} location.reload(); });
+
+  /* ---------- Questionário ---------- */
+  var KP='ttk-guia-perfil', KC='ttk-guia-checks';
+  var Q=[
+    {k:'nicho',t:'Seu nicho principal',multi:true,ops:['Tech e eletrônicos','Casa e cozinha','Beleza e cuidados','Moda','Fitness e saúde','Achadinhos variados']},
+    {k:'videos',t:'Quantos vídeos você posta por dia',s:'Conte o que você aguenta gravar de verdade, toda semana.',ops:['3','5','8','10','15']},
+    {k:'estilo',t:'Como você gosta dos seus vídeos',ops:['Direto ao ponto','Explicativo, com calma','Review sincero','POV e rotina']},
+    {k:'duracao',t:'Duração do vídeo',ops:['15 s','20 a 25 s','30 s','45 s']},
+    {k:'beneficios',t:'Quantos benefícios por vídeo',s:'Menos benefícios deixa o vídeo mais curto e mais claro.',ops:['2','3','4','5']},
+    {k:'gancho',t:'Gancho que mais combina com você',ops:['Pergunta','Dor do cliente','Resultado primeiro','Achado / "olha isso"']},
+    {k:'edicao',t:'Como quer a edição',ops:['Só cortes secos','Cortes + headline do gancho','Cortes + headline + legenda']},
+    {k:'horario',t:'Quando postar',ops:['Espalhado das 8h às 23h','Picos: almoço e noite','Só à noite']}
+  ];
+  var RYAN={nicho:['Tech e eletrônicos','Achadinhos variados'],videos:'15',estilo:'Direto ao ponto',duracao:'20 a 25 s',beneficios:'3',gancho:'Pergunta',edicao:'Cortes + headline do gancho',horario:'Espalhado das 8h às 23h',ryan:true};
+  var perfil=ler(KP,{nicho:[]}); if(!Array.isArray(perfil.nicho)) perfil.nicho=[];
+  var checks=ler(KC,{});
+
+  function montarQuiz(){
+    var box=$('#quiz'); if(!box) return; box.innerHTML='';
+    Q.forEach(function(q){
+      var it=document.createElement('div'); it.className='item';
+      var l=document.createElement('div'); l.className='lbl'; l.textContent=q.t+(q.multi?' (pode marcar mais de um)':'');
+      if(q.s){var sm=document.createElement('small');sm.textContent=q.s;l.appendChild(sm)}
+      var ch=document.createElement('div'); ch.className='chips';
+      q.ops.forEach(function(o){
+        var b=document.createElement('button'); b.type='button'; b.className='chip'; b.textContent=q.k==='videos'?o+' por dia':o;
+        var on=q.multi?perfil[q.k].indexOf(o)>-1:perfil[q.k]===o; b.setAttribute('aria-pressed',on?'true':'false');
+        b.addEventListener('click',function(){
+          if(q.multi){var a=perfil[q.k],i=a.indexOf(o); if(i>-1)a.splice(i,1); else a.push(o);} else perfil[q.k]=o;
+          perfil.ryan=false; gravar(KP,perfil); montarQuiz(); atualizarPedidos();
+        });
+        ch.appendChild(b);
+      });
+      it.appendChild(l); it.appendChild(ch); box.appendChild(it);
+    });
+  }
+  var bRyan=$('#usarRyan'); if(bRyan) bRyan.addEventListener('click',function(){ var pp=perfil.painel; perfil=JSON.parse(JSON.stringify(RYAN)); if(pp) perfil.painel=pp; gravar(KP,perfil); montarQuiz(); atualizarPedidos(); toast('Estilo do Ryan aplicado'); });
+
+  /* ---------- Pedidos personalizados ---------- */
+  function v(k,pad){var x=perfil[k]; if(Array.isArray(x)) return x.length?x.join(' e ').toLowerCase():pad; return x||pad}
+  function segs(){var d=v('duracao','20 a 25 s'); var m=d.match(/\d+/g); return m?Math.round(m.reduce(function(a,b){return a+ +b},0)/m.length):22}
+  function palavras(){return Math.round(segs()*3.25)}
+  function nVideos(){return parseInt(v('videos','5'),10)}
+  function horarios(){
+    var h=v('horario','Espalhado das 8h às 23h');
+    if(h.indexOf('Picos')===0) return 'concentrados nos picos: entre 11h e 13h e entre 18h e 22h';
+    if(h.indexOf('noite')>-1) return 'à noite, entre 18h e 23h, com pelo menos 30 minutos entre um e outro';
+    return 'espalhados das 8h às 23h, com intervalo parecido entre eles';
+  }
+  function divisao(){
+    var n=nVideos(); if(n<8) return 'Escolha os produtos que mais venderam nos últimos 30 dias pelo meu painel e deixe 1 vídeo por dia para testar produto novo.';
+    var a=Math.round(n*.4), b=Math.round(n*.4), c=n-a-b;
+    return 'Divida assim: '+a+' vídeos dos meus 3 produtos principais (os que mais deram comissão no painel), '+b+' de produtos que já venderam mas ainda não são campeões, e '+c+' de testes (produto novo ou ângulo novo).';
+  }
+  function edicaoTxt(){
+    var e=v('edicao','Cortes + headline do gancho');
+    var base='só cortes secos, sem respiro, fica só a última tomada de cada fala, um gancho por vídeo, demo inteira quando a imagem é o ponto. Vertical 1080x1920, áudio original, sem música';
+    if(e.indexOf('legenda')>-1) return base+'. Headline do gancho dentro da área segura e fora do rosto, e legenda curta (até 3 palavras por vez) também fora do rosto.';
+    if(e.indexOf('headline')>-1) return base+'. Headline do gancho na letra do TikTok, dentro da área segura e fora do rosto.';
+    return base+'. Sem headline, sem legenda, sem efeito.';
+  }
+
+  function atualizarPedidos(){
+    var ok=!!perfil.estilo&&!!perfil.videos;
+    var resumoBox=$('#resumo')||document.createElement('div'); resumoBox.innerHTML='';
+    var r=document.createElement('div');
+    if(!ok){ r.textContent='Escolha pelo menos o número de vídeos e o estilo para personalizar os pedidos.'; }
+    else{
+      r.innerHTML='<b>Seu resumo:</b> ';
+      r.appendChild(document.createTextNode((perfil.ryan?'estilo do Ryan · ':'')+nVideos()+' vídeos por dia · '+v('estilo','').toLowerCase()+' · '+v('duracao','20 a 25 s')+' (cerca de '+palavras()+' palavras) · '+v('beneficios','3')+' benefícios · gancho '+v('gancho','pergunta').toLowerCase()+' · '+v('edicao','só cortes secos').toLowerCase()+'.'));
+    }
+    resumoBox.appendChild(r);
+
+    var nicho=v('nicho','achadinhos variados'), estilo=v('estilo','direto ao ponto'), gancho=v('gancho','pergunta');
+    // Texto de colar: instala a skill (texto inteiro) e já faz o pedido
+    function colar(id, nome, pedido){
+      if(!SKILLS[nome]||!$('#'+id)) return;
+      var completo='Instale esta skill do curso do Ryan e depois faça o meu pedido.\n\n'+
+        '1. Crie a pasta ~/.claude/skills/'+nome+'/ (se ainda não existir).\n'+
+        '2. Dentro dela, crie o arquivo SKILL.md com TUDO o que está entre ===COMEÇO DA SKILL=== e ===FIM DA SKILL===, sem mudar nada. Se o arquivo já existir, troque pelo texto novo.\n'+
+        (ARQUIVOS[nome]?'2b. Na mesma pasta, crie também cada arquivo que vem depois da skill, entre ===ARQUIVO nome=== e ===FIM DO ARQUIVO===, com o conteúdo exato, sem mudar nada.\n':'')+
+        '3. Depois de salvar, use a skill '+nome+' para o meu pedido:\n\n'+pedido+'\n\n'+
+        '===COMEÇO DA SKILL===\n'+SKILLS[nome]+'\n===FIM DA SKILL===';
+      Object.keys(ARQUIVOS[nome]||{}).forEach(function(f){ completo+='\n\n===ARQUIVO '+f+'===\n'+ARQUIVOS[nome][f]+'\n===FIM DO ARQUIVO==='; });
+      COMPLETO[id]=completo;
+      var linhas=SKILLS[nome].split('\n').length+Object.keys(ARQUIVOS[nome]||{}).reduce(function(s,f){return s+ARQUIVOS[nome][f].split('\n').length},0), pre=$('#'+id);
+      pre.textContent='Instale esta skill do curso do Ryan e depois faça o meu pedido:\n\n'+pedido+'\n';
+      var m=document.createElement('span'); m.className='mais'; m.textContent='+ a skill completa ('+linhas+' linhas) vai junto quando você aperta Copiar.'; pre.appendChild(m);
+    }
+    // Perguntas do painel (etapa 04): montadas uma vez, guardadas junto do perfil
+    var EST_P={light:'Modern Light',dark:'Dark Pro',glass:'Glass / Aurora',bold:'Bold Modern'}, COR_P={cafe:'Café',oliva:'Oliva',grafite:'Grafite',rosa:'Rosa',azul:'Azul',lavanda:'Lavanda',terracota:'Terracota',energia:'Energia'};
+    if(!perfil.painel){ var ac=ler(KA,{})||{}; perfil.painel={nome:ac.nome||'',apelido:'',tiktok:ac.tiktok||'',meta:'',estilo:'light',cor:'cafe'}; }
+    if(!EST_P[perfil.painel.estilo]) perfil.painel.estilo=({classico:'light',grafico:'light',minimal:'light',clean:'light',editorial:'light',colorful:'bold'})[perfil.painel.estilo]||'light';
+    if(!COR_P[perfil.painel.cor]) perfil.painel.cor='cafe';
+    if(perfil.painel.email===undefined){ var ac2=ler(KA,{})||{}; perfil.painel.email=ac2.email||''; perfil.painel.supa_url=''; perfil.painel.supa_key=''; }
+    var P=perfil.painel, qp=$('#quizPainel');
+    if(qp&&!qp.dataset.ok){
+      qp.dataset.ok='1';
+      function campo(k,rot,ph,tipo){
+        var d=document.createElement('div'); d.className='item';
+        var l=document.createElement('label'); l.className='lbl'; l.htmlFor='qp_'+k; l.textContent=rot;
+        var i=document.createElement('input'); i.className='inp'; i.id='qp_'+k; i.placeholder=ph; i.value=P[k]||''; i.autocomplete='off';
+        if(tipo){i.type=tipo; i.inputMode='numeric'; i.min='0'; i.step='500';}
+        i.addEventListener('input',function(){
+          var v=i.value.trim();
+          if(k==='supa_url'||k==='supa_key'){
+            // aceita a linha inteira do Supabase (NEXT_PUBLIC_...=valor) e até as duas linhas juntas
+            var mu=v.match(/https:\/\/[a-z0-9]+\.supabase\.co/i), mk=v.match(/sb_(publishable|secret)_[A-Za-z0-9_-]+|eyJ[A-Za-z0-9._-]{20,}/);
+            if(k==='supa_url'&&mu) v=mu[0]; else if(k==='supa_key'&&mk) v=mk[0]; else if(/=/.test(v)) v=v.split('=').slice(1).join('=').trim();
+            if(mu&&mk){ perfil.painel.supa_url=mu[0]; perfil.painel.supa_key=mk[0]; var ou=document.getElementById(k==='supa_url'?'qp_supa_key':'qp_supa_url'); if(ou) ou.value=k==='supa_url'?mk[0]:mu[0]; }
+            if(v!==i.value) i.value=v;
+          }
+          perfil.painel[k]=v; gravar(KP,perfil); atualizarPedidos(); });
+        d.appendChild(l); d.appendChild(i); return d;
+      }
+      function chips(k,rot,ops){
+        var d=document.createElement('div'); d.className='item';
+        var l=document.createElement('div'); l.className='lbl'; l.textContent=rot;
+        var ch=document.createElement('div'); ch.className='chips';
+        Object.keys(ops).forEach(function(o){
+          var b=document.createElement('button'); b.type='button'; b.className='chip'; b.textContent=ops[o]; b.dataset.v=o;
+          b.setAttribute('aria-pressed',P[k]===o?'true':'false');
+          b.addEventListener("click",function(){ perfil.painel[k]=o; gravar(KP,perfil); [].forEach.call(ch.children,function(x){x.setAttribute('aria-pressed',x.dataset.v===o?'true':'false')}); atualizarPedidos(); });
+          ch.appendChild(b);
+        });
+        d.appendChild(l); d.appendChild(ch); return d;
+      }
+      qp.appendChild(campo('nome','Seu nome','ex.: Juliana Souza'));
+      qp.appendChild(campo('apelido','Como quer ser chamado no painel','ex.: Ju'));
+      qp.appendChild(campo('tiktok','Seu @ do TikTok','@seuuser'));
+      qp.appendChild(campo('meta','Quanto quer vender no mês, em reais (pode deixar em branco)','ex.: 5000','number'));
+      // Seu Supabase (só a chave pública; a secreta nunca)
+      var tsb=document.createElement('div'); tsb.className='item'; tsb.innerHTML='<div class="lbl">Seu Supabase <small>No seu projeto, clique em <b>Connect</b> no topo e escolha a aba <b>Framework</b> (a primeira, não a MCP). Copie o que vem depois do <b>=</b> em <b>SUPABASE_URL</b> e em <b>SUPABASE_PUBLISHABLE_KEY</b>. A chave também fica em Project Settings &gt; API Keys.</small></div>'; qp.appendChild(tsb);
+      qp.appendChild(campo('supa_url','URL do projeto (Project URL)','https://xxxx.supabase.co'));
+      qp.appendChild(campo('supa_key','Chave pública (Publishable key, ou anon public)','sb_publishable_...'));
+      var av=document.createElement('p'); av.className='nota'; av.id='qpAvisoChave'; av.hidden=true; av.innerHTML='<b>Essa é a chave secreta.</b> Apague e cole a <b>Publishable</b>: a secreta nunca sai do Supabase.'; qp.appendChild(av);
+      qp.appendChild(campo('email','E-mail que vai ser o seu login no painel','voce@email.com'));
+      // Estilo e cor com prévia pequena do painel (muda na hora)
+      var CORV={cafe:['#2B241C','#A8864A','#E2BE7E','#F6F2EB'],oliva:['#3F4A2B','#7C8B4A','#BFD27A','#F3F3EA'],grafite:['#1C1C1E','#6E6E73','#D4D4DA','#EDEDEF'],rosa:['#6E2F48','#C45A80','#F48FB4','#FBF1F4'],azul:['#14213D','#3D6FB6','#7DB2FF','#EEF2F8'],lavanda:['#3B2A5C','#8E6CCB','#B9A0FF','#F4F1FA'],terracota:['#6B2E1F','#C46A3C','#F2A274','#F8F1EA'],energia:['#14452F','#D9A514','#F5C842','#F3F5EE']};
+      var DESC={light:'Claro e limpo, borda fina',dark:'Fundo escuro, destaque com brilho',glass:'Luzes da cor e cards de vidro',bold:'Blocos de cor e títulos grandes'};
+      if(!document.getElementById('cssPrevia')){var cs=document.createElement('style');cs.id='cssPrevia';cs.textContent=
+        '.estilos-p{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}'+
+        '.mini .cd{min-width:0;white-space:nowrap}'+
+        '.mini.m2{height:132px;display:flex;font-weight:600}.m2 .sd2{width:46px;flex:none;padding:8px 6px;display:flex;flex-direction:column;gap:5px}.m2 .sd2 b{width:12px;height:12px;border-radius:4px;display:block;margin:0 0 4px 2px}'+
+        '.m2 .sd2 i{display:flex;flex-direction:column;gap:2px;padding:4px 4px}.m2 .sd2 u{display:block;height:3px;border-radius:2px;width:85%}'+
+        '.m2 .ct2{flex:1;min-width:0;padding:9px 8px;display:flex;flex-direction:column;gap:7px}.m2 .t2{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'+
+        '.m2 .cs2{display:flex;gap:5px}.m2 .c2{flex:1;min-width:0;padding:6px 5px;display:flex;flex-direction:column;gap:2px;white-space:nowrap}.m2 .c2 small{font-size:7.5px}.m2 .c2 span{font-size:10.5px;font-weight:700}'+
+        '.m2 .bar2{height:5px;border-radius:99px;overflow:hidden;margin-top:auto}.m2 .bar2 i{display:block;height:100%;width:72%;border-radius:99px}'+
+        '.mini .sd{position:absolute;left:0;top:0;bottom:0;width:22px;display:flex;flex-direction:column;align-items:center;gap:6px;padding-top:7px}.mini .sd i{width:9px;height:9px;border-radius:3px;display:block;opacity:.55}.mini .sd i.at{opacity:1}.mini .ct{margin-left:22px}'+
+        '.est-op{border:1px solid var(--borda);background:rgba(255,255,255,.7);border-radius:18px;padding:8px 8px 10px;text-align:left;cursor:pointer;font:inherit;color:inherit}'+
+        '.est-op[aria-pressed="true"]{border-color:var(--preto);box-shadow:0 0 0 2px var(--preto)}'+
+        '.est-op b{display:block;margin:8px 4px 0;font-size:14px}.est-op small{display:block;margin:2px 4px 0;font-size:12px;opacity:.7}'+
+        '.mini{height:118px;border-radius:12px;overflow:hidden;background:#fbf8f3;border:1px solid rgba(0,0,0,.06);font:600 8px/1.2 var(--sans);position:relative}'+
+        '.mini .bar{height:16px;display:flex;align-items:center;padding:0 7px;color:#fff;font-size:7.5px}'+
+        '.mini .ttl{padding:6px 8px 4px;font-size:9px;color:#222}'+
+        '.mini .cards{display:flex;gap:5px;padding:0 8px}.mini .cd{flex:1;background:#fff;border:1px solid rgba(0,0,0,.08);border-radius:5px;padding:4px 5px}'+
+        '.mini .cd i{display:block;font-style:normal;font-size:10px;margin-top:2px}.mini .ln{height:5px;border-radius:3px;margin:5px 8px 0;background:rgba(0,0,0,.08)}'+
+        '.mini .big{font-size:17px;padding:2px 8px 0;letter-spacing:-.5px}.mini svg{position:absolute;left:0;right:0;bottom:0;width:100%;height:58px}'+
+        '.mini .tiles{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:6px 8px}.mini .tl{border-radius:12px;height:34px;display:flex;align-items:center;gap:5px;padding:0 7px}'+
+        '.mini .tl span{width:14px;height:14px;border-radius:50%;display:block;flex:none}'+
+        '.cor-op .bola{width:14px;height:14px;border-radius:50%;display:inline-block;vertical-align:-2px;margin-right:6px;border:1px solid rgba(0,0,0,.15)}';
+        document.head.appendChild(cs);}
+      function nomeP(){ return (perfil.painel.apelido||(perfil.painel.nome||'').split(' ')[0]||'Ju'); }
+      function mini(e,c){
+        var a=CORV[c]||CORV.cafe, n=esc(nomeP()), d=a[0], k=a[1], v=a[2], f=a[3];
+        function menu(bg,lin,at,atTx,raio,borda){ return '<div class="sd2" style="background:'+bg+';'+(borda||'')+'"><b style="background:'+atTx+'"></b>'+[1,0,0,0].map(function(x){return '<i style="'+(x?'background:'+at+';':'')+'border-radius:'+raio+'"><u style="background:'+(x?atTx:lin)+'"></u><u style="background:'+(x?atTx:lin)+';width:60%"></u></i>'}).join('')+'</div>'; }
+        if(e==='dark') return '<div class="mini m2" style="background:#0A0C10;color:#EDEFF4">'+menu('#0D1016','#3a4150',v+'22',v,'4px','border-right:1px solid #ffffff12')+
+          '<div class="ct2"><div class="t2" style="font-family:\'Space Grotesk\',sans-serif">Bom dia, '+n+'.</div><div class="cs2">'+
+          '<div class="c2" style="background:#11151C;border:1px solid '+v+'99;box-shadow:0 0 14px '+v+'55;border-radius:6px"><small style="color:#9AA2B1">Vendas</small><span style="font-family:\'Space Grotesk\',sans-serif">R$ 4.820</span></div>'+
+          '<div class="c2" style="background:#11151C;border:1px solid #ffffff14;border-radius:6px"><small style="color:#9AA2B1">Comissão</small><span>R$ 610</span></div></div>'+
+          '<div class="bar2" style="background:#ffffff14"><i style="background:linear-gradient(90deg,'+k+','+v+');box-shadow:0 0 8px '+v+'"></i></div></div></div>';
+        if(e==='glass') return '<div class="mini m2" style="background:radial-gradient(70% 70% at 0% 0%,'+k+'cc,transparent 70%),radial-gradient(60% 70% at 100% 0%,'+v+'dd,transparent 70%),radial-gradient(70% 60% at 70% 100%,'+d+'66,transparent 70%),'+f+';color:#1B1D24">'+
+          menu('rgba(255,255,255,.45)','#ffffffcc','rgba(255,255,255,.95)',d,'6px','border-right:1px solid rgba(255,255,255,.8);backdrop-filter:blur(8px)')+
+          '<div class="ct2"><div class="t2">Bom dia, '+n+'.</div><div class="cs2">'+
+          '<div class="c2" style="background:linear-gradient(135deg,'+d+','+k+');color:#fff;border-radius:12px;box-shadow:0 6px 14px '+d+'44"><small style="opacity:.8">Vendas</small><span>R$ 4.820</span></div>'+
+          '<div class="c2" style="background:rgba(255,255,255,.55);border:1px solid rgba(255,255,255,.95);border-radius:12px;backdrop-filter:blur(8px)"><small style="opacity:.65">Comissão</small><span>R$ 610</span></div></div>'+
+          '<div class="bar2" style="background:rgba(255,255,255,.7)"><i style="background:linear-gradient(90deg,'+k+','+d+')"></i></div></div></div>';
+        if(e==='bold') return '<div class="mini m2" style="background:'+f+';color:#101114">'+menu(d,'#ffffff55','#fff',d,'99px')+
+          '<div class="ct2"><div class="t2" style="font-family:\'Space Grotesk\',sans-serif;font-size:15px;letter-spacing:-.04em;font-weight:700">Bom dia, '+n+'.</div><div class="cs2">'+
+          '<div class="c2" style="background:'+d+';color:#fff;border-radius:14px"><small style="opacity:.75">Vendas</small><span style="font-family:\'Space Grotesk\',sans-serif;font-size:11px">R$ 4.820</span></div>'+
+          '<div class="c2" style="background:#fff;border-radius:14px"><small style="opacity:.6">Comissão</small><span style="font-family:\'Space Grotesk\',sans-serif;font-size:11px">R$ 610</span></div></div>'+
+          '<div class="bar2" style="background:#10111414;height:7px"><i style="background:'+d+'"></i></div></div></div>';
+        return '<div class="mini m2" style="background:#F6F7F9;color:#111318">'+menu('#fff','#e3e6eb',d+'18',d,'4px','border-right:1px solid #E6E8EC')+
+          '<div class="ct2"><div class="t2">Bom dia, '+n+'.</div><div class="cs2">'+
+          '<div class="c2" style="background:#fff;border:1px solid #E6E8EC;box-shadow:inset 2px 0 0 '+d+';border-radius:5px"><small style="color:#5B6270">Vendas</small><span style="color:'+d+'">R$ 4.820</span></div>'+
+          '<div class="c2" style="background:#fff;border:1px solid #E6E8EC;border-radius:5px"><small style="color:#5B6270">Comissão</small><span>R$ 610</span></div></div>'+
+          '<div class="bar2" style="background:#EEF0F3"><i style="background:'+d+'"></i></div></div></div>';
+      }
+      function esc(s){return String(s).replace(/[&<>"]/g,function(x){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[x]})}
+      var dE=document.createElement('div'); dE.className='item';
+      dE.innerHTML='<div class="lbl">Estilo do painel <small>Toque para escolher. A prévia já mostra a sua cor. Não gostou depois? Dá pra trocar estilo e cor quando quiser no painel, em <b>Meu perfil &gt; Aparência</b>.</small></div><div class="estilos-p" id="qpEstilos"></div>';
+      var dC=document.createElement('div'); dC.className='item';
+      dC.innerHTML='<div class="lbl">Cor do painel</div><div class="chips" id="qpCores"></div>';
+      qp.appendChild(dE); qp.appendChild(dC);
+      window.desenharPrevia=function(){
+        var P2=perfil.painel;
+        $('#qpEstilos').innerHTML=Object.keys(EST_P).map(function(e){return '<button type="button" class="est-op" data-v="'+e+'" aria-pressed="'+(P2.estilo===e)+'">'+mini(e,P2.cor)+'<b>'+EST_P[e]+'</b><small>'+DESC[e]+'</small></button>'}).join('');
+        $('#qpCores').innerHTML=Object.keys(COR_P).map(function(c){var a=CORV[c];return '<button type="button" class="chip cor-op" data-v="'+c+'" aria-pressed="'+(P2.cor===c)+'"><span class="bola" style="background:linear-gradient(135deg,'+a[0]+' 50%,'+a[1]+' 50%)"></span>'+COR_P[c]+'</button>'}).join('');
+      };
+      $('#qpEstilos').addEventListener('click',function(ev){var b=ev.target.closest('[data-v]'); if(!b) return; perfil.painel.estilo=b.dataset.v; gravar(KP,perfil); desenharPrevia(); atualizarPedidos();});
+      $('#qpCores').addEventListener('click',function(ev){var b=ev.target.closest('[data-v]'); if(!b) return; perfil.painel.cor=b.dataset.v; gravar(KP,perfil); desenharPrevia(); atualizarPedidos();});
+      ['qp_nome','qp_apelido'].forEach(function(id){ $('#'+id).addEventListener('input',function(){ desenharPrevia(); }); });
+      desenharPrevia();
+    }
+    var tk=(P.tiktok||'').replace(/\s/g,''); if(tk&&tk.charAt(0)!=='@') tk='@'+tk;
+    var meta=parseInt(String(P.meta||'').replace(/\D/g,''),10);
+    var secreta=/sb_secret|service_role/i.test(P.supa_key||''), chaveOk=!!P.supa_key&&!secreta;
+    colar('pInstPainel','painel-tiktok-shop','Crie o meu painel de TikTok Shop já com o meu perfil:\n'+
+      '- Nome: '+(P.nome||'(não informado)')+'\n'+
+      '- Como quero ser chamado: '+(P.apelido||(P.nome||'').split(' ')[0]||'(não informado)')+'\n'+
+      '- @ do TikTok: '+(tk||'(não informado)')+'\n'+
+      '- Meta de vendas no mês: '+(meta?'R$ '+meta.toLocaleString('pt-BR'):'ainda não sei')+'\n'+
+      '- Vídeos por dia: '+nVideos()+'\n'+
+      '- Estilo do painel: '+(EST_P[P.estilo]||'Modern Light')+'\n'+
+      '- Cor do painel: '+(COR_P[P.cor]||'Café')+'\n\n'+
+      'Meu Supabase:\n'+
+      '- URL do projeto: '+(P.supa_url||'(ainda não criei: me ensine)')+'\n'+
+      '- Chave publishable: '+(chaveOk?P.supa_key:'(ainda não tenho: me mostre onde fica)')+'\n'+
+      '- E-mail do meu login: '+(P.email||'(não informado)'));
+    var avc=$('#qpAvisoChave'); if(avc) avc.hidden=!secreta;
+    colar('pInstRoteiro','roteiro-tiktok-shop',
+'Faça o treino com o meu jeito:\n'+
+'- Nicho: '+nicho+'\n'+
+'- Estilo: '+estilo+'\n'+
+'- Duração: '+v('duracao','20 a 25 s')+' (cerca de '+palavras()+' palavras)\n'+
+'- Benefícios por vídeo: '+v('beneficios','3')+'\n'+
+'- Gancho preferido: '+gancho+'\n'+
+'Depois me peça os links dos meus vídeos que venderam.');
+    if($('#pDiaRoteiro')) $('#pDiaRoteiro').textContent='Roteiro para [nome do produto]';
+    colar('pInstEditar','editar-tiktok-shop','Edite os vídeos desta pasta e coloque os prontos na fila Para postar.\nComo eu gosto: '+edicaoTxt()+'\nMe mostre o primeiro antes de fazer o resto.');
+    if($('#pDiaEditar')) $('#pDiaEditar').textContent='Edite os vídeos desta pasta.';
+    colar('pInstAgendar','agendar-tiktok-shop','Crie as pastas de postagem se ainda não existirem e agende a minha fila "Para postar": '+nVideos()+' vídeos por dia, '+horarios()+', em sequência a partir do primeiro dia livre.\n'+divisao()+'\nLegenda curta com o gancho e hashtags do meu nicho ('+nicho+'). Me mostre a tabela antes de agendar.');
+    if($('#pDiaAgendar')) $('#pDiaAgendar').textContent='Agende os vídeos da minha fila Para postar.';
+
+    $$('.pers').forEach(function(e){e.remove()});
+    if(!ok){ ['pInstRoteiro','pInstEditar','pInstAgendar'].filter(function(id){return $('#'+id)}).map(function(id){return $('#'+id).closest('.prompt').querySelector('.hd span')}).forEach(function(s){var p=document.createElement('span');p.className='pers nao';p.textContent=' · responda a etapa 03';s.appendChild(p)}); }
+  }
+
+  /* ---------- Copiar ---------- */
+  $$('[data-copiar]').forEach(function(b){
+    b.addEventListener('click',function(){
+      var id=b.getAttribute('data-copiar'), el=document.getElementById(id), txt=COMPLETO[id]||el.textContent;
+      function ok(){b.textContent='Copiado';b.classList.add('ok');setTimeout(function(){b.textContent='Copiar';b.classList.remove('ok')},2000)}
+      function alt(){ var t=document.createElement('textarea'); t.value=txt; t.style.position='fixed'; t.style.opacity='0'; document.body.appendChild(t); t.select();
+        var deu=false; try{deu=document.execCommand('copy')}catch(e){} document.body.removeChild(t); if(deu) ok(); else toast('Não consegui copiar. Tente de novo.'); }
+      try{navigator.clipboard.writeText(txt).then(ok,alt)}catch(e){alt()}
+    });
+  });
+
+  /* ---------- Progresso ---------- */
+  function progresso(){
+    var bx=$$('[data-c]'), feitos=0;
+    bx.forEach(function(b){ if(b.checked) feitos++; });
+    var p=bx.length?Math.round(feitos/bx.length*100):0;
+    $('#pct').textContent=p+'%'; $('#pctTop').textContent=p+'%';
+    $('#cnt').textContent=feitos+' de '+bx.length+' marcados';
+    $('#ringfg').setAttribute('stroke-dashoffset',(125.66*(1-p/100)).toFixed(2));
+    $$('[data-etapa]').forEach(function(s){
+      var c=s.querySelectorAll('[data-c]'), todos=c.length>0;
+      [].forEach.call(c,function(i){if(!i.checked)todos=false});
+      var a=document.querySelector('.nav a[href="#'+s.id+'"]'); if(a) a.classList.toggle('feito',todos);
+      s.classList.toggle('feita',todos); s.dataset.feita=todos?'1':'';
+    });
+    var agora=proxima(), etapas=$$('[data-etapa]');
+    etapas.forEach(function(s){ var st=s.querySelector('.cab-etapa .st'); if(!st) return;
+      var f=s.dataset.feita==='1'; st.className='st'+(f?' feito':(s===agora?' agora':''));
+      st.textContent=f?'Feito':(s===agora?'Agora':'Depois'); });
+    var cp=$('#cntPainel'); if(cp) cp.textContent=etapas.filter(function(s){return s.dataset.feita==='1'}).length+' de '+etapas.length+' feitas';
+  }
+  function proxima(){ var l=$$('[data-etapa]'); for(var i=0;i<l.length;i++) if(l[i].dataset.feita!=='1') return l[i]; return l[l.length-1]; }
+  function abrirEtapa(s,sim,rolar){ if(!s) return; s.classList.toggle('aberta',sim); var b=s.querySelector('.cab-etapa'); if(b) b.setAttribute('aria-expanded',sim?'true':'false');
+    if(sim&&rolar) setTimeout(function(){ s.scrollIntoView({behavior:'smooth',block:'start'}); },30); }
+  function montarAcordeao(){
+    $$('[data-etapa]').forEach(function(s,i){
+      if(s.querySelector('.cab-etapa')) return;
+      var tag=s.querySelector('.tag'), h2=s.querySelector('h2'), grupo=tag?tag.querySelector('.g').textContent:'';
+      var corpo=document.createElement('div'); corpo.className='corpo'; corpo.id='corpo-'+s.id;
+      while(h2.nextSibling) corpo.appendChild(h2.nextSibling);
+      var b=document.createElement('button'); b.type='button'; b.className='cab-etapa'; b.setAttribute('aria-expanded','false'); b.setAttribute('aria-controls',corpo.id);
+      b.innerHTML='<span class="num">'+(i<9?'0':'')+(i+1)+'</span><span class="tit"><small></small></span><span class="st"></span><span class="seta" aria-hidden="true">›</span>';
+      b.querySelector('.tit small').textContent=grupo; b.querySelector('.tit').insertAdjacentHTML('beforeend',h2.innerHTML);
+      if(tag) tag.remove(); h2.remove(); s.appendChild(b); s.appendChild(corpo);
+      b.addEventListener('click',function(){ abrirEtapa(s,!s.classList.contains('aberta'),false); });
+    });
+  }
+  document.addEventListener('click',function(e){
+    var c=e.target.closest('[data-continuar]'); if(c){ e.preventDefault(); fecharMenu(); abrirEtapa(proxima(),true,true); return; }
+    var a=e.target.closest('a[href^="#e"]'); if(a){ var s=document.getElementById(a.getAttribute('href').slice(1)); if(s&&s.hasAttribute('data-etapa')){ e.preventDefault(); fecharMenu(); abrirEtapa(s,true,true); try{history.replaceState(null,'','#'+s.id)}catch(_){} } }
+  });
+  $$('[data-c]').forEach(function(b){
+    b.checked=!!checks[b.getAttribute('data-c')];
+    b.addEventListener('change',function(){ checks[b.getAttribute('data-c')]=b.checked; gravar(KC,checks); progresso(); });
+  });
+
+  /* ---------- Menu: etapa atual e gaveta ---------- */
+  function marcarAtual(){
+    var atual=null;
+    $$('[data-etapa]').forEach(function(s){ if(s.getBoundingClientRect().top<160) atual=s.id; });
+    $$('.nav a').forEach(function(a){ a.classList.toggle('on',a.getAttribute('href')==='#'+atual); });
+  }
+  function fecharMenu(){ $('#side').classList.remove('aberto'); $('#veu').hidden=true; }
+  $('#abrirMenu').addEventListener('click',function(){ $('#side').classList.add('aberto'); $('#veu').hidden=false; });
+  $('#veu').addEventListener('click',fecharMenu);
+  $$('.nav a').forEach(function(a){ a.addEventListener('click',fecharMenu); });
+
+  var iniciado=false;
+  function iniciar(){
+    if(iniciado) return; iniciado=true;
+    montarAcordeao(); montarQuiz(); atualizarPedidos(); progresso(); marcarAtual();
+    addEventListener('scroll',marcarAtual,{passive:true});
+    var alvo=location.hash?document.getElementById(location.hash.slice(1)):null;
+    if(alvo&&alvo.hasAttribute('data-etapa')) abrirEtapa(alvo,true,true); else abrirEtapa(proxima(),true,false);
+  }
+  if(ler(KA,null)) abrirGuia();
+})();
+</script>
+</body>
+</html>
