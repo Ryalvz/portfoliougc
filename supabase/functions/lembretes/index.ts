@@ -216,6 +216,9 @@ const EMAIL_PROPOSTAS = "heyryan.ugc@gmail.com";
 const PALAVRAS_PROPOSTA = ["ugc", "\"user generated\"", "proposta", "parceria", "publi", "publicidade", "publipost", "campanha", "collab", "collaboration", "briefing", "orçamento", "orcamento", "\"mídia kit\"", "\"media kit\"", "midiakit", "influenciador", "influencer", "creator", "\"criador de conteúdo\"", "permuta", "cachê", "cache", "job", "contratar", "freela"];
 const BUSCA_NOVAS = `{in:inbox in:spam} is:unread newer_than:1d -category:promotions -category:social -category:forums -category:updates (${PALAVRAS_PROPOSTA.join(" OR ")})`;
 // Contrato ou documento pra assinar (Clicksign, DocuSign...): avisa sempre, mesmo vindo de plataforma automática
+// Proposta, publi, orçamento ou cachê no assunto: avisa mesmo se vier de plataforma, "atendimento@" ou "noreply@"
+const PROPOSTA_FORTE = /proposta|or[cç]amento|\bpubli\b|publicidade|cach[eê]|briefing|\bbudget\b|\bquote\b|convite (para|pra) (a )?(campanha|publi|a[cç][aã]o)/i;
+const BUSCA_FORTES = `{in:inbox in:spam} is:unread newer_than:1d subject:(proposta OR orçamento OR orcamento OR publi OR publicidade OR cachê OR cache OR briefing OR budget OR quote OR convite)`;
 const PALAVRAS_DOCUMENTO = ["contrato", "assinar", "assinatura", "clicksign", "docusign", "zapsign", "autentique", "d4sign", "\"adobe sign\"", "\"please sign\""];
 const BUSCA_DOCUMENTOS = `{in:inbox in:spam} is:unread newer_than:1d (${PALAVRAS_DOCUMENTO.join(" OR ")})`;
 const DOCUMENTO_RE = /assinar (o |seu |este )?documento|\bassine\b|solicita[çc][ãa]o de assinatura|assinatura (pendente|solicitada|do documento|do contrato)|documento assinado|documento (pendente|aguardando)|\bcontrato\b|please sign|signature request|sign(ed)? (the |this |your )?document|docusign/i;
@@ -390,8 +393,8 @@ async function propostasNovas() {
     return r.json();
   };
   // Lê também a caixa de spam (às vezes o e-mail da marca cai lá)
-  const [lista, docs] = await Promise.all([BUSCA_NOVAS, BUSCA_DOCUMENTOS].map((q) => api("messages?maxResults=20&includeSpamTrash=true&q=" + encodeURIComponent(q))));
-  const ids: string[] = [...new Set([...(lista.messages || []), ...(docs.messages || [])].map((x: any) => x.id))];
+  const [lista, docs, fortes] = await Promise.all([BUSCA_NOVAS, BUSCA_DOCUMENTOS, BUSCA_FORTES].map((q) => api("messages?maxResults=20&includeSpamTrash=true&q=" + encodeURIComponent(q))));
+  const ids: string[] = [...new Set([...(lista.messages || []), ...(docs.messages || []), ...(fortes.messages || [])].map((x: any) => x.id))];
   if (!ids.length) return [];
   const [{ data: avisados }, { data: adiados }] = await Promise.all([
     db.from("lembretes_enviados").select("chave").in("chave", ids.map((id) => "prop-" + id)),
@@ -414,11 +417,12 @@ async function propostasNovas() {
       || /bulk|list|junk/i.test(cab("Precedence")) || (cab("Auto-Submitted") && !/^no$/i.test(cab("Auto-Submitted")))
       || REMETENTE_ROBO.test(email.split("@")[0]) || (destino.trim() && !destino.includes(EMAIL_PROPOSTAS))
       || ASSUNTO_ROBO.test(cab("Subject")) || escondidos.has("dominio-" + dominio) || email === EMAIL_PROPOSTAS;
+    const forte = PROPOSTA_FORTE.test(cab("Subject")) && !ASSUNTO_ROBO.test(cab("Subject")) && !escondidos.has("dominio-" + dominio) && email !== EMAIL_PROPOSTAS;
     const documento = DOCUMENTO_RE.test(cab("Subject")) && !ASSUNTO_ROBO.test(cab("Subject")) && email !== EMAIL_PROPOSTAS;
     // Marca como avisado de qualquer jeito, para não conferir de novo
     await db.from("lembretes_enviados").insert({ chave: "prop-" + id });
     if (documento) novas.push({ id, nome, assunto: (/assinad[oa]|signed|conclu[ií]d|completed/i.test(cab("Subject")) ? "Contrato assinado: " : "Contrato pra assinar: ") + (cab("Subject") || "(sem assunto)") });
-    else if (!robo) novas.push({ id, nome, assunto: cab("Subject") || "(sem assunto)" });
+    else if (!robo || forte) novas.push({ id, nome, assunto: cab("Subject") || "(sem assunto)" });
   }
   return novas;
 }
