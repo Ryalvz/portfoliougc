@@ -4179,6 +4179,8 @@ const OPORTUNIDADE_RE = /campanha|proposta|publi|candidatura|candidate|oportunid
 const NAO_OPORTUNIDADE_RE = /senha|password|login|entrou|signed in|device|dispositivo|c[óo]digo|code|verifica|confirma[çc][ãa]o|pedido|entrega|order|pagamento|payment|fatura|documento|identidade|welcome|bem-vind|cadastro|recebemos/i;
 const DOMINIOS_PESSOAIS = ["gmail", "hotmail", "outlook", "yahoo", "icloud", "live", "bol", "uol", "terra", "me"];
 // Remetentes que são robôs ou envio em massa (o começo do e-mail, antes do @)
+// Assunto que é proposta de trabalho de verdade: aparece e avisa mesmo vindo de plataforma ou de "atendimento@"/"noreply@"
+const PROPOSTA_FORTE = /proposta|or[cç]amento|\bpubli\b|publicidade|cach[eê]|briefing|\bbudget\b|\bquote\b|convite (para|pra) (a )?(campanha|publi|a[cç][aã]o)/i;
 const REMETENTE_ROBO = /^(no-?reply|nao-?responda|naoresponda|donotreply|do-?not-?reply|notifica|notification|news|newsletter|marketing|mkt|comunicad|todomundo|support|suporte|faleconosco|fale-conosco|atendimento|info|noticias|alert|update|mailer|bounce|hello|team|time|equipe|contato-?noreply|campanhas|digest|community|comunidade|creators?|parcerias-?noreply|plataforma)/i;
 const gm = { token: null, expira: 0, escopo: "", carregando: false, emails: null, erro: "", busca: "", verAutomaticos: false, aberto: null, conversa: null, carregandoConversa: false };
 let propostasNovas = 0;
@@ -4302,6 +4304,9 @@ const ASSUNTO_ROBO = /\[#?\d{3,}\]|novo dispositivo|fez login|c[oó]digo de (ver
 function motivoAutomatico(m, de) {
   // Resposta de uma pessoa a uma conversa (Re:) aparece sempre, mesmo que ela use ferramenta de e-mail
   if (/^\s*(re|res|resp|enc|fw|fwd)\s*:/i.test(cabecalho(m, "Subject")) && !/resposta autom|automatic reply|out of office|aus[êe]ncia/i.test(cabecalho(m, "Subject")) && !REMETENTE_ROBO.test(de.email.split("@")[0])) return "";
+  // Proposta, publi, orçamento ou cachê no assunto: é trabalho, não esconde
+  const assunto = cabecalho(m, "Subject");
+  if (PROPOSTA_FORTE.test(assunto) && !ASSUNTO_ROBO.test(assunto) && !(de.dominio && adiado("dominio-" + de.dominio))) return "";
   if (cabecalho(m, "List-Unsubscribe") || cabecalho(m, "List-Id")) return "envio em massa";
   if (cabecalho(m, "Feedback-ID") || cabecalho(m, "X-Feedback-Id") || cabecalho(m, "X-SES-Outgoing") || cabecalho(m, "X-Mailer")) return "ferramenta de envio em massa";
   if (/^yes/i.test(cabecalho(m, "X-Spam-Flag")) || /^yes/i.test(cabecalho(m, "X-Spam-Status"))) return "marcado como spam";
@@ -4338,7 +4343,7 @@ async function lerPropostas() {
         novo: (m.labelIds || []).includes("UNREAD") && !adiado("lido-" + m.id), automatico: motivoAutomatico(m, de),
         documento: DOCUMENTO_RE.test(cabecalho(m, "Subject")) && !ASSUNTO_ROBO.test(cabecalho(m, "Subject")),
         oportunidade: OPORTUNIDADE_RE.test(cabecalho(m, "Subject") + " " + (m.snippet || "")) && !NAO_OPORTUNIDADE_RE.test(cabecalho(m, "Subject")),
-        importante: /proposta|or[cç]amento|briefing|contrato|campanha|parceria|pagamento|valor|cach[eê]|budget|rate|paid|collab/i.test(cabecalho(m, "Subject") + " " + (m.snippet || "")) };
+        importante: /proposta|or[cç]amento|\bpubli\b|briefing|contrato|campanha|parceria|pagamento|valor|cach[eê]|budget|rate|paid|collab/i.test(cabecalho(m, "Subject") + " " + (m.snippet || "")) };
     }).filter((x) => x.de.email !== EMAIL_PROPOSTAS)
       // Uma conversa vira um cartão só (o e-mail mais recente dela)
       .filter((x, i, todos) => todos.findIndex((y) => y.thread === x.thread) === i);
