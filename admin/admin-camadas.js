@@ -127,7 +127,11 @@ const CAMADAS = (() => {
   function montar(ctx, l) {
     const tam = Math.max(8, Number(l.tam) || 40), larg = Math.max(40, Number(l.w) || 400), entre = Number(l.entre) || 1.25;
     ctx.letterSpacing = `${Number(l.letra) || 0}px`;
-    ctx.font = fonte(l, "n", tam); const esp = ctx.measureText(" ").width;
+    // Espaço entre palavras: o natural da fonte, nunca menor que 1/4 da letra, e sem o aperto do "espaço entre letras"
+    // (com letra apertada e fonte pesada o espaço sumia e as palavras grudavam: "minharegra")
+    ctx.font = fonte(l, "n", tam); ctx.letterSpacing = "0px";
+    const esp = Math.max(ctx.measureText(" ").width, tam * 0.24) + Math.max(0, -(Number(l.letra) || 0));
+    ctx.letterSpacing = `${Number(l.letra) || 0}px`;
     const linhas = [];
     String(l.texto || "").split("\n").forEach((par) => {
       let atual = { itens: [], w: 0 };
@@ -1016,6 +1020,7 @@ const CAMADAS = (() => {
     const { w: W, h: H } = dims(car), s = car.slides[i], n = car.slides.length;
     cv.width = W; cv.height = H;
     const ctx = cv.getContext("2d"), tema = temaDe(car, s), camadas = garantir(car, i);
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high"; // prints e fotos reduzidas ficam nítidas
     idAtual = car.estilo === "ryan" ? idDaPagina(car, s) : null;
     fundo(ctx, car, s, tema, W, H, aoCarregar);
     // O que passa da borda direita do slide anterior continua aqui (efeito de arrastar)
