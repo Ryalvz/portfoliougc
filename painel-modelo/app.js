@@ -299,9 +299,11 @@
       async perfil() { return ok(await sb.from("perfis").select("*").eq("user_id", uid).maybeSingle()); },
       async salvarPerfil(p) { ok(await sb.from("perfis").upsert({ ...p, user_id: uid }, { onConflict: "user_id" })); },
       async pedidos() {
-        const todos = [], passo = 1000;
+        const todos = [], passo = 1000; let semConta = false;
         for (let i = 0; i < 200000; i += passo) {
-          const lote = ok(await sb.from("pedidos").select("pedido_id,sku_id,produto_id,produto,loja,itens,reembolsados,status,tipo_conteudo,conteudo_id,gmv,comissao_est,comissao_real,data,liquidado_em").order("data", { ascending: true }).order("pedido_id").range(i, i + passo - 1));
+          let lote;
+          try { lote = ok(await sb.from("pedidos").select("pedido_id,sku_id,produto_id,produto,loja,itens,reembolsados,status,tipo_conteudo,conteudo_id,gmv,comissao_est,comissao_real,data,liquidado_em" + (semConta ? "" : ",conta")).order("data", { ascending: true }).order("pedido_id").range(i, i + passo - 1)); }
+          catch (e) { if (!semConta && /conta/i.test(String(e && e.message))) { semConta = true; i -= passo; continue; } throw e; }
           todos.push(...lote); if (lote.length < passo) break;
         }
         return todos;
@@ -389,7 +391,7 @@
           const st = r() < (lojaEx === "Som Total Shop" ? .28 : .05) ? "Inelegível" : idade > 18 ? "Liquidado" : r() < .1 ? "AwaitingPayment" : "Pendente";
           const itens = r() < .12 ? 2 : 1, gmv = Math.round(preco * itens * 100) / 100, ce = Math.round(gmv * com * 100) / 100;
           const cs = conteudos[k];
-          B.pedidos.push({ pedido_id: String(5800000000000000000n + BigInt(++n * 7919)), sku_id: String(1729000000 + k), produto_id: String(1730000000000 + k * 11), produto: nome, loja: lojaEx, itens, reembolsados: 0, status: st,
+          B.pedidos.push({ pedido_id: String(5800000000000000000n + BigInt(++n * 7919)), sku_id: String(1729000000 + k), produto_id: String(1730000000000 + k * 11), produto: nome, loja: lojaEx, conta: k % 3 === 2 ? "c2" : "", itens, reembolsados: 0, status: st,
             tipo_conteudo: r() < .9 ? "Vídeo" : "Vitrine", conteudo_id: cs[Math.floor(r() * cs.length)], gmv, comissao_est: ce, comissao_real: st === "Liquidado" ? ce : null,
             data: `${d}T${pad(8 + Math.floor(r() * 15))}:${pad(Math.floor(r() * 60))}:00`, liquidado_em: st === "Liquidado" ? `${somaDias(d, 15)}T10:00:00` : null });
         }
@@ -430,7 +432,40 @@
     };
   }
 
-  const API = DEMO ? apiDemo() : apiSupabase();
+  const API0 = DEMO ? apiDemo() : apiSupabase();
+  /* ---------- PERFIS DO TIKTOK: uma pessoa pode ter mais de um @ no mesmo painel ---------- */
+  // "" = perfil principal (o @ de Meu perfil). Os outros ficam em perfis.contas: [{ id: "c2", nome: "@outro", meta: 5000 }]
+  const contas = () => (S.perfil && Array.isArray(S.perfil.contas) ? S.perfil.contas : []);
+  const temContas = () => contas().length > 0;
+  const verTodos = () => temContas() && S.conta === "*";
+  const contaAtiva = () => (!temContas() || S.conta === "*" ? "" : S.conta || "");
+  const daConta = (l) => (!temContas() || S.conta === "*" ? l : (l || []).filter((x) => (x.conta || "") === (S.conta || "")));
+  const comConta = (x) => (contaAtiva() ? { ...x, conta: contaAtiva() } : x);
+  const nomeConta = (id) => (id ? ((contas().find((c) => c.id === id) || {}).nome || id) : ((S.perfil && (S.perfil.tiktok || "").trim()) || "Perfil principal"));
+  const API = { ...API0,
+    videos: async (i, f) => daConta(await API0.videos(i, f)),
+    novosVideos: async (l) => API0.novosVideos(l.map(comConta)),
+    amostras: async () => daConta(await API0.amostras()),
+    novaAmostra: async (a) => API0.novaAmostra(comConta(a))
+  };
+  const chaveConta = () => "painel-perfil-tiktok:" + ((S.user && S.user.id) || "anon");
+  function lerConta() { if (!temContas()) return ""; let v = null; try { v = localStorage.getItem(chaveConta()); } catch (_) {} return v === "*" || v === "" || contas().some((c) => c.id === v) ? v : "*"; }
+  async function trocarConta(v) {
+    S.conta = v; try { localStorage.setItem(chaveConta(), v); } catch (_) {}
+    reprocessar(); S.mes = (S.ultimo || hojeISO()).slice(0, 7);
+    [S.amostras, S.videosHoje] = await Promise.all([API.amostras(), API.videos(hojeISO(), hojeISO())]);
+    montarMenu(); irPara(S.tela);
+  }
+  // Meta do mês do que está na tela: a do perfil escolhido, ou a soma em "Todos"
+  function metaAtual() {
+    if (!temContas() || S.conta === "") return +S.perfil.meta_gmv || 0;
+    if (S.conta === "*") return (+S.perfil.meta_gmv || 0) + contas().reduce((a, c) => a + (+c.meta || 0), 0);
+    return +((contas().find((c) => c.id === S.conta) || {}).meta) || 0;
+  }
+  async function salvarMeta(valor) {
+    if (contaAtiva()) { const l = contas().map((c) => (c.id === contaAtiva() ? { ...c, meta: valor } : c)); await API.salvarPerfil({ contas: l }); S.perfil.contas = l; }
+    else { await API.salvarPerfil({ meta_gmv: valor }); S.perfil.meta_gmv = valor; }
+  }
 
   /* =============================================================
      ESTADO E LEITURA
@@ -446,11 +481,11 @@
       chave: p.produto_id || "n:" + nome, nome, ...(() => { const c = catDoProduto(pr, p.produto); return { categoria: c.cat, subcategoria: c.sub }; })() };
   }
   function reprocessar() {
-    S.pedidos = S.brutos.map(enriquecer);
+    S.pedidos = (temContas() && S.conta !== "*" ? S.brutos.filter((p) => (p.conta || "") === (S.conta || "")) : S.brutos).map(enriquecer);
     S.ultimo = S.pedidos.length ? S.pedidos[S.pedidos.length - 1].dia : "";
   }
   async function carregarTudo() {
-    const [perfil, brutos, produtos, importacoes, amostras] = await Promise.all([API.perfil(), API.pedidos(), API.produtos(), API.importacoes(), API.amostras()]);
+    const [perfil, brutos, produtos, importacoes, amostras] = await Promise.all([API.perfil(), API.pedidos(), API.produtos(), API.importacoes(), API0.amostras()]);
     S.perfil = perfil || { nome: "", meta_videos: 15 };
     // Primeiro login: o perfil que o aluno preencheu no guia (config.js) entra sozinho
     const ini = CFG.PERFIL_INICIAL;
@@ -460,7 +495,8 @@
     }
     aplicarAparencia(S.perfil.estilo, S.perfil.cor, S.perfil.cor_custom);
     aplicarMenuRecolhido(lerMenuRecolhido());
-    S.brutos = brutos; S.importacoes = importacoes; S.amostras = amostras;
+    S.conta = lerConta(); S.amostras = daConta(amostras);
+    S.brutos = brutos; S.importacoes = importacoes;
     S.produtos = {}; produtos.forEach((p) => { S.produtos[p.produto_id] = p; });
     reprocessar();
     await conferirEsgotados();
@@ -603,7 +639,7 @@
     return { valor: Math.max(1000, Math.round(base * (1 + g) / 1000) * 1000), motivo, g };
   }
   function cardMeta(per, t) {
-    const mes = MESES[+per.mes.slice(5, 7) - 1], meta = +S.perfil.meta_gmv || 0, sug = sugestaoMeta();
+    const mes = MESES[+per.mes.slice(5, 7) - 1], meta = metaAtual(), sug = verTodos() ? null : sugestaoMeta();
     if (!meta) return `<div class="card meta-card"><div class="card-topo"><h2>Meta de ${mes}</h2></div>
       <p class="vazio">Você ainda não definiu quanto quer vender este mês.</p>
       ${sug ? `<div class="sugestao"><span class="rot">Sugestão pelo seu crescimento</span><div class="meta-num">${real(sug.valor)}</div><p class="frase">${esc(sug.motivo)}</p>
@@ -697,6 +733,7 @@
     $("#marcaSinal").textContent = (((S.perfil.nome || "").trim() || "M")[0]).toUpperCase();
     $("#sair").dataset.dica = nomeQuem ? "Sair (" + nomeQuem + ")" : "Sair";
     $("#telaNomeCel").textContent = NOMES[S.tela] || "";
+    const bc = $("#boxConta"); if (bc) { bc.hidden = !temContas(); if (temContas()) $("#selConta").innerHTML = [["*", "Todos os perfis"], ["", nomeConta("")], ...contas().map((c) => [c.id, c.nome || c.id])].map(([v, n]) => `<option value="${esc(v)}"${S.conta === v ? " selected" : ""}>${esc(n)}</option>`).join(""); }
   }
   async function irPara(tela, manterRolagem) {
     const y = window.scrollY;
@@ -802,7 +839,7 @@
   async function telaHoje(el) {
     const hoje = hojeISO(), d = new Date(), nome = (S.perfil.apelido || "").trim() || (S.perfil.nome || "").split(" ")[0];
     const saud = d.getHours() < 12 ? "Bom dia" : d.getHours() < 18 ? "Boa tarde" : "Boa noite";
-    const cab = `<div class="cabeca"><div><h1>${saud}${nome ? ", <em>" + esc(nome) + "</em>" : ""}.</h1><p>${SEMANA[d.getDay()]}, ${d.getDate()} de ${MESES[d.getMonth()]}. ${S.ultimo ? `Pedidos lidos até ${dataBR(S.ultimo)}.` : ""}</p></div></div>`;
+    const cab = `<div class="cabeca"><div><h1>${saud}${nome ? ", <em>" + esc(nome) + "</em>" : ""}.</h1><p>${SEMANA[d.getDay()]}, ${d.getDate()} de ${MESES[d.getMonth()]}. ${S.ultimo ? `Pedidos lidos até ${dataBR(S.ultimo)}.` : ""}${temContas() ? ` <span class="selo novo">${verTodos() ? "Todos os perfis" : esc(nomeConta(S.conta))}</span>` : ""}</p></div></div>`;
     if (!S.pedidos.length) { telaComecando(el, cab); return; }
     const ref = S.ultimo, antes = somaDias(ref, -1);
     const tRef = somar(entre(ref, ref)), tAntes = somar(entre(antes, antes));
@@ -1133,10 +1170,11 @@
           <li>Aqui no painel, toque em <b>Escolher arquivo</b> e pegue o relatório. Faça isso toda manhã: o Hoje e as sugestões ficam em dia.</li></ol>
           <p class="frase">Dica: instale o painel como app (em Meu perfil). Aí, de manhã, ele já te lembra de subir o extrato.</p></div>
       </div>
+      ${temContas() ? `<div class="card escolhe-conta"><label class="lbl" for="contaImp">Este extrato é de qual perfil?</label><select class="inp" id="contaImp">${[["", nomeConta("")], ...contas().map((c) => [c.id, c.nome || c.id])].map(([v, n]) => `<option value="${esc(v)}"${(contaAtiva() || "") === v ? " selected" : ""}>${esc(n)}</option>`).join("")}</select><p class="frase">Escolha antes de subir. Cada perfil baixa o próprio extrato na Central de afiliados dele.</p></div>` : ""}
       <p class="aviso neutro" id="progresso" hidden></p>
       <div class="card"><div class="card-topo"><h2>Arquivos importados</h2></div>
-        <div class="tabela-caixa"><table><thead><tr><th>Quando</th><th>Arquivo</th><th>Período</th><th class="num">Linhas</th><th class="num">Novas</th><th class="num">Atualizadas</th></tr></thead><tbody>
-        ${S.importacoes.map((i) => `<tr><td>${dataBR(String(i.importado_em).slice(0, 10))}</td><td><div class="td-nome" style="max-width:260px">${esc(i.arquivo)}</div></td><td>${dataBR(String(i.periodo_ini || "").slice(0, 10))} a ${dataBR(String(i.periodo_fim || "").slice(0, 10))}</td><td class="num">${num(i.linhas)}</td><td class="num">${num(i.novas)}</td><td class="num">${num(i.atualizadas)}</td></tr>`).join("") || '<tr><td colspan="6"><p class="vazio">Nenhum arquivo ainda.</p></td></tr>'}
+        <div class="tabela-caixa"><table><thead><tr><th>Quando</th>${temContas() ? "<th>Perfil</th>" : ""}<th>Arquivo</th><th>Período</th><th class="num">Linhas</th><th class="num">Novas</th><th class="num">Atualizadas</th></tr></thead><tbody>
+        ${S.importacoes.map((i) => `<tr><td>${dataBR(String(i.importado_em).slice(0, 10))}</td>${temContas() ? `<td>${esc(nomeConta(i.conta || ""))}</td>` : ""}<td><div class="td-nome" style="max-width:260px">${esc(i.arquivo)}</div></td><td>${dataBR(String(i.periodo_ini || "").slice(0, 10))} a ${dataBR(String(i.periodo_fim || "").slice(0, 10))}</td><td class="num">${num(i.linhas)}</td><td class="num">${num(i.novas)}</td><td class="num">${num(i.atualizadas)}</td></tr>`).join("") || '<tr><td colspan="6"><p class="vazio">Nenhum arquivo ainda.</p></td></tr>'}
         </tbody></table></div></div>`;
     const solta = $("#solta"), inp = $("#arquivo");
     inp.addEventListener("change", () => inp.files[0] && importar(inp.files[0]));
@@ -1169,6 +1207,7 @@
       if (faltam.length) throw new Error(`Faltam as colunas ${faltam.map((k) => `"${COLUNAS[k]}"`).join(" e ")} no arquivo.`);
       const cel = (l, k) => (idx[k] >= 0 ? l[idx[k]] : ""), txt = (l, k, max) => { const v = String(cel(l, k) ?? "").trim(); return v ? v.slice(0, max) : null; };
       const agora = new Date().toISOString(), porChave = new Map(); let semData = 0;
+      const contaImp = temContas() ? ($("#contaImp") ? $("#contaImp").value : contaAtiva()) : "";
       linhas.slice(h + 1).forEach((l) => {
         const pedido = txt(l, "pedido_id", 40); if (!pedido) return;
         const data = lerData(cel(l, "data")); if (!data) { semData++; return; }
@@ -1178,7 +1217,8 @@
           itens: Math.round(lerNum(cel(l, "itens"))), reembolsados: Math.round(lerNum(cel(l, "reembolsados"))), status: st === "AwaitingPayment" ? "Aguardando pagamento" : st,
           tipo_conteudo: txt(l, "tipo_conteudo", 40), conteudo_id: txt(l, "conteudo_id", 40), gmv: lerNum(cel(l, "gmv")),
           comissao_est: Math.round((lerNum(cel(l, "padrao")) + lerNum(cel(l, "anuncios")) + lerNum(cel(l, "bonus"))) * 100) / 100,
-          comissao_real: recebido || null, data, liquidado_em: lerData(cel(l, "liquidado")), atualizado_em: agora
+          comissao_real: recebido || null, data, liquidado_em: lerData(cel(l, "liquidado")), atualizado_em: agora,
+          ...(contaImp ? { conta: contaImp } : {})
         });
       });
       const lista = [...porChave.values()];
@@ -1187,12 +1227,12 @@
       const ja = await API.statusExistentes([...new Set(lista.map((p) => p.pedido_id))]);
       await API.gravarPedidos(lista, (n) => diz(`Gravando pedidos... ${num(n)} de ${num(lista.length)}`));
       const novas = lista.filter((p) => !ja.has(p.pedido_id + "|" + p.sku_id)).length, datas = lista.map((p) => p.data).sort();
-      await API.novaImportacao({ arquivo: String(arq.name || "").slice(0, 200), periodo_ini: datas[0], periodo_fim: datas[datas.length - 1], linhas: lista.length, novas, atualizadas: lista.length - novas });
+      await API.novaImportacao({ arquivo: String(arq.name || "").slice(0, 200), periodo_ini: datas[0], periodo_fim: datas[datas.length - 1], linhas: lista.length, novas, atualizadas: lista.length - novas, ...(contaImp ? { conta: contaImp } : {}) });
       diz("Atualizando o painel...");
       [S.brutos, S.importacoes] = await Promise.all([API.pedidos(), API.importacoes()]);
       reprocessar(); S.mes = (S.ultimo || hojeISO()).slice(0, 7);
       const voltaram = await conferirEsgotados(true);
-      toast(`Pronto: ${plural(novas, "pedido novo", "pedidos novos")} e ${plural(lista.length - novas, "atualizado", "atualizados")}.${semData ? ` ${semData} linhas sem data ficaram de fora.` : ""}${voltaram ? " " + voltaram : ""}`);
+      toast(`${temContas() ? nomeConta(contaImp) + ": " : "Pronto: "}${plural(novas, "pedido novo", "pedidos novos")} e ${plural(lista.length - novas, "atualizado", "atualizados")}.${semData ? ` ${semData} linhas sem data ficaram de fora.` : ""}${voltaram ? " " + voltaram : ""}`);
       irPara("hoje");
     } catch (e) { console.error(e); diz(traduz(e)); toast(traduz(e), true); }
   }
@@ -1213,8 +1253,10 @@
         <div><button class="btn" type="submit">Salvar</button></div>
       </form></div>
       </div>
+      <div class="card" id="cardContas"></div>
       <div class="card" id="cardAparencia"></div>
       <div class="card" id="cardApp"><div class="card-topo"><h2>App no celular</h2><span class="sub">ícone na tela inicial e lembrete de manhã pra subir o extrato</span></div>${comoInstalar()}</div>`;
+    desenharContas();
     S.ap = { estilo: normEstilo(p.estilo || document.documentElement.dataset.estilo), cor: normPaleta(p.cor || document.documentElement.dataset.paleta), custom: normCustom(p.cor_custom) };
     desenharAparencia();
     const u = $("#pUsarSug"); if (u) u.addEventListener("click", () => { $("#pMetaG").value = sug.valor; toast("Sugestão colocada. Clique em Salvar."); });
@@ -1227,6 +1269,29 @@
       try { await API.salvarPerfil(novo); Object.assign(S.perfil, novo); montarMenu(); toast("Perfil salvo."); } catch (er) { toast(traduz(er), true); }
     });
   }
+
+  /* ---------- PERFIS DO TIKTOK (Meu perfil) ---------- */
+  function desenharContas() {
+    const box = $("#cardContas"); if (!box) return;
+    const l = S.rascContas || contas().map((c) => ({ ...c }));
+    box.innerHTML = `<div class="card-topo"><h2>Perfis do TikTok</h2><span class="sub">tem mais de um @? Cada um com os seus pedidos, vídeos, amostras e meta</span></div>
+      <ul class="lista-foco contas">
+        <li><span class="nome">${esc(nomeConta(""))}</span><span class="selo">principal</span><small>O @ dos seus dados acima. A meta dele é a de "Quanto quero vender no mês".</small></li>
+        ${l.map((c, k) => `<li class="conta-linha"><div class="dupla"><div><label class="lbl" for="cN${k}">@ do perfil</label><input class="inp" id="cN${k}" data-conta-nome="${k}" value="${esc(c.nome || "")}" placeholder="@outroperfil"></div>
+          <div><label class="lbl" for="cM${k}">Meta de vendas no mês (R$)</label><input class="inp" id="cM${k}" data-conta-meta="${k}" type="number" min="0" step="500" value="${esc(c.meta || "")}" placeholder="opcional"></div></div>
+          <button class="link" type="button" data-acao="conta-remover" data-k="${k}">tirar este perfil</button></li>`).join("")}
+      </ul>
+      <div class="controles" style="margin-top:12px"><button class="btn sec pequeno" type="button" data-acao="conta-add">Adicionar perfil</button><button class="btn pequeno" type="button" data-acao="conta-salvar">Salvar perfis</button></div>
+      <p class="frase">Com 2 perfis ou mais, aparece um seletor no menu: veja um perfil por vez ou "Todos os perfis" somados. Na aba Importar você escolhe de qual perfil é cada extrato. Tirar um perfil não apaga os pedidos dele: eles continuam em "Todos os perfis".</p>`;
+    box.querySelectorAll("[data-conta-nome],[data-conta-meta]").forEach((i) => i.addEventListener("input", () => { S.rascContas = lerRascContas(); }));
+  }
+  function lerRascContas() {
+    const l = (S.rascContas || contas()).map((c) => ({ ...c }));
+    $$("#cardContas [data-conta-nome]").forEach((i) => { const k = +i.dataset.contaNome; if (l[k]) l[k].nome = i.value.trim().slice(0, 60); });
+    $$("#cardContas [data-conta-meta]").forEach((i) => { const k = +i.dataset.contaMeta; if (l[k]) l[k].meta = Number(i.value) || null; });
+    return l;
+  }
+  function novoIdConta(l) { let n = 2; while (l.some((c) => c.id === "c" + n)) n++; return "c" + n; }
 
   /* ---------- APARÊNCIA: escolher estilo, paleta e ver a prévia ---------- */
   // Prévia feita com as peças reais do painel (cartões, números, gráfico, lista) e os números do próprio usuário
@@ -1553,7 +1618,7 @@ REGRAS: entregue tudo agora, sem fazer perguntas antes: o que faltar fica [entre
       else if (a === "ap-aplicar") { t.disabled = true; const ok = await salvarAparencia(S.ap.estilo, S.ap.cor, S.ap.custom); montarMenu(); desenharAparencia(); if (ok) toast(`${ESTILOS[S.ap.estilo][0]} com ${PALETAS[S.ap.cor][0]} aplicado.`); }
       else if (a === "ap-restaurar") { S.ap = { ...APARENCIA_PADRAO }; const ok = await salvarAparencia(S.ap.estilo, S.ap.cor, null); desenharAparencia(); if (ok) toast("Aparência padrão restaurada."); }
       else if (a === "usar-sugestao") {
-        const sg = sugestaoMeta(); if (!sg) return; await API.salvarPerfil({ meta_gmv: sg.valor }); S.perfil.meta_gmv = sg.valor; toast(`Meta de ${real(sg.valor)} salva.`); irPara(S.tela);
+        const sg = sugestaoMeta(); if (!sg) return; await salvarMeta(sg.valor); toast(`Meta de ${real(sg.valor)} salva${temContas() ? " para " + nomeConta(contaAtiva()) : ""}.`); irPara(S.tela);
       } else if (a === "periodo") { S.mes = t.dataset.v === "tudo" ? "tudo" : (S.ultimo || hojeISO()).slice(0, 7); irPara("resultados");
       } else if (a === "mes") { S.mes = mesDesloca(S.mes, +t.dataset.n); irPara("resultados"); }
       else if (a === "passo") {
@@ -1600,6 +1665,17 @@ REGRAS: entregue tudo agora, sem fazer perguntas antes: o que faltar fica [entre
       else if (a === "ped-per") { S.pedPer = t.dataset.v; irPara("pedidos", true); }
       else if (a === "ped-filtro") { S.pedFiltro = t.dataset.v; irPara("pedidos", true); }
       else if (a === "esgotado") { await marcarEsgotado(t.dataset.id, true); }
+      else if (a === "conta-add") { const l = lerRascContas(); l.push({ id: novoIdConta(l), nome: "", meta: null }); S.rascContas = l; desenharContas(); const ult = $$("#cardContas [data-conta-nome]").pop(); if (ult) ult.focus(); }
+      else if (a === "conta-remover") { const l = lerRascContas(); l.splice(+t.dataset.k, 1); S.rascContas = l; desenharContas(); }
+      else if (a === "conta-salvar") {
+        const l = lerRascContas().map((c) => { let n = (c.nome || "").trim(); if (n && n[0] !== "@") n = "@" + n; return { id: c.id, nome: n, ...(c.meta ? { meta: c.meta } : {}) }; }).filter((c) => c.nome);
+        const tinha = temContas();
+        await API.salvarPerfil({ contas: l }); S.perfil.contas = l; S.rascContas = null;
+        if (!l.length) S.conta = ""; else if (!tinha || (S.conta !== "*" && S.conta !== "" && !l.some((c) => c.id === S.conta))) S.conta = "*";
+        try { localStorage.setItem(chaveConta(), S.conta); } catch (_) {}
+        reprocessar(); [S.amostras, S.videosHoje] = await Promise.all([API.amostras(), API.videos(hojeISO(), hojeISO())]);
+        montarMenu(); desenharContas(); toast(l.length ? `${plural(l.length + 1, "perfil", "perfis")} no painel. Troque no menu.` : "Voltou a ter um perfil só.");
+      }
       else if (a === "instalar-app") { if (pedidoInstalar) { pedidoInstalar.prompt(); try { await pedidoInstalar.userChoice; } catch (_) {} pedidoInstalar = null; irPara(S.tela, true); } }
       else if (a === "fechar-instalar") { marcarDia("painel-sem-instalar"); irPara(S.tela, true); }
       else if (a === "fechar-lembrete") { marcarDia("painel-sem-lembrete"); irPara(S.tela, true); }
@@ -1651,6 +1727,7 @@ REGRAS: entregue tudo agora, sem fazer perguntas antes: o que faltar fica [entre
     try { const v = localStorage.getItem(chaveMenu()); if (v !== null) return v === "1"; } catch (_) {}
     return !!(S.perfil && S.perfil.menu_recolhido);
   }
+  $("#selConta").addEventListener("change", (e) => { trocarConta(e.target.value); });
   $("#alternaMenu").addEventListener("click", () => {
     const sim = !$("#app").classList.contains("recolhido");
     aplicarMenuRecolhido(sim);

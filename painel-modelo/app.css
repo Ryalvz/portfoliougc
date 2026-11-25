@@ -511,7 +511,7 @@ ol.passos { margin: 0; padding-left: 20px; display: flex; flex-direction: column
 .ap-acoes { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; margin-top: 14px; }
 /* Prévia: um pedaço do painel de verdade, com o tema escolhido */
 .tema-amostra { background: var(--creme); color: var(--texto); font-family: var(--fonte-texto, var(--sans)); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 10px; overflow: hidden; }
-.ap-estilo .tema-amostra { zoom: .5; pointer-events: none; height: 290px; }
+.ap-estilo .tema-amostra { zoom: .5; pointer-events: none; height: auto; }
 .ap-previa .tema-amostra { border: 1px solid var(--linha); }
 .tema-amostra .ta-topo { display: flex; justify-content: space-between; align-items: flex-end; gap: 10px; }
 .tema-amostra .ta-topo h3 { margin: 0; font-family: var(--fonte-titulo); font-weight: var(--peso-titulo); font-size: 30px; line-height: 1.05; letter-spacing: var(--esp-titulo); }
@@ -724,6 +724,23 @@ td select.sel-cat { min-width: 190px; max-width: 240px; }
 .ta-corpo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
 .tema-amostra.ta-hoje, .tema-amostra.ta-resultados { padding: 10px; }
 @media (max-width: 720px) { .ap-previa .ta-lado { display: none; } }
+
+/* Perfis do TikTok: seletor no menu e cadastro em Meu perfil */
+.seletor-conta { padding: 0 4px 8px; }
+.seletor-conta .lbl { color: var(--menu-txt2); margin-bottom: 4px; }
+.seletor-conta select.inp { background: var(--menu-hover); color: var(--menu-txt); border-color: var(--menu-borda); padding: 7px 10px; font-size: 13px; }
+.seletor-conta select.inp option { color: #111318; background: #fff; }
+@media (min-width: 901px) { .app.recolhido .seletor-conta { display: none; } }
+.contas .conta-linha { display: block; }
+.contas .conta-linha .link { margin-top: 6px; }
+.escolhe-conta select.inp { max-width: 320px; }
+
+/* Miniaturas dos modelos: a prévia aparece inteira (sem cortar o gráfico e os Principais) */
+.ap-estilo { justify-content: flex-start; }
+.ap-estilo .tema-amostra .card { --card-pad: 14px; }
+.ap-estilo .ta-grade { grid-template-columns: 1fr; }
+.ap-estilo .ta-grade > .card:nth-child(2) { display: none; }
+.ap-estilo .tema-amostra .graf { max-height: 150px; }
 
 /* Site do aluno: sem "Criar conta" */
 .abas-entrada, #formCriar { display: none !important; }
