@@ -755,6 +755,41 @@
   if ("serviceWorker" in navigator && (location.protocol === "https:" || /^(localhost|127\.0\.0\.1)$/.test(location.hostname))) window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
   const lerDia = (k) => { try { return localStorage.getItem(k) === hojeISO(); } catch (_) { return false; } };
   const marcarDia = (k) => { try { localStorage.setItem(k, hojeISO()); } catch (_) {} };
+  // Lembrete da manhã por notificação (o envio fica no Supabase do curso; só guarda o endereço de notificação e a hora)
+  const LEMBRETE = { url: "https://heajflidlhgmzvhpjtuy.supabase.co/functions/v1/lembrete-push", chave: "BIMzUgEF1Qtd09pPqrd2ceH0SsJqRKYJuWj1OhTRbup7WDZwBBypAy4o1CdZHTUfgp7DB-rSuAb8vo3Iz0pgZkA" };
+  const pushPossivel = () => "serviceWorker" in navigator && "PushManager" in window && "Notification" in window && location.protocol === "https:";
+  const b64u = (t) => { const p = "=".repeat((4 - t.length % 4) % 4), b = atob((t + p).replace(/-/g, "+").replace(/_/g, "/")); return Uint8Array.from(b, (c) => c.charCodeAt(0)); };
+  const lerLembrete = () => { try { return +localStorage.getItem("painel-lembrete-hora") || 0; } catch (_) { return 0; } };
+  async function chamarLembrete(rota, corpo) {
+    const r = await fetch(LEMBRETE.url + "/" + rota, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) });
+    const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.erro || "Não consegui falar com o lembrete agora. Tente de novo em alguns minutos."); return j;
+  }
+  async function ativarLembrete(hora) {
+    if (ehIOS() && !instalado()) throw new Error("No iPhone, primeiro instale o painel na tela inicial (Safari > Compartilhar > Adicionar à Tela de Início) e abra por lá.");
+    const perm = await Notification.requestPermission();
+    if (perm !== "granted") throw new Error("As notificações ficaram bloqueadas. Libere em Ajustes do celular > Notificações > Meu painel e tente de novo.");
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64u(LEMBRETE.chave) });
+    await chamarLembrete("inscrever", { sub: sub.toJSON(), hora, painel: location.origin + location.pathname });
+    try { localStorage.setItem("painel-lembrete-hora", String(hora)); } catch (_) {}
+    await chamarLembrete("testar", { endpoint: sub.endpoint }).catch(() => {});
+  }
+  async function desligarLembrete() {
+    const reg = await navigator.serviceWorker.ready, sub = await reg.pushManager.getSubscription();
+    if (sub) { await chamarLembrete("sair", { endpoint: sub.endpoint }).catch(() => {}); await sub.unsubscribe().catch(() => {}); }
+    try { localStorage.removeItem("painel-lembrete-hora"); } catch (_) {}
+  }
+  function cardLembrete() {
+    if (!pushPossivel()) return `<div class="lembrete-push"><p class="lbl">Lembrete de manhã</p><p class="frase" style="margin-top:0">${ehIOS() ? "No iPhone, o lembrete chega depois de instalar o painel na tela inicial (iOS 16.4 ou mais novo). Instale e abra o painel por lá para ligar." : "Este navegador não recebe notificação. Abra o painel no Chrome do celular para ligar o lembrete."}</p></div>`;
+    const h = lerLembrete(), ligado = h && Notification.permission === "granted";
+    const horas = [6, 7, 8, 9, 10, 11].map((x) => `<option value="${x}"${(h || 8) === x ? " selected" : ""}>${x}h</option>`).join("");
+    return `<div class="lembrete-push"><p class="lbl">Lembrete de manhã</p>
+      ${ligado ? `<p class="ok-msg">Ligado: todo dia às ${h}h chega "Hora de subir o extrato", mesmo com o app fechado.</p>
+        <div class="controles" style="margin-top:10px"><button class="btn sec pequeno" type="button" data-acao="lembrete-testar">Mandar um teste</button><button class="link" type="button" data-acao="lembrete-desligar">Desligar</button></div>`
+      : `<p class="frase" style="margin-top:0">Toda manhã chega uma notificação no celular lembrando de subir o extrato, mesmo com o app fechado.</p>
+        <div class="controles"><label class="lbl" for="lembreteHora" style="margin:0">Hora</label><select class="inp" id="lembreteHora" style="width:auto">${horas}</select><button class="btn pequeno" type="button" data-acao="lembrete-ligar">Ativar lembrete</button></div>`}</div>`;
+  }
   function comoInstalar() {
     if (instalado()) return `<p class="ok-msg">O painel já está instalado como app neste aparelho.</p>`;
     if (pedidoInstalar) return `<p class="frase" style="margin-top:0">Um toque e ele vira app, com ícone na tela inicial.</p><button class="btn pequeno" type="button" data-acao="instalar-app">Instalar no celular</button>`;
@@ -1100,7 +1135,7 @@
     const naAgenda = new Map(); v.forEach((x) => naAgenda.set(x.produto, (naAgenda.get(x.produto) || 0) + 1));
     const ROT = { principal: "Principal", com_vendas: "Com vendas", teste: "Teste" };
     const itens = lista.map((x, k) => { const tem = (naAgenda.get(x.produto) || 0) > 0; if (tem) naAgenda.set(x.produto, naAgenda.get(x.produto) - 1);
-      return `<li class="${tem ? "ok" : ""}"><span class="n">${k + 1}</span><span class="hora">${horasSug[k] || "--:--"}</span><span class="prod" title="${esc(x.produto)}">${esc(x.produto)}${x.tag ? ` <em>${esc(x.tag)}</em>` : ""}</span><span class="bl bl-${x.bloco}">${ROT[x.bloco] || "Teste"}</span>${tem ? '<span class="ja">na agenda</span>' : passado ? "" : `<button class="x mais" type="button" data-acao="sug-add" data-k="${k}" aria-label="Pôr na agenda" title="Pôr na agenda">+</button>`}</li>`; }).join("");
+      return `<li class="${tem ? "ok" : ""}"><span class="n">${k + 1}</span><span class="hora">${horasSug[k] || "--:--"}</span><span class="prod" title="${esc(x.produto)}"><b>${esc(x.produto)}</b>${x.tag ? `<em>${esc(x.tag)}</em>` : ""}</span><span class="bl bl-${x.bloco}">${ROT[x.bloco] || "Teste"}</span>${tem ? '<span class="ja">na agenda</span>' : passado ? "" : `<button class="x mais" type="button" data-acao="sug-add" data-k="${k}" aria-label="Pôr na agenda" title="Pôr na agenda">+</button>`}</li>`; }).join("");
     const falta = sug.N - lista.length;
     const cardSug = passado ? "" : `<div class="card sugestao-dia"><div class="card-topo"><h2>Sugestão do dia</h2><span class="sub">${sug.N} vídeos${sug.comecando ? " de teste" : ` · ${sug.nP} principais, ${sug.nC} com vendas, ${sug.nT} testes`}</span><span class="espaco"></span>${lista.length ? `<button class="btn pequeno" type="button" data-acao="sug-lancar">Lançar na agenda de ${S.diaVideos === hojeISO() ? "hoje" : dataBR(S.diaVideos)}</button>` : ""}</div>
         ${lista.length ? `<ol class="sug-lista">${itens}</ol>` : '<p class="vazio">Ainda sem sugestão. Cadastre em Amostras os produtos que quer testar, ou importe seus pedidos.</p>'}
@@ -1255,7 +1290,7 @@
       </div>
       <div class="card" id="cardContas"></div>
       <div class="card" id="cardAparencia"></div>
-      <div class="card" id="cardApp"><div class="card-topo"><h2>App no celular</h2><span class="sub">ícone na tela inicial e lembrete de manhã pra subir o extrato</span></div>${comoInstalar()}</div>`;
+      <div class="card" id="cardApp"><div class="card-topo"><h2>App no celular</h2><span class="sub">ícone na tela inicial e lembrete de manhã pra subir o extrato</span></div>${comoInstalar()}${cardLembrete()}</div>`;
     desenharContas();
     S.ap = { estilo: normEstilo(p.estilo || document.documentElement.dataset.estilo), cor: normPaleta(p.cor || document.documentElement.dataset.paleta), custom: normCustom(p.cor_custom) };
     desenharAparencia();
@@ -1665,6 +1700,9 @@ REGRAS: entregue tudo agora, sem fazer perguntas antes: o que faltar fica [entre
       else if (a === "ped-per") { S.pedPer = t.dataset.v; irPara("pedidos", true); }
       else if (a === "ped-filtro") { S.pedFiltro = t.dataset.v; irPara("pedidos", true); }
       else if (a === "esgotado") { await marcarEsgotado(t.dataset.id, true); }
+      else if (a === "lembrete-ligar") { t.disabled = true; try { await ativarLembrete(+$("#lembreteHora").value || 8); toast("Lembrete ligado. Mandei uma notificação de teste agora."); } catch (er) { toast(er.message || traduz(er), true); } irPara(S.tela, true); }
+      else if (a === "lembrete-testar") { try { const reg = await navigator.serviceWorker.ready, sub = await reg.pushManager.getSubscription(); if (!sub) throw new Error("O lembrete não está ligado neste celular."); await chamarLembrete("testar", { endpoint: sub.endpoint }); toast("Mandei. Deve chegar em alguns segundos."); } catch (er) { toast(er.message || traduz(er), true); } }
+      else if (a === "lembrete-desligar") { await desligarLembrete(); toast("Lembrete desligado neste celular."); irPara(S.tela, true); }
       else if (a === "conta-add") { const l = lerRascContas(); l.push({ id: novoIdConta(l), nome: "", meta: null }); S.rascContas = l; desenharContas(); const ult = $$("#cardContas [data-conta-nome]").pop(); if (ult) ult.focus(); }
       else if (a === "conta-remover") { const l = lerRascContas(); l.splice(+t.dataset.k, 1); S.rascContas = l; desenharContas(); }
       else if (a === "conta-salvar") {

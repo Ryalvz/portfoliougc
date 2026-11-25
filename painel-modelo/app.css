@@ -69,7 +69,7 @@ select.inp { padding: 8px 10px; }
 .principal { margin-left: var(--menu-w); min-width: 0; }
 .topo-celular { display: none; }
 .faixa-demo { background: var(--ambar-bg); color: var(--ambar); font-size: 12.5px; font-weight: 600; text-align: center; padding: 7px 16px; }
-.conteudo { max-width: 1180px; margin: 0 auto; padding-block: 34px 80px; padding-left: max(28px, env(safe-area-inset-left, 0px)); padding-right: max(28px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 18px; }
+.conteudo { max-width: none; margin: 0; padding-block: 34px 80px; padding-left: max(28px, env(safe-area-inset-left, 0px)); padding-right: max(28px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 18px; }
 
 @media (max-width: 900px) {
   .menu { transform: translateX(-102%); transition: transform .25s; box-shadow: var(--sombra-alta); padding-top: calc(20px + env(safe-area-inset-top, 0px)); }
@@ -741,6 +741,17 @@ td select.sel-cat { min-width: 190px; max-width: 240px; }
 .ap-estilo .ta-grade { grid-template-columns: 1fr; }
 .ap-estilo .ta-grade > .card:nth-child(2) { display: none; }
 .ap-estilo .tema-amostra .graf { max-height: 150px; }
+
+/* Lembrete de manhã (notificação) */
+.lembrete-push { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--linha); }
+.lembrete-push .controles { align-items: center; }
+
+/* Sugestão do dia compacta: nome numa linha só (nome inteiro ao passar o mouse), sinal embaixo */
+.sug-lista { grid-template-columns: repeat(auto-fill, minmax(min(330px, 100%), 1fr)); gap: 0 22px; }
+.sug-lista li { align-items: center; padding: 7px 0; }
+.sug-lista .prod { min-width: 0; }
+.sug-lista .prod b { display: block; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sug-lista .prod em { display: block; line-height: 1.2; margin-top: 1px; }
 
 /* Site do aluno: sem "Criar conta" */
 .abas-entrada, #formCriar { display: none !important; }
