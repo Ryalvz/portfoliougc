@@ -684,13 +684,17 @@ function fotoCarrossel(url, aoCarregar) {
 const esperarFotos = (slides) => Promise.all(slides.flatMap((s) => [s.foto, s.foto2]).filter(Boolean).map((u) => { fotoCarrossel(u); return fotosCarrossel.get(u).promessa; }));
 async function prepararFoto(arquivo) {
   const url = URL.createObjectURL(arquivo);
-  const img = await new Promise((ok, falha) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => falha(new Error("Não consegui abrir essa imagem. Use JPG, PNG ou HEIC convertido.")); i.src = url; });
+  const heic = /heic|heif/i.test(arquivo.type || "") || /\.(heic|heif)$/i.test(arquivo.name || "");
+  const img = await new Promise((ok, falha) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => falha(new Error(heic ? "Essa foto está em HEIC (formato do iPhone) e o navegador não abre. No iPhone: Ajustes > Câmera > Formatos > Mais compatível, ou mande a foto como JPG." : "Não consegui abrir essa imagem. Use JPG, PNG ou WEBP.")); i.src = url; });
   const escala = Math.min(1, 1700 / Math.max(img.width, img.height));
   const cv = document.createElement("canvas"); cv.width = Math.round(img.width * escala); cv.height = Math.round(img.height * escala);
   cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
   URL.revokeObjectURL(url);
-  const blob = await new Promise((ok) => cv.toBlob(ok, "image/jpeg", 0.88));
-  return new File([blob], "foto.jpg", { type: "image/jpeg" });
+  // PNG e WEBP guardam a transparência (recorte); o resto vira JPG leve
+  const alfa = /png|webp/i.test(arquivo.type || "") || /\.(png|webp)$/i.test(arquivo.name || "");
+  const blob = await new Promise((ok) => cv.toBlob(ok, alfa ? "image/png" : "image/jpeg", 0.88));
+  if (!blob) throw new Error("Não consegui preparar essa imagem. Tente outra ou exporte como JPG.");
+  return new File([blob], alfa ? "foto.png" : "foto.jpg", { type: alfa ? "image/png" : "image/jpeg" });
 }
 
 /* ---------- Texto rico: *itálico colorido* e **negrito** ---------- */
@@ -1229,7 +1233,7 @@ function desenharCarrossel(el) {
       const rotulo = e.target.closest("label"); rotulo.firstChild.textContent = "Enviando...";
       try {
         const arq = await prepararFoto(e.target.files[0]);
-        const url = await enviarArquivo(arq, "carrosseis", "foto.jpg");
+        const url = await enviarArquivo(arq, "carrosseis");
         if (url) { s[campoFoto] = url; desenhar(); avisar("Foto no slide."); }
         else rotulo.firstChild.textContent = "Subir foto";
       } catch (erro) { avisar(erro.message || "Não deu para usar essa foto.", true); rotulo.firstChild.textContent = "Subir foto"; }
@@ -1444,7 +1448,7 @@ function desenharEstilos(el) {
     if (e.target.dataset.foto && e.target.files && e.target.files[0]) {
       const rotulo = e.target.closest("label"); rotulo.firstChild.textContent = "Enviando...";
       try {
-        const url = await enviarArquivo(await prepararFoto(e.target.files[0]), "carrosseis", "foto.jpg");
+        const url = await enviarArquivo(await prepararFoto(e.target.files[0]), "carrosseis");
         if (url) { s.foto = url; desenhar(); avisar("Foto no slide."); } else rotulo.firstChild.textContent = "Subir foto";
       } catch (erro) { avisar(erro.message || "Não deu para usar essa foto.", true); rotulo.firstChild.textContent = "Subir foto"; }
     }

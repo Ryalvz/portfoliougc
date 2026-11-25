@@ -232,7 +232,7 @@ const CAMADAS = (() => {
       return c;
     }
     if (l.t === "fundoFoto") { // a foto de fundo do slide: arrasta, aumenta e diminui
-      const img = fotoCarrossel(s.foto, aoCarregar), c = { x0: l.x, y0: l.y, x1: l.x + l.w, y1: l.y + l.h };
+      const img = fotoCarrossel(l.src || s.foto, aoCarregar), c = { x0: l.x, y0: l.y, x1: l.x + l.w, y1: l.y + l.h };
       ctx.save(); ctx.beginPath(); ctx.rect(l.x, l.y, l.w, l.h); ctx.clip();
       if (img) {
         const e0 = Math.max(l.w / img.width, l.h / img.height) * (l.zoom || 1), iw = img.width * e0, ih = img.height * e0;
@@ -265,6 +265,11 @@ const CAMADAS = (() => {
       girar0(c, () => {
         if (l.sombra !== false) { ctx.save(); sombra(ctx, 0.28, 34, 14); caminhoRedondo(ctx, l.x, l.y, l.w, l.h, l.raio || 0); ctx.fillStyle = "#1E1813"; ctx.fill(); ctx.restore(); }
         ctx.save(); caminhoRedondo(ctx, l.x, l.y, l.w, l.h, l.raio || 0); ctx.clip(); fotoCobre(ctx, fotoCarrossel(url, aoCarregar), l.x, l.y, l.w, l.h, l.foco ?? 0.4); ctx.restore();
+        if (l.video) { // selo de play: mostra que é um vídeo
+          const r = Math.max(26, Math.min(l.w, l.h) * 0.11), cx = l.x + l.w / 2, cy = l.y + l.h / 2;
+          ctx.save(); ctx.fillStyle = "rgba(10,8,6,.55)"; ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = "#FFFFFF"; ctx.beginPath(); ctx.moveTo(cx - r * 0.32, cy - r * 0.45); ctx.lineTo(cx + r * 0.5, cy); ctx.lineTo(cx - r * 0.32, cy + r * 0.45); ctx.closePath(); ctx.fill(); ctx.restore();
+        }
       });
       return c;
     }
