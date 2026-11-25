@@ -22,17 +22,17 @@ create table if not exists public.perfis (
 );
 -- Meta do mês em vendas (GMV) e a aparência que o aluno escolheu
 alter table public.perfis add column if not exists meta_gmv numeric(12, 2);
--- Aparência: 4 direções (light, dark, glass, bold) e 8 paletas, mais uma cor principal opcional (#rrggbb).
+-- Aparência: 4 modelos (minimal, editorial, glass, neon) e 8 paletas, mais uma cor principal opcional (#rrggbb).
 -- Os nomes antigos continuam aceitos: o painel converte sozinho para a direção nova.
 alter table public.perfis add column if not exists estilo text not null default 'editorial';
 alter table public.perfis add column if not exists cor text not null default 'cafe';
 alter table public.perfis drop constraint if exists perfis_estilo_check;
-alter table public.perfis add constraint perfis_estilo_check check (estilo in ('light', 'dark', 'glass', 'bold', 'clean', 'editorial', 'colorful', 'classico', 'grafico', 'minimal'));
-alter table public.perfis alter column estilo set default 'light';
+alter table public.perfis add constraint perfis_estilo_check check (estilo in ('minimal', 'editorial', 'glass', 'neon', 'light', 'dark', 'bold', 'clean', 'colorful', 'classico', 'grafico')) not valid;
+alter table public.perfis alter column estilo set default 'minimal';
 -- Menu lateral recolhido ou aberto (a escolha de cada usuário)
 alter table public.perfis add column if not exists menu_recolhido boolean not null default false;
 alter table public.perfis drop constraint if exists perfis_cor_check;
-alter table public.perfis add constraint perfis_cor_check check (cor in ('cafe', 'oliva', 'grafite', 'rosa', 'azul', 'lavanda', 'terracota', 'energia'));
+alter table public.perfis add constraint perfis_cor_check check (cor in ('cafe', 'oliva', 'grafite', 'rosa', 'azul', 'lavanda', 'terracota', 'energia')) not valid;
 alter table public.perfis add column if not exists cor_custom text check (cor_custom ~ '^#[0-9a-fA-F]{6}$');
 -- Como você quer ser chamado e os primeiros passos marcados (modo Começando)
 alter table public.perfis add column if not exists apelido text check (char_length(apelido) <= 40);
@@ -105,7 +105,7 @@ create table if not exists public.produtos (
 -- Categorias novas (10 + Outros) com subcategoria, e produto esgotado (sai das sugestões até vender de novo).
 -- Os nomes antigos de categoria continuam aceitos: o painel converte sozinho.
 alter table public.produtos drop constraint if exists produtos_categoria_check;
-alter table public.produtos add constraint produtos_categoria_check check (categoria in ('moda', 'beleza', 'casa', 'eletronicos', 'auto', 'pets', 'bebe', 'saude', 'alimentos', 'joias', 'outros', 'tech', 'fitness', 'infantil'));
+alter table public.produtos add constraint produtos_categoria_check check (categoria in ('moda', 'beleza', 'casa', 'eletronicos', 'auto', 'pets', 'bebe', 'saude', 'alimentos', 'joias', 'outros', 'tech', 'fitness', 'infantil')) not valid;
 alter table public.produtos add column if not exists subcategoria text check (char_length(subcategoria) <= 60);
 alter table public.produtos add column if not exists esgotado_em date;
 
@@ -183,3 +183,6 @@ revoke all on public.perfis, public.pedidos, public.produtos, public.importacoes
 insert into public.perfis (user_id, email)
 select id, email from auth.users
 on conflict (user_id) do nothing;
+
+-- Avisa o Supabase que as colunas mudaram (sem isso o painel pode dizer "column ... schema cache")
+notify pgrst, 'reload schema';

@@ -9,7 +9,7 @@
   --card: #FCFAF6; --ouro-tint: rgba(168, 134, 74, .16);
   --verde: #1e6b45; --verde-bg: #e3f2ea; --vermelho: #b42318; --vermelho-bg: #fdecea; --ambar: #8a5a00; --ambar-bg: #fdf1d6;
   --raio: 12px; --menu-w: 236px;
-  --serif: "Space Grotesk", "Inter", system-ui, sans-serif; --sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; --display: "Space Grotesk", "Inter", system-ui, sans-serif;
+  --serif: "Space Grotesk", "Inter", system-ui, sans-serif; --sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; --display: "Space Grotesk", "Inter", system-ui, sans-serif; --serif-ed: "Playfair Display", Georgia, "Times New Roman", serif;
   color-scheme: light;
 }
 *, *::before, *::after { box-sizing: border-box; }
@@ -335,91 +335,148 @@ ol.passos { margin: 0; padding-left: 20px; display: flex; flex-direction: column
 
 
 /* =============================================================
-   SISTEMA DE TEMAS
-   Direção (data-estilo) = forma: fundo, cards, fontes, cantos, sombras, menu.
-   Paleta (data-paleta) = cores. Qualquer direção combina com qualquer paleta.
-   A cor principal pode ser trocada pelo usuário (--p-principal no html).
+   SISTEMA DE DESIGN DO SHOPFLOW
+   MODELO (data-estilo) = composição, tipografia, espaçamento, bordas, sombras, efeitos, gráficos e menu.
+     minimal (Minimalista) · editorial (Moderno Editorial) · glass (Glass / Aurora) · neon (Premium Neon)
+   PALETA (data-paleta) = só cores: escuro, principal, destaque, suave e fundo.
+   Os dois são independentes: 4 modelos x 8 paletas = 32 combinações. A cor principal pode ser trocada pelo usuário.
    ============================================================= */
 
-/* ---------- 8 paletas (--p-vivo = versão clara e viva, usada no escuro e nos destaques do Bold) ---------- */
-:root, [data-paleta="cafe"] { --p-principal: #2B241C; --p-secundaria: #5A4632; --p-destaque: #A8864A; --p-vivo: #E2BE7E; --p-fundo: #F6F2EB; --p-card: #FCFAF6; --p-texto: #2B241C; --p-texto2: #7A6E60; --g1: #2B241C; --g2: #A8864A; --g3: #D7C3A0; --g4: #6E5A43; --g5: #C9A979; --g6: #8C7A66; }
-[data-paleta="oliva"] { --p-principal: #3F4A2B; --p-secundaria: #26301F; --p-destaque: #7C8B4A; --p-vivo: #BFD27A; --p-fundo: #F3F3EA; --p-card: #FBFBF5; --p-texto: #26301F; --p-texto2: #6E7462; --g1: #3F4A2B; --g2: #7C8B4A; --g3: #B8C28A; --g4: #26301F; --g5: #C9B97A; --g6: #7F8C6B; }
-[data-paleta="grafite"] { --p-principal: #1C1C1E; --p-secundaria: #3A3A3C; --p-destaque: #6E6E73; --p-vivo: #D4D4DA; --p-fundo: #EDEDEF; --p-card: #FFFFFF; --p-texto: #141414; --p-texto2: #6E6E73; --g1: #1C1C1E; --g2: #6E6E73; --g3: #A1A1A6; --g4: #3A3A3C; --g5: #C7C7CC; --g6: #48484A; }
-[data-paleta="rosa"] { --p-principal: #6E2F48; --p-secundaria: #3A1F2B; --p-destaque: #C45A80; --p-vivo: #F48FB4; --p-fundo: #FBF1F4; --p-card: #FFFAFB; --p-texto: #3A1F2B; --p-texto2: #8A6B77; --g1: #6E2F48; --g2: #C45A80; --g3: #E8A7BD; --g4: #3A1F2B; --g5: #D98FA8; --g6: #B07A8C; }
-[data-paleta="azul"] { --p-principal: #14213D; --p-secundaria: #2C4A7E; --p-destaque: #3D6FB6; --p-vivo: #7DB2FF; --p-fundo: #EEF2F8; --p-card: #FAFCFF; --p-texto: #14213D; --p-texto2: #5E6B82; --g1: #14213D; --g2: #3D6FB6; --g3: #8FB3E3; --g4: #2C4A7E; --g5: #BFD3EE; --g6: #5E6B82; }
-[data-paleta="lavanda"] { --p-principal: #3B2A5C; --p-secundaria: #6B4FA0; --p-destaque: #8E6CCB; --p-vivo: #B9A0FF; --p-fundo: #F4F1FA; --p-card: #FCFBFF; --p-texto: #2E2245; --p-texto2: #75698C; --g1: #3B2A5C; --g2: #8E6CCB; --g3: #C3B2E8; --g4: #6B4FA0; --g5: #DCD2F2; --g6: #8A7BA8; }
-[data-paleta="terracota"] { --p-principal: #6B2E1F; --p-secundaria: #A4532F; --p-destaque: #C46A3C; --p-vivo: #F2A274; --p-fundo: #F8F1EA; --p-card: #FFFBF7; --p-texto: #3D1F15; --p-texto2: #8A6B5C; --g1: #6B2E1F; --g2: #C46A3C; --g3: #E3B08E; --g4: #A4532F; --g5: #EED3BE; --g6: #8F6A57; }
-[data-paleta="energia"] { --p-principal: #14452F; --p-secundaria: #1F6B45; --p-destaque: #D9A514; --p-vivo: #F5C842; --p-fundo: #F3F5EE; --p-card: #FFFFFB; --p-texto: #14281E; --p-texto2: #5F6E64; --g1: #14452F; --g2: #D9A514; --g3: #8DBF6A; --g4: #1F6B45; --g5: #F2D774; --g6: #5F6E64; }
+/* ---------- 8 paletas (as cores exatas do Shopflow) ---------- */
+:root, [data-paleta="cafe"] { --p-escuro: #2B211B; --p-principal: #805A38; --p-destaque: #C19A62; --p-suave: #E8DCCB; --p-fundo: #F8F4ED; }
+[data-paleta="oliva"] { --p-escuro: #283528; --p-principal: #53663E; --p-destaque: #89975C; --p-suave: #C5CDA8; --p-fundo: #F3F3E9; }
+[data-paleta="grafite"] { --p-escuro: #171719; --p-principal: #414147; --p-destaque: #77777F; --p-suave: #B9B9BF; --p-fundo: #F0F0F2; }
+[data-paleta="rosa"] { --p-escuro: #542B3C; --p-principal: #A34466; --p-destaque: #D47796; --p-suave: #EAB9C9; --p-fundo: #FAEFF3; }
+[data-paleta="azul"] { --p-escuro: #142747; --p-principal: #2456A6; --p-destaque: #5489D6; --p-suave: #A9C7F0; --p-fundo: #F0F5FC; }
+[data-paleta="lavanda"] { --p-escuro: #38245B; --p-principal: #6843A6; --p-destaque: #9674D4; --p-suave: #C9B7EB; --p-fundo: #F4F0FC; }
+[data-paleta="terracota"] { --p-escuro: #602F24; --p-principal: #A65336; --p-destaque: #CE815B; --p-suave: #E6B99C; --p-fundo: #F8F0E9; }
+[data-paleta="energia"] { --p-escuro: #153D30; --p-principal: #17865C; --p-destaque: #E5B323; --p-suave: #A9D66B; --p-fundo: #F4F5EC; }
 
-/* ---------- Base comum (vale para Modern Light e é o ponto de partida das outras) ---------- */
+/* Derivadas da paleta (recalculadas em cada elemento com tema, inclusive nas prévias) */
+:root, [data-paleta], [data-estilo] {
+  --p-forte: color-mix(in srgb, var(--p-principal) 72%, var(--p-escuro));       /* principal escurecida: aguenta texto branco */
+  --p-vivo: color-mix(in srgb, var(--p-destaque) 62%, #fff);                      /* versão luminosa: para fundo escuro */
+  --p-neon: color-mix(in srgb, var(--p-principal) 45%, var(--p-vivo));
+  --g1: var(--p-principal); --g2: var(--p-destaque); --g3: color-mix(in srgb, var(--p-suave) 70%, var(--p-principal));
+  --g4: var(--p-escuro); --g5: color-mix(in srgb, var(--p-principal) 45%, var(--p-suave)); --g6: color-mix(in srgb, var(--p-destaque) 50%, var(--p-escuro));
+}
+
+/* ---------- MINIMALISTA (base): claro, muito espaço, foco nos dados ---------- */
 :root, [data-estilo] {
   color-scheme: light;
-  --fundo: #F6F7F9; --fundo-img: none; --card-bg: #FFFFFF; --txt: #111318; --txt2: #5B6270; --campo-bg: #FFFFFF;
-  --raio: 12px; --sombra: 0 1px 2px rgba(16, 24, 40, .04); --sombra-alta: 0 18px 50px rgba(16, 24, 40, .14); --card-borda: 1px solid #E6E8EC; --card-blur: none;
-  --fonte-texto: var(--sans); --fonte-titulo: var(--sans); --peso-titulo: 650; --peso-h2: 650; --tam-h1: clamp(24px, 2.4vw, 30px); --tam-h2: 15px; --esp-titulo: -.02em;
-  --fonte-num: var(--sans); --peso-num: 650; --tam-num: clamp(20px, 1.9vw, 26px); --kpi-mix: 0%;
-  --barra-cor: var(--p-principal); --destaque-cor: var(--p-destaque); --sobre: #FFFFFF;
+  --fundo: color-mix(in srgb, var(--p-fundo) 35%, #FAFAFB); --fundo-img: none; --card-bg: #FFFFFF; --campo-bg: #FFFFFF;
+  --txt: #111318; --txt2: #5B6270;
+  --raio: 14px; --card-borda: 1px solid #E8EAEE; --sombra: 0 1px 2px rgba(16, 24, 40, .04), 0 6px 18px rgba(16, 24, 40, .04); --sombra-alta: 0 18px 50px rgba(16, 24, 40, .14); --card-blur: none;
+  --fonte-texto: var(--sans); --fonte-titulo: var(--sans); --peso-titulo: 700; --peso-h2: 650; --tam-h1: clamp(24px, 2.4vw, 30px); --tam-h2: 15px; --esp-titulo: -.02em;
+  --fonte-num: var(--sans); --peso-num: 700; --tam-num: clamp(20px, 1.9vw, 25px); --kpi-mix: 0%; --card-pad: 20px;
+  --barra-cor: var(--p-forte); --destaque-cor: var(--p-principal); --sobre: #FFFFFF;
   --kpi-dest-bg: #FFFFFF; --kpi-dest-txt: #111318;
-  --btn-raio: 9px; --btn-sombra: none; --btn-transform: none; --btn-esp: 0; --btn-tam: 13px; --btn-peso: 600;
-  --btn-bg: var(--cafe); --btn-txt: var(--sobre); --btn-sec-bg: transparent; --btn-sec-txt: var(--cafe); --btn-sec-borda: 1px solid var(--cafe);
-  --chip-at-bg: var(--cafe); --chip-at-txt: var(--sobre);
-  --kpi-dest-borda: var(--card-borda); --kpi-dest-sombra: inset 3px 0 0 var(--p-principal), var(--sombra); --kpi-dest-val: var(--p-principal);
-  --barra-fill: var(--ouro); --meta-fill: var(--cafe); --barra-brilho: none; --barra-trilho: var(--tint); --barra-alt: 8px;
-  --lista-bg: var(--campo); --lista-borda: 1px solid var(--linha); --esp-h1: var(--esp-titulo);
-}
-/* MODERN LIGHT: claro, limpo, borda fina, a cor só onde importa */
-
-/* DARK PRO: fundo quase preto, cards grafite, destaque vivo com brilho leve */
-[data-estilo="dark"] {
-  color-scheme: dark;
-  --fundo: #0A0C10; --card-bg: #11151C; --campo-bg: #161B23; --txt: #EDEFF4; --txt2: #9AA2B1;
-  --raio: 14px; --sombra: none; --sombra-alta: 0 18px 50px rgba(0, 0, 0, .55); --card-borda: 1px solid rgba(255, 255, 255, .07);
-  --fonte-titulo: var(--display); --peso-titulo: 600; --peso-h2: 600; --tam-h1: clamp(26px, 2.6vw, 32px);
-  --fonte-num: var(--display); --peso-num: 600; --tam-num: clamp(21px, 2vw, 28px);
-  --barra-cor: var(--p-vivo); --destaque-cor: var(--p-vivo); --sobre: #0A0C10;
-  --kpi-dest-bg: linear-gradient(180deg, color-mix(in srgb, var(--p-vivo) 14%, #11151C), #11151C 75%); --kpi-dest-txt: #FFFFFF;
-  --btn-sombra: 0 0 22px color-mix(in srgb, var(--p-vivo) 35%, transparent);
-  --kpi-dest-borda: 1px solid color-mix(in srgb, var(--p-vivo) 45%, transparent); --kpi-dest-sombra: 0 0 32px color-mix(in srgb, var(--p-vivo) 14%, transparent); --kpi-dest-val: #FFFFFF;
-  --barra-fill: linear-gradient(90deg, var(--p-destaque), var(--p-vivo)); --meta-fill: var(--barra-fill); --barra-brilho: 0 0 12px color-mix(in srgb, var(--p-vivo) 45%, transparent);
-  --g1: var(--p-vivo); --g2: color-mix(in srgb, var(--p-vivo) 55%, #fff); --g3: color-mix(in srgb, var(--p-destaque) 70%, #fff);
-  --g4: color-mix(in srgb, var(--p-vivo) 60%, #000); --g5: #d4d4d8; --g6: #8b8b95;
-  --verde: #4ade80; --verde-bg: rgba(74, 222, 128, .13); --vermelho: #f87171; --vermelho-bg: rgba(248, 113, 113, .15); --ambar: #fbbf24; --ambar-bg: rgba(251, 191, 36, .13);
+  --btn-raio: 10px; --btn-sombra: none; --btn-esp: 0; --btn-tam: 13px; --btn-peso: 600;
+  --btn-bg: var(--p-forte); --btn-txt: #FFFFFF; --btn-sec-bg: #FFFFFF; --btn-sec-txt: #111318; --btn-sec-borda: 1px solid #E2E5EA;
+  --chip-at-bg: var(--p-forte); --chip-at-txt: #FFFFFF;
+  --kpi-dest-borda: var(--card-borda); --kpi-dest-sombra: var(--sombra); --kpi-dest-val: #111318;
+  --barra-fill: var(--p-principal); --meta-fill: var(--p-forte); --barra-brilho: none; --barra-trilho: #EEF0F3; --barra-alt: 8px;
+  --lista-bg: #FAFAFB; --lista-borda: 1px solid #EEF0F3; --esp-h1: var(--esp-titulo);
+  --ic-kpi: var(--p-principal); --ic-kpi-bg: color-mix(in srgb, var(--p-principal) 10%, #fff); --ic-kpi-dest-bg: var(--ic-kpi-bg); --ic-kpi-dest: var(--ic-kpi);
+  --verde: #1e6b45; --verde-bg: #e3f2ea; --vermelho: #b42318; --vermelho-bg: #fdecea; --ambar: #8a5a00; --ambar-bg: #fdf1d6;
+  /* gráficos */
+  --graf-linha: var(--p-principal); --graf-area: color-mix(in srgb, var(--p-principal) 14%, transparent); --graf-brilho: none; --graf-grade: #EEF0F3; --graf-eixo: #8A909B;
+  --dica-graf-bg: #111318; --dica-graf-txt: #FFFFFF;
+  /* menu */
+  --menu-bg: #FFFFFF; --menu-blur: none; --menu-txt: #2A2F3A; --menu-txt2: #6B717C; --menu-borda: #ECEEF1;
+  --menu-hover: color-mix(in srgb, var(--p-principal) 6%, transparent); --menu-ativo-bg: color-mix(in srgb, var(--p-principal) 11%, #fff); --menu-ativo-txt: var(--p-forte); --menu-ativo-sombra: none;
+  --menu-ic: #8C929E; --menu-ic-ativo: var(--p-principal); --menu-ic-hover: var(--p-principal); --menu-raio: 10px; --menu-foco: var(--p-principal);
+  --marca-bg: var(--p-forte); --marca-txt: #FFFFFF; --bolinha-bg: var(--p-forte); --bolinha-txt: #FFFFFF;
+  --avatar-bg: color-mix(in srgb, var(--p-suave) 60%, #fff); --avatar-txt: var(--p-escuro); --sair-borda: 1px solid #E2E5EA; --sair-raio: 10px;
+  --dica-bg: #111318; --dica-txt: #FFFFFF;
 }
 
-/* GLASS / AURORA: fundo com luzes da paleta, cards de vidro, cantos grandes */
+/* ---------- MODERNO EDITORIAL: menu escuro, serifa, números grandes, cards sofisticados ---------- */
+[data-estilo="editorial"] {
+  --fundo: var(--p-fundo); --card-bg: #FFFDFA; --campo-bg: #FFFFFF; --txt: #1E1915; --txt2: #6B625A;
+  --raio: 18px; --card-borda: 1px solid color-mix(in srgb, var(--p-suave) 70%, transparent); --sombra: 0 2px 4px color-mix(in srgb, var(--p-escuro) 4%, transparent), 0 14px 34px color-mix(in srgb, var(--p-escuro) 7%, transparent);
+  --fonte-titulo: var(--serif-ed); --peso-titulo: 700; --peso-h2: 700; --tam-h1: clamp(28px, 3vw, 38px); --tam-h2: 16px; --esp-titulo: -.01em;
+  --tam-num: clamp(21px, 2vw, 27px); --card-pad: 22px;
+  --destaque-cor: var(--p-principal);
+  --kpi-dest-bg: linear-gradient(145deg, var(--p-escuro), color-mix(in srgb, var(--p-principal) 60%, var(--p-escuro))); --kpi-dest-txt: #FFFFFF;
+  --kpi-dest-borda: 0 solid transparent; --kpi-dest-sombra: 0 14px 30px color-mix(in srgb, var(--p-escuro) 25%, transparent); --kpi-dest-val: #FFFFFF;
+  --btn-raio: 999px; --btn-bg: var(--p-escuro); --btn-sec-borda: 1px solid color-mix(in srgb, var(--p-escuro) 35%, transparent); --btn-sec-txt: var(--p-escuro);
+  --chip-at-bg: var(--p-escuro);
+  --barra-fill: linear-gradient(90deg, var(--p-escuro), var(--p-principal)); --meta-fill: linear-gradient(90deg, var(--p-escuro), var(--p-principal), var(--p-destaque)); --barra-trilho: color-mix(in srgb, var(--p-suave) 55%, #fff); --barra-alt: 10px;
+  --lista-bg: color-mix(in srgb, var(--p-fundo) 60%, #fff); --lista-borda: 1px solid color-mix(in srgb, var(--p-suave) 60%, transparent);
+  --ic-kpi: var(--p-principal); --ic-kpi-bg: color-mix(in srgb, var(--p-suave) 45%, #fff);
+  --graf-linha: var(--p-principal); --graf-area: color-mix(in srgb, var(--p-destaque) 26%, transparent); --graf-grade: color-mix(in srgb, var(--p-suave) 60%, transparent); --graf-eixo: #8A8076;
+  --dica-graf-bg: var(--p-escuro);
+  --menu-bg: var(--p-escuro); --menu-txt: rgba(255, 255, 255, .88); --menu-txt2: rgba(255, 255, 255, .6); --menu-borda: rgba(255, 255, 255, .12);
+  --ed-claro: color-mix(in srgb, var(--p-destaque) 45%, var(--p-suave));
+  --menu-hover: rgba(255, 255, 255, .08); --menu-ativo-bg: var(--ed-claro); --menu-ativo-txt: var(--p-escuro); --menu-ativo-sombra: 0 6px 16px rgba(0, 0, 0, .25);
+  --menu-ic: rgba(255, 255, 255, .7); --menu-ic-ativo: var(--p-escuro); --menu-ic-hover: #FFFFFF; --menu-raio: 12px; --menu-foco: var(--p-destaque);
+  --marca-bg: var(--ed-claro); --marca-txt: var(--p-escuro); --bolinha-bg: var(--ed-claro); --bolinha-txt: var(--p-escuro);
+  --avatar-bg: var(--p-suave); --avatar-txt: var(--p-escuro); --sair-borda: 1px solid rgba(255, 255, 255, .22); --sair-raio: 999px;
+  --dica-bg: var(--p-escuro);
+}
+
+/* ---------- GLASS / AURORA: fundo com luzes, vidro com blur, reflexo e profundidade ---------- */
 [data-estilo="glass"] {
-  --fundo: var(--p-fundo);
-  --fundo-img: radial-gradient(55% 45% at 12% 6%, color-mix(in srgb, var(--p-destaque) 38%, transparent), transparent 70%), radial-gradient(45% 45% at 90% 10%, color-mix(in srgb, var(--g3) 55%, transparent), transparent 70%), radial-gradient(60% 55% at 65% 100%, color-mix(in srgb, var(--p-principal) 20%, transparent), transparent 70%);
-  --card-bg: rgba(255, 255, 255, .58); --campo-bg: rgba(255, 255, 255, .72); --txt: #1B1D24; --txt2: #4F5561;
-  --raio: 20px; --card-borda: 1px solid rgba(255, 255, 255, .78); --sombra: 0 10px 30px color-mix(in srgb, var(--p-principal) 8%, transparent); --card-blur: blur(18px) saturate(150%);
-  --tam-h1: clamp(26px, 2.6vw, 32px); --tam-num: clamp(21px, 2vw, 28px);
-  --kpi-dest-bg: linear-gradient(135deg, var(--p-principal), color-mix(in srgb, var(--p-principal) 68%, var(--p-destaque))); --kpi-dest-txt: #FFFFFF;
-  --btn-raio: 12px; --btn-sombra: 0 6px 18px color-mix(in srgb, var(--p-principal) 25%, transparent);
-  --btn-bg: linear-gradient(135deg, var(--p-principal), color-mix(in srgb, var(--p-principal) 62%, var(--p-destaque))); --btn-txt: #FFFFFF;
-  --btn-sec-bg: rgba(255, 255, 255, .65); --btn-sec-txt: var(--txt); --btn-sec-borda: 1px solid rgba(255, 255, 255, .95);
-  --kpi-dest-borda: 1px solid transparent; --kpi-dest-sombra: var(--sombra); --kpi-dest-val: #FFFFFF;
+  --fundo: color-mix(in srgb, var(--p-fundo) 70%, #fff);
+  --fundo-img: radial-gradient(50% 55% at 6% 0%, color-mix(in srgb, var(--p-destaque) 60%, transparent), transparent 72%), radial-gradient(45% 55% at 100% 4%, color-mix(in srgb, var(--p-suave) 95%, transparent), transparent 72%), radial-gradient(55% 60% at 70% 100%, color-mix(in srgb, var(--p-principal) 40%, transparent), transparent 72%), radial-gradient(40% 40% at 25% 75%, color-mix(in srgb, var(--p-suave) 70%, transparent), transparent 70%);
+  --card-bg: rgba(255, 255, 255, .5); --campo-bg: rgba(255, 255, 255, .72); --txt: #1B1D24; --txt2: #4B5160;
+  --raio: 22px; --card-borda: 1px solid rgba(255, 255, 255, .8); --sombra: inset 0 1px 0 rgba(255, 255, 255, .9), 0 10px 30px color-mix(in srgb, var(--p-escuro) 10%, transparent); --card-blur: blur(20px) saturate(160%);
+  --tam-h1: clamp(26px, 2.6vw, 32px); --tam-num: clamp(21px, 2vw, 26px);
+  --kpi-dest-bg: var(--card-bg); --kpi-dest-txt: #1B1D24; --kpi-dest-borda: var(--card-borda); --kpi-dest-sombra: var(--sombra); --kpi-dest-val: var(--p-forte);
+  --btn-raio: 14px; --btn-sombra: 0 8px 20px color-mix(in srgb, var(--p-principal) 30%, transparent);
+  --btn-bg: linear-gradient(135deg, var(--p-forte), color-mix(in srgb, var(--p-forte) 80%, var(--p-destaque)));
+  --btn-sec-bg: rgba(255, 255, 255, .6); --btn-sec-txt: var(--txt); --btn-sec-borda: 1px solid rgba(255, 255, 255, .95);
   --barra-fill: linear-gradient(90deg, var(--p-destaque), var(--p-principal)); --meta-fill: var(--barra-fill); --barra-trilho: rgba(255, 255, 255, .7);
+  --lista-bg: rgba(255, 255, 255, .55); --lista-borda: 1px solid rgba(255, 255, 255, .85);
+  --ic-kpi: var(--p-principal); --ic-kpi-bg: rgba(255, 255, 255, .7);
+  --graf-linha: var(--p-principal); --graf-area: color-mix(in srgb, var(--p-principal) 18%, transparent); --graf-grade: rgba(255, 255, 255, .7); --graf-eixo: #5B6170;
+  --dica-graf-bg: rgba(20, 22, 28, .9);
+  --menu-bg: rgba(255, 255, 255, .4); --menu-blur: blur(24px) saturate(170%); --menu-txt: #22252E; --menu-txt2: #555B67; --menu-borda: rgba(255, 255, 255, .7);
+  --menu-hover: rgba(255, 255, 255, .55); --menu-ativo-bg: linear-gradient(135deg, var(--p-forte), color-mix(in srgb, var(--p-forte) 80%, var(--p-destaque))); --menu-ativo-txt: #FFFFFF;
+  --menu-ativo-sombra: 0 8px 20px color-mix(in srgb, var(--p-principal) 32%, transparent);
+  --menu-ic: #5E6472; --menu-ic-ativo: #FFFFFF; --menu-ic-hover: var(--p-principal); --menu-raio: 14px;
+  --marca-bg: linear-gradient(135deg, var(--p-forte), color-mix(in srgb, var(--p-forte) 80%, var(--p-destaque)));
+  --avatar-bg: rgba(255, 255, 255, .8); --sair-borda: 1px solid rgba(255, 255, 255, .9); --sair-raio: 14px;
+  --dica-bg: rgba(20, 22, 28, .9);
 }
 
-/* BOLD MODERN: blocos sólidos, títulos grandes, pílulas e alto contraste */
-[data-estilo="bold"] {
-  --fundo: var(--p-fundo); --card-bg: #FFFFFF; --txt: #101114; --txt2: #565B66;
-  --raio: 24px; --card-borda: 0 solid transparent; --sombra: none;
-  --fonte-titulo: var(--display); --peso-titulo: 700; --peso-h2: 700; --tam-h1: clamp(30px, 3.6vw, 44px); --tam-h2: 18px; --esp-titulo: -.03em;
-  --fonte-num: var(--display); --peso-num: 700; --tam-num: clamp(22px, 2.3vw, 32px);
-  --kpi-dest-bg: var(--p-principal); --kpi-dest-txt: #FFFFFF;
-  --btn-raio: 999px;
-  --btn-bg: #101114; --btn-txt: #FFFFFF; --btn-sec-txt: #101114; --btn-sec-borda: 1.5px solid #101114; --chip-at-bg: #101114; --chip-at-txt: #FFFFFF;
-  --kpi-dest-borda: 0 solid transparent; --kpi-dest-sombra: none; --kpi-dest-val: #FFFFFF;
-  --barra-alt: 12px; --lista-bg: var(--p-fundo); --lista-borda: 0 solid transparent; --esp-h1: -.035em;
+/* ---------- PREMIUM NEON: escuro, contraste forte, gráficos luminosos ---------- */
+[data-estilo="neon"] {
+  color-scheme: dark;
+  --fundo: color-mix(in srgb, var(--p-escuro) 30%, #07070E); --fundo-img: radial-gradient(70% 40% at 80% 0%, color-mix(in srgb, var(--p-principal) 18%, transparent), transparent 70%);
+  --card-bg: color-mix(in srgb, var(--p-escuro) 22%, #0E0E1A); --campo-bg: color-mix(in srgb, #fff 5%, #0E0E1A); --txt: #F2F2F7; --txt2: #A6A6B8;
+  --raio: 16px; --card-borda: 1px solid color-mix(in srgb, var(--p-vivo) 16%, transparent); --sombra: 0 0 0 1px rgba(255, 255, 255, .02), 0 10px 30px rgba(0, 0, 0, .35); --sombra-alta: 0 18px 50px rgba(0, 0, 0, .6);
+  --fonte-titulo: var(--display); --peso-titulo: 700; --peso-h2: 600; --tam-h1: clamp(26px, 2.6vw, 32px);
+  --fonte-num: var(--display); --peso-num: 600; --tam-num: clamp(21px, 2vw, 27px);
+  --barra-cor: var(--p-vivo); --destaque-cor: var(--p-vivo); --sobre: #07070E;
+  --kpi-dest-bg: linear-gradient(160deg, color-mix(in srgb, var(--p-principal) 22%, #0E0E1A), #0E0E1A 75%); --kpi-dest-txt: #FFFFFF;
+  --kpi-dest-borda: 1px solid color-mix(in srgb, var(--p-vivo) 45%, transparent); --kpi-dest-sombra: 0 0 32px color-mix(in srgb, var(--p-vivo) 16%, transparent); --kpi-dest-val: #FFFFFF;
+  --btn-raio: 12px; --btn-bg: linear-gradient(135deg, var(--p-vivo), color-mix(in srgb, var(--p-vivo) 70%, var(--p-suave))); --btn-txt: #07070E; --btn-sombra: 0 0 22px color-mix(in srgb, var(--p-vivo) 35%, transparent);
+  --btn-sec-bg: transparent; --btn-sec-txt: #F2F2F7; --btn-sec-borda: 1px solid rgba(255, 255, 255, .16);
+  --chip-at-bg: var(--p-vivo); --chip-at-txt: #07070E;
+  --barra-fill: linear-gradient(90deg, var(--p-principal), var(--p-vivo)); --meta-fill: var(--barra-fill); --barra-brilho: 0 0 12px color-mix(in srgb, var(--p-vivo) 55%, transparent); --barra-trilho: rgba(255, 255, 255, .08);
+  --lista-bg: rgba(255, 255, 255, .03); --lista-borda: 1px solid rgba(255, 255, 255, .06);
+  --ic-kpi: var(--p-vivo); --ic-kpi-bg: color-mix(in srgb, var(--p-vivo) 14%, transparent);
+  --g1: color-mix(in srgb, var(--p-principal) 50%, var(--p-vivo)); --g2: var(--p-vivo); --g3: var(--p-destaque); --g4: color-mix(in srgb, var(--p-suave) 80%, #fff); --g5: color-mix(in srgb, var(--p-principal) 75%, #000); --g6: #8b8b9a;
+  --graf-linha: var(--p-vivo); --graf-area: color-mix(in srgb, var(--p-vivo) 22%, transparent); --graf-brilho: drop-shadow(0 0 6px color-mix(in srgb, var(--p-vivo) 80%, transparent)); --graf-grade: rgba(255, 255, 255, .07); --graf-eixo: #8C8CA0;
+  --dica-graf-bg: #F2F2F7; --dica-graf-txt: #07070E;
+  --verde: #4ade80; --verde-bg: rgba(74, 222, 128, .13); --vermelho: #f87171; --vermelho-bg: rgba(248, 113, 113, .15); --ambar: #fbbf24; --ambar-bg: rgba(251, 191, 36, .13);
+  --menu-bg: color-mix(in srgb, var(--p-escuro) 25%, #08080F); --menu-txt: #D9D9E3; --menu-txt2: #8C8CA0; --menu-borda: rgba(255, 255, 255, .07);
+  --menu-hover: rgba(255, 255, 255, .05); --menu-ativo-bg: linear-gradient(135deg, color-mix(in srgb, var(--p-principal) 55%, #07070E), color-mix(in srgb, var(--p-principal) 80%, #07070E)); --menu-ativo-txt: #FFFFFF;
+  --menu-ativo-sombra: 0 0 0 1px color-mix(in srgb, var(--p-vivo) 45%, transparent), 0 0 24px color-mix(in srgb, var(--p-vivo) 28%, transparent);
+  --menu-ic: #8C8CA0; --menu-ic-ativo: #FFFFFF; --menu-ic-hover: var(--p-vivo); --menu-raio: 12px; --menu-foco: var(--p-vivo);
+  --marca-bg: linear-gradient(135deg, var(--p-vivo), color-mix(in srgb, var(--p-vivo) 70%, var(--p-suave))); --marca-txt: #07070E; --bolinha-bg: var(--p-vivo); --bolinha-txt: #07070E;
+  --avatar-bg: color-mix(in srgb, var(--p-vivo) 18%, transparent); --avatar-txt: var(--p-vivo); --sair-borda: 1px solid rgba(255, 255, 255, .14); --sair-raio: 12px;
+  --dica-bg: #F2F2F7; --dica-txt: #07070E;
 }
 
-/* ---------- Tokens que o resto do CSS usa (recalculados em cada tema) ---------- */
+/* ---------- Tokens que o resto do CSS usa ---------- */
 :root, [data-paleta], [data-estilo] {
   --cafe: var(--barra-cor); --ouro: var(--destaque-cor); --creme: var(--fundo); --card: var(--card-bg);
   --texto: var(--txt); --muted: var(--txt2); --campo: var(--campo-bg);
   --linha: color-mix(in srgb, var(--txt) 12%, transparent); --tint: color-mix(in srgb, var(--txt) 6%, transparent); --tint2: color-mix(in srgb, var(--txt) 11%, transparent);
-  --ouro-tint: color-mix(in srgb, var(--destaque-cor) 17%, transparent); --destaque-txt: color-mix(in srgb, var(--destaque-cor) 60%, var(--txt));
+  --ouro-tint: color-mix(in srgb, var(--destaque-cor) 17%, transparent); --destaque-txt: color-mix(in srgb, var(--destaque-cor) 78%, var(--txt));
   --g-barra: var(--barra-cor);
   color: var(--texto);
 }
@@ -427,6 +484,7 @@ ol.passos { margin: 0; padding-left: 20px; display: flex; flex-direction: column
 .btn { border-radius: var(--btn-raio); box-shadow: var(--btn-sombra); }
 .cabeca h1, .card-topo h2 { letter-spacing: var(--esp-titulo); }
 .tema-amostra { background: var(--fundo-img, none), var(--creme); }
+
 /* =============================================================
    TELA DE PERSONALIZAÇÃO (Meu perfil > Aparência)
    ============================================================= */
@@ -476,42 +534,6 @@ ol.passos { margin: 0; padding-left: 20px; display: flex; flex-direction: column
    Aberto: ícone + nome. Recolhido (só no computador): ícones centralizados + dica ao passar o mouse.
    No celular vira gaveta por cima da tela.
    ============================================================= */
-:root, [data-estilo] {
-  --menu-bg: #FFFFFF; --menu-blur: none; --menu-txt: #2A2F3A; --menu-txt2: #6B717C; --menu-borda: #E6E8EC;
-  --menu-hover: color-mix(in srgb, var(--p-principal) 6%, transparent);
-  --menu-ativo-bg: color-mix(in srgb, var(--p-principal) 10%, #fff); --menu-ativo-txt: var(--p-principal); --menu-ativo-sombra: none;
-  --menu-ic: #8C929E; --menu-ic-ativo: var(--p-principal); --menu-raio: 8px; --menu-foco: var(--p-principal);
-  --marca-bg: var(--p-principal); --marca-txt: #FFFFFF; --bolinha-bg: var(--p-principal); --bolinha-txt: #FFFFFF;
-  --avatar-bg: color-mix(in srgb, var(--p-destaque) 22%, #fff); --avatar-txt: var(--p-principal);
-  --dica-bg: #111318; --dica-txt: #FFFFFF;
-}
-[data-estilo="dark"] {
-  --menu-bg: #0D1016; --menu-txt: #C9CED8; --menu-txt2: #7C8496; --menu-borda: rgba(255, 255, 255, .07); --menu-hover: rgba(255, 255, 255, .05);
-  --menu-ativo-bg: color-mix(in srgb, var(--p-vivo) 13%, transparent); --menu-ativo-txt: #FFFFFF;
-  --menu-ativo-sombra: inset 0 0 0 1px color-mix(in srgb, var(--p-vivo) 35%, transparent), 0 0 24px color-mix(in srgb, var(--p-vivo) 20%, transparent);
-  --menu-ic: #7C8496; --menu-ic-ativo: var(--p-vivo); --menu-raio: 10px; --menu-foco: var(--p-vivo);
-  --marca-bg: linear-gradient(135deg, var(--p-vivo), color-mix(in srgb, var(--p-vivo) 72%, var(--p-destaque))); --marca-txt: #0A0C10; --bolinha-bg: var(--p-vivo); --bolinha-txt: #0A0C10;
-  --avatar-bg: color-mix(in srgb, var(--p-vivo) 18%, transparent); --avatar-txt: var(--p-vivo);
-  --dica-bg: #F1F3F7; --dica-txt: #0A0C10;
-}
-[data-estilo="glass"] {
-  --menu-bg: rgba(255, 255, 255, .42); --menu-blur: blur(22px) saturate(160%); --menu-txt: #22252E; --menu-txt2: #555B67; --menu-borda: rgba(255, 255, 255, .65);
-  --menu-hover: rgba(255, 255, 255, .5); --menu-ativo-bg: rgba(255, 255, 255, .88); --menu-ativo-txt: var(--p-principal);
-  --menu-ativo-sombra: 0 6px 18px color-mix(in srgb, var(--p-principal) 12%, transparent);
-  --menu-ic: #626874; --menu-ic-ativo: var(--p-destaque); --menu-raio: 12px;
-  --marca-bg: linear-gradient(135deg, var(--p-principal), color-mix(in srgb, var(--p-principal) 62%, var(--p-destaque)));
-  --avatar-bg: rgba(255, 255, 255, .8);
-  --dica-bg: rgba(20, 22, 28, .9);
-}
-[data-estilo="bold"] {
-  --menu-bg: var(--p-principal); --menu-txt: rgba(255, 255, 255, .92); --menu-txt2: rgba(255, 255, 255, .66); --menu-borda: rgba(255, 255, 255, .2);
-  --menu-hover: rgba(255, 255, 255, .1); --menu-ativo-bg: #FFFFFF; --menu-ativo-txt: var(--p-principal);
-  --menu-ic: rgba(255, 255, 255, .75); --menu-ic-ativo: var(--p-principal); --menu-raio: 999px; --menu-foco: #FFFFFF;
-  --marca-bg: var(--p-vivo); --marca-txt: #101114; --bolinha-bg: var(--p-vivo); --bolinha-txt: #101114;
-  --avatar-bg: #FFFFFF; --avatar-txt: var(--p-principal);
-  --dica-bg: #101114;
-}
-
 .menu { background: var(--menu-bg); -webkit-backdrop-filter: var(--menu-blur); backdrop-filter: var(--menu-blur); border-right: 1px solid var(--menu-borda); color: var(--menu-txt); padding: 18px 14px; gap: 2px; overflow-x: hidden; transition: width .22s ease, padding .22s ease, transform .25s; }
 .principal { transition: margin-left .22s ease; }
 .marca { display: flex; align-items: center; gap: 10px; padding: 2px 2px 14px; }
@@ -528,8 +550,7 @@ ol.passos { margin: 0; padding-left: 20px; display: flex; flex-direction: column
 .menu-item svg.i { color: var(--menu-ic); width: 19px; height: 19px; transition: color .15s; }
 .menu-item .rotulo { overflow: hidden; text-overflow: ellipsis; }
 .menu-item:hover { background: var(--menu-hover); }
-.menu-item:hover svg.i { color: var(--menu-ic-ativo); }
-[data-estilo="bold"] .menu-item:hover svg.i { color: #FFFFFF; }
+.menu-item:hover svg.i { color: var(--menu-ic-hover); }
 .menu-item:focus-visible { outline: 2px solid var(--menu-foco); outline-offset: -2px; }
 .menu-item[aria-current="page"] { background: var(--menu-ativo-bg); color: var(--menu-ativo-txt); font-weight: 650; box-shadow: var(--menu-ativo-sombra); }
 .menu-item[aria-current="page"] svg.i { color: var(--menu-ic-ativo); }
@@ -540,8 +561,7 @@ ol.passos { margin: 0; padding-left: 20px; display: flex; flex-direction: column
 .quem { padding: 0; min-width: 0; color: var(--menu-txt2); font-size: 11.5px; line-height: 1.35; overflow-wrap: normal; }
 .quem b { display: block; color: var(--menu-txt); font-size: 13.5px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .quem span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.menu-rodape .btn.sec.menu-sair { margin: 0; height: 38px; border-radius: min(var(--menu-raio), 10px); color: var(--menu-txt); border: 1px solid var(--menu-borda); background: transparent; box-shadow: none; font-size: 13px; }
-[data-estilo="bold"] .menu-rodape .btn.sec.menu-sair { border-radius: 999px; border-color: rgba(255, 255, 255, .3); color: var(--menu-txt); }
+.menu-rodape .btn.sec.menu-sair { margin: 0; height: 38px; border-radius: var(--sair-raio); color: var(--menu-txt); border: var(--sair-borda); background: transparent; box-shadow: none; font-size: 13px; }
 .menu-sair svg.i { width: 16px; height: 16px; }
 .menu-rodape .btn.sec.menu-sair:hover { background: var(--menu-hover); }
 .menu-rodape .btn.sec.menu-sair:focus-visible { outline: 2px solid var(--menu-foco); outline-offset: 2px; }
@@ -564,7 +584,7 @@ ol.passos { margin: 0; padding-left: 20px; display: flex; flex-direction: column
 /* Celular: gaveta por cima da tela */
 @media (max-width: 900px) {
   .menu-alterna { display: none; }
-  [data-estilo="glass"] .menu { --menu-bg: rgba(255, 255, 255, .86); }
+  [data-estilo="glass"] .menu { --menu-bg: rgba(255, 255, 255, .88); }
   .topo-celular { background: var(--menu-bg); -webkit-backdrop-filter: var(--menu-blur); backdrop-filter: var(--menu-blur); border-bottom-color: var(--menu-borda); color: var(--menu-txt); }
   .topo-celular button { background: transparent; border-color: var(--menu-borda); color: var(--menu-txt); }
   .topo-celular .assina { font-size: 15px; max-width: 45vw; }
@@ -623,6 +643,87 @@ td select.sel-cat { min-width: 190px; max-width: 240px; }
 .meta-barra i { background: var(--meta-fill); box-shadow: var(--barra-brilho); }
 .cabeca h1 { letter-spacing: var(--esp-h1); }
 .lista-foco li, .dia-videos li, .passo-item { background: var(--lista-bg); border: var(--lista-borda); }
+
+/* =============================================================
+   COMPOSIÇÃO DOS MODELOS (Hoje) E GRÁFICOS
+   Tudo por tokens: as prévias de um modelo dentro de outro não se misturam.
+   ============================================================= */
+:root, [data-estilo] { --card-img: none; --alvo-display: none; --alvo-cor: var(--p-destaque); --alvo-brilho: none; --foco-ic-bg: color-mix(in srgb, var(--p-principal) 10%, transparent); --foco-ic-cor: var(--p-principal); }
+[data-estilo="editorial"] { --alvo-display: grid; --alvo-cor: var(--p-destaque); }
+[data-estilo="glass"] { --card-img: linear-gradient(140deg, rgba(255, 255, 255, .6), rgba(255, 255, 255, .08) 60%); --foco-ic-bg: rgba(255, 255, 255, .75); }
+[data-estilo="neon"] { --alvo-display: grid; --alvo-cor: var(--p-vivo); --alvo-brilho: drop-shadow(0 0 10px color-mix(in srgb, var(--p-vivo) 70%, transparent)); --foco-ic-bg: color-mix(in srgb, var(--p-vivo) 14%, transparent); --foco-ic-cor: var(--p-vivo); }
+.card { background-image: var(--card-img); }
+.hoje { display: flex; flex-direction: column; gap: 18px; }
+.g12 { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); }
+@media (max-width: 1050px) { .g12 { grid-template-columns: 1fr; } }
+.kpi-ic { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: var(--ic-kpi-bg); color: var(--ic-kpi); margin-bottom: 10px; }
+.kpi-ic svg.i { width: 18px; height: 18px; }
+.kpi.escuro .kpi-ic { background: var(--ic-kpi-dest-bg, var(--ic-kpi-bg)); color: var(--ic-kpi-dest, var(--ic-kpi)); }
+[data-estilo="editorial"], [data-estilo="neon"] { --ic-kpi-dest-bg: color-mix(in srgb, var(--kpi-dest-txt) 13%, transparent); --ic-kpi-dest: var(--kpi-dest-val); }
+.graf-card { display: flex; flex-direction: column; }
+.graf-card > .graf { margin-block: auto; }
+.foco .card-topo { align-items: center; }
+.foco-ic { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--foco-ic-bg); color: var(--foco-ic-cor); flex: none; }
+.foco-ic svg.i { width: 16px; height: 16px; }
+.foco-alerta { color: var(--ambar); } .foco-chama { color: var(--vermelho); }
+.secao-titulo { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: -6px; }
+.secao-titulo h2 { margin: 0; font-family: var(--fonte-titulo); font-weight: var(--peso-titulo); font-size: 20px; letter-spacing: var(--esp-titulo); }
+.meta-card { position: relative; }
+.meta-alvo { display: var(--alvo-display); position: absolute; top: 18px; right: 18px; width: 64px; height: 64px; place-items: center; color: var(--alvo-cor); filter: var(--alvo-brilho); opacity: .9; pointer-events: none; }
+.meta-alvo svg.i { width: 60px; height: 60px; stroke-width: 1.3; }
+.meta-card .card-topo { padding-right: 70px; }
+.hoje-editorial .meta-destaque .meta-num { font-size: clamp(32px, 3.6vw, 46px); }
+.hoje-neon .meta-neon .meta-num { font-size: clamp(28px, 3vw, 38px); }
+@media (max-width: 520px) { .meta-alvo { width: 44px; height: 44px; top: 14px; right: 14px; } .meta-alvo svg.i { width: 40px; height: 40px; } }
+
+/* Gráfico de série (linha, área, barras, neon) */
+.serie .grade-l { stroke: var(--graf-grade); stroke-dasharray: none; }
+.serie .eixo, .graf .eixo { fill: var(--graf-eixo); }
+.serie .l-serie { fill: none; stroke: var(--graf-linha); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; filter: var(--graf-brilho); }
+.serie .a-serie { opacity: .9; }
+.serie-linha .a-serie { opacity: .55; }
+.serie-area .l-serie { stroke-width: 2.2; }
+.serie-area .a-serie { opacity: 1; }
+.serie-neon .l-serie { stroke-width: 3; }
+.serie .p-serie { fill: var(--card-bg); stroke: var(--graf-linha); stroke-width: 3; filter: var(--graf-brilho); }
+.serie .zona-dica, .graf rect[data-dica] { cursor: crosshair; }
+.serie .zona-dica { fill: transparent; }
+.serie .zona-dica.zona-ativa { fill: color-mix(in srgb, var(--graf-linha) 9%, transparent); }
+.graf rect.zona-ativa:not(.zona-dica) { opacity: .75; }
+.dica-graf { position: fixed; z-index: 96; pointer-events: none; padding: 6px 10px; border-radius: 8px; background: var(--dica-graf-bg); color: var(--dica-graf-txt); font-size: 12.5px; font-weight: 600; white-space: nowrap; box-shadow: 0 8px 20px rgba(0, 0, 0, .2); }
+/* Rosca e pizza */
+.rosca .fatia { transition: opacity .15s, stroke-width .15s; cursor: pointer; }
+.rosca .fatia.zona-ativa { opacity: .82; }
+.rosca svg { filter: var(--graf-brilho); }
+.rosca .centro-v { font-family: var(--fonte-num); font-weight: 700; font-size: 19px; fill: var(--txt); }
+.rosca .centro-r { font-size: 10.5px; fill: var(--txt2); }
+
+/* Prévias da Aparência: Hoje, Resultados e menu aberto/recolhido */
+.ap-abas { margin: 0 0 10px; }
+.tema-amostra .graf { max-height: 170px; }
+.ap-estilo .tema-amostra .graf { max-height: 120px; }
+.tema-amostra .rosca { gap: 12px; }
+.tema-amostra .rosca svg { width: 120px; height: 120px; }
+.tema-amostra .rosca-leg { min-width: 140px; }
+.ta-menus { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+@media (max-width: 520px) { .ta-menus { grid-template-columns: 1fr; } }
+.mm { background: var(--menu-bg); color: var(--menu-txt); border: 1px solid var(--menu-borda); border-radius: 14px; padding: 12px 10px; display: flex; flex-direction: column; gap: 3px; -webkit-backdrop-filter: var(--menu-blur); backdrop-filter: var(--menu-blur); max-width: 230px; }
+.mm-rec { width: 68px; align-items: center; overflow: visible; }
+.mm-marca { display: flex; align-items: center; gap: 8px; padding: 0 4px 10px; font-size: 14px; }
+.mm-marca .marca-sinal { width: 28px; height: 28px; font-size: 13px; border-radius: 8px; }
+.mm-item { position: relative; display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: var(--menu-raio); font-size: 13px; color: var(--menu-txt); }
+.mm-item svg.i { width: 17px; height: 17px; color: var(--menu-ic); }
+.mm-item.at { background: var(--menu-ativo-bg); color: var(--menu-ativo-txt); box-shadow: var(--menu-ativo-sombra); font-weight: 650; }
+.mm-item.at svg.i { color: var(--menu-ic-ativo); }
+.mm-rec .mm-item { justify-content: center; padding: 9px 0; width: 44px; }
+.mm-dica { position: absolute; left: calc(100% + 8px); top: 50%; transform: translateY(-50%); white-space: nowrap; font-style: normal; font-size: 11.5px; font-weight: 600; padding: 4px 8px; border-radius: 7px; background: var(--dica-bg); color: var(--dica-txt); }
+.tema-amostra { background: var(--fundo-img, none), var(--creme); }
+.ta-app { display: flex; gap: 12px; align-items: stretch; }
+.ta-lado { flex: none; display: flex; }
+.ta-lado .mm { border-radius: 12px; }
+.ta-corpo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.tema-amostra.ta-hoje, .tema-amostra.ta-resultados { padding: 10px; }
+@media (max-width: 720px) { .ap-previa .ta-lado { display: none; } }
 
 /* Site do aluno: sem "Criar conta" */
 .abas-entrada, #formCriar { display: none !important; }

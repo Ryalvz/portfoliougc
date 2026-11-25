@@ -34,6 +34,7 @@
   function toast(t, ruim) { const e = $("#toast"); e.textContent = t; e.classList.toggle("ruim", !!ruim); e.classList.add("on"); clearTimeout(toast.t); toast.t = setTimeout(() => e.classList.remove("on"), ruim ? 4200 : 2400); }
   function traduz(e) {
     const m = String((e && (e.message || e.error_description)) || e || "").toLowerCase();
+    if (m.includes("schema cache") || (m.includes("column") && m.includes("does not exist")) || m.includes("violates check constraint")) return "Falta atualizar o banco do painel. Peça ao Claude: \"saiu versão nova do painel\" (ele copia o banco.sql para você rodar no Supabase).";
     if (m.includes("invalid login")) return "E-mail ou senha errados.";
     if (m.includes("email not confirmed")) return "Confirme seu e-mail primeiro: abra o link que mandamos na sua caixa de entrada.";
     if (m.includes("already registered") || m.includes("already been registered")) return "Esse e-mail já tem conta. Use Entrar ou Esqueci minha senha.";
@@ -46,21 +47,22 @@
   /* ---------- Aparência: estilo e cor (escolhidos em Meu perfil) ---------- */
   // Aparência: 4 estilos (forma) x 8 paletas (cores) + cor principal opcional. Tudo combina com tudo.
   const ESTILOS = {
-    light: ["Modern Light", "Claro e limpo, borda fina. A cor aparece só onde importa."],
-    dark: ["Dark Pro", "Fundo escuro, números fortes e destaque com brilho leve."],
-    glass: ["Glass / Aurora", "Fundo com luzes da paleta e cards de vidro. Leve e moderno."],
-    bold: ["Bold Modern", "Blocos de cor, títulos grandes e muito contraste."]
+    minimal: ["Minimalista", "Clean, muito espaço e foco nos dados."],
+    editorial: ["Moderno Editorial", "Menu escuro, títulos com serifa e números grandes. Sofisticado."],
+    glass: ["Glass / Aurora", "Vidro com blur, luzes da paleta e profundidade."],
+    neon: ["Premium Neon", "Fundo escuro, contraste forte e gráficos luminosos."]
   };
   const PALETAS = {
-    cafe: ["Café", ["#2B241C", "#A8864A", "#D7C3A0", "#F6F2EB"]], oliva: ["Oliva", ["#3F4A2B", "#7C8B4A", "#B8C28A", "#F3F3EA"]],
-    grafite: ["Grafite", ["#1C1C1E", "#6E6E73", "#A1A1A6", "#EDEDEF"]], rosa: ["Rosa", ["#6E2F48", "#C45A80", "#E8A7BD", "#FBF1F4"]],
-    azul: ["Azul", ["#14213D", "#3D6FB6", "#8FB3E3", "#EEF2F8"]], lavanda: ["Lavanda", ["#3B2A5C", "#8E6CCB", "#C3B2E8", "#F4F1FA"]],
-    terracota: ["Terracota", ["#6B2E1F", "#C46A3C", "#E3B08E", "#F8F1EA"]], energia: ["Energia", ["#14452F", "#D9A514", "#8DBF6A", "#F3F5EE"]]
+    // [nome, [escuro, principal, destaque, suave, fundo]]
+    cafe: ["Café", ["#2B211B", "#805A38", "#C19A62", "#E8DCCB", "#F8F4ED"]], oliva: ["Oliva", ["#283528", "#53663E", "#89975C", "#C5CDA8", "#F3F3E9"]],
+    grafite: ["Grafite", ["#171719", "#414147", "#77777F", "#B9B9BF", "#F0F0F2"]], rosa: ["Rosa", ["#542B3C", "#A34466", "#D47796", "#EAB9C9", "#FAEFF3"]],
+    azul: ["Azul", ["#142747", "#2456A6", "#5489D6", "#A9C7F0", "#F0F5FC"]], lavanda: ["Lavanda", ["#38245B", "#6843A6", "#9674D4", "#C9B7EB", "#F4F0FC"]],
+    terracota: ["Terracota", ["#602F24", "#A65336", "#CE815B", "#E6B99C", "#F8F0E9"]], energia: ["Energia", ["#153D30", "#17865C", "#E5B323", "#A9D66B", "#F4F5EC"]]
   };
   const CORES = PALETAS;
-  const ESTILO_ANTIGO = { clean: "light", editorial: "light", classico: "light", grafico: "light", minimal: "light", colorful: "bold" };
-  const LAYOUT_HOJE = { light: "classico", dark: "classico", glass: "classico", bold: "classico" };
-  const APARENCIA_PADRAO = { estilo: "light", cor: "cafe", custom: null };
+  const ESTILO_ANTIGO = { light: "minimal", clean: "minimal", classico: "minimal", grafico: "editorial", colorful: "editorial", bold: "editorial", dark: "neon" };
+  const LAYOUT_HOJE = { minimal: "classico", editorial: "classico", glass: "classico", neon: "classico" };
+  const APARENCIA_PADRAO = { estilo: "minimal", cor: "cafe", custom: null };
   const normEstilo = (e) => { e = ESTILO_ANTIGO[e] || e; return ESTILOS[e] ? e : APARENCIA_PADRAO.estilo; };
   const normPaleta = (c) => (PALETAS[c] ? c : APARENCIA_PADRAO.cor);
   const normCustom = (c) => (/^#[0-9a-f]{6}$/i.test(String(c || "")) ? String(c).toLowerCase() : null);
@@ -299,7 +301,7 @@
       async pedidos() {
         const todos = [], passo = 1000;
         for (let i = 0; i < 200000; i += passo) {
-          const lote = ok(await sb.from("pedidos").select("pedido_id,sku_id,produto_id,produto,itens,reembolsados,status,tipo_conteudo,conteudo_id,gmv,comissao_est,comissao_real,data").order("data", { ascending: true }).order("pedido_id").range(i, i + passo - 1));
+          const lote = ok(await sb.from("pedidos").select("pedido_id,sku_id,produto_id,produto,loja,itens,reembolsados,status,tipo_conteudo,conteudo_id,gmv,comissao_est,comissao_real,data,liquidado_em").order("data", { ascending: true }).order("pedido_id").range(i, i + passo - 1));
           todos.push(...lote); if (lote.length < passo) break;
         }
         return todos;
@@ -383,12 +385,13 @@
         const dow = new Date(d + "T12:00:00").getDay(); if (dow === 0 || dow === 6) taxa *= 1.25;
         let q = 0; const lim = Math.exp(-taxa); let pr = 1; do { q++; pr *= r(); } while (pr > lim); q--;
         for (let x = 0; x < q; x++) {
-          const st = r() < .06 ? "Inelegível" : idade > 18 ? "Liquidado" : r() < .1 ? "AwaitingPayment" : "Pendente";
+          const lojaEx = ["Casa Prática Store", "Foto & Luz Oficial", "Som Total Shop", "Casa Prática Store", "Organiza Já", "Bella Pele Cosméticos"][k % 6];
+          const st = r() < (lojaEx === "Som Total Shop" ? .28 : .05) ? "Inelegível" : idade > 18 ? "Liquidado" : r() < .1 ? "AwaitingPayment" : "Pendente";
           const itens = r() < .12 ? 2 : 1, gmv = Math.round(preco * itens * 100) / 100, ce = Math.round(gmv * com * 100) / 100;
           const cs = conteudos[k];
-          B.pedidos.push({ pedido_id: String(5800000000000000000n + BigInt(++n * 7919)), sku_id: String(1729000000 + k), produto_id: String(1730000000000 + k * 11), produto: nome, itens, reembolsados: 0, status: st,
+          B.pedidos.push({ pedido_id: String(5800000000000000000n + BigInt(++n * 7919)), sku_id: String(1729000000 + k), produto_id: String(1730000000000 + k * 11), produto: nome, loja: lojaEx, itens, reembolsados: 0, status: st,
             tipo_conteudo: r() < .9 ? "Vídeo" : "Vitrine", conteudo_id: cs[Math.floor(r() * cs.length)], gmv, comissao_est: ce, comissao_real: st === "Liquidado" ? ce : null,
-            data: `${d}T${pad(8 + Math.floor(r() * 15))}:${pad(Math.floor(r() * 60))}:00` });
+            data: `${d}T${pad(8 + Math.floor(r() * 15))}:${pad(Math.floor(r() * 60))}:00`, liquidado_em: st === "Liquidado" ? `${somaDias(d, 15)}T10:00:00` : null });
         }
       });
     }
@@ -401,7 +404,7 @@
     return {
       async sessao() { return B.perfil ? { id: "demo", email: B.perfil.email } : null; },
       aoMudar() {},
-      async entrar(email) { B.perfil = B.perfil || { user_id: "demo", email: email || "voce@exemplo.com", nome: "Aluno de exemplo", whatsapp: "27912345678", tiktok: "@seuuser", aceite_avisos: true, meta_videos: 15, meta_gmv: 100000, estilo: lerAparencia().estilo || "light", cor: lerAparencia().cor || "cafe", cor_custom: lerAparencia().custom || null }; return { id: "demo", email: B.perfil.email }; },
+      async entrar(email) { B.perfil = B.perfil || { user_id: "demo", email: email || "voce@exemplo.com", nome: "Aluno de exemplo", whatsapp: "27912345678", tiktok: "@seuuser", aceite_avisos: true, meta_videos: 15, meta_gmv: 100000, estilo: lerAparencia().estilo || "minimal", cor: lerAparencia().cor || "cafe", cor_custom: lerAparencia().custom || null }; return { id: "demo", email: B.perfil.email }; },
       async cadastrar(c) { B.perfil = { user_id: "demo", email: c.email, nome: c.nome, whatsapp: c.whatsapp, tiktok: c.tiktok, aceite_avisos: c.aceite, meta_videos: 15, meta_gmv: null, estilo: "classico", cor: "cafe" }; return { id: "demo", email: c.email }; },
       async recuperar() {}, async novaSenha() {}, async sair() { B.perfil = null; },
       async perfil() { return clone(B.perfil); },
@@ -607,7 +610,7 @@
         <div class="controles"><button class="btn pequeno" type="button" data-acao="usar-sugestao">Usar essa meta</button><button class="btn sec pequeno" type="button" data-tela="perfil">Escolher outra</button></div></div>` : `<button class="btn pequeno" type="button" data-tela="perfil">Definir minha meta</button>`}</div>`;
     const prev = previsaoMes(per), p = t.g / meta * 100, esperado = per.N / per.D * 100, falta = Math.max(0, meta - t.g), dias = per.D - per.N, bate = prev >= meta;
     return `<div class="card meta-card"><div class="card-topo"><h2>Meta de ${mes}</h2><span class="espaco"></span><button class="link" type="button" data-tela="perfil">mudar</button></div>
-      <div class="meta-num">${real(t.g)}</div><p class="rot">de ${real(meta)} em vendas (${pct(p)})</p>
+      <span class="meta-alvo" aria-hidden="true">${svgIc("meta")}</span><div class="meta-num">${real(t.g)}</div><p class="rot">de ${real(meta)} em vendas (${pct(p)})</p>
       <div class="barra meta-barra"><i style="width:${Math.min(100, p).toFixed(1)}%"></i><b style="left:${esperado.toFixed(1)}%" title="onde você deveria estar hoje"></b></div>
       <div class="meta-linhas">
         <div><span>Falta</span><b>${real(falta)}</b></div>
@@ -635,7 +638,9 @@
     vendas: '<path d="M6 7h12l-1 13H7z"/><path d="M9 7a3 3 0 0 1 6 0"/>', mes: '<rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
     comissao: '<circle cx="12" cy="12" r="8.5"/><path d="M14.5 9.5c-.5-1-1.5-1.5-2.5-1.5-1.4 0-2.5.8-2.5 2s1.1 1.7 2.5 2 2.5.8 2.5 2-1.1 2-2.5 2c-1 0-2-.5-2.5-1.5M12 6.5v11"/>',
     pedidos: '<path d="M4 8l8-4 8 4v8l-8 4-8-4z"/><path d="M4 8l8 4 8-4M12 12v8"/>', meta: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/>',
-    video: '<path d="M8 5.5v13l10-6.5z"/>'
+    video: '<path d="M8 5.5v13l10-6.5z"/>',
+    coroa: '<path d="M4 8l4 4 4-7 4 7 4-4-2 11H6z"/>', alerta: '<path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17h.01"/>',
+    chama: '<path d="M12 3c1 4 6 6 6 11a6 6 0 0 1-12 0c0-3 2-4 2-7 2 1 3 3 3 5 1-2 1-6 1-9z"/>'
   };
   const svgIc = (k) => `<svg class="i" viewBox="0 0 24 24">${IC_TILE[k]}</svg>`;
   function sparkline(v) {
@@ -655,7 +660,7 @@
     for (let v = 0; v <= topo + .1; v += passo) s += `<line class="grade-l" x1="${m.e}" x2="${W - m.d}" y1="${Y(v)}" y2="${Y(v)}"/><text class="eixo" x="${m.e - 8}" y="${Y(v) + 4}" text-anchor="end">${realCurto(v)}</text>`;
     for (let d = 1; d <= per.D; d++) {
       const v = atual[d]; if (d > per.N && per.atual) continue;
-      s += `<rect class="${d === per.N && per.atual ? "b-hoje" : "b-atual"}" x="${(X(d) - bw * .36).toFixed(1)}" width="${(bw * .72).toFixed(1)}" y="${Y(v).toFixed(1)}" height="${(Y(0) - Y(v)).toFixed(1)}" rx="2"><title>${dataBR(`${per.mes}-${pad(d)}`)}: ${real(v)}</title></rect>`;
+      s += `<rect class="${d === per.N && per.atual ? "b-hoje" : "b-atual"}" x="${(X(d) - bw * .36).toFixed(1)}" width="${(bw * .72).toFixed(1)}" y="${Y(v).toFixed(1)}" height="${(Y(0) - Y(v)).toFixed(1)}" rx="2" data-dica="${dataBR(`${per.mes}-${pad(d)}`)} · ${real(v)}"><title>${dataBR(`${per.mes}-${pad(d)}`)}: ${real(v)}</title></rect>`;
     }
     const pts = []; for (let d = 1; d <= Math.min(per.D, ant.length - 1); d++) pts.push(`${pts.length ? "L" : "M"}${X(d).toFixed(1)},${Y(ant[d]).toFixed(1)}`);
     s += `<path class="l-ant" d="${pts.join("")}"/>`;
@@ -668,6 +673,7 @@
      TELAS
      ============================================================= */
   const ICONES = {
+    pedidos: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/>',
     hoje: '<rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
     resultados: '<path d="M12 3a9 9 0 1 0 9 9h-9z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15z"/>',
     produtos: '<path d="M4 21V9l8-5 8 5v12"/><path d="M9 21v-6h6v6M9 11h.01M12 11h.01M15 11h.01"/>',
@@ -676,7 +682,7 @@
     criar: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>',
     importar: '<path d="M12 15V3M7 8l5-5 5 5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/>'
   };
-  const TELAS = [["hoje", "Hoje"], ["resultados", "Resultados"], ["produtos", "Produtos"], ["videos", "Vídeos"], ["criar", "Criar"], ["amostras", "Amostras"], ["importar", "Importar"]];
+  const TELAS = [["hoje", "Hoje"], ["resultados", "Resultados"], ["pedidos", "Pedidos"], ["produtos", "Produtos"], ["videos", "Vídeos"], ["criar", "Criar"], ["amostras", "Amostras"], ["importar", "Importar"]];
   const NOMES = Object.fromEntries([...TELAS, ["perfil", "Meu perfil"]]);
 
   function montarMenu() {
@@ -738,6 +744,61 @@
   }
 
   /* ---------- HOJE ---------- */
+  /* ---------- GRÁFICOS: um motor só; o modelo escolhe o tipo e as cores vêm da paleta ---------- */
+  const modelo = () => (document.documentElement.dataset.estilo || "minimal");
+  const TIPO_GRAF = { minimal: "linha", editorial: "area", glass: "barras", neon: "neon" };
+  // pts = [{ rot: "1", v: 123, dica: "1/11 · R$ 123,00" }]
+  function grafSerie(pts, tipo, rotulo) {
+    if (!pts.length || !pts.some((p) => p.v > 0)) return '<p class="vazio">Ainda sem vendas neste período.</p>';
+    const W = 640, H = 230, m = { e: 58, d: 12, t: 14, b: 26 };
+    const max = Math.max(...pts.map((p) => p.v), 1), passo = niceStep(max), topo = Math.ceil(max / passo) * passo;
+    const Y = (v) => m.t + (H - m.t - m.b) * (1 - v / topo), larg = (W - m.e - m.d) / pts.length, X = (i) => m.e + (i + .5) * larg;
+    const uid = (grafSerie.n = (grafSerie.n || 0) + 1);
+    let s = `<svg class="graf serie serie-${tipo}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(rotulo)}"><defs><linearGradient id="gArea${uid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--graf-linha)" stop-opacity=".35"/><stop offset="1" stop-color="var(--graf-linha)" stop-opacity="0"/></linearGradient><linearGradient id="gBarra${uid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--g1)"/><stop offset="1" stop-color="var(--g2)"/></linearGradient></defs>`;
+    for (let v = 0; v <= topo + .1; v += passo) s += `<line class="grade-l" x1="${m.e}" x2="${W - m.d}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}"/><text class="eixo" x="${m.e - 8}" y="${(Y(v) + 4).toFixed(1)}" text-anchor="end">${realCurto(v)}</text>`;
+    const cada = Math.max(1, Math.ceil(pts.length / 7));
+    pts.forEach((p, i) => { if (i % cada === 0 || i === pts.length - 1) s += `<text class="eixo" x="${X(i).toFixed(1)}" y="${H - 6}" text-anchor="middle">${esc(p.rot)}</text>`; });
+    if (tipo === "barras") {
+      pts.forEach((p, i) => { const w = Math.max(3, larg * .62); s += `<rect class="b-serie" fill="url(#gBarra${uid})" x="${(X(i) - w / 2).toFixed(1)}" width="${w.toFixed(1)}" y="${Y(p.v).toFixed(1)}" height="${Math.max(0, Y(0) - Y(p.v)).toFixed(1)}" rx="${Math.min(6, w / 2).toFixed(1)}"/>`; });
+    } else {
+      // linha suave (curva) entre os pontos
+      const P = pts.map((p, i) => [X(i), Y(p.v)]);
+      let d = `M${P[0][0].toFixed(1)},${P[0][1].toFixed(1)}`;
+      for (let i = 1; i < P.length; i++) { const [x0, y0] = P[i - 1], [x1, y1] = P[i], cx = (x0 + x1) / 2; d += ` C${cx.toFixed(1)},${y0.toFixed(1)} ${cx.toFixed(1)},${y1.toFixed(1)} ${x1.toFixed(1)},${y1.toFixed(1)}`; }
+      const area = `${d} L${P[P.length - 1][0].toFixed(1)},${Y(0).toFixed(1)} L${P[0][0].toFixed(1)},${Y(0).toFixed(1)} Z`;
+      s += `<path class="a-serie" d="${area}" fill="url(#gArea${uid})"/><path class="l-serie" d="${d}"/>`;
+      const iMax = pts.reduce((b, p, i) => (p.v > pts[b].v ? i : b), 0);
+      s += `<circle class="p-serie" cx="${P[iMax][0].toFixed(1)}" cy="${P[iMax][1].toFixed(1)}" r="5"/>`;
+    }
+    // zonas invisíveis para a dica com o valor (mouse e toque)
+    pts.forEach((p, i) => { s += `<rect class="zona-dica" x="${(X(i) - larg / 2).toFixed(1)}" y="${m.t}" width="${larg.toFixed(1)}" height="${(H - m.t - m.b).toFixed(1)}" data-dica="${esc(p.dica)}" data-x="${X(i).toFixed(1)}" data-y="${Y(p.v).toFixed(1)}"/>`; });
+    return s + "</svg>";
+  }
+  // Rosca (com total no centro) ou pizza, com legenda, valores, % e dica
+  function graficoCirculo(itens, pizza, rotulo) {
+    const tot = itens.reduce((a, [, v]) => a + v, 0);
+    if (!tot) return '<p class="vazio">Sem vendas válidas no período.</p>';
+    let l = [...itens].filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+    if (l.length > 6) { const resto = l.slice(5).reduce((a, [, v]) => a + v, 0); l = [...l.slice(0, 5), ["Outros", resto]]; }
+    const R = pizza ? 42 : 66, esp = pizza ? 84 : 24, C = 2 * Math.PI * R; let acc = 0;
+    const pct2 = (f) => (f * 100).toFixed(1).replace(".", ",") + "%";
+    const arcos = l.map(([n, v], i) => { const f = v / tot, el = `<circle class="fatia" r="${R}" cx="90" cy="90" fill="none" style="stroke:${CORES_ROSCA[i]}" stroke-width="${esp}" stroke-dasharray="${(f * C).toFixed(2)} ${C.toFixed(2)}" stroke-dashoffset="${(-acc * C).toFixed(2)}" transform="rotate(-90 90 90)" data-dica="${esc(n)} · ${real(v)} · ${pct2(f)}"/>`; acc += f; return el; }).join("");
+    const centro = pizza ? "" : `<text class="centro-v" x="90" y="88" text-anchor="middle">${realCurto(tot)}</text><text class="centro-r" x="90" y="106" text-anchor="middle">no total</text>`;
+    return `<div class="rosca${pizza ? " pizza" : ""}"><svg viewBox="0 0 180 180" role="img" aria-label="${esc(rotulo)}">${arcos}${centro}</svg>
+      <ul class="rosca-leg">${l.map(([n, v], i) => `<li><i style="background:${CORES_ROSCA[i]}"></i><span class="n">${esc(n)}</span><b>${pct2(v / tot)}</b><small>${real(v)}</small></li>`).join("")}</ul></div>`;
+  }
+  // Dica dos gráficos: um balão só, que segue o mouse (ou o toque)
+  const dicaGraf = document.createElement("div"); dicaGraf.className = "dica-graf"; dicaGraf.hidden = true; dicaGraf.setAttribute("role", "status"); document.body.appendChild(dicaGraf);
+  function mostrarDicaGraf(alvo, ev) {
+    dicaGraf.textContent = alvo.dataset.dica; dicaGraf.hidden = false;
+    const r = dicaGraf.getBoundingClientRect(), x = Math.min(window.innerWidth - r.width - 8, Math.max(8, ev.clientX - r.width / 2)), y = ev.clientY - r.height - 14;
+    dicaGraf.style.left = x + "px"; dicaGraf.style.top = (y < 8 ? ev.clientY + 18 : y) + "px";
+    document.querySelectorAll(".zona-ativa").forEach((z) => z.classList.remove("zona-ativa")); alvo.classList.add("zona-ativa");
+  }
+  document.addEventListener("pointermove", (e) => { const a = e.target.closest && e.target.closest("[data-dica]"); if (a && a.closest("svg.graf, .rosca svg")) mostrarDicaGraf(a, e); else if (!dicaGraf.hidden) { dicaGraf.hidden = true; document.querySelectorAll(".zona-ativa").forEach((z) => z.classList.remove("zona-ativa")); } });
+  document.addEventListener("scroll", () => { dicaGraf.hidden = true; }, true);
+
+  /* ---------- HOJE: mesmos dados, composição própria em cada modelo ---------- */
   async function telaHoje(el) {
     const hoje = hojeISO(), d = new Date(), nome = (S.perfil.apelido || "").trim() || (S.perfil.nome || "").split(" ")[0];
     const saud = d.getHours() < 12 ? "Bom dia" : d.getHours() < 18 ? "Boa tarde" : "Boa noite";
@@ -749,51 +810,54 @@
     const an = analiseProdutos(), f = foco(an), plano = planoDoDia(an, f);
     const vids = S.videosHoje, feitos = vids.filter((v) => v.status !== "rascunho").length;
     const rotRef = ref === hoje ? "Hoje até agora" : ref === somaDias(hoje, -1) ? "Ontem" : "Último dia: " + dataBR(ref);
-    const meta = +S.perfil.meta_gmv || 0, est = LAYOUT_HOJE[document.documentElement.dataset.estilo] || "classico";
-    const kVid = `<p class="rot">Vídeos de hoje</p><div class="val">${feitos} de ${plano.N}</div><div class="barra"><i style="width:${Math.min(100, feitos / plano.N * 100).toFixed(1)}%"></i></div><small>${vids.length ? `${plural(vids.length, "planejado", "planejados")}, ${plural(feitos, "agendado ou postado", "agendados ou postados")}` : "Nenhum vídeo planejado ainda."}</small>`;
-    let topo;
-    if (est === "grafico") topo = `<div class="grade g21">
-        <div class="card hero"><div class="card-topo"><h2>${rotRef}</h2><span class="espaco"></span><span class="etiqueta">${nomeMes(per.mes)}</span></div>
-          <div class="hero-num">${real(tRef.g)}</div><p class="hero-rot">vendas (GMV) ${selo(tRef.g, tAntes.g)}</p>
-          <div class="hero-linha"><div><b>${num(tRef.pedidos)}</b><span>pedidos</span></div><div><b>${real(tRef.c)}</b><span>comissão estimada</span></div><div><b>${realCurto(tMes.g)}</b><span>vendas no mês ${selo(tMes.g, tAnt.g)}</span></div></div>
-          ${grafArea(per)}<p class="hero-rot">vendas por dia em ${MESES[+per.mes.slice(5, 7) - 1]}</p></div>
-        ${cardMeta(per, tMes)}</div>
-      <div class="card kpi">${kVid}</div>`;
-    else if (est === "minimal") topo = `<div class="grade g6">${[
-        ["vendas", rotRef, realCurto(tRef.g), selo(tRef.g, tAntes.g)], ["mes", "Vendas no mês", realCurto(tMes.g), selo(tMes.g, tAnt.g)],
-        ["comissao", "Comissão no mês", realCurto(tMes.c), selo(tMes.c, tAnt.c)], ["pedidos", "Pedidos no mês", num(tMes.pedidos), selo(tMes.pedidos, tAnt.pedidos)],
-        ["meta", "Da meta do mês", meta ? pct(tMes.g / meta * 100) : "sem meta", ""], ["video", "Vídeos de hoje", `${feitos}/${plano.N}`, ""]
-      ].map(([ic, r, v, s], k) => `<div class="card tile${k === 0 ? " destaque" : ""}"><span class="tile-ic">${svgIc(ic)}</span><div class="val">${v}</div><p class="rot">${r}</p>${s}</div>`).join("")}</div>
-      <div class="grade g2">${cardMeta(per, tMes)}<div class="card kpi">${kVid}</div></div>`;
-    else topo = `<div class="grade g4">
-        <div class="card kpi escuro"><p class="rot">${rotRef}</p><div class="val">${real(tRef.g)}</div>${selo(tRef.g, tAntes.g)}<small>${plural(tRef.pedidos, "pedido", "pedidos")} · comissão ${real(tRef.c)}</small></div>
-        <div class="card kpi"><p class="rot">Vendas no mês</p><div class="val">${real(tMes.g)}</div>${selo(tMes.g, tAnt.g)}<small>até o dia ${per.N}, contra o mesmo pedaço de ${MESES[+per.ant.slice(5, 7) - 1]}</small></div>
-        <div class="card kpi"><p class="rot">Comissão no mês</p><div class="val">${real(tMes.c)}</div>${selo(tMes.c, tAnt.c)}<small>${pct(tMes.g ? tMes.c / tMes.g * 100 : 0)} das vendas · ${real(tMes.liq)} já liquidada</small></div>
+    const mod = modelo(), mesNome = MESES[+per.mes.slice(5, 7) - 1];
+    const ic = (k) => `<span class="kpi-ic">${svgIc(k)}</span>`;
+    const kVid = `${ic("video")}<p class="rot">Vídeos de hoje</p><div class="val">${feitos} de ${plano.N}</div><div class="barra"><i style="width:${Math.min(100, feitos / plano.N * 100).toFixed(1)}%"></i></div><small>${vids.length ? `${plural(vids.length, "planejado", "planejados")}, ${plural(feitos, "agendado ou postado", "agendados ou postados")}` : "Nenhum vídeo planejado ainda."}</small>`;
+    const KPIS = `<div class="grade g4 kpis">
+        <div class="card kpi escuro">${ic("vendas")}<p class="rot">${rotRef}</p><div class="val">${real(tRef.g)}</div>${selo(tRef.g, tAntes.g)}<small>${plural(tRef.pedidos, "pedido", "pedidos")} · comissão ${real(tRef.c)}</small></div>
+        <div class="card kpi">${ic("mes")}<p class="rot">Vendas no mês</p><div class="val">${real(tMes.g)}</div>${selo(tMes.g, tAnt.g)}<small>até o dia ${per.N}, contra o mesmo pedaço de ${MESES[+per.ant.slice(5, 7) - 1]}</small></div>
+        <div class="card kpi">${ic("comissao")}<p class="rot">Comissão no mês</p><div class="val">${real(tMes.c)}</div>${selo(tMes.c, tAnt.c)}<small>${pct(tMes.g ? tMes.c / tMes.g * 100 : 0)} das vendas · ${real(tMes.liq)} já liquidada</small></div>
         <div class="card kpi">${kVid}</div>
-      </div>
-      ${cardMeta(per, tMes)}`;
+      </div>`;
+    // dados dos gráficos: só pedidos válidos do mês
+    const doMes = entre(per.ini, per.fim).filter(valido);
+    const porDia = []; for (let k = 1; k <= per.N; k++) { const dia = `${per.mes}-${pad(k)}`, v = doMes.filter((p) => p.dia === dia).reduce((a, p) => a + p.g, 0); porDia.push({ rot: String(k), v, dica: `${dataBR(dia)} · ${real(v)}` }); }
+    const cats = {}; doMes.forEach((p) => { const c = CATS[p.categoria] || "Outros"; cats[c] = (cats[c] || 0) + p.g; });
+    const canais = {}; doMes.forEach((p) => { const c = (p.tipo_conteudo || "").trim() || "Outro"; canais[c] = (canais[c] || 0) + p.g; });
+    const GRAF = `<div class="card graf-card"><div class="card-topo"><h2>Vendas por dia</h2><span class="sub">${mesNome}, só pedidos válidos</span></div>${grafSerie(porDia, TIPO_GRAF[mod] || "linha", "Vendas por dia")}</div>`;
+    const CAT = `<div class="card"><div class="card-topo"><h2>Vendas por categoria</h2><span class="sub">${mesNome}</span></div>${graficoCirculo(Object.entries(cats), false, "Vendas por categoria")}</div>`;
+    const CANAL = `<div class="card"><div class="card-topo"><h2>Vendas por canal</h2><span class="sub">${mesNome}</span></div>${graficoCirculo(Object.entries(canais), true, "Vendas por canal")}</div>`;
+    const META = cardMeta(per, tMes);
     const item = (x, extra) => `<li><span class="nome" title="${esc(x.nome)}">${esc(x.nome)}</span><span class="val">${real(x.c30)}</span><small>${extra}${x.produto_id ? ` · <button class="link esg" type="button" data-acao="esgotado" data-id="${esc(x.produto_id)}">esgotou?</button>` : ""}</small></li>`;
     const esgotados = an.lista.filter((x) => x.esgotado);
-    el.innerHTML = cab + (lembreteManha() || avisoImport()) + cartaoInstalar() + topo + `
-      <div class="grade g3">
-        <div class="card"><div class="card-topo"><h2>Principais</h2><span class="sub">o que mais te paga</span></div>
+    const icFoco = (k) => `<span class="foco-ic foco-${k}">${svgIc(k)}</span>`;
+    const FOCO = `${mod === "editorial" ? '<div class="secao-titulo"><h2>Desempenho de produtos</h2><button class="link" type="button" data-tela="produtos">Ver todos</button></div>' : ""}<div class="grade g3 foco">
+        <div class="card"><div class="card-topo">${icFoco("coroa")}<h2>Principais</h2><span class="sub">o que mais te paga</span></div>
           <ul class="lista-foco">${f.principais.map((x) => item(x, `${x.dias.size} dias com venda em 30 · ${pct(x.share)} da comissão`)).join("") || '<p class="vazio">Ainda sem vendas nos últimos 30 dias.</p>'}</ul>
           <p class="frase">Mantenha 2 vídeos por dia de cada um. São eles que seguram o mês.</p></div>
-        <div class="card"><div class="card-topo"><h2>Dê atenção</h2><span class="sub">começando a vender</span></div>
+        <div class="card"><div class="card-topo">${icFoco("alerta")}<h2>Dê atenção</h2><span class="sub">começando a vender</span></div>
           <ul class="lista-foco">${f.apostas.map((x) => item(x, `<span class="selo ${x.tend === "Novo" ? "novo" : "sobe"}">${x.tend}</span> ${real(x.a)} nos últimos ${S.janela} dias${x.b ? ` contra ${real(x.b)} antes` : ""}`)).join("") || '<p class="vazio">Nenhum produto acelerando agora. Hora de testar produto novo.</p>'}</ul>
           <p class="frase">Produto novo ou que vendeu 1,5 vez mais que nos ${S.janela} dias anteriores, em pelo menos 3 dias diferentes. Grave mais desses.</p></div>
-        <div class="card"><div class="card-topo"><h2>Esfriando</h2><span class="sub">perdeu força</span></div>
+        <div class="card"><div class="card-topo">${icFoco("chama")}<h2>Esfriando</h2><span class="sub">perdeu força</span></div>
           <ul class="lista-foco">${f.esfriando.map((x) => item(x, `<span class="selo desce">▼ ${pct(Math.abs(x.var))}</span> ${real(x.a)} nos últimos ${S.janela} dias contra ${real(x.b)} antes`)).join("") || '<p class="vazio">Nenhum produto caindo forte. Bom sinal.</p>'}</ul>
           <p class="frase">Vendeu metade ou menos que antes. Teste gancho novo ou troque por um da coluna do meio. Se for falta de estoque, toque em "esgotou?".</p>
           ${esgotados.length ? `<div class="esgotados"><p class="lbl">Esgotados · fora das sugestões</p>${esgotados.map((x) => `<span class="chip">${esc(x.nome)} <button class="link" type="button" data-acao="desfazer-esgotado" data-id="${esc(x.produto_id)}" aria-label="Voltar ${esc(x.nome)} para as sugestões">voltar</button></span>`).join("")}<p class="frase" style="margin-top:6px">Voltam sozinhos quando venderem de novo.</p></div>` : ""}</div>
-      </div>
-      <div class="grade g21">
+      </div>`;
+    const PLANO = `<div class="grade g21">
         <div class="card"><div class="card-topo"><h2>Plano dos ${plano.N} vídeos de hoje</h2><span class="espaco"></span><button class="btn pequeno" type="button" data-acao="lancar-plano"${vids.length >= plano.N ? " disabled" : ""}>${vids.length ? "Completar o dia" : "Lançar no dia"}</button></div>
           ${blocoPlano("Principais", plano.prin, plano.nP)}${blocoPlano("Com vendas", plano.com, plano.nC)}${blocoPlano("Testes", plano.testes, plano.nT)}
           <p class="frase">40% nos principais, 40% em produtos que já venderam (os que estão acelerando primeiro) e 20% em testes. Mude a meta de vídeos em Meu perfil.</p></div>
         <div class="card"><div class="card-topo"><h2>Na agenda de hoje</h2><span class="espaco"></span><button class="link" type="button" data-tela="videos">Abrir Vídeos</button></div>
           ${vids.length ? `<ul class="dia-videos">${vids.map(linhaVideo).join("")}</ul>` : '<p class="vazio">Use "Lançar no dia" para criar a lista com horários.</p>'}</div>
       </div>`;
+    // cada modelo organiza as mesmas peças do seu jeito
+    const COMPOSICAO = {
+      minimal: [KPIS, `<div class="grade g21">${GRAF}${CAT}</div>`, FOCO, `<div class="grade g2">${META}${CANAL}</div>`, PLANO],
+      editorial: [KPIS, `<div class="grade g21 meta-destaque">${META}${CANAL}</div>`, FOCO, `<div class="grade g21">${GRAF}${CAT}</div>`, PLANO],
+      glass: [KPIS, `<div class="grade g21">${GRAF}${CAT}</div>`, FOCO, `<div class="grade g2">${META}${CANAL}</div>`, PLANO],
+      neon: [KPIS, `<div class="grade g21">${GRAF}${CAT}</div>`, `<div class="grade g12 meta-neon">${META}${CANAL}</div>`, FOCO, PLANO]
+    };
+    el.innerHTML = `<div class="hoje hoje-${mod}">` + cab + (lembreteManha() || avisoImport()) + cartaoInstalar() + (COMPOSICAO[mod] || COMPOSICAO.minimal).join("") + "</div>";
   }
   function blocoPlano(titulo, l, n) {
     if (!n) return "";
@@ -856,18 +920,7 @@
 
   /* ---------- TODO O PERÍODO ---------- */
   const CORES_ROSCA = ["var(--g1)", "var(--g2)", "var(--g3)", "var(--g4)", "var(--g5)", "var(--g6)"];
-  function rosca(itens) {
-    const tot = itens.reduce((a, [, v]) => a + v, 0);
-    if (!tot) return '<p class="vazio">Sem vendas válidas no período.</p>';
-    let l = [...itens].sort((a, b) => b[1] - a[1]);
-    if (l.length > 6) { const resto = l.slice(5).reduce((a, [, v]) => a + v, 0); l = [...l.slice(0, 5), ["Outros", resto]]; }
-    const R = 70, C = 2 * Math.PI * R; let acc = 0;
-    const arcos = l.map(([n, v], i) => { const f = v / tot, d = `<circle r="${R}" cx="90" cy="90" fill="none" style="stroke:${CORES_ROSCA[i]}" stroke-width="28" stroke-dasharray="${(f * C).toFixed(2)} ${C.toFixed(2)}" stroke-dashoffset="${(-acc * C).toFixed(2)}" transform="rotate(-90 90 90)"><title>${esc(n)}: ${pct(f * 100)} (${real(v)})</title></circle>`; acc += f; return d; }).join("");
-    const sep = l.length > 1 ? l.map((_, i) => { const ang = (l.slice(0, i).reduce((a, [, v]) => a + v, 0) / tot) * 2 * Math.PI - Math.PI / 2; return `<line x1="${90 + 55 * Math.cos(ang)}" y1="${90 + 55 * Math.sin(ang)}" x2="${90 + 85 * Math.cos(ang)}" y2="${90 + 85 * Math.sin(ang)}" style="stroke:var(--card)" stroke-width="2"/>`; }).join("") : "";
-    const pct2 = (f) => (f * 100).toFixed(2).replace(".", ",") + "%";
-    return `<div class="rosca"><svg viewBox="0 0 180 180" role="img" aria-label="Divisão das vendas">${arcos}${sep}</svg>
-      <ul class="rosca-leg">${l.map(([n, v], i) => `<li><i style="background:${CORES_ROSCA[i]}"></i><span class="n">${esc(n)}</span><b>${pct2(v / tot)}</b><small>${real(v)}</small></li>`).join("")}</ul></div>`;
-  }
+  function rosca(itens) { return graficoCirculo(itens, false, "Divisão das vendas"); }
   function grafMeses(meses) {
     const W = 720, H = 220, m = { e: 54, d: 8, t: 10, b: 24 };
     const max = Math.max(...meses.map((x) => x.g), 1), passo = niceStep(max), topo = Math.ceil(max / passo) * passo;
@@ -877,7 +930,7 @@
     for (let v = 0; v <= topo + .1; v += passo) s += `<line class="grade-l" x1="${m.e}" x2="${W - m.d}" y1="${Y(v)}" y2="${Y(v)}"/><text class="eixo" x="${m.e - 8}" y="${Y(v) + 4}" text-anchor="end">${realCurto(v)}</text>`;
     meses.forEach((x, i) => {
       const w = Math.min(bw * .7, 48);
-      s += `<rect class="${x.mes === hoje ? "b-hoje" : "b-atual"}" x="${(X(i) - w / 2).toFixed(1)}" width="${w.toFixed(1)}" y="${Y(x.g).toFixed(1)}" height="${(Y(0) - Y(x.g)).toFixed(1)}" rx="3"><title>${nomeMes(x.mes)}: ${real(x.g)} em vendas, ${real(x.c)} de comissão</title></rect>`;
+      s += `<rect class="${x.mes === hoje ? "b-hoje" : "b-atual"}" x="${(X(i) - w / 2).toFixed(1)}" width="${w.toFixed(1)}" y="${Y(x.g).toFixed(1)}" height="${(Y(0) - Y(x.g)).toFixed(1)}" rx="3" data-dica="${nomeMes(x.mes)} · ${real(x.g)} em vendas · ${real(x.c)} de comissão"><title>${nomeMes(x.mes)}: ${real(x.g)} em vendas, ${real(x.c)} de comissão</title></rect>`;
       if (i % cada === 0 || i === meses.length - 1) s += `<text class="eixo" x="${X(i)}" y="${H - 6}" text-anchor="middle">${MESES[+x.mes.slice(5, 7) - 1].slice(0, 3)}/${x.mes.slice(2, 4)}</text>`;
     });
     return s + "</svg>";
@@ -901,7 +954,7 @@
       <div class="card"><div class="card-topo"><h2>Vendas por mês</h2><span class="sub">melhor mês: ${nomeMes(melhor.mes)}</span></div>${grafMeses(meses)}
         <p class="frase">Cada barra é um mês de vendas válidas (liquidadas e pendentes). A barra clara é o mês que ainda está correndo.</p></div>
       <div class="grade g2">
-        <div class="card"><div class="card-topo"><h2>Vendas por canal</h2></div>${rosca(Object.entries(canais))}
+        <div class="card"><div class="card-topo"><h2>Vendas por canal</h2></div>${graficoCirculo(Object.entries(canais), true, "Vendas por canal")}
           <p class="frase">De onde vêm as suas vendas: vídeo, LIVE ou vitrine (cartão de produto).</p></div>
         <div class="card"><div class="card-topo"><h2>Vendas por categoria</h2></div>${rosca(Object.entries(cats))}
           <p class="frase">O perfil do que você vende. Corrija a categoria na aba Produtos se alguma estiver errada.</p></div>
@@ -916,6 +969,53 @@
   function seletorCat(x) {
     const atual = x.categoria + "|" + (x.subcategoria || "");
     return `<select class="inp sel-cat" data-acao="mudar-cat" data-id="${esc(x.produto_id)}" aria-label="Categoria de ${esc(x.nome)}">${Object.entries(CATS_SUB).map(([k, [n, subs]]) => `<optgroup label="${esc(n)}"><option value="${k}|"${atual === k + "|" ? " selected" : ""}>${esc(n)}${subs.length ? " (geral)" : ""}</option>${subs.map((sb) => `<option value="${k}|${esc(sb)}"${atual === k + "|" + sb ? " selected" : ""}>${esc(sb)}</option>`).join("")}</optgroup>`).join("")}</select>`;
+  }
+  /* ---------- PEDIDOS: liquidado, pendente, aguardando e inelegível ---------- */
+  const ST_PED = { liq: ["Liquidado", "sobe", "Comissão já liberada pelo TikTok."], pen: ["Pendente", "novo", "Pedido válido. A comissão é liberada depois do prazo de devolução."],
+    agu: ["Aguardando pagamento", "alerta", "O cliente ainda não terminou de pagar. Se não pagar, o pedido cai."], ine: ["Inelegível", "desce", "Não gera comissão (por exemplo: cancelado, devolvido ou fora das regras de afiliado da loja). O motivo de cada um aparece na Central de afiliados."],
+    out: ["Outros", "", "Status que o painel não reconhece."] };
+  function telaPedidos(el) {
+    const cab = `<div class="cabeca"><div><h1>Pedidos</h1><p>O que já foi pago, o que ainda vai cair e o que não gera comissão${S.ultimo ? `. Pedidos lidos até ${dataBR(S.ultimo)}` : ""}.</p></div></div>`;
+    if (!S.pedidos.length) { el.innerHTML = cab + semDados(); return; }
+    const fim = S.ultimo, per = S.pedPer || "30";
+    const ini = per === "30" ? somaDias(fim, -29) : per === "90" ? somaDias(fim, -89) : per === "mes" ? fim.slice(0, 8) + "01" : "0000-00-00";
+    const lista = S.pedidos.filter((p) => p.dia >= ini && p.dia <= fim);
+    const G = {}; Object.keys(ST_PED).forEach((k) => { G[k] = { ped: new Set(), itens: 0, g: 0, c: 0 }; });
+    lista.forEach((p) => { const x = G[p.cat] || G.out; x.ped.add(p.pedido_id); x.itens += +p.itens || 0; x.g += p.g; x.c += p.cat === "liq" ? (+p.comissao_real || p.c) : p.c; });
+    const totPed = new Set(lista.map((p) => p.pedido_id)).size;
+    const kpi = (k, rotulo, val, sub) => `<div class="card kpi"><p class="rot">${rotulo}</p><div class="val">${val}</div><span class="selo ${ST_PED[k][1]}">${plural(G[k].ped.size, "pedido", "pedidos")}</span><small>${sub}</small></div>`;
+    // lojas e produtos com muito inelegível (mínimo de 5 pedidos para não alarmar à toa)
+    const agrupa = (chave) => { const m = new Map(); lista.forEach((p) => { const k = (chave(p) || "").trim(); if (!k) return; const x = m.get(k) || { nome: k, ped: new Set(), ine: new Set(), gIne: 0, cIne: 0 }; x.ped.add(p.pedido_id); if (p.cat === "ine") { x.ine.add(p.pedido_id); x.gIne += p.g; x.cIne += p.c; } m.set(k, x); }); return [...m.values()].map((x) => ({ ...x, n: x.ped.size, ni: x.ine.size, pi: x.ped.size ? x.ine.size / x.ped.size * 100 : 0 })); };
+    const temLoja = lista.some((p) => (p.loja || "").trim());
+    const lojas = agrupa((p) => p.loja), alertas = lojas.filter((x) => x.n >= 5 && x.pi >= 20).sort((a, b) => b.pi - a.pi);
+    const prods = agrupa((p) => p.nome).filter((x) => x.n >= 5 && x.pi >= 20).sort((a, b) => b.pi - a.pi).slice(0, 5);
+    const piGeral = totPed ? G.ine.ped.size / totPed * 100 : 0;
+    const filtro = S.pedFiltro || "todos", busca = (S.pedBusca || "").toLowerCase();
+    let linhas = lista.filter((p) => (filtro === "todos" || p.cat === filtro) && (!busca || (p.nome + " " + (p.loja || "") + " " + p.pedido_id).toLowerCase().includes(busca)));
+    const totalLinhas = linhas.length; linhas = linhas.slice().sort((a, b) => String(b.data).localeCompare(String(a.data))).slice(0, 200);
+    const linhaAlerta = (x, tipo) => `<li><span class="nome">${esc(x.nome)}</span><span class="val"><span class="selo desce">${pct(x.pi)} inelegível</span></span><small>${x.ni} de ${plural(x.n, "pedido", "pedidos")} no período · ${real(x.cIne)} de comissão que não veio${tipo === "loja" ? "" : ""}</small></li>`;
+    el.innerHTML = cab + `
+      <div class="controles">${[["30", "Últimos 30 dias"], ["90", "Últimos 90 dias"], ["mes", "Este mês"], ["tudo", "Todo o período"]].map(([k, n]) => `<button class="chip" type="button" data-acao="ped-per" data-v="${k}" aria-pressed="${per === k}">${n}</button>`).join("")}</div>
+      <div class="grade g4">
+        ${kpi("liq", "Liquidado", real(G.liq.c), "comissão já paga")}
+        ${kpi("pen", "Pendente", real(G.pen.c), "comissão que ainda vai cair")}
+        ${kpi("agu", "Aguardando pagamento", real(G.agu.g), "em vendas, cliente ainda não pagou")}
+        ${kpi("ine", "Inelegível", real(G.ine.c), `comissão que não vem · ${pct(piGeral)} dos pedidos`)}
+      </div>
+      <div class="grade g2 alto">
+        <div class="card"><div class="card-topo"><h2>Divisão dos pedidos</h2><span class="sub">em vendas (GMV)</span></div>${rosca(Object.keys(ST_PED).filter((k) => G[k].g > 0).map((k) => [ST_PED[k][0], G[k].g]))}</div>
+        <div class="card"><div class="card-topo"><h2>Fique de olho</h2><span class="sub">lojas e produtos com 20% ou mais de inelegível</span></div>
+          ${!temLoja ? '<p class="vazio">Os pedidos importados ainda não trazem o nome da loja. Importe o extrato de novo para ver as lojas aqui.</p>' : alertas.length ? `<p class="lbl">Lojas</p><ul class="lista-foco">${alertas.slice(0, 5).map((x) => linhaAlerta(x, "loja")).join("")}</ul>` : '<p class="vazio">Nenhuma loja com muito pedido inelegível no período. Bom sinal.</p>'}
+          ${prods.length ? `<p class="lbl" style="margin-top:14px">Produtos</p><ul class="lista-foco">${prods.map((x) => linhaAlerta(x, "prod")).join("")}</ul>` : ""}
+          <p class="frase">Muito inelegível numa loja costuma ser cancelamento, devolução ou regra de afiliado da loja. Abra a Central de afiliados para ver o motivo de cada pedido e, se continuar, pense em trocar de loja ou de produto.</p></div>
+      </div>
+      <div class="card"><div class="card-topo"><h2>Todos os pedidos</h2><span class="sub">${plural(totalLinhas, "linha", "linhas")}${totalLinhas > 200 ? ", mostrando as 200 mais recentes" : ""}</span><span class="espaco"></span><input class="inp busca" id="buscaPed" type="search" placeholder="Buscar produto, loja ou nº do pedido" value="${esc(S.pedBusca || "")}"></div>
+        <div class="chips" style="margin-bottom:10px">${[["todos", "Todos"], ...Object.entries(ST_PED).filter(([k]) => k !== "out" || G.out.ped.size).map(([k, [n]]) => [k, n])].map(([k, n]) => `<button class="chip" type="button" data-acao="ped-filtro" data-v="${k}" aria-pressed="${filtro === k}">${esc(n)}${k !== "todos" ? ` (${G[k].ped.size})` : ""}</button>`).join("")}</div>
+        <div class="tabela-caixa"><table><thead><tr><th>Data</th><th>Produto</th><th>Loja</th><th>Status</th><th class="num">Itens</th><th class="num">Vendas</th><th class="num">Comissão</th><th>Liquidado em</th></tr></thead><tbody>
+        ${linhas.map((p) => { const st = ST_PED[p.cat] || ST_PED.out; return `<tr><td>${dataBR(p.dia)}</td><td><div class="td-nome">${esc(p.nome)}</div></td><td>${esc(p.loja || "-")}</td><td><span class="selo ${st[1]}" title="${esc(p.status || "")}">${st[0]}</span></td><td class="num">${num(p.itens)}</td><td class="num">${real(p.g)}</td><td class="num">${real(p.cat === "liq" ? (+p.comissao_real || p.c) : p.c)}</td><td>${p.liquidado_em ? dataBR(String(p.liquidado_em).slice(0, 10)) : "-"}</td></tr>`; }).join("") || '<tr><td colspan="8"><p class="vazio">Nenhum pedido com esse filtro.</p></td></tr>'}
+        </tbody></table></div></div>
+      <div class="card"><div class="card-topo"><h2>O que cada status quer dizer</h2></div><ul class="lista-foco">${["liq", "pen", "agu", "ine"].map((k) => `<li><span class="nome"><span class="selo ${ST_PED[k][1]}">${ST_PED[k][0]}</span></span><span></span><small>${ST_PED[k][2]}</small></li>`).join("")}</ul></div>`;
+    $("#buscaPed").addEventListener("input", (e) => { S.pedBusca = e.target.value; clearTimeout(telaPedidos.t); telaPedidos.t = setTimeout(() => { telaPedidos(el); const b = $("#buscaPed"); b.focus(); b.setSelectionRange(b.value.length, b.value.length); }, 250); });
   }
   async function telaProdutos(el) {
     const cab = `<div class="cabeca"><div><h1>Produtos</h1><p>Últimos 30 dias com dados${S.ultimo ? `, até ${dataBR(S.ultimo)}` : ""}. Ordenado pela comissão.</p></div></div>`;
@@ -1135,40 +1235,56 @@
     const dias = []; for (let k = 13; k >= 0; k--) dias.push(somaDias(S.ultimo || hojeISO(), -k));
     const porDia = dias.map((d) => S.pedidos.filter((x) => x.dia === d && valido(x)).reduce((a, x) => a + x.g, 0));
     const an = S.pedidos.length ? analiseProdutos().lista.slice().sort((a, b) => b.c30 - a.c30).slice(0, 3) : [];
+    const cats = {}; entre(per.ini, per.fim).filter(valido).forEach((p) => { const c = CATS[p.categoria] || "Outros"; cats[c] = (cats[c] || 0) + p.g; });
     const temDados = porDia.some((v) => v > 0);
-    return { t, porDia: temDados ? porDia : [3, 5, 4, 6, 5, 7, 6, 8, 7, 9, 8, 10, 9, 11], exemplo: !temDados, an, N: +S.perfil.meta_videos || 15, feitos: (S.videosHoje || []).filter((v) => v.status !== "rascunho").length };
+    return { t, dias, porDia: temDados ? porDia : [3, 5, 4, 6, 5, 7, 6, 8, 7, 9, 8, 10, 9, 11], exemplo: !temDados, an, cats: Object.keys(cats).length ? cats : { "Seus produtos": 1 }, N: +S.perfil.meta_videos || 15, feitos: (S.videosHoje || []).filter((v) => v.status !== "rascunho").length };
   }
-  function amostra(estilo, cor, custom, d) {
-    const nome = esc((S.perfil.apelido || "").trim() || (S.perfil.nome || "").split(" ")[0] || "você"), max = Math.max(...d.porDia, 1);
-    const barras = d.porDia.map((v, i) => { const h = Math.max(2, v / max * 70); return `<rect class="${i === d.porDia.length - 1 ? "b-hoje" : "b-atual"}" x="${i * 20 + 3}" y="${78 - h}" width="13" height="${h}" rx="3"/>`; }).join("");
+  // Menu em miniatura (aberto ou recolhido), com os mesmos tokens do menu de verdade
+  function miniMenu(recolhido, comDica) {
+    const itens = [["hoje", "Hoje"], ["resultados", "Resultados"], ["pedidos", "Pedidos"], ["produtos", "Produtos"], ["videos", "Vídeos"], ["criar", "Criar"]];
+    const ini = ((S.perfil.nome || "").trim() || "M")[0].toUpperCase();
+    return `<div class="mm${recolhido ? " mm-rec" : ""}"><div class="mm-marca"><span class="marca-sinal">${esc(ini)}</span>${recolhido ? "" : `<b>${esc((S.perfil.nome || "Meu painel").split(" ")[0])}</b>`}</div>
+      ${itens.map(([k, n], i) => `<span class="mm-item${i === 0 ? " at" : ""}"><svg class="i" viewBox="0 0 24 24">${ICONES[k]}</svg>${recolhido ? "" : `<span>${n}</span>`}${comDica && recolhido && i === 2 ? `<em class="mm-dica">${n}</em>` : ""}</span>`).join("")}</div>`;
+  }
+  function amostra(estilo, cor, custom, d, aba, compacto) {
+    const nome = esc((S.perfil.apelido || "").trim() || (S.perfil.nome || "").split(" ")[0] || "você");
+    const c = normCustom(custom), tipo = TIPO_GRAF[estilo] || "linha";
+    const pts = d.porDia.map((v, i) => ({ rot: d.dias[i] ? String(+d.dias[i].slice(8, 10)) : String(i + 1), v, dica: `${d.dias[i] ? dataBR(d.dias[i]) : ""} · ${real(v)}` }));
     const lista = d.an.length ? d.an.map((x) => `<li><span class="nome">${esc(x.nome)}</span><span class="val">${realCurto(x.c30)}</span></li>`).join("") : "<li><span class=\"nome\">Seus produtos aparecem aqui</span><span class=\"val\">-</span></li>";
-    const c = normCustom(custom);
-    return `<div class="tema-amostra" data-estilo="${estilo}" data-paleta="${cor}"${c ? ` style="--p-principal:${c}"` : ""}>
-      <div class="ta-topo"><div><p class="lbl" style="margin:0">Hoje</p><h3>Bom dia, <em>${nome}</em>.</h3></div><span class="btn pequeno">Lançar no dia</span></div>
+    const attrs = `data-estilo="${estilo}" data-paleta="${cor}"${c ? ` style="--p-principal:${c}"` : ""}`;
+    let corpo;
+    if (aba === "menu") corpo = `<div class="ta-menus"><div><p class="lbl">Menu aberto</p>${miniMenu(false)}</div><div><p class="lbl">Menu recolhido</p>${miniMenu(true, true)}</div></div>`;
+    else if (aba === "resultados") corpo = `<div class="ta-topo"><div><p class="lbl" style="margin:0">Resultados</p><h3>${nomeMes((S.ultimo || hojeISO()).slice(0, 7))}</h3></div><span class="btn pequeno">Todo o período</span></div>
+      <div class="ta-kpis"><div class="card kpi escuro"><p class="rot">Vendas no mês</p><div class="val">${realCurto(d.t.g)}</div></div><div class="card kpi"><p class="rot">Comissão</p><div class="val">${realCurto(d.t.c)}</div><span class="selo sobe">no mês</span></div><div class="card kpi"><p class="rot">Pedidos</p><div class="val">${num(d.t.pedidos)}</div></div></div>
+      <div class="ta-grade"><div class="card"><div class="card-topo"><h2>Vendas por dia</h2></div>${grafSerie(pts, tipo, "Vendas por dia")}</div><div class="card"><div class="card-topo"><h2>Por categoria</h2></div>${graficoCirculo(Object.entries(d.cats), false, "Vendas por categoria")}</div></div>`;
+    else corpo = `<div class="ta-topo"><div><p class="lbl" style="margin:0">Hoje</p><h3>Bom dia, <em>${nome}</em>.</h3></div><span class="btn pequeno">Lançar no dia</span></div>
       <div class="ta-kpis">
         <div class="card kpi escuro"><p class="rot">Vendas no mês</p><div class="val">${realCurto(d.t.g)}</div></div>
         <div class="card kpi"><p class="rot">Comissão</p><div class="val">${realCurto(d.t.c)}</div><span class="selo sobe">no mês</span></div>
         <div class="card kpi"><p class="rot">Vídeos de hoje</p><div class="val">${d.feitos} de ${d.N}</div><div class="barra"><i style="width:${Math.min(100, d.feitos / d.N * 100).toFixed(0)}%"></i></div></div>
       </div>
       <div class="ta-grade">
-        <div class="card"><div class="card-topo"><h2>Vendas por dia</h2><span class="sub">${d.exemplo ? "exemplo" : "14 dias"}</span></div><svg class="graf" viewBox="0 0 280 82" aria-hidden="true">${barras}</svg></div>
+        <div class="card"><div class="card-topo"><h2>Vendas por dia</h2><span class="sub">${d.exemplo ? "exemplo" : "14 dias"}</span></div>${grafSerie(pts, tipo, "Vendas por dia")}</div>
         <div class="card"><div class="card-topo"><h2>Principais</h2></div><ul class="lista-foco">${lista}</ul><div class="chips" style="margin-top:10px"><span class="chip" aria-pressed="true">Todas</span><span class="chip">Tech</span></div></div>
-      </div></div>`;
+      </div>`;
+    if (aba !== "menu") corpo = `<div class="ta-app"><div class="ta-lado">${miniMenu(!!compacto)}</div><div class="ta-corpo">${corpo}</div></div>`;
+    return `<div class="tema-amostra ta-${aba || "hoje"}" ${attrs}>${corpo}</div>`;
   }
   function desenharAparencia() {
     const box = $("#cardAparencia"); if (!box) return;
-    const a = S.ap, d = dadosPrevia(), atual = document.documentElement;
+    const a = S.ap, d = dadosPrevia(), atual = document.documentElement, aba = a.aba || "hoje";
     const salvo = normEstilo(S.perfil.estilo || atual.dataset.estilo) === a.estilo && normPaleta(S.perfil.cor || atual.dataset.paleta) === a.cor && normCustom(S.perfil.cor_custom) === a.custom;
-    const corBase = a.custom || PALETAS[a.cor][1][0];
-    box.innerHTML = `<div class="card-topo"><h2>Aparência</h2><span class="sub">escolha o estilo e a paleta: tudo combina com tudo</span></div>
-      <div class="ap-passo"><p class="lbl"><b>1</b>Estilo</p>
-        <div class="ap-estilos">${Object.entries(ESTILOS).map(([k, [n, desc]]) => `<button type="button" class="ap-estilo" data-acao="ap-estilo" data-v="${k}" aria-pressed="${a.estilo === k}">${amostra(k, a.cor, a.custom, d)}<b>${n}</b><small>${desc}</small></button>`).join("")}</div></div>
+    const corBase = a.custom || PALETAS[a.cor][1][1];
+    box.innerHTML = `<div class="card-topo"><h2>Aparência</h2><span class="sub">4 modelos x 8 paletas: tudo combina com tudo</span></div>
+      <div class="ap-passo"><p class="lbl"><b>1</b>Modelo</p>
+        <div class="ap-estilos">${Object.entries(ESTILOS).map(([k, [n, desc]]) => `<button type="button" class="ap-estilo" data-acao="ap-estilo" data-v="${k}" aria-pressed="${a.estilo === k}">${amostra(k, a.cor, a.custom, d, "hoje", true)}<b>${n}</b><small>${desc}</small></button>`).join("")}</div></div>
       <div class="ap-passo"><p class="lbl"><b>2</b>Paleta</p>
         <div class="ap-paletas">${Object.entries(PALETAS).map(([k, [n, cs]]) => `<button type="button" class="ap-paleta" data-acao="ap-paleta" data-v="${k}" aria-pressed="${a.cor === k}"><span class="ap-cores">${cs.map((x) => `<i style="background:${x}"></i>`).join("")}</span>${n}</button>`).join("")}</div>
         <div class="ap-custom"><label for="apCor">Cor principal personalizada</label><input type="color" id="apCor" value="${corBase}">${a.custom ? `<button class="link" type="button" data-acao="ap-sem-custom">usar a cor da paleta</button>` : `<span class="sub" style="color:var(--muted)">opcional</span>`}</div></div>
       <div class="ap-passo ap-previa"><p class="lbl"><b>3</b>Prévia ${salvo ? "· é o que você está usando" : "· ainda não aplicado"}</p>
-        ${amostra(a.estilo, a.cor, a.custom, d)}
-        <div class="ap-acoes"><button class="btn sec pequeno" type="button" data-acao="ap-restaurar">Restaurar padrão</button><button class="btn pequeno" type="button" data-acao="ap-aplicar"${salvo ? " disabled" : ""}>Aplicar estilo</button></div></div>`;
+        <div class="chips ap-abas" role="tablist">${[["hoje", "Hoje"], ["resultados", "Resultados"], ["menu", "Menu aberto e recolhido"]].map(([k, n]) => `<button class="chip" type="button" role="tab" data-acao="ap-aba" data-v="${k}" aria-pressed="${aba === k}" aria-selected="${aba === k}">${n}</button>`).join("")}</div>
+        ${amostra(a.estilo, a.cor, a.custom, d, aba)}
+        <div class="ap-acoes"><button class="btn sec pequeno" type="button" data-acao="ap-restaurar">Restaurar padrão</button><button class="btn pequeno" type="button" data-acao="ap-aplicar"${salvo ? " disabled" : ""}>Aplicar</button></div></div>`;
     const inp = $("#apCor");
     inp.addEventListener("input", () => { $$("#cardAparencia .tema-amostra").forEach((x) => x.style.setProperty("--p-principal", inp.value)); });
     inp.addEventListener("change", () => { S.ap.custom = normCustom(inp.value); desenharAparencia(); });
@@ -1420,7 +1536,7 @@ REGRAS: entregue tudo agora, sem fazer perguntas antes: o que faltar fica [entre
     } finally { botao.disabled = false; botao.textContent = "Gerar com o Claude"; }
   }
 
-  const DESENHOS = { criar: telaCriar, hoje: telaHoje, resultados: telaResultados, produtos: telaProdutos, videos: telaVideos, amostras: telaAmostras, importar: telaImportar, perfil: telaPerfil };
+  const DESENHOS = { pedidos: telaPedidos, criar: telaCriar, hoje: telaHoje, resultados: telaResultados, produtos: telaProdutos, videos: telaVideos, amostras: telaAmostras, importar: telaImportar, perfil: telaPerfil };
 
   /* =============================================================
      CLIQUES (um ouvinte só para o painel)
@@ -1431,6 +1547,7 @@ REGRAS: entregue tudo agora, sem fazer perguntas antes: o que faltar fica [entre
     const a = t.dataset.acao, id = Number(t.dataset.id);
     try {
       if (a === "ap-estilo") { S.ap.estilo = t.dataset.v; desenharAparencia(); }
+      else if (a === "ap-aba") { S.ap.aba = t.dataset.v; desenharAparencia(); }
       else if (a === "ap-paleta") { S.ap.cor = t.dataset.v; S.ap.custom = null; desenharAparencia(); }
       else if (a === "ap-sem-custom") { S.ap.custom = null; desenharAparencia(); }
       else if (a === "ap-aplicar") { t.disabled = true; const ok = await salvarAparencia(S.ap.estilo, S.ap.cor, S.ap.custom); montarMenu(); desenharAparencia(); if (ok) toast(`${ESTILOS[S.ap.estilo][0]} com ${PALETAS[S.ap.cor][0]} aplicado.`); }
@@ -1480,6 +1597,8 @@ REGRAS: entregue tudo agora, sem fazer perguntas antes: o que faltar fica [entre
         } else if (a === "apagar-ref") { await API.apagarReferencia(r.id); S.refs = S.refs.filter((x) => x.id !== r.id); S.refSel = null; toast("Referência apagada."); irPara("criar"); }
       }
       else if (a === "cat") { S.filtroCat = t.dataset.cat; irPara("produtos"); }
+      else if (a === "ped-per") { S.pedPer = t.dataset.v; irPara("pedidos", true); }
+      else if (a === "ped-filtro") { S.pedFiltro = t.dataset.v; irPara("pedidos", true); }
       else if (a === "esgotado") { await marcarEsgotado(t.dataset.id, true); }
       else if (a === "instalar-app") { if (pedidoInstalar) { pedidoInstalar.prompt(); try { await pedidoInstalar.userChoice; } catch (_) {} pedidoInstalar = null; irPara(S.tela, true); } }
       else if (a === "fechar-instalar") { marcarDia("painel-sem-instalar"); irPara(S.tela, true); }
