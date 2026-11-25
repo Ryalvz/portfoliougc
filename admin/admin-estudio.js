@@ -35,7 +35,21 @@ function estFaixa(k, rotulo, min, max, passo, v, un = "") {
     <input type="range" min="${min}" max="${max}" step="${passo}" value="${v}" data-cam-num="${k}" data-un="${un}" data-passo="${passo}"></label>`;
 }
 
+// Quem rola a tela do Estúdio (a página ou um container com rolagem)
+function rolagemDe(el) {
+  let p = el && el.parentElement;
+  while (p && p !== document.body) { const st = getComputedStyle(p); if (/(auto|scroll)/.test(st.overflowY) && p.scrollHeight > p.clientHeight) return p; p = p.parentElement; }
+  return document.scrollingElement || document.documentElement;
+}
+
 function desenharEstudio(el) {
+  // Guarda onde a tela estava no momento do clique, pra não pular pro topo quando redesenha
+  if (!el.__travaRolagem) {
+    el.__travaRolagem = true;
+    const guarda = () => { est.rolagem = { t: Date.now(), topo: rolagemDe(el).scrollTop, painel: ($("#est-painel", el) || {}).scrollTop || 0, camadas: ($(".est-camadas", el) || {}).scrollTop || 0, minis: ($(".est-minis", el) || {}).scrollTop || 0 }; };
+    ["pointerdown", "keydown", "change", "input"].forEach((ev) => el.addEventListener(ev, guarda, true));
+  }
+  const volta = est.rolagem && Date.now() - est.rolagem.t < 4000 ? est.rolagem : null;
   const car = igx.car;
   if (est.car !== car) { est.car = car; est.i = 0; est.sel = null; est.hist = []; } // carrossel novo aberto: começa do primeiro slide
   if (!car.formato) car.formato = car.estilo === "ryan" ? "retrato" : "quadrado";
@@ -157,15 +171,21 @@ function desenharEstudio(el) {
             <div class="est-opcoes"><button type="button" data-cam-encaixar>Encaixar de novo</button></div>` : ""}
           ${L.t === "linha" ? estFaixa("w", "Comprimento", 40, W, 10, L.w, "px") : ""}
           ${novo && outrasCom(L) ? `<div class="est-global"><button type="button" class="btn" data-cam-global>Aplicar em todas as páginas</button><small>Leva fonte, peso, tamanho, cor e espaçamento desta peça pra ${outrasCom(L)} ${outrasCom(L) === 1 ? "outra página" : "outras páginas"} que têm ${esc(L.nome.toLowerCase())}. Posição e texto de cada página não mudam.</small></div>` : ""}
+          <div class="est-opcoes est-opcoes-ordem"><button type="button" data-sel-ordem="1">Trazer pra frente</button><button type="button" data-sel-ordem="-1">Levar pra trás</button><button type="button" data-sel-ordem="topo">Na frente de tudo</button><button type="button" data-sel-ordem="fundo">Atrás de tudo</button></div>
+          ${L.t === "imagem" ? `<div class="est-opcoes"><button type="button" data-cam-virar-fundo>Usar como fundo do slide</button></div>` : ""}
+          ${L.video && est.videos && est.videos[L.id] ? `<label class="est-faixa"><span>Momento do vídeo<output data-momento-saida>${(L.momento || 1).toFixed(1).replace(".", ",")}s</output></span><input type="range" min="0" max="${Math.max(0.5, est.videos[L.id].dur - 0.1).toFixed(1)}" step="0.1" value="${L.momento || 1}" data-cam-momento></label>` : L.video ? `<small class="sub">Pra escolher outro momento do vídeo, suba o vídeo de novo.</small>` : ""}
           <div class="est-opcoes"><button type="button" data-cam-dup>Duplicar</button><button type="button" data-cam-apagar="${L.id}">Apagar camada</button></div>
         </div>` : `<p class="sub est-dica">Clique num texto do slide (ou na lista abaixo) pra mudar o tamanho da letra, o espaço, a largura e o alinhamento.</p>`}
 
         <div class="est-bloco"><span class="est-rot">Camadas do slide<small>${camadas.length}</small></span>
           <ul class="est-camadas">${[...camadas].reverse().map((l) => `<li class="${l.id === est.sel ? "on" : ""} ${l.oculto ? "oculta" : ""}">
             <button type="button" class="est-cam-nome" data-cam-sel="${l.id}"><b>${esc(l.nome)}</b><small>${esc(String(l.auto === "num" ? "número do slide" : l.texto || (l.t === "foto" ? "foto" : "forma")).replace(/\*/g, "").slice(0, 40))}</small></button>
+            <button type="button" class="est-cam-ordem" data-cam-ordem="1" data-cam-id="${l.id}" title="Trazer pra frente" aria-label="Trazer ${esc(l.nome)} pra frente">&#8593;</button>
+            <button type="button" class="est-cam-ordem" data-cam-ordem="-1" data-cam-id="${l.id}" title="Levar pra trás" aria-label="Levar ${esc(l.nome)} pra trás">&#8595;</button>
             <button type="button" class="est-cam-acao" data-cam-olho="${l.id}">${l.oculto ? "Mostrar" : "Esconder"}</button>
             <button type="button" class="icone-btn" data-cam-apagar="${l.id}" aria-label="Apagar ${esc(l.nome)}">${ic("apagar")}</button></li>`).join("")}</ul>
           <div class="est-opcoes"><button type="button" data-cam-novo>Adicionar texto</button><label class="est-btn-arquivo">Adicionar imagem<input type="file" accept="image/*" data-cam-imagem hidden></label></div>
+          <div class="est-opcoes"><label class="est-btn-arquivo">Adicionar vídeo<input type="file" accept="video/*" data-cam-video hidden></label></div>
           <div class="est-opcoes"><button type="button" data-cam-refazer>${novo ? "Refazer a página" : "Refazer pelo estilo"}</button></div>
         </div>
 
@@ -180,6 +200,13 @@ function desenharEstudio(el) {
         <button type="button" class="link-btn" data-est-todos>Usar este fundo e esta cor em todos os slides</button>
       </aside>
     </div>`;
+
+  // Volta a tela pro mesmo lugar
+  if (volta) {
+    const r = rolagemDe(el), pn = $("#est-painel", el), cm = $(".est-camadas", el), mn = $(".est-minis", el);
+    const aplica = () => { r.scrollTop = volta.topo; if (pn) pn.scrollTop = volta.painel; if (cm) cm.scrollTop = volta.camadas; if (mn) mn.scrollTop = volta.minis; };
+    aplica(); requestAnimationFrame(aplica);
+  }
 
   // Desenho
   const cvG = $("#est-grande", el);
@@ -329,6 +356,7 @@ function desenharEstudio(el) {
     const digitando = /INPUT|TEXTAREA|SELECT/.test((document.activeElement || {}).tagName || "") && (document.activeElement || {}).type !== "range";
     if (digitando || ($("#janela") && $("#janela").open)) return;
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") { e.preventDefault(); if (e.shiftKey) refazer(); else desfazer(); return; }
+    if ((e.metaKey || e.ctrlKey) && (e.key === "]" || e.key === "[") && est.sel && est.moverOrdem) { e.preventDefault(); est.moverOrdem(est.sel, e.key === "]" ? (e.shiftKey ? "topo" : 1) : (e.shiftKey ? "fundo" : -1)); return; }
     const l = est.sel && camadas.find((x) => x.id === est.sel);
     if (l && /^Arrow/.test(e.key)) {
       e.preventDefault(); marcar(); const d = e.shiftKey ? 40 : 4;
@@ -429,7 +457,7 @@ function desenharEstudio(el) {
   };
   tela.addEventListener("pointerup", soltar);
   tela.addEventListener("pointercancel", soltar);
-  tela.addEventListener("dblclick", () => { const f = $("[data-cam-texto]", el); if (f) { f.focus(); f.select(); } });
+  tela.addEventListener("dblclick", () => { const f = $("[data-cam-texto]", el); if (f) { f.focus({ preventScroll: true }); f.select(); } });
   // A rodinha do mouse só rola a página (o tamanho muda pela bolinha do canto ou pelo painel)
   if (window.__estResize) window.removeEventListener("resize", window.__estResize);
   window.__estResize = mostrarSel; window.addEventListener("resize", mostrarSel);
@@ -468,7 +496,7 @@ function desenharEstudio(el) {
     marcar(true);
     const c = CAMADAS.texto("Texto novo", "Escreva aqui", { x: M, y: Math.round(H / 2 - 30), w: W - 2 * M, tam: 48, peso: 700, cor: "tinta", entre: 1.2 });
     camadas.push(c); est.sel = c.id; editado(); desenhar();
-    const f = $("[data-cam-texto]", el); if (f) { f.focus(); f.select(); }
+    const f = $("[data-cam-texto]", el); if (f) { f.focus({ preventScroll: true }); f.select(); }
   };
   $("[data-cam-refazer]", painel).onclick = async () => {
     if (s.camadasEditadas && !(await confirmar("Refazer este slide do jeito do estilo? Os ajustes feitos à mão neste slide se perdem (dá pra desfazer).", "Refazer slide"))) return;
@@ -491,8 +519,16 @@ function desenharEstudio(el) {
     if (e.target.matches("[data-est-foto]") && e.target.files && e.target.files[0]) {
       const rotulo = e.target.closest("label"); rotulo.firstChild.textContent = "Enviando...";
       try {
-        const url = await enviarArquivo(await prepararFoto(e.target.files[0]), "carrosseis", "foto.jpg");
-        if (url) { s.foto = url; desenhar(); avisar("Foto no slide."); } else rotulo.firstChild.textContent = "Subir foto";
+        const url = await enviarArquivo(await prepararFoto(e.target.files[0]), "carrosseis");
+        if (url) {
+          marcar(true); s.foto = url;
+          if (novo) {
+            const cs = CAMADAS.garantir(car, est.i);
+            const usa = cs.some((l) => l.t === "fundoFoto" || l.t === "foto" || l.t === "celular" || l.t === "polaroid" || (l.t === "imagem" && l.src === "@foto") || (l.t === "janela" && !l.vazia));
+            if (!usa) { cs.unshift({ id: CAMADAS.novoId(), nome: "Foto de fundo", papel: "fundoFoto", t: "fundoFoto", x: 0, y: 0, w: W, h: H, zoom: 1, px: 0, py: 0, foco: 0.3 }); s.camadasEditadas = true; est.sel = cs[0].id; }
+          }
+          desenhar(); avisar("Foto no slide. Clique nela pra mudar o tamanho e a posição.");
+        } else rotulo.firstChild.textContent = "Subir foto";
       } catch (erro) { avisar(erro.message || "Não deu para usar essa foto.", true); rotulo.firstChild.textContent = "Subir foto"; }
     }
   });
@@ -563,7 +599,7 @@ function desenharEstudio(el) {
     const up = $("[data-id-logo]", idBox);
     if (up) up.onchange = async () => {
       const f = up.files && up.files[0]; if (!f) return;
-      try { const url = await enviarArquivo(await prepararFoto(f), "carrosseis", "logo.jpg"); if (url) { marcar(true); ID.logo = url; desenhar(); avisar("Logo salvo. Toque em \"Colocar em todas as páginas\" pra ele aparecer."); } }
+      try { const url = await enviarArquivo(await prepararFoto(f), "carrosseis"); if (url) { marcar(true); ID.logo = url; desenhar(); avisar("Logo salvo. Toque em \"Colocar em todas as páginas\" pra ele aparecer."); } }
       catch (erro) { avisar(erro.message || "Não deu pra usar esse logo.", true); }
     };
     const logoTodas = $("[data-id-logo-todas]", idBox);
@@ -617,18 +653,74 @@ function desenharEstudio(el) {
     });
     editado(); desenhar(); avisar(`Aplicado em ${pags} ${pags === 1 ? "página" : "páginas"}. Dá pra desfazer com Cmd + Z.`);
   };
+  // Ordem das camadas (a de cima da lista fica na frente)
+  const moverOrdem = (id, passo) => {
+    const k = camadas.findIndex((x) => x.id === id); if (k < 0) return;
+    let j = passo === "topo" ? camadas.length - 1 : passo === "fundo" ? 0 : k + Number(passo);
+    j = Math.max(0, Math.min(camadas.length - 1, j)); if (j === k) return;
+    marcar(true); const [c] = camadas.splice(k, 1); camadas.splice(j, 0, c); editado(); desenhar();
+  };
+  $$("[data-cam-ordem]", painel).forEach((b) => b.onclick = () => moverOrdem(b.dataset.camId, b.dataset.camOrdem));
+  $$("[data-sel-ordem]", painel).forEach((b) => b.onclick = () => { if (est.sel) moverOrdem(est.sel, b.dataset.selOrdem); });
+  est.moverOrdem = moverOrdem;
+  // Imagem solta vira o fundo do slide (ocupa tudo, atrás de tudo, com zoom e posição)
+  const virar = $("[data-cam-virar-fundo]", painel);
+  if (virar) virar.onclick = () => {
+    const l = Lsel(); if (!l) return; marcar(true);
+    const k = camadas.indexOf(l); camadas.splice(k, 1);
+    const f = { id: l.id, nome: "Foto de fundo", papel: "fundoFoto", t: "fundoFoto", src: l.src === "@foto" ? undefined : l.src, x: 0, y: 0, w: W, h: H, zoom: 1, px: 0, py: 0, foco: l.foco ?? 0.3, escurecer: false };
+    camadas.unshift(f); editado(); desenhar(); avisar("A imagem virou o fundo do slide. Arraste pra posicionar e use a bolinha do canto pro tamanho.");
+  };
+  // Vídeo: entra como um quadro do vídeo, com o selo de play
+  const quadroDoVideo = (url, t) => new Promise((ok, falha) => {
+    const v = document.createElement("video"); v.muted = true; v.playsInline = true; v.preload = "auto"; v.src = url;
+    v.onerror = () => falha(new Error("Não consegui abrir esse vídeo. Tente MP4 ou MOV."));
+    v.onloadedmetadata = () => { v.currentTime = Math.min(Math.max(0, t), Math.max(0, (v.duration || 1) - 0.1)); };
+    v.onseeked = () => {
+      const esc0 = Math.min(1, 1700 / Math.max(v.videoWidth, v.videoHeight)), cv = document.createElement("canvas");
+      cv.width = Math.round(v.videoWidth * esc0); cv.height = Math.round(v.videoHeight * esc0);
+      cv.getContext("2d").drawImage(v, 0, 0, cv.width, cv.height);
+      cv.toBlob((b) => b ? ok({ arq: new File([b], "quadro-video.jpg", { type: "image/jpeg" }), w: cv.width, h: cv.height, dur: v.duration || 1 }) : falha(new Error("Não consegui tirar o quadro do vídeo.")), "image/jpeg", 0.9);
+    };
+  });
+  const novoVideo = $("[data-cam-video]", painel);
+  if (novoVideo) novoVideo.onchange = async () => {
+    const f = novoVideo.files && novoVideo.files[0]; if (!f) return;
+    const rot = novoVideo.closest("label"); rot.firstChild.textContent = "Lendo o vídeo...";
+    try {
+      const local = URL.createObjectURL(f), q = await quadroDoVideo(local, 1);
+      const url = await enviarArquivo(q.arq, "carrosseis");
+      if (!url) { rot.firstChild.textContent = "Adicionar vídeo"; return; }
+      const w = Math.round((W - 2 * M) * 0.55), h = Math.round(w * q.h / q.w);
+      marcar(true);
+      const c = { id: CAMADAS.novoId(), nome: "Vídeo", papel: "video", t: "imagem", video: true, momento: 1, src: url, x: Math.round((W - w) / 2), y: Math.round(Math.max(M, (H - h) / 2)), w, h: Math.min(h, H - 2 * M), raio: 18, foco: 0.4 };
+      (est.videos = est.videos || {})[c.id] = { url: local, dur: q.dur };
+      camadas.push(c); est.sel = c.id; editado(); desenhar(); avisar("Vídeo no slide como um quadro, com o selo de play. Escolha o momento no painel.");
+    } catch (erro) { avisar(erro.message || "Não deu pra usar esse vídeo.", true); rot.firstChild.textContent = "Adicionar vídeo"; }
+  };
+  const momento = $("[data-cam-momento]", painel);
+  if (momento) {
+    momento.addEventListener("input", () => { $("[data-momento-saida]", painel).textContent = Number(momento.value).toFixed(1).replace(".", ",") + "s"; });
+    momento.addEventListener("change", async () => {
+      const l = Lsel(); if (!l || !est.videos || !est.videos[l.id]) return;
+      try { const q = await quadroDoVideo(est.videos[l.id].url, Number(momento.value)); const url = await enviarArquivo(q.arq, "carrosseis"); if (url) { marcar(true); l.src = url; l.momento = Number(momento.value); editado(); desenhar(); } }
+      catch (erro) { avisar(erro.message || "Não deu pra trocar o quadro.", true); }
+    });
+  }
+
   // Adicionar imagem solta
   const novaImg = $("[data-cam-imagem]", painel);
   if (novaImg) novaImg.onchange = async () => {
     const f = novaImg.files && novaImg.files[0]; if (!f) return;
     const rot = novaImg.closest("label"); rot.firstChild.textContent = "Enviando...";
     try {
-      const arq = await prepararFoto(f), url = await enviarArquivo(arq, "carrosseis", "imagem.jpg");
+      const arq = await prepararFoto(f), url = await enviarArquivo(arq, "carrosseis");
       if (!url) { rot.firstChild.textContent = "Adicionar imagem"; return; }
       const dimsImg = await new Promise((ok) => { const im = new Image(); im.onload = () => ok([im.width, im.height]); im.onerror = () => ok([4, 3]); im.src = URL.createObjectURL(arq); });
       const w = Math.round((W - 2 * M) * 0.6), h = Math.round(w * dimsImg[1] / dimsImg[0]);
       marcar(true);
-      const c = { id: CAMADAS.novoId(), nome: "Imagem", papel: "imagem", t: "imagem", src: url, x: Math.round((W - w) / 2), y: Math.round(Math.max(M, (H - h) / 2)), w, h: Math.min(h, H - 2 * M), raio: 18, foco: 0.4 };
+      const png = /\.png(\?|$)/i.test(url);
+      const c = { id: CAMADAS.novoId(), nome: png ? "Imagem (PNG)" : "Imagem", papel: "imagem", t: "imagem", src: url, x: Math.round((W - w) / 2), y: Math.round(Math.max(M, (H - h) / 2)), w, h: Math.min(h, H - 2 * M), raio: png ? 0 : 18, sombra: !png, foco: 0.4 };
       camadas.push(c); est.sel = c.id; editado(); desenhar(); avisar("Imagem no slide. Arraste e redimensione pela bolinha do canto.");
     } catch (erro) { avisar(erro.message || "Não deu pra usar essa imagem.", true); rot.firstChild.textContent = "Adicionar imagem"; }
   };
