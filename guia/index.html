@@ -6,7 +6,7 @@
 <title>Shopflow · Guia</title>
 <meta name="robots" content="noindex">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Allura&family=Montserrat:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Allura&family=Montserrat:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&family=Playfair+Display:wght@700&display=swap">
 <style>
 /* Guia no estilo vidro: fundo areia com luz de janela, painéis de vidro fosco,
    etapas como pílulas que abrem e fecham, botão preto arredondado. Identidade: assinatura Ryan Alves em Allura. */
@@ -467,9 +467,9 @@ var CONFIG = {
       var m=document.createElement('span'); m.className='mais'; m.textContent='+ a skill completa ('+linhas+' linhas) vai junto quando você aperta Copiar.'; pre.appendChild(m);
     }
     // Perguntas do painel (etapa 04): montadas uma vez, guardadas junto do perfil
-    var EST_P={light:'Modern Light',dark:'Dark Pro',glass:'Glass / Aurora',bold:'Bold Modern'}, COR_P={cafe:'Café',oliva:'Oliva',grafite:'Grafite',rosa:'Rosa',azul:'Azul',lavanda:'Lavanda',terracota:'Terracota',energia:'Energia'};
-    if(!perfil.painel){ var ac=ler(KA,{})||{}; perfil.painel={nome:ac.nome||'',apelido:'',tiktok:ac.tiktok||'',meta:'',estilo:'light',cor:'cafe'}; }
-    if(!EST_P[perfil.painel.estilo]) perfil.painel.estilo=({classico:'light',grafico:'light',minimal:'light',clean:'light',editorial:'light',colorful:'bold'})[perfil.painel.estilo]||'light';
+    var EST_P={minimal:'Minimalista',editorial:'Moderno Editorial',glass:'Glass / Aurora',neon:'Premium Neon'}, COR_P={cafe:'Café',oliva:'Oliva',grafite:'Grafite',rosa:'Rosa',azul:'Azul',lavanda:'Lavanda',terracota:'Terracota',energia:'Energia'};
+    if(!perfil.painel){ var ac=ler(KA,{})||{}; perfil.painel={nome:ac.nome||'',apelido:'',tiktok:ac.tiktok||'',meta:'',estilo:'minimal',cor:'cafe'}; }
+    if(!EST_P[perfil.painel.estilo]) perfil.painel.estilo=({light:'minimal',classico:'minimal',clean:'minimal',grafico:'editorial',colorful:'editorial',bold:'editorial',dark:'neon'})[perfil.painel.estilo]||'minimal';
     if(!COR_P[perfil.painel.cor]) perfil.painel.cor='cafe';
     if(perfil.painel.email===undefined){ var ac2=ler(KA,{})||{}; perfil.painel.email=ac2.email||''; perfil.painel.supa_url=''; perfil.painel.supa_key=''; }
     var P=perfil.painel, qp=$('#quizPainel');
@@ -515,15 +515,15 @@ var CONFIG = {
       var av=document.createElement('p'); av.className='nota'; av.id='qpAvisoChave'; av.hidden=true; av.innerHTML='<b>Essa é a chave secreta.</b> Apague e cole a <b>Publishable</b>: a secreta nunca sai do Supabase.'; qp.appendChild(av);
       qp.appendChild(campo('email','E-mail que vai ser o seu login no painel','voce@email.com'));
       // Estilo e cor com prévia pequena do painel (muda na hora)
-      var CORV={cafe:['#2B241C','#A8864A','#E2BE7E','#F6F2EB'],oliva:['#3F4A2B','#7C8B4A','#BFD27A','#F3F3EA'],grafite:['#1C1C1E','#6E6E73','#D4D4DA','#EDEDEF'],rosa:['#6E2F48','#C45A80','#F48FB4','#FBF1F4'],azul:['#14213D','#3D6FB6','#7DB2FF','#EEF2F8'],lavanda:['#3B2A5C','#8E6CCB','#B9A0FF','#F4F1FA'],terracota:['#6B2E1F','#C46A3C','#F2A274','#F8F1EA'],energia:['#14452F','#D9A514','#F5C842','#F3F5EE']};
-      var DESC={light:'Claro e limpo, borda fina',dark:'Fundo escuro, destaque com brilho',glass:'Luzes da cor e cards de vidro',bold:'Blocos de cor e títulos grandes'};
+      var CORV={cafe:['#2B211B','#805A38','#C19A62','#E8DCCB','#F8F4ED'],oliva:['#283528','#53663E','#89975C','#C5CDA8','#F3F3E9'],grafite:['#171719','#414147','#77777F','#B9B9BF','#F0F0F2'],rosa:['#542B3C','#A34466','#D47796','#EAB9C9','#FAEFF3'],azul:['#142747','#2456A6','#5489D6','#A9C7F0','#F0F5FC'],lavanda:['#38245B','#6843A6','#9674D4','#C9B7EB','#F4F0FC'],terracota:['#602F24','#A65336','#CE815B','#E6B99C','#F8F0E9'],energia:['#153D30','#17865C','#E5B323','#A9D66B','#F4F5EC']};
+      var DESC={minimal:'Clean e foco nos dados',editorial:'Menu escuro, serifa e números grandes',glass:'Vidro, luzes e profundidade',neon:'Escuro com gráficos luminosos'};
       if(!document.getElementById('cssPrevia')){var cs=document.createElement('style');cs.id='cssPrevia';cs.textContent=
-        '.estilos-p{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}'+
+        '.estilos-p{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}'+
         '.mini .cd{min-width:0;white-space:nowrap}'+
         '.mini.m2{height:132px;display:flex;font-weight:600}.m2 .sd2{width:46px;flex:none;padding:8px 6px;display:flex;flex-direction:column;gap:5px}.m2 .sd2 b{width:12px;height:12px;border-radius:4px;display:block;margin:0 0 4px 2px}'+
         '.m2 .sd2 i{display:flex;flex-direction:column;gap:2px;padding:4px 4px}.m2 .sd2 u{display:block;height:3px;border-radius:2px;width:85%}'+
         '.m2 .ct2{flex:1;min-width:0;padding:9px 8px;display:flex;flex-direction:column;gap:7px}.m2 .t2{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'+
-        '.m2 .cs2{display:flex;gap:5px}.m2 .c2{flex:1;min-width:0;padding:6px 5px;display:flex;flex-direction:column;gap:2px;white-space:nowrap}.m2 .c2 small{font-size:7.5px}.m2 .c2 span{font-size:10.5px;font-weight:700}'+
+        '.m2 .cs2{display:flex;gap:5px}.m2 .c2{flex:1;min-width:0;padding:6px 5px;display:flex;flex-direction:column;gap:2px;white-space:nowrap}.m2 .c2 small{font-size:7.5px}.m2 .c2 span{font-size:9.5px;font-weight:700;letter-spacing:-.01em}'+
         '.m2 .bar2{height:5px;border-radius:99px;overflow:hidden;margin-top:auto}.m2 .bar2 i{display:block;height:100%;width:72%;border-radius:99px}'+
         '.mini .sd{position:absolute;left:0;top:0;bottom:0;width:22px;display:flex;flex-direction:column;align-items:center;gap:6px;padding-top:7px}.mini .sd i{width:9px;height:9px;border-radius:3px;display:block;opacity:.55}.mini .sd i.at{opacity:1}.mini .ct{margin-left:22px}'+
         '.est-op{border:1px solid var(--borda);background:rgba(255,255,255,.7);border-radius:18px;padding:8px 8px 10px;text-align:left;cursor:pointer;font:inherit;color:inherit}'+
@@ -541,29 +541,30 @@ var CONFIG = {
         document.head.appendChild(cs);}
       function nomeP(){ return (perfil.painel.apelido||(perfil.painel.nome||'').split(' ')[0]||'Ju'); }
       function mini(e,c){
-        var a=CORV[c]||CORV.cafe, n=esc(nomeP()), d=a[0], k=a[1], v=a[2], f=a[3];
+        var a=CORV[c]||CORV.cafe, n=esc(nomeP()), E=a[0], P=a[1], D=a[2], S=a[3], F=a[4];
         function menu(bg,lin,at,atTx,raio,borda){ return '<div class="sd2" style="background:'+bg+';'+(borda||'')+'"><b style="background:'+atTx+'"></b>'+[1,0,0,0].map(function(x){return '<i style="'+(x?'background:'+at+';':'')+'border-radius:'+raio+'"><u style="background:'+(x?atTx:lin)+'"></u><u style="background:'+(x?atTx:lin)+';width:60%"></u></i>'}).join('')+'</div>'; }
-        if(e==='dark') return '<div class="mini m2" style="background:#0A0C10;color:#EDEFF4">'+menu('#0D1016','#3a4150',v+'22',v,'4px','border-right:1px solid #ffffff12')+
+        function linha(cor,larg){ return '<svg viewBox="0 0 100 26" preserveAspectRatio="none" style="width:100%;height:22px;display:block"><path d="M0 20 C10 18 15 10 25 14 S40 6 50 12 S70 4 80 9 S95 3 100 2" fill="none" stroke="'+cor+'" stroke-width="'+(larg||2)+'"/></svg>'; }
+        if(e==='neon') return '<div class="mini m2" style="background:#0B0B15;color:#F2F2F7">'+menu('#0E0E18','#30304a','linear-gradient(135deg,'+P+','+D+')','#fff','5px','border-right:1px solid #ffffff12')+
           '<div class="ct2"><div class="t2" style="font-family:\'Space Grotesk\',sans-serif">Bom dia, '+n+'.</div><div class="cs2">'+
-          '<div class="c2" style="background:#11151C;border:1px solid '+v+'99;box-shadow:0 0 14px '+v+'55;border-radius:6px"><small style="color:#9AA2B1">Vendas</small><span style="font-family:\'Space Grotesk\',sans-serif">R$ 4.820</span></div>'+
-          '<div class="c2" style="background:#11151C;border:1px solid #ffffff14;border-radius:6px"><small style="color:#9AA2B1">Comissão</small><span>R$ 610</span></div></div>'+
-          '<div class="bar2" style="background:#ffffff14"><i style="background:linear-gradient(90deg,'+k+','+v+');box-shadow:0 0 8px '+v+'"></i></div></div></div>';
-        if(e==='glass') return '<div class="mini m2" style="background:radial-gradient(70% 70% at 0% 0%,'+k+'cc,transparent 70%),radial-gradient(60% 70% at 100% 0%,'+v+'dd,transparent 70%),radial-gradient(70% 60% at 70% 100%,'+d+'66,transparent 70%),'+f+';color:#1B1D24">'+
-          menu('rgba(255,255,255,.45)','#ffffffcc','rgba(255,255,255,.95)',d,'6px','border-right:1px solid rgba(255,255,255,.8);backdrop-filter:blur(8px)')+
+          '<div class="c2" style="background:#12121F;border:1px solid '+S+'88;box-shadow:0 0 12px '+D+'66;border-radius:7px"><small style="color:#A6A6B8">Vendas</small><span style="font-family:\'Space Grotesk\',sans-serif">R$ 4.820</span></div>'+
+          '<div class="c2" style="background:#12121F;border:1px solid #ffffff14;border-radius:7px"><small style="color:#A6A6B8">Comissão</small><span>R$ 610</span></div></div>'+
+          '<div style="filter:drop-shadow(0 0 4px '+S+')">'+linha(S,2.4)+'</div></div></div>';
+        if(e==='glass') return '<div class="mini m2" style="background:radial-gradient(70% 70% at 0% 0%,'+D+'bb,transparent 70%),radial-gradient(60% 70% at 100% 0%,'+S+'ee,transparent 70%),radial-gradient(70% 60% at 70% 100%,'+P+'66,transparent 70%),'+F+';color:#1B1D24">'+
+          menu('rgba(255,255,255,.45)','#ffffffcc','linear-gradient(135deg,'+P+','+D+')','#fff','8px','border-right:1px solid rgba(255,255,255,.8);backdrop-filter:blur(8px)')+
           '<div class="ct2"><div class="t2">Bom dia, '+n+'.</div><div class="cs2">'+
-          '<div class="c2" style="background:linear-gradient(135deg,'+d+','+k+');color:#fff;border-radius:12px;box-shadow:0 6px 14px '+d+'44"><small style="opacity:.8">Vendas</small><span>R$ 4.820</span></div>'+
-          '<div class="c2" style="background:rgba(255,255,255,.55);border:1px solid rgba(255,255,255,.95);border-radius:12px;backdrop-filter:blur(8px)"><small style="opacity:.65">Comissão</small><span>R$ 610</span></div></div>'+
-          '<div class="bar2" style="background:rgba(255,255,255,.7)"><i style="background:linear-gradient(90deg,'+k+','+d+')"></i></div></div></div>';
-        if(e==='bold') return '<div class="mini m2" style="background:'+f+';color:#101114">'+menu(d,'#ffffff55','#fff',d,'99px')+
-          '<div class="ct2"><div class="t2" style="font-family:\'Space Grotesk\',sans-serif;font-size:15px;letter-spacing:-.04em;font-weight:700">Bom dia, '+n+'.</div><div class="cs2">'+
-          '<div class="c2" style="background:'+d+';color:#fff;border-radius:14px"><small style="opacity:.75">Vendas</small><span style="font-family:\'Space Grotesk\',sans-serif;font-size:11px">R$ 4.820</span></div>'+
-          '<div class="c2" style="background:#fff;border-radius:14px"><small style="opacity:.6">Comissão</small><span style="font-family:\'Space Grotesk\',sans-serif;font-size:11px">R$ 610</span></div></div>'+
-          '<div class="bar2" style="background:#10111414;height:7px"><i style="background:'+d+'"></i></div></div></div>';
-        return '<div class="mini m2" style="background:#F6F7F9;color:#111318">'+menu('#fff','#e3e6eb',d+'18',d,'4px','border-right:1px solid #E6E8EC')+
-          '<div class="ct2"><div class="t2">Bom dia, '+n+'.</div><div class="cs2">'+
-          '<div class="c2" style="background:#fff;border:1px solid #E6E8EC;box-shadow:inset 2px 0 0 '+d+';border-radius:5px"><small style="color:#5B6270">Vendas</small><span style="color:'+d+'">R$ 4.820</span></div>'+
-          '<div class="c2" style="background:#fff;border:1px solid #E6E8EC;border-radius:5px"><small style="color:#5B6270">Comissão</small><span>R$ 610</span></div></div>'+
-          '<div class="bar2" style="background:#EEF0F3"><i style="background:'+d+'"></i></div></div></div>';
+          '<div class="c2" style="background:rgba(255,255,255,.55);border:1px solid rgba(255,255,255,.95);border-radius:12px"><small style="opacity:.65">Vendas</small><span style="color:'+P+'">R$ 4.820</span></div>'+
+          '<div class="c2" style="background:rgba(255,255,255,.55);border:1px solid rgba(255,255,255,.95);border-radius:12px"><small style="opacity:.65">Comissão</small><span>R$ 610</span></div></div>'+
+          '<div style="display:flex;align-items:flex-end;gap:2px;height:22px">'+[8,12,9,15,11,18,14,20].map(function(h){return '<i style="flex:1;height:'+h+'px;border-radius:3px;background:linear-gradient('+P+','+D+')"></i>'}).join('')+'</div></div></div>';
+        if(e==='editorial') return '<div class="mini m2" style="background:'+F+';color:#1E1915">'+menu(E,'#ffffff40',D,E,'6px')+
+          '<div class="ct2"><div class="t2" style="font-family:\'Playfair Display\',Georgia,serif;font-size:12px;font-weight:700">Bom dia, <span style="color:'+P+'">'+n+'.</span></div><div class="cs2">'+
+          '<div class="c2" style="background:linear-gradient(145deg,'+E+','+P+');color:#fff;border-radius:10px"><small style="opacity:.75">Vendas</small><span>R$ 4.820</span></div>'+
+          '<div class="c2" style="background:#FFFDFA;border:1px solid '+S+';border-radius:10px"><small style="opacity:.6">Comissão</small><span>R$ 610</span></div></div>'+
+          '<div class="bar2" style="background:'+S+';height:6px"><i style="background:linear-gradient(90deg,'+E+','+P+','+D+')"></i></div></div></div>';
+        return '<div class="mini m2" style="background:#FAFAFB;color:#111318">'+menu('#fff','#e3e6eb',P+'1c',P,'5px','border-right:1px solid #ECEEF1')+
+          '<div class="ct2"><div class="t2">Bom dia, <span style="color:'+P+'">'+n+'.</span></div><div class="cs2">'+
+          '<div class="c2" style="background:#fff;border:1px solid #E8EAEE;border-radius:7px"><small style="color:#5B6270">Vendas</small><span>R$ 4.820</span></div>'+
+          '<div class="c2" style="background:#fff;border:1px solid #E8EAEE;border-radius:7px"><small style="color:#5B6270">Comissão</small><span>R$ 610</span></div></div>'+
+          linha(P,2)+'</div></div>';
       }
       function esc(s){return String(s).replace(/[&<>"]/g,function(x){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[x]})}
       var dE=document.createElement('div'); dE.className='item';
@@ -574,7 +575,7 @@ var CONFIG = {
       window.desenharPrevia=function(){
         var P2=perfil.painel;
         $('#qpEstilos').innerHTML=Object.keys(EST_P).map(function(e){return '<button type="button" class="est-op" data-v="'+e+'" aria-pressed="'+(P2.estilo===e)+'">'+mini(e,P2.cor)+'<b>'+EST_P[e]+'</b><small>'+DESC[e]+'</small></button>'}).join('');
-        $('#qpCores').innerHTML=Object.keys(COR_P).map(function(c){var a=CORV[c];return '<button type="button" class="chip cor-op" data-v="'+c+'" aria-pressed="'+(P2.cor===c)+'"><span class="bola" style="background:linear-gradient(135deg,'+a[0]+' 50%,'+a[1]+' 50%)"></span>'+COR_P[c]+'</button>'}).join('');
+        $('#qpCores').innerHTML=Object.keys(COR_P).map(function(c){var a=CORV[c];return '<button type="button" class="chip cor-op" data-v="'+c+'" aria-pressed="'+(P2.cor===c)+'"><span class="bola" style="background:linear-gradient(135deg,'+a[0]+' 33%,'+a[1]+' 33% 66%,'+a[2]+' 66%)"></span>'+COR_P[c]+'</button>'}).join('');
       };
       $('#qpEstilos').addEventListener('click',function(ev){var b=ev.target.closest('[data-v]'); if(!b) return; perfil.painel.estilo=b.dataset.v; gravar(KP,perfil); desenharPrevia(); atualizarPedidos();});
       $('#qpCores').addEventListener('click',function(ev){var b=ev.target.closest('[data-v]'); if(!b) return; perfil.painel.cor=b.dataset.v; gravar(KP,perfil); desenharPrevia(); atualizarPedidos();});
@@ -590,7 +591,7 @@ var CONFIG = {
       '- @ do TikTok: '+(tk||'(não informado)')+'\n'+
       '- Meta de vendas no mês: '+(meta?'R$ '+meta.toLocaleString('pt-BR'):'ainda não sei')+'\n'+
       '- Vídeos por dia: '+nVideos()+'\n'+
-      '- Estilo do painel: '+(EST_P[P.estilo]||'Modern Light')+'\n'+
+      '- Estilo do painel: '+(EST_P[P.estilo]||'Minimalista')+'\n'+
       '- Cor do painel: '+(COR_P[P.cor]||'Café')+'\n\n'+
       'Meu Supabase:\n'+
       '- URL do projeto: '+(P.supa_url||'(ainda não criei: me ensine)')+'\n'+
