@@ -921,7 +921,7 @@
     [...vids].sort((a, b) => ordemSt[a.status] - ordemSt[b.status]).forEach((v) => { if (!naAg.has(v.produto)) naAg.set(v.produto, []); naAg.get(v.produto).push(v.status); });
     const stPlano = (produto) => { const l = naAg.get(produto); return l && l.length ? l.shift() : ""; };
     const PLANO = `<div class="plano-hoje">
-        <div class="card"><div class="card-topo"><h2>Plano dos ${plano.N} vídeos de hoje</h2><span class="espaco"></span><button class="btn pequeno" type="button" data-acao="lancar-plano"${vids.length >= plano.N ? " disabled" : ""}>${vids.length ? "Completar o dia" : "Lançar no dia"}</button></div>
+        <div class="card"><div class="card-topo"><h2>Plano dos ${plano.N} vídeos de hoje</h2><span class="espaco"></span><button class="btn sec pequeno" type="button" data-acao="sug-copiar" data-dia="${hojeISO()}" title="Copia o plano para colar no Claude na hora de agendar">Copiar pro Claude</button><button class="btn pequeno" type="button" data-acao="lancar-plano"${vids.length >= plano.N ? " disabled" : ""}>${vids.length ? "Completar o dia" : "Lançar no dia"}</button></div>
           <div class="plano-colunas">${blocoPlano("Principais", plano.prin, plano.nP, stPlano)}${blocoPlano("Com vendas", plano.com, plano.nC, stPlano)}${blocoPlano("Testes", plano.testes, plano.nT, stPlano)}</div>
           <p class="frase">40% nos principais, 40% em produtos que já venderam (os que estão acelerando primeiro) e 20% em testes. Mude a meta de vídeos em Meu perfil.</p></div>
         <div class="card agenda-hoje"><div class="card-topo"><h2>Na agenda de hoje</h2>${vids.length ? `<span class="sub">${kv.resumo.replace(/^postados?/, `${kv.val} postados`)}</span>` : ""}<span class="espaco"></span><button class="link" type="button" data-tela="videos">Abrir Vídeos</button></div>
@@ -951,6 +951,20 @@
       return `<li class="${st === "postado" ? "feito" : ""}" title="${esc(x.produto)}"><span class="nome">${esc(x.produto)}</span><span>${st ? `<span class="st st-${st}">${ROT_ST[st]}</span>` : x.tag ? `<span class="selo ${x.tag === "Novo" ? "novo" : x.tag === "Acelerando" ? "sobe" : "alerta"}">${esc(x.tag)}</span>` : ""}</span></li>`; }).join("")}</ul>${falta > 0 ? `<p class="vazio">Faltam ${falta}: ${titulo === "Testes" ? "cadastre amostras em Amostras" : "importe mais pedidos ou escolha produtos novos"}.</p>` : ""}</div>`;
   }
   // Sugestão do dia: os N vídeos (meta de Meu perfil) divididos 40% principais, 40% com vendas, 20% testes
+  // Texto da Sugestão do dia para colar no Claude na hora de agendar (skill agendar-tiktok-shop)
+  function textoSugestao(dia) {
+    const sug = sugestaoDia(), ROT = { principal: "Principais", com_vendas: "Com vendas", teste: "Testes" };
+    const linhas = [`Sugestão do dia do meu painel, para ${dataBR(dia)} (${dia})`, `Vídeos por dia: ${sug.N}${sug.comecando ? " (começando: todos de teste)" : ` (${sug.nP} principais, ${sug.nC} com vendas, ${sug.nT} testes)`}`];
+    if (temContas() && !verTodos()) linhas.push(`Perfil do TikTok: ${nomeConta(S.conta)}`);
+    ["principal", "com_vendas", "teste"].forEach((b) => {
+      const l = sug.lista.filter((x) => x.bloco === b); if (!l.length) return;
+      const cont = new Map(); l.forEach((x) => { const c = cont.get(x.produto) || { n: 0, tag: x.tag }; c.n++; cont.set(x.produto, c); });
+      linhas.push("", ROT[b] + ":"); cont.forEach((c, nome) => linhas.push(`- ${nome}${c.n > 1 ? ` (${c.n} vídeos)` : ""}${c.tag ? ` [${c.tag}]` : ""}`));
+    });
+    const falta = sug.N - sug.lista.length; if (falta > 0) linhas.push("", `${falta === 1 ? "Falta 1" : `Faltam ${falta}`} para completar os ${sug.N}.`);
+    linhas.push("", "Agende os vídeos da minha pasta Para postar seguindo esta sugestão. Me avise o que falta editar.");
+    return linhas.join("\n");
+  }
   function sugestaoDia() {
     if (S.pedidos.length) { const an = analiseProdutos(), pl = planoDoDia(an, foco(an)); return { N: pl.N, lista: [...pl.prin, ...pl.com, ...pl.testes], nP: pl.nP, nC: pl.nC, nT: pl.nT, comecando: false }; }
     const pc = planoComecando(); return { N: pc.N, lista: pc.lista, nP: 0, nC: 0, nT: pc.N, comecando: true };
@@ -1151,7 +1165,7 @@
     const itens = lista.map((x, k) => { const tem = (naAgenda.get(x.produto) || 0) > 0; if (tem) naAgenda.set(x.produto, naAgenda.get(x.produto) - 1);
       return `<li class="${tem ? "ok" : ""}"><span class="n">${k + 1}</span><span class="hora">${horasSug[k] || "--:--"}</span><span class="prod" title="${esc(x.produto)}"><b>${esc(x.produto)}</b>${x.tag ? `<em>${esc(x.tag)}</em>` : ""}</span><span class="bl bl-${x.bloco}">${ROT[x.bloco] || "Teste"}</span>${tem ? '<span class="ja">na agenda</span>' : passado ? "" : `<button class="x mais" type="button" data-acao="sug-add" data-k="${k}" aria-label="Pôr na agenda" title="Pôr na agenda">+</button>`}</li>`; }).join("");
     const falta = sug.N - lista.length;
-    const cardSug = passado ? "" : `<div class="card sugestao-dia"><div class="card-topo"><h2>Sugestão do dia</h2><span class="sub">${sug.N} vídeos${sug.comecando ? " de teste" : ` · ${sug.nP} principais, ${sug.nC} com vendas, ${sug.nT} testes`}</span><span class="espaco"></span>${lista.length ? `<button class="btn pequeno" type="button" data-acao="sug-lancar">Lançar na agenda de ${S.diaVideos === hojeISO() ? "hoje" : dataBR(S.diaVideos)}</button>` : ""}</div>
+    const cardSug = passado ? "" : `<div class="card sugestao-dia"><div class="card-topo"><h2>Sugestão do dia</h2><span class="sub">${sug.N} vídeos${sug.comecando ? " de teste" : ` · ${sug.nP} principais, ${sug.nC} com vendas, ${sug.nT} testes`}</span><span class="espaco"></span>${lista.length ? `<button class="btn sec pequeno" type="button" data-acao="sug-copiar" data-dia="${S.diaVideos}" title="Copia a sugestão para colar no Claude na hora de agendar">Copiar pro Claude</button>` : ""}${lista.length ? `<button class="btn pequeno" type="button" data-acao="sug-lancar">Lançar na agenda de ${S.diaVideos === hojeISO() ? "hoje" : dataBR(S.diaVideos)}</button>` : ""}</div>
         ${lista.length ? `<ol class="sug-lista">${itens}</ol>` : '<p class="vazio">Ainda sem sugestão. Cadastre em Amostras os produtos que quer testar, ou importe seus pedidos.</p>'}
         ${falta > 0 && lista.length ? `<p class="frase">Faltam ${falta} para completar os ${sug.N}: ${sug.comecando ? "cadastre mais produtos para testar em Amostras" : "cadastre amostras (testes) ou importe mais pedidos"}.</p>` : ""}
         <p class="frase">A quantidade vem de "Vídeos por dia" em Meu perfil. Principais = o que mais te paga; com vendas = já vendeu e está subindo; testes = amostras e produtos novos.</p></div>`;
@@ -1733,6 +1747,7 @@ REGRAS: entregue tudo agora, sem fazer perguntas antes: o que faltar fica [entre
       else if (a === "fechar-lembrete") { marcarDia("painel-sem-lembrete"); irPara(S.tela, true); }
       else if (a === "desfazer-esgotado") { await marcarEsgotado(t.dataset.id, false); }
       else if (a === "lancar-plano") { t.disabled = true; await lancarPlano(); }
+      else if (a === "sug-copiar") { const txt = textoSugestao(t.dataset.dia || hojeISO()); try { await navigator.clipboard.writeText(txt); toast("Sugestão copiada. Cole no Claude junto com o pedido de agendar."); } catch (_) { const ta = document.createElement("textarea"); ta.value = txt; document.body.appendChild(ta); ta.select(); try { document.execCommand("copy"); toast("Sugestão copiada. Cole no Claude junto com o pedido de agendar."); } catch (__) { toast("Não consegui copiar.", true); } ta.remove(); } }
       else if (a === "sug-lancar") { t.disabled = true; await lancarPlano(S.diaVideos); }
       else if (a === "sug-add") { const x = (S._sug || [])[+t.dataset.k]; if (x) { t.disabled = true; await lancarPlano(S.diaVideos, [x]); } }
       else if (a === "status-video") {
