@@ -884,7 +884,8 @@
     const rotRef = ref === hoje ? "Hoje até agora" : ref === somaDias(hoje, -1) ? "Ontem" : "Último dia: " + dataBR(ref);
     const mod = modelo(), mesNome = MESES[+per.mes.slice(5, 7) - 1];
     const ic = (k) => `<span class="kpi-ic">${svgIc(k)}</span>`;
-    const kVid = `${ic("video")}<p class="rot">Vídeos de hoje</p><div class="val">${feitos} de ${plano.N}</div><div class="barra"><i style="width:${Math.min(100, feitos / plano.N * 100).toFixed(1)}%"></i></div><small>${vids.length ? `${plural(vids.length, "planejado", "planejados")}, ${plural(feitos, "agendado ou postado", "agendados ou postados")}` : "Nenhum vídeo planejado ainda."}</small>`;
+    const kv = kpiVideos(vids, plano.N);
+    const kVid = `${ic("video")}<p class="rot">Vídeos de hoje</p><div class="val">${kv.val}</div>${kv.barra}<small>${kv.resumo}</small>`;
     const KPIS = `<div class="grade g4 kpis">
         <div class="card kpi escuro">${ic("vendas")}<p class="rot">${rotRef}</p><div class="val">${real(tRef.g)}</div>${selo(tRef.g, tAntes.g)}<small>${plural(tRef.pedidos, "pedido", "pedidos")} · comissão ${real(tRef.c)}</small></div>
         <div class="card kpi">${ic("mes")}<p class="rot">Vendas no mês</p><div class="val">${real(tMes.g)}</div>${selo(tMes.g, tAnt.g)}<small>até o dia ${per.N}, contra o mesmo pedaço de ${MESES[+per.ant.slice(5, 7) - 1]}</small></div>
@@ -915,11 +916,15 @@
           <p class="frase">Vendeu metade ou menos que antes. Teste gancho novo ou troque por um da coluna do meio. Se for falta de estoque, toque em "esgotou?".</p>
           ${esgotados.length ? `<div class="esgotados"><p class="lbl">Esgotados · fora das sugestões</p>${esgotados.map((x) => `<span class="chip">${esc(x.nome)} <button class="link" type="button" data-acao="desfazer-esgotado" data-id="${esc(x.produto_id)}" aria-label="Voltar ${esc(x.nome)} para as sugestões">voltar</button></span>`).join("")}<p class="frase" style="margin-top:6px">Voltam sozinhos quando venderem de novo.</p></div>` : ""}</div>
       </div>`;
-    const PLANO = `<div class="grade g21">
+    // status de cada item do plano, pelo que já está na agenda de hoje (postado primeiro)
+    const naAg = new Map(), ordemSt = { postado: 0, agendado: 1, rascunho: 2 };
+    [...vids].sort((a, b) => ordemSt[a.status] - ordemSt[b.status]).forEach((v) => { if (!naAg.has(v.produto)) naAg.set(v.produto, []); naAg.get(v.produto).push(v.status); });
+    const stPlano = (produto) => { const l = naAg.get(produto); return l && l.length ? l.shift() : ""; };
+    const PLANO = `<div class="plano-hoje">
         <div class="card"><div class="card-topo"><h2>Plano dos ${plano.N} vídeos de hoje</h2><span class="espaco"></span><button class="btn pequeno" type="button" data-acao="lancar-plano"${vids.length >= plano.N ? " disabled" : ""}>${vids.length ? "Completar o dia" : "Lançar no dia"}</button></div>
-          ${blocoPlano("Principais", plano.prin, plano.nP)}${blocoPlano("Com vendas", plano.com, plano.nC)}${blocoPlano("Testes", plano.testes, plano.nT)}
+          <div class="plano-colunas">${blocoPlano("Principais", plano.prin, plano.nP, stPlano)}${blocoPlano("Com vendas", plano.com, plano.nC, stPlano)}${blocoPlano("Testes", plano.testes, plano.nT, stPlano)}</div>
           <p class="frase">40% nos principais, 40% em produtos que já venderam (os que estão acelerando primeiro) e 20% em testes. Mude a meta de vídeos em Meu perfil.</p></div>
-        <div class="card"><div class="card-topo"><h2>Na agenda de hoje</h2><span class="espaco"></span><button class="link" type="button" data-tela="videos">Abrir Vídeos</button></div>
+        <div class="card agenda-hoje"><div class="card-topo"><h2>Na agenda de hoje</h2>${vids.length ? `<span class="sub">${kv.resumo.replace(/^postados?/, `${kv.val} postados`)}</span>` : ""}<span class="espaco"></span><button class="link" type="button" data-tela="videos">Abrir Vídeos</button></div>
           ${vids.length ? `<ul class="dia-videos">${vids.map(linhaVideo).join("")}</ul>` : '<p class="vazio">Use "Lançar no dia" para criar a lista com horários.</p>'}</div>
       </div>`;
     // cada modelo organiza as mesmas peças do seu jeito
@@ -931,10 +936,19 @@
     };
     el.innerHTML = `<div class="hoje hoje-${mod}">` + cab + (lembreteManha() || avisoImport()) + cartaoInstalar() + (COMPOSICAO[mod] || COMPOSICAO.minimal).join("") + "</div>";
   }
-  function blocoPlano(titulo, l, n) {
+  // Vídeos de hoje: conta só os postados; agendado aparece à parte (na barra, mais claro)
+  function kpiVideos(vids, N) {
+    const pos = vids.filter((v) => v.status === "postado").length, ag = vids.filter((v) => v.status === "agendado").length, gr = vids.length - pos - ag;
+    const wP = Math.min(100, pos / N * 100), wA = Math.min(100 - wP, ag / N * 100);
+    const partes = [pos === 1 ? "postado" : "postados", ag ? plural(ag, "agendado", "agendados") : "", gr ? `${gr} a gravar` : ""].filter(Boolean);
+    return { val: `${pos} de ${N}`, barra: `<div class="barra dupla" title="${pos} postados, ${ag} agendados"><i style="width:${wP.toFixed(1)}%"></i><i class="ag" style="width:${wA.toFixed(1)}%"></i></div>`, resumo: vids.length ? partes.join(" · ") : "Nenhum vídeo planejado ainda." };
+  }
+  const ROT_ST = { postado: "Postado", agendado: "Agendado", rascunho: "A gravar" };
+  function blocoPlano(titulo, l, n, stDe) {
     if (!n) return "";
     const falta = n - l.length;
-    return `<div class="plano-bloco"><h3>${titulo} · ${n}</h3><ul class="lista-foco">${l.map((x) => `<li><span class="nome">${esc(x.produto)}</span><span>${x.tag ? `<span class="selo ${x.tag === "Novo" ? "novo" : x.tag === "Acelerando" ? "sobe" : "alerta"}">${esc(x.tag)}</span>` : ""}</span></li>`).join("")}</ul>${falta > 0 ? `<p class="vazio">Faltam ${falta}: ${titulo === "Testes" ? "cadastre amostras em Amostras" : "importe mais pedidos ou escolha produtos novos"}.</p>` : ""}</div>`;
+    return `<div class="plano-bloco"><h3>${titulo} · ${n}</h3><ul class="lista-foco">${l.map((x) => { const st = stDe ? stDe(x.produto) : "";
+      return `<li class="${st === "postado" ? "feito" : ""}" title="${esc(x.produto)}"><span class="nome">${esc(x.produto)}</span><span>${st ? `<span class="st st-${st}">${ROT_ST[st]}</span>` : x.tag ? `<span class="selo ${x.tag === "Novo" ? "novo" : x.tag === "Acelerando" ? "sobe" : "alerta"}">${esc(x.tag)}</span>` : ""}</span></li>`; }).join("")}</ul>${falta > 0 ? `<p class="vazio">Faltam ${falta}: ${titulo === "Testes" ? "cadastre amostras em Amostras" : "importe mais pedidos ou escolha produtos novos"}.</p>` : ""}</div>`;
   }
   // Sugestão do dia: os N vídeos (meta de Meu perfil) divididos 40% principais, 40% com vendas, 20% testes
   function sugestaoDia() {
@@ -1424,8 +1438,8 @@
           <div class="barra"><i style="width:${(nFeitos / PASSOS.length * 100).toFixed(1)}%"></i></div>
           <ul class="passos-lista">${PASSOS.map(([k, t], i) => `<li><button type="button" class="passo-item" data-acao="passo" data-k="${k}" aria-pressed="${!!feitos[k]}"><span class="pn">${feitos[k] ? "✓" : i + 1}</span><span>${esc(t)}</span></button></li>`).join("")}</ul>
           <p class="frase">Toque em cada passo quando terminar. Fica salvo no seu painel.</p></div>
-        <div class="card kpi"><p class="rot">Vídeos de hoje</p><div class="val">${vids.filter((v) => v.status !== "rascunho").length} de ${plano.N}</div>
-          <div class="barra"><i style="width:${Math.min(100, vids.filter((v) => v.status !== "rascunho").length / plano.N * 100).toFixed(1)}%"></i></div>
+        <div class="card kpi"><p class="rot">Vídeos de hoje</p><div class="val">${kpiVideos(vids, plano.N).val}</div>
+          ${kpiVideos(vids, plano.N).barra}<small style="display:block;margin-bottom:4px">${kpiVideos(vids, plano.N).resumo}</small>
           <small>Começando? Uma meta de 3 a 5 vídeos por dia já é ótima. <button class="link" type="button" data-tela="perfil">Mudar a meta</button></small></div>
       </div>
       <div class="grade g2">

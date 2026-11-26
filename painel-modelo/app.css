@@ -753,5 +753,23 @@ td select.sel-cat { min-width: 190px; max-width: 240px; }
 .sug-lista .prod b { display: block; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sug-lista .prod em { display: block; line-height: 1.2; margin-top: 1px; }
 
+/* Plano dos vídeos de hoje: 3 colunas, uma linha por produto, com o status da agenda */
+.plano-colunas { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 4px 18px; }
+.plano-colunas .lista-foco { gap: 6px; }
+.plano-colunas .lista-foco li { padding: 7px 10px; gap: 4px 8px; }
+.plano-colunas .lista-foco .nome { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; }
+.plano-colunas .st { cursor: default; padding: 3px 9px; font-size: 11px; white-space: nowrap; }
+.plano-colunas li.feito .nome { color: var(--muted); }
+/* barra de vídeos: postado cheio, agendado mais claro */
+.barra.dupla { display: flex; }
+.barra.dupla i { border-radius: 0; flex: none; }
+.barra.dupla i:first-child { border-radius: 999px 0 0 999px; }
+.barra.dupla i.ag { opacity: .4; border-radius: 0 999px 999px 0; }
+
+/* Hoje: plano e agenda um embaixo do outro, cada um usando a largura toda */
+.plano-hoje { display: flex; flex-direction: column; gap: 18px; }
+.agenda-hoje .dia-videos { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(380px, 100%), 1fr)); gap: 6px 14px; }
+.agenda-hoje .dia-videos .prod { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
 /* Site do aluno: sem "Criar conta" */
 .abas-entrada, #formCriar { display: none !important; }
