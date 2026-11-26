@@ -880,7 +880,7 @@
     const tRef = somar(entre(ref, ref)), tAntes = somar(entre(antes, antes));
     const per = periodo(ref.slice(0, 7)), tMes = somar(entre(per.ini, per.fim)), tAnt = somar(entre(per.iniAnt, per.fimAnt));
     const an = analiseProdutos(), f = foco(an), plano = planoDoDia(an, f);
-    const vids = S.videosHoje, feitos = vids.filter((v) => v.status !== "rascunho").length;
+    const vids = S.videosHoje, feitos = vids.filter((v) => stEf(v) !== "rascunho").length;
     const rotRef = ref === hoje ? "Hoje até agora" : ref === somaDias(hoje, -1) ? "Ontem" : "Último dia: " + dataBR(ref);
     const mod = modelo(), mesNome = MESES[+per.mes.slice(5, 7) - 1];
     const ic = (k) => `<span class="kpi-ic">${svgIc(k)}</span>`;
@@ -918,7 +918,7 @@
       </div>`;
     // status de cada item do plano, pelo que já está na agenda de hoje (postado primeiro)
     const naAg = new Map(), ordemSt = { postado: 0, agendado: 1, rascunho: 2 };
-    [...vids].sort((a, b) => ordemSt[a.status] - ordemSt[b.status]).forEach((v) => { if (!naAg.has(v.produto)) naAg.set(v.produto, []); naAg.get(v.produto).push(v.status); });
+    [...vids].sort((a, b) => ordemSt[stEf(a)] - ordemSt[stEf(b)]).forEach((v) => { if (!naAg.has(v.produto)) naAg.set(v.produto, []); naAg.get(v.produto).push(stEf(v)); });
     const stPlano = (produto) => { const l = naAg.get(produto); return l && l.length ? l.shift() : ""; };
     const PLANO = `<div class="plano-hoje">
         <div class="card"><div class="card-topo"><h2>Plano dos ${plano.N} vídeos de hoje</h2><span class="espaco"></span><button class="btn sec pequeno" type="button" data-acao="sug-copiar" data-dia="${hojeISO()}" title="Copia o plano para colar no Claude na hora de agendar">Copiar pro Claude</button><button class="btn pequeno" type="button" data-acao="lancar-plano"${vids.length >= plano.N ? " disabled" : ""}>${vids.length ? "Completar o dia" : "Lançar no dia"}</button></div>
@@ -938,10 +938,10 @@
   }
   // Vídeos de hoje: conta só os postados; agendado aparece à parte (na barra, mais claro)
   function kpiVideos(vids, N) {
-    const pos = vids.filter((v) => v.status === "postado").length, ag = vids.filter((v) => v.status === "agendado").length, gr = vids.length - pos - ag;
+    const pos = vids.filter((v) => stEf(v) === "postado").length, ag = vids.filter((v) => stEf(v) === "agendado").length, gr = vids.length - pos - ag;
     const wP = Math.min(100, pos / N * 100), wA = Math.min(100 - wP, ag / N * 100);
     const partes = [pos === 1 ? "postado" : "postados", ag ? plural(ag, "agendado", "agendados") : "", gr ? `${gr} a gravar` : ""].filter(Boolean);
-    return { val: `${pos} de ${N}`, barra: `<div class="barra dupla" title="${pos} postados, ${ag} agendados"><i style="width:${wP.toFixed(1)}%"></i><i class="ag" style="width:${wA.toFixed(1)}%"></i></div>`, resumo: vids.length ? partes.join(" · ") : "Nenhum vídeo planejado ainda." };
+    return { val: `${pos} de ${N}`, barra: `<div class="barra dupla" title="${pos} postados, ${ag} agendados">${wP > 0 ? `<i style="width:${wP.toFixed(1)}%"></i>` : ""}${wA > 0 ? `<i class="ag" style="width:${wA.toFixed(1)}%"></i>` : ""}</div>`, resumo: vids.length ? partes.join(" · ") : "Nenhum vídeo planejado ainda." };
   }
   const ROT_ST = { postado: "Postado", agendado: "Agendado", rascunho: "A gravar" };
   function blocoPlano(titulo, l, n, stDe) {
@@ -1149,7 +1149,14 @@
   }
 
   /* ---------- VÍDEOS ---------- */
-  const linhaVideo = (v) => `<li><span class="hora">${v.hora ? v.hora.slice(0, 5) : "--:--"}</span><span class="prod" title="${esc(v.produto)}">${esc(v.produto)}${v.bloco ? `<small>${{ principal: "Principal", com_vendas: "Com vendas", teste: "Teste" }[v.bloco]}</small>` : ""}</span><button class="st st-${v.status}" type="button" data-acao="status-video" data-id="${v.id}" title="Mudar status">${{ rascunho: "A gravar", agendado: "Agendado", postado: "Postado" }[v.status]}</button><button class="x" type="button" data-acao="apagar-video" data-id="${v.id}" aria-label="Apagar">×</button></li>`;
+  // Agendado que já passou da hora conta como postado (o TikTok publica sozinho; o painel não fica sabendo)
+  const stEf = (v) => {
+    if (v.status !== "agendado") return v.status;
+    const hoje = hojeISO(); if (v.data && v.data < hoje) return "postado";
+    if ((!v.data || v.data === hoje) && v.hora) { const d = new Date(), agora = String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); if (v.hora.slice(0, 5) <= agora) return "postado"; }
+    return "agendado";
+  };
+  const linhaVideo = (v) => `<li><span class="hora">${v.hora ? v.hora.slice(0, 5) : "--:--"}</span><span class="prod" title="${esc(v.produto)}">${esc(v.produto)}${v.bloco ? `<small>${{ principal: "Principal", com_vendas: "Com vendas", teste: "Teste" }[v.bloco]}</small>` : ""}</span><button class="st st-${stEf(v)}" type="button" data-acao="status-video" data-id="${v.id}" title="${stEf(v) !== v.status ? "Já passou da hora agendada. Toque para mudar" : "Mudar status"}">${{ rascunho: "A gravar", agendado: "Agendado", postado: "Postado" }[stEf(v)]}</button><button class="x" type="button" data-acao="apagar-video" data-id="${v.id}" aria-label="Apagar">×</button></li>`;
   async function telaVideos(el) {
     S.videosDia = await API.videos(S.diaVideos, S.diaVideos);
     const nomes = [...new Set(analiseProdutos().lista.map((x) => x.nome))];
@@ -1752,7 +1759,7 @@ REGRAS: entregue tudo agora, sem fazer perguntas antes: o que faltar fica [entre
       else if (a === "sug-add") { const x = (S._sug || [])[+t.dataset.k]; if (x) { t.disabled = true; await lancarPlano(S.diaVideos, [x]); } }
       else if (a === "status-video") {
         const lista = S.tela === "videos" ? S.videosDia : S.videosHoje, v = lista.find((x) => x.id === id); if (!v) return;
-        const prox = { rascunho: "agendado", agendado: "postado", postado: "rascunho" }[v.status];
+        const prox = { rascunho: "agendado", agendado: "postado", postado: "rascunho" }[stEf(v)];
         await API.mudarVideo(id, { status: prox }); v.status = prox;
         const h = S.videosHoje.find((x) => x.id === id); if (h) h.status = prox;
         irPara(S.tela);

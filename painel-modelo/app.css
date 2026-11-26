@@ -765,6 +765,7 @@ td select.sel-cat { min-width: 190px; max-width: 240px; }
 .barra.dupla i { border-radius: 0; flex: none; }
 .barra.dupla i:first-child { border-radius: 999px 0 0 999px; }
 .barra.dupla i.ag { opacity: .4; border-radius: 0 999px 999px 0; }
+.barra.dupla i.ag:first-child { border-radius: 999px; }
 
 /* Hoje: plano e agenda um embaixo do outro, cada um usando a largura toda */
 .plano-hoje { display: flex; flex-direction: column; gap: 18px; }
